@@ -1,24 +1,37 @@
-# AlphaZero implementation for Ray/RLlib
-## Notes
+![alt tag](doc/molMCTS.png)
 
-This code implements a one-player AlphaZero agent. It includes the "ranked rewards" (R2) strategy which simulates the self-play in the two-player AlphaZero in forcing the agent to be better than its previous self. R2 is also very helpful to normalize dynamically the rewards. 
+# LambdaZero is a universal method for molecule optimization (in progress)
+Library Includes:
+- RL Algorithms
+- Tools for dataset generation
+- Tools to design action space
 
-The code is Pytorch based. It assumes that the environment is a gym environment, has a discrete action space and returns an observation as a dictionary with two keys:
+## Install
+Make 
+Install dependencies
+Install torch geometric
+-- add a line to your profile
 
- - `obs` that contains an observation under either the form of a state vector or an image
- - `action_mask` that contains a mask over the legal actions
- 
- It should also implement a `get_state`and a `set_state` function.
- 
- The model used in AlphaZero trainer should extend `ActorCriticModel` and implement the method `compute_priors_and_value`. 
- 
-## Example on Cartpole
+## Getting started
+This is an actor critic model using ranked rewards
 
-Note that both mean and max rewards are obtained with the MCTS in exploration mode: dirichlet noise is added to priors and actions are sampled from the tree policy vectors. We will add later the display of the MCTS in exploitation mode: no dirichlet noise and actions are chosen as tree policy vectors argmax.
-![cartpole_plot](doc/cartpole_plot.png)
+Run RL algorithm
+   PPO, run Ape-X, Run AlphaZero
+
+Run Docking simulation in parallel
+
+Train MPNN on simulation data
+
+For more information see tutorials, and docs
+
+## Getting Involved
+ Google group
+ Slack community
+ Meetings schedule
+
 
 ## References
-
 - AlphaZero: https://arxiv.org/abs/1712.01815
 - Ranked rewards: https://arxiv.org/abs/1807.01672
-    
+
+
