@@ -8,10 +8,10 @@ from ray.rllib.optimizers import SyncSamplesOptimizer
 from ray.rllib.utils import try_import_tf, try_import_torch
 from ray.tune.registry import ENV_CREATOR, _global_registry
 
-from affinity_models.alpha_zero.core.alpha_zero_policy import AlphaZeroPolicy
-from affinity_models.alpha_zero.core.mcts import MCTS
-from affinity_models.alpha_zero.core.ranked_rewards import get_r2_env_wrapper
-from affinity_models.alpha_zero.optimizer.sync_batches_replay_optimizer import SyncBatchesReplayOptimizer
+from LambdaZero.core.alpha_zero_policy import AlphaZeroPolicy
+from LambdaZero.core.mcts import MCTS
+from LambdaZero.core.ranked_rewards import get_r2_env_wrapper
+from LambdaZero.optimizer.sync_batches_replay_optimizer import SyncBatchesReplayOptimizer
 
 tf = try_import_tf()
 torch, nn = try_import_torch()

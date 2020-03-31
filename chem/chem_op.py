@@ -6,12 +6,20 @@ from rdkit.Chem import BRICS
 from rdkit.Chem import Draw
 from rdkit.Chem import AllChem
 from rdkit.Chem.Scaffolds import MurckoScaffold
-import prody as pr
-from Bio import pairwise2
-from Bio.pairwise2 import affine_penalty
+
+from rdkit import rdBase
+from rdkit.Chem.rdchem import HybridizationType
+from rdkit import RDConfig
+from rdkit.Chem import ChemicalFeatures
+from rdkit.Chem.rdchem import BondType as BT
+rdBase.DisableLog('rdApp.error')
+
 import pandas as pd
 from rdkit import DataStructs
-import ray
+
+import torch as th
+from torch_geometric.data import (InMemoryDataset, download_url, extract_zip, Data)
+from torch_sparse import coalesce
 
 atomic_numbers = {"H":1,"He":2,"Li":3,"Be":4,"B":5,"C":6,"N":7,"O":8,"F":9,"Ne":10,"Na":11,"Mg":12,"Al":13,"Si":14,
                   "P":15, "S":16,"Cl":17,"Ar":18,"K":19,"Ca":20,"Sc":21,"Ti":22,"V":23,"Cr":24,"Mn":25,"Fe":26,"Co":27,
@@ -418,3 +426,97 @@ def get_fingerprint(smiles, radius=2,length=1024):
   arr = np.zeros((1,))
   DataStructs.ConvertToNumpyArray(fingerprint, arr)
   return pd.DataFrame({"fingerprint":[arr]})
+
+
+def onehot(arr,num_classes,dtype=np.int):
+    arr = np.asarray(arr,dtype=np.int)
+    assert len(arr.shape) ==1, "dims other than 1 not implemented"
+    onehot_arr = np.zeros(arr.shape + (num_classes,),dtype=dtype)
+    onehot_arr[np.arange(arr.shape[0]), arr] = 1
+    return onehot_arr
+
+def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
+    atomtypes = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
+    bondtypes = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
+
+    natm = len(mol.GetAtoms())
+    # featurize elements
+    atmfeat = pd.DataFrame(index=range(natm),columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic",
+                                                      "sp", "sp2", "sp3", "num_hs"])
+
+    # featurize
+    fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
+    factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
+    for i,atom in enumerate(mol.GetAtoms()):
+        type_idx = atomtypes.get(atom.GetSymbol(),5)
+        atmfeat["type_idx"][i] = onehot([type_idx], num_classes=len(atomtypes) + 1)[0]
+        atmfeat["atomic_number"][i] = atom.GetAtomicNum()
+        atmfeat["aromatic"][i] = 1 if atom.GetIsAromatic() else 0
+        hybridization = atom.GetHybridization()
+        atmfeat["sp"][i] = 1 if hybridization == HybridizationType.SP else 0
+        atmfeat["sp2"][i] = 1 if hybridization == HybridizationType.SP2 else 0
+        atmfeat["sp3"][i] = 1 if hybridization == HybridizationType.SP3 else 0
+        atmfeat["num_hs"][i] = atom.GetTotalNumHs(includeNeighbors=True)
+
+    # get donors and acceptors
+    atmfeat["acceptor"].values[:] = 0
+    atmfeat["donor"].values[:] = 0
+    feats = factory.GetFeaturesForMol(mol)
+    for j in range(0, len(feats)):
+         if feats[j].GetFamily() == 'Donor':
+             node_list = feats[j].GetAtomIds()
+             for k in node_list:
+                 atmfeat["donor"][k] = 1
+         elif feats[j].GetFamily() == 'Acceptor':
+             node_list = feats[j].GetAtomIds()
+             for k in node_list:
+                 atmfeat["acceptor"][k] = 1
+    # get coord
+    if ifcoord:
+        coord = np.asarray([mol.GetConformer(0).GetAtomPosition(j) for j in range(natm)])
+    else:
+        coord = None
+    # get bonds and bond features
+    bond = np.asarray([[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()] for bond in mol.GetBonds()])
+    bondfeat = [bondtypes[bond.GetBondType()] for bond in mol.GetBonds()]
+    bondfeat = onehot(bondfeat,num_classes=len(bondtypes))
+
+    # convert atmfeat to numpy matrix
+    if not panda_fmt:
+        type_idx = np.stack(atmfeat["type_idx"].values,axis=0)
+        atmfeat = atmfeat[["atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3","num_hs"]]
+        atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
+    return atmfeat, coord, bond, bondfeat
+
+def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
+    "convert to PyTorch geometric module"
+    natm = atmfeat.shape[0]
+    # transform to torch_geometric bond format; send edges both ways; sort bonds
+    atmfeat = th.tensor(atmfeat, dtype=th.float32)
+    edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
+    edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
+    edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    # make torch data
+    if coord is not None:
+        coord = th.tensor(coord,dtype=th.float32)
+        data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+    else:
+        data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+    return data
+
+def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
+    "mol to graph convertor"
+    mol = build_mol(smiles, num_conf=num_conf, noh=noh)["mol"].to_list()[0]
+    if feat == "mpnn":
+        atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
+    else:
+        raise NotImplementedError(feat)
+    props = {}
+    if dockscore is not None:
+        props["dockscore"] = dockscore
+    if gridscore is not None:
+        props["gridscore"] = gridscore
+    if klabel is not None:
+        props["klabel"] = klabel
+    graph = mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props)
+    return graph

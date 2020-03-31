@@ -2,35 +2,17 @@ import socket, time, os.path as osp
 from copy import deepcopy
 from ray.rllib.agents.trainer import with_base_config
 from ray.rllib.utils import merge_dicts
-from affinity_models.rl_molecule.rlmol.env import MolMDP, QEDReward, PredDockReward
-from affinity_models.alpha_zero.environments.molecule import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnv_v5
-from affinity_models.alpha_zero.core.alpha_zero_trainer import AlphaZeroTrainer
+
+from LambdaZero.environments.molecule import MolMDP, QEDReward, PredDockReward
+from LambdaZero.environments.molecule import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnv_v5
+from LambdaZero.core.alpha_zero_trainer import AlphaZeroTrainer
+
+
 from ray.rllib.agents.dqn import ApexTrainer
 from ray.rllib.agents.a3c import A3CTrainer
 from ray.rllib.agents.dqn import DQNTrainer
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.impala import ImpalaTrainer
-
-# todo: solitary agents that don't need the reward
-# todo: exponential reward for docking (instead of linear) (should not matter much)
-# todo: exact squre loss setup of actor / critic. Maybe, critic needs to be upweighted due to the large number of actions
-
-# todo: Murcko's article raises a valid concern - how similar are my molecules to the molecules in the training set
-# I need to make sure my split is very good and the dataset and the network is large
-# bad losses would decay my result by an enormous amount here I need something other than L2 loss
-# ordering loss Pratik suggested I also need a validation
-
-# todo: Ape-X baseline
-# todo: try randomizing starts (start with a molecule)
-# todo: async optimizer
-
-# todo: there might be the point in agents being different from each other (while the common objective is optimized)
-# IE: the population of agents (agent state is a sample from some complex distribution)
-
-# todo: allow pick bond (25 actions) or add group (105 actions)
-# todo: config with RNN
-# todo: try scaled rewards and cross entropy instead of ranked rewards as in muZero
-# todo: scale with the number of steps as in muZero
 
 def dock_metrics(info):
     "report custom metrics"

@@ -8,6 +8,21 @@ from rdkit import Chem
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
+
+import torch as th
+import torch_geometric.transforms as T
+from torch_geometric.data import Batch
+from rdkit import DataStructs
+#from affinity_torch import inputs
+#from affinity_torch.py_tools import chem
+from rdkit import Chem
+from rdkit.Chem import QED
+
+import torch.nn.functional as F
+from torch.nn import Sequential, Linear, ReLU, GRU
+from torch_geometric.nn import NNConv, Set2Set
+from torch_geometric.utils import remove_self_loops
+
 from .. import chem
 
 
@@ -541,3 +556,162 @@ class BlockMolEnv_dummy:
     def get_state(self):
         molecule = {"nsteps": self.nsteps}
         return molecule, self.reward
+
+
+
+class QEDReward:
+    def __init__(self):
+        pass
+    def __call__(self, molecule, done, num_steps):
+        mol = molecule.mol
+        if mol is None:
+            return 0.0, {"discounted_reward": 0.0, "QED": 0.0}
+        qed = QED.qed(mol)
+        if done:
+            discounted_reward = qed
+        else:
+            discounted_reward = 0.0
+
+        return discounted_reward, {"discounted_reward": discounted_reward, "QED": qed}
+
+
+
+class MorganDistReward:
+    def __init__(self, target, fp_len, fp_radius, limit_atoms):
+        self.fp_len, self.fp_radius = fp_len, fp_radius
+        self.limit_atoms = limit_atoms
+        target = Chem.MolFromSmiles(target)
+        self.target_fp = chem.AllChem.GetMorganFingerprintAsBitVect(target, self.fp_radius, self.fp_len)
+    def __call__(self, molecule, done, num_steps):
+        mol = molecule.mol
+        if mol is not None:
+            natm = mol.GetNumAtoms()
+            fp = chem.AllChem.GetMorganFingerprintAsBitVect(mol, self.fp_radius, self.fp_len)
+            reward = DataStructs.DiceSimilarity(self.target_fp, fp)
+            if natm < self.limit_atoms[0]:
+                discounted_reward = reward
+            else:
+                natm_discount = max(0.0, self.limit_atoms[1] - natm) / (self.limit_atoms[1] - self.limit_atoms[0])
+                discounted_reward = reward * natm_discount
+        else:
+            reward, discounted_reward = 0.0, 0.0
+        return reward, discounted_reward
+
+
+class Complete(object):
+    def __call__(self, data):
+        device = data.edge_index.device
+        row = th.arange(data.num_nodes, dtype=th.long, device=device)
+        col = th.arange(data.num_nodes, dtype=th.long, device=device)
+        row = row.view(-1, 1).repeat(1, data.num_nodes).view(-1)
+        col = col.repeat(data.num_nodes)
+        edge_index = th.stack([row, col], dim=0)
+
+        edge_attr = None
+        if data.edge_attr is not None:
+            idx = data.edge_index[0] * data.num_nodes + data.edge_index[1]
+            size = list(data.edge_attr.size())
+            size[0] = data.num_nodes * data.num_nodes
+            edge_attr = data.edge_attr.new_zeros(size)
+            edge_attr[idx] = data.edge_attr
+
+        edge_index, edge_attr = remove_self_loops(edge_index, edge_attr)
+        data.edge_attr = edge_attr
+        data.edge_index = edge_index
+        return data
+
+class MPNNet(th.nn.Module):
+    def __init__(self, num_feat=14, dim=64):
+        super(MPNNet, self).__init__()
+        self.lin0 = th.nn.Linear(num_feat, dim)
+
+        nn = Sequential(Linear(4, 128), ReLU(), Linear(128, dim * dim))
+        self.conv = NNConv(dim, dim, nn, aggr='mean')
+        self.gru = GRU(dim, dim)
+
+        self.set2set = Set2Set(dim, processing_steps=3)
+        self.lin1 = th.nn.Linear(2 * dim, dim)
+        self.lin2 = th.nn.Linear(dim, 1)
+
+    def forward(self, data):
+        out = F.relu(self.lin0(data.x))
+        h = out.unsqueeze(0)
+
+        for i in range(3):
+            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+            out, h = self.gru(m.unsqueeze(0), h)
+            out = out.squeeze(0)
+
+        out = self.set2set(out, data.batch)
+        out = F.relu(self.lin1(out))
+        out = self.lin2(out)
+        return out.view(-1)
+
+class PredDockReward:
+    def __init__(self, load_model, natm_cutoff, qed_cutoff, soft_stop, exp, delta, simulation_cost, device,
+                 transform=T.Compose([Complete()])):
+
+        self.natm_cutoff = natm_cutoff
+        self.qed_cutoff = qed_cutoff
+        self.soft_stop = soft_stop
+        self.exp = exp
+        self.delta = delta
+        self.simulation_cost = simulation_cost
+        self.device = device
+        self.transform = transform
+
+        self.net = MPNNet()
+        self.net.to(device)
+        self.net.load_state_dict(th.load(load_model, map_location=th.device(device)))
+        self.net.eval()
+
+    def reset(self):
+        self.previous_reward = 0.0
+
+    def _discount(self, mol, reward):
+        # num atoms constraint
+        natm = mol.GetNumAtoms()
+        natm_discount = (self.natm_cutoff[1] - natm) / (self.natm_cutoff[1] - self.natm_cutoff[0])
+        natm_discount = min(max(natm_discount, 0.0), 1.0) # relu to maxout at 1
+
+        # QED constraint
+        qed = QED.qed(mol)
+        qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
+        qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
+        disc_reward = min(reward, reward * natm_discount * qed_discount) # don't appy to negative rewards
+        if self.exp is not None: disc_reward = self.exp ** disc_reward
+
+        # delta reward
+        delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
+        self.previous_reward = disc_reward
+        if self.delta: disc_reward = delta_reward
+        return disc_reward, qed
+
+    def _simulation(self, molecule):
+        mol = molecule.mol
+        if (mol is not None) and (len(molecule.jbonds) > 0):
+            atmfeat, _, bond, bondfeat = chem.mpnn_feat(mol, ifcoord=False)
+            graph = chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
+            graph = self.transform(graph)
+            batch = Batch.from_data_list([graph]).to(self.device)
+            pred = self.net(batch)
+            reward = -float(pred.detach().cpu().numpy())
+        else:
+            reward = None
+        return reward
+
+    def __call__(self, molecule, simulate, env_stop, num_steps):
+        if self.soft_stop:
+            simulate = simulate or env_stop
+        else:
+            simulate = simulate
+
+        if simulate:
+            reward = self._simulation(molecule)
+            if reward is not None:
+                discounted_reward, qed = self._discount(molecule.mol, reward)
+            else:
+                reward, discounted_reward, qed = -0.5, -0.5, -0.5
+        else:
+            reward, discounted_reward, qed = 0.0, 0.0, 0.0
+        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed}
