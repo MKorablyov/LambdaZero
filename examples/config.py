@@ -233,7 +233,7 @@ def get_config(config_name):
     if memory in config.keys(): memory = config.pop("memory")
     return trainer, config, memory, summaries_dir, checkpoint_freq
 
-cfg000 = { # killed OOM
+az000 = { # killed OOM
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "sample_batch_size": 128,
@@ -251,131 +251,131 @@ cfg000 = { # killed OOM
                     },
 }
 
-cfg001 = { # killed OOM
+az001 = { # killed OOM
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
 }
 
-cfg002 = { # max 3.2
+az002 = { # max 3.2
     "mcts_config": {
         "num_simulations": 30
     }
 }
 
-cfg003 = { # max 3.4
+az003 = { # max 3.4
     "mcts_config": {
         "num_simulations": 90
     }
 }
 
-cfg004 = { # killed
+az004 = { # killed
     "mcts_config": {
         "num_simulations": 270
     }
 }
 
-cfg005 = { # killed
+az005 = { # killed
     "mcts_config": {
         "num_simulations": 1600
     }
 }
 
-cfg006 = {
+az006 = {
     "mcts_config": { # max 1.8
         "dirichlet_epsilon": 0.000020,
         "dirichlet_noise": 0.00003,
     }
 }
 
-cfg007 = {
+az007 = {
     "mcts_config": { # max 2.1
         "dirichlet_epsilon": 0.00020,
         "dirichlet_noise": 0.003,
     }
 }
 
-cfg008 = { # max 2.4
+az008 = { # max 2.4
     "mcts_config": {
         "dirichlet_epsilon": 0.006,
         "dirichlet_noise": 0.0009}
 }
 
-cfg009 = { # max 2.5
+az009 = { # max 2.5
     "mcts_config": {
         "dirichlet_epsilon": 0.060,
         "dirichlet_noise": 0.009,
     }
 }
 
-cfg010 = { # max 2.6, climbing
+az010 = { # max 2.6, climbing
     "ranked_rewards": {
         "percentile": 60,
     }
 }
 
-cfg011 = { # max 2.2 climbing
+az011 = { # max 2.2 climbing
     "ranked_rewards": {
         "percentile": 55,
     }
 }
 
-cfg012 = { # 2.9 climbing
+az012 = { # 2.9 climbing
     "lr":3e-3
 }
 
-cfg013 = { # 2.5 climbing
+az013 = { # 2.5 climbing
     "lr":3e-4
 }
 
-cfg014 = { # max 2.9 climbing
+az014 = { # max 2.9 climbing
     "num_sgd_iter": 3
 }
 
-cfg015 = { # max 3.0 climbing
+az015 = { # max 3.0 climbing
     "num_sgd_iter": 9
 }
 
-cfg016 = { #.2.2 climbing
+az016 = { #.2.2 climbing
     "env_config": {"obs_config":
         {"mol_fp_len": 1024,
             "stem_fp_len":128}}
 }
 
-cfg017 = { # 2.4 climbing
+az017 = { # 2.4 climbing
     "env_config": {"obs_config":
         {"mol_fp_len": 1024,
             "stem_fp_len": 256}}
 }
 
-cfg018 = {
+az018 = {
     "env_config": {"reward_config": {"soft_stop": False}}
 }
 
-cfg019 = {
+az019 = {
     "env_config": {"max_steps": 5}
 }
 
-cfg020 = {
+az020 = {
     "env_config": {"max_steps": 9}
 }
 
 
-cfg021 = {
+az021 = {
     "env_config": {"random_steps": 0}
 }
 
-cfg022 = {
+az022 = {
     "env_config": {"random_steps": 1}
 }
 
 
-cfg023 = {
+az023 = {
     "ranked_rewards": {
         "percentile": 60,
     }
 }
 
-cfg024 = {
+az024 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "ranked_rewards": {
@@ -383,31 +383,31 @@ cfg024 = {
     }
 }
 
-cfg025 = {
+az025 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "lr":3e-3
 }
 
-cfg026 = {
+az026 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "lr":3e-4
 }
 
-cfg027 = {
+az027 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3
 }
 
-cfg028 = {
+az028 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 9
 }
 
-cfg029 = {
+az029 = {
     # eval max      3.2
     # eval mean     1.68
     # max           3.3
@@ -418,7 +418,7 @@ cfg029 = {
 }
 
 
-cfg030 = {
+az030 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -427,7 +427,7 @@ cfg030 = {
     }
 }
 
-cfg031 = {
+az031 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 9,
@@ -436,7 +436,7 @@ cfg031 = {
     }
 }
 
-cfg032 = {
+az032 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "lr":3e-4,
@@ -446,7 +446,7 @@ cfg032 = {
     }
 }
 
-cfg033 = {
+az033 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "lr":3e-4,
@@ -457,7 +457,7 @@ cfg033 = {
 }
 
 
-cfg034 = {
+az034 = {
     # eval max      3.1
     # eval mean     2.7
     # eval mean     2.8
@@ -470,14 +470,14 @@ cfg034 = {
     "env_config":{"allow_removal":True}
 }
 
-cfg035 = {
+az035 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 9,
     "env_config":{"allow_removal":True}
 }
 
-cfg036 = {
+az036 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "ranked_rewards": {
@@ -486,7 +486,7 @@ cfg036 = {
     "env_config":{"allow_removal":True}
 }
 
-cfg037 = {
+az037 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "ranked_rewards": {
@@ -496,21 +496,21 @@ cfg037 = {
 }
 
 
-cfg038 = {
+az038 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
     "env_config":{"allow_removal":True, "random_steps": 3}
 }
 
-cfg039 = {
+az039 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 9,
     "env_config":{"allow_removal":True, "random_steps": 3}
 }
 
-cfg040 = {
+az040 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "ranked_rewards": {
@@ -519,7 +519,7 @@ cfg040 = {
     "env_config":{"allow_removal":True, "random_steps": 3}
 }
 
-cfg041 = {
+az041 = {
     # the copy of 34
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
@@ -528,7 +528,7 @@ cfg041 = {
                   "allow_removal":True}
 }
 
-cfg042 = {
+az042 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -538,7 +538,7 @@ cfg042 = {
         "allow_removal": True}
 }
 
-cfg043 = {
+az043 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -549,7 +549,7 @@ cfg043 = {
         }
 }
 
-cfg044 = {
+az044 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -559,7 +559,7 @@ cfg044 = {
                   "allow_removal":True}
 }
 
-cfg045 = {
+az045 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -570,7 +570,7 @@ cfg045 = {
                   "allow_removal":True}
 }
 
-cfg046 = {
+az046 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -582,7 +582,7 @@ cfg046 = {
 }
 
 
-cfg047 = {
+az047 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -592,7 +592,7 @@ cfg047 = {
                   "allow_removal":True}
 }
 
-cfg048 = {
+az048 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -604,7 +604,7 @@ cfg048 = {
         "allow_removal": True}
 }
 
-cfg049 = {
+az049 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -617,7 +617,7 @@ cfg049 = {
         }
 }
 
-cfg050 = {
+az050 = {
     "base_env_config": mol_blocks_v3_config,
     "base_trainer_config": alphazero_config,
     "num_sgd_iter": 3,
@@ -828,13 +828,6 @@ ppo020 = {
         "max_steps": 10,
     }
 }
-
-
-
-
-
-
-
 
 
 apex001 = {

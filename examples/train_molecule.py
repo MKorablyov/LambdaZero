@@ -7,7 +7,7 @@ from LambdaZero.models.custom_torch_models import MolActorCritic_thv1
 from LambdaZero.models.custom_tf_models import MolActorCritic_tfv1
 from LambdaZero.examples.config import get_config, alphazero_config
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo001" # "ppo001"
+else: config_name = "ppo001" # "apex001"
 
 trainer, config, memory, summaries_dir, checkpoint_freq = get_config(config_name)
 print("starting with config:", config_name)
