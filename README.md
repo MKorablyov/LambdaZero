@@ -30,6 +30,23 @@ conda install -c conda-forge rdkit
 # install misc
 conda install -c anaconda pandas
 pip install psutil
+
+# install datasets
+cd ~/Datasets
+git clone https://github.com/MKorablyov/fragdb 	        # fragments to use in the scoring function
+git clone https://github.com/MKorablyov/brutal_dock     # pretrained message passing NN to predict docking energy
+
+# install 3rd party binaries
+cd ~/Programs
+# chimera is used for conversion between molecule formats and for visualization
+# https://www.cgl.ucsf.edu/chimera/
+git clone https://github.com/MKorablyov/chimera
+# dock6 is a software the predicts energy of binding of the drug and protein
+# http://dock.compbio.ucsf.edu/DOCK_6/index.html
+git clone https://github.com/MKorablyov/dock6
+
+# perform postclone instructions described at git clone https://github.com/MKorablyov/chimera
+
 ```
 
 ## Getting started
