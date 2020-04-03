@@ -31,14 +31,24 @@ pip install https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-
 # Install the pip packages
 pip install psutil torch-geometric ray[rllib]
 
+pip install -e .
 
-# Setup LambdaZero for import
-PYTHON_BIN=`which python`
-TMP=`dirname "$PYTHON_BIN"`
-ENV_DIR=`dirname "$TMP"`
-LZ_PATH=`dirname "$0"`
+mkdir -p Datasets
+cd Datasets
+git clone --depth 1 https://github.com/MKorablyov/fragdb
+git clone --depth 1 https://github.com/MKorablyov/brutal_dock
+cd ..
 
-
-ln -s `realpath "$LZ_PATH"` "$ENV_DIR/lib/python3.6/site-packages/LambdaZero"
+mkdir -p Programs
+cd Programs
+git clone --depth 1 https://github.com/MKorablyov/dock6
+git clone --depth 1 https://github.com/MKorablyov/chimera tmp
+cd tmp
+cat xaa xab > chimera.bin
+chmod 755 chimera.bin
+echo '../chimera' | ./chimera.bin
+cd ..
+rm -rf tmp
+cd ..
 
 echo "Use \"conda activate $1\" to activate the conda environement."
