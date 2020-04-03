@@ -14,6 +14,12 @@ from ray.rllib.agents.dqn import DQNTrainer
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.impala import ImpalaTrainer
 
+ROOT = osp.expanduser("~")
+datasets_dir = osp.join(ROOT, "Datasets")
+programs_dir = osp.join(ROOT, "Programs")
+summaries_dir = osp.join(ROOT, "model_summaries/ray")
+
+
 def dock_metrics(info):
     "report custom metrics"
     env_info = list(info["episode"]._agent_to_last_info.values())[0]
@@ -24,13 +30,6 @@ def dock_metrics(info):
 
 def mol_blocks_v3_config():
     machine = socket.gethostname()
-    if machine == "Ikarus":
-        datasets_dir = "/home/maksym/Datasets"
-        programs_dir = "/home/maksym/Programs"
-    else:
-        datasets_dir = "/home/mkkr/scratch/Datasets"
-        programs_dir = "/home/mkkr/Programs"
-
     obs_config = {"mol_fp_len": 512,
                   "mol_fp_radiis": [3],
                   "stem_fp_len": 64,
@@ -71,13 +70,6 @@ def mol_blocks_v3_config():
 
 def mol_blocks_v4_config():
     machine = socket.gethostname()
-    if machine == "Ikarus":
-        datasets_dir = "/home/maksym/Datasets"
-        programs_dir = "/home/maksym/Programs"
-    else:
-        datasets_dir = "/home/mkkr/scratch/Datasets"
-        programs_dir = "/home/mkkr/Programs"
-
     obs_config = {"mol_fp_len": 512,
                   "mol_fp_radiis": [3],
                   "stem_fp_len": 64,
@@ -219,18 +211,15 @@ def apex_config():
 
 def get_config(config_name):
     machine = socket.gethostname()
-    if machine == "Ikarus":
-        summaries_dir = "/home/maksym/model_summaries/ray"
-    else:
-        summaries_dir = "/home/mkkr/scratch/model_summaries/ray"
     config = deepcopy(eval(config_name))
     base_env_config = config.pop("base_env_config")()
-    trainer, base_trainer_config, memory, checkpoint_freq = config.pop("base_trainer_config")()
+    trainer, base_trainer_config, memory, checkpoint_freq = config.pop("base_trainer_config")()  
 
     assert not bool(set(base_env_config.keys()) & set(base_trainer_config.keys())), "default configs overlap"
     base_config = merge_dicts(base_env_config, base_trainer_config)
     config = merge_dicts(base_config, config)
     if memory in config.keys(): memory = config.pop("memory")
+  
     return trainer, config, memory, summaries_dir, checkpoint_freq
 
 az000 = { # killed OOM
