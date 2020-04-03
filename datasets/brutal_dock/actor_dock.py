@@ -1,13 +1,12 @@
 import os, time, socket, os.path as osp
 import numpy as np
-from affinity_models.alpha_zero.environments.molecule import BlockMolEnv_v3
-from affinity_models.rl_molecule.rlmol.env import MolMDP, QEDReward, PredDockReward
+from LambdaZero.environments.molecule import BlockMolEnv_v3, MolMDP, QEDReward, PredDockReward
 from copy import deepcopy
 import ray
 import os, sys
-from affinity_models.alpha_zero.examples.config import mol_blocks_v4_config
+from LambdaZero.examples.config import mol_blocks_v4_config
 from rdkit import Chem
-from affinity_torch.py_tools.chem import Dock_smi
+from LambdaZero.chem import Dock_smi
 import pandas as pd
 
 def exhaustive_subs(env, env_config):
