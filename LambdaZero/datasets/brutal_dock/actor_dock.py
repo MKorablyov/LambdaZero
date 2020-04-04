@@ -44,20 +44,15 @@ class Empty:
 
 class cfg:
     # temp
-    machine = socket.gethostname()
-    if machine == "Ikarus":
-        datasets_dir = "/home/maksym/Datasets"
-        programs_dir = "/home/maksym/Programs"
-        num_cpus = 8
-    else:
-        datasets_dir = "/home/mkkr/scratch/Datasets"
-        programs_dir = "/home/mkkr/Programs"
-        num_cpus = 8
+    ROOT = osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))
+    datasets_dir = osp.join(ROOT, "Datasets")
+    programs_dir = osp.join(ROOT, "Programs")
+    num_cpus = 8
 
     db_name = "actor_dock"
-    db_path = os.path.join(datasets_dir, db_name)
-    results_dir = os.path.join(datasets_dir, db_name, "results")
-    dock_dir = os.path.join(datasets_dir, db_name, "dock")
+    db_path = osp.join(datasets_dir, db_name)
+    results_dir = osp.join(datasets_dir, db_name, "results")
+    dock_dir = osp.join(datasets_dir, db_name, "dock")
 
     # env
     env_config = mol_blocks_v4_config()["env_config"]
@@ -66,9 +61,9 @@ class cfg:
     env_config["obs"] = Empty
 
     # docking parameters
-    dock6_dir = os.path.join(programs_dir, "dock6")
-    chimera_dir = os.path.join(programs_dir, "chimera")
-    docksetup_dir = os.path.join(datasets_dir, "brutal_dock/d4/docksetup")
+    dock6_dir = osp.join(programs_dir, "dock6")
+    chimera_dir = osp.join(programs_dir, "chimera")
+    docksetup_dir = osp.join(datasets_dir, "brutal_dock/d4/docksetup")
 
 
 if __name__ == "__main__":

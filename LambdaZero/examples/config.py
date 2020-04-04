@@ -14,7 +14,8 @@ from ray.rllib.agents.dqn import DQNTrainer
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.impala import ImpalaTrainer
 
-ROOT = osp.expanduser("~")
+# These paths assume that you used the install-[cg]pu.sh script in the root folder.
+ROOT = osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))
 datasets_dir = osp.join(ROOT, "Datasets")
 programs_dir = osp.join(ROOT, "Programs")
 summaries_dir = osp.join(ROOT, "model_summaries/ray")
