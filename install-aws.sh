@@ -33,22 +33,4 @@ pip install psutil torch-geometric ray[rllib]
 
 pip install -e .
 
-mkdir -p Datasets
-cd Datasets
-git clone --depth 1 https://github.com/MKorablyov/fragdb
-git clone --depth 1 https://github.com/MKorablyov/brutal_dock
-cd ..
-
-mkdir -p Programs
-cd Programs
-git clone --depth 1 https://github.com/MKorablyov/dock6
-git clone --depth 1 https://github.com/MKorablyov/chimera tmp
-cd tmp
-cat xaa xab > chimera.bin
-chmod 755 chimera.bin
-echo '../chimera' | ./chimera.bin
-cd ..
-rm -rf tmp
-cd ..
-
 echo "Use \"conda activate $1\" to activate the conda environement."
