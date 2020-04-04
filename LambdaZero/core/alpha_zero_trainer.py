@@ -28,8 +28,10 @@ def on_episode_start(info):
 # yapf: disable
 # __sphinx_doc_begin__
 DEFAULT_CONFIG = with_common_config({
+    # Use pytorch
+    "use_pytorch": True,
     # Size of batches collected from each worker
-    "sample_batch_size": 200,
+    "rollout_fragment_length": 200,
     # Number of timesteps collected for each SGD round
     "train_batch_size": 4000,
     # Total SGD batch size across all devices for SGD
