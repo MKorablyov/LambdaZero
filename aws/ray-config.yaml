@@ -70,12 +70,16 @@ auth:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 head_node:
-    InstanceType: m5.large
-    #ImageId: ami-05931d11d2bf831c3 # Deep Learning AMI (Ubuntu) Version 24.3
-    ImageId: ami-0dbb717f493016a1a
+    InstanceType: m5.24xlarge
+    #ImageId: ami-0dbb717f493016a1a
+    ImageId: ami-0dca5a27e7adb8c0b
     SubnetIds:
-     - subnet-08b029af65be5bd96
-     - subnet-0ccbd383eac457d38
+     - subnet-0acad998b2f6fa54a
+     - subnet-05e2f01382fc77a2d
+     - subnet-08ce821a820f36705
+     - subnet-020042f567b8cc4a7
+     - subnet-0f8810f5729329669
+     - subnet-0d2d97d3e5e60336b
 
     # You can provision additional disk space with a conf as follows
     #BlockDeviceMappings:
@@ -90,19 +94,23 @@ head_node:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
-    InstanceType: c5.xlarge
-    #ImageId: ami-05931d11d2bf831c3 # Deep Learning AMI (Ubuntu) Version 24.3
-    ImageId: ami-0dbb717f493016a1a
+    InstanceType: c5.18xlarge
+    #ImageId: ami-0dbb717f493016a1a
+    ImageId: ami-0dca5a27e7adb8c0b
     SubnetIds:
-     - subnet-019e3de741b5257f7
-     - subnet-062c47a5364e3ee94
+     - subnet-024698d61cadd77f4
+     - subnet-025b0d94456268676
+     - subnet-0782bb0f3b195fa9b
+     - subnet-054e3e5cd9790b170
+     - subnet-07977cb16e9264a4e
+     - subnet-0952c6b3851a0651a
 
     # Run workers on spot by default. Comment this out to use on-demand.
-    #InstanceMarketOptions:
-    #    MarketType: spot
-    #    # Additional options can be found in the boto docs, e.g.
-    #    #   SpotOptions:
-    #    #       MaxPrice: MAX_HOURLY_PRICE
+    InstanceMarketOptions:
+        MarketType: spot
+        # Additional options can be found in the boto docs, e.g.
+        SpotOptions:
+            MaxPrice: 3,06
 
     # Additional options in the boto docs.
 
@@ -115,13 +123,11 @@ file_mounts: {
 # List of commands that will be run before `setup_commands`. If docker is
 # enabled, these commands will run outside the container and before docker
 # is setup.
-initialization_commands: []
+initialization_commands:
+   - sudo mount -t lustre -o noatime,flock fs-025ed2ceb7bd10473.fsx.us-east-1.amazonaws.com@tcp:/hm5wpbmv /fsx
 
 # List of shell commands to run to set up nodes.
-setup_commands:
-    - conda update -y conda
-    - conda init bash
-    - cd LambdaZero && bash install-aws.sh lzc
+setup_commands: []
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands: []
