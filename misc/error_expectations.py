@@ -3,15 +3,15 @@ from sklearn import metrics
 from matplotlib import pyplot as plt
 
 class cfg:
-    mean = - 25
-    std = 12.6
+    mean = - 9
+    std = 1.31
     num_samples = 10000000
     #
     dock_err_mean = 0.0
-    dock_err_std = 2.6 * 4.18 # 2.6 cKal/mol energy from paper 4.18 is conversion
+    dock_err_std = 2.1
     #
     fep_err_mean = 0.0
-    fep_err_std = 3.62
+    fep_err_std = 0.927
 
     n_mol_tests = 100 # means how many molecules tested in experiment
 
@@ -89,8 +89,19 @@ def plot_search_space_size(true_data,dock_data,fep_data, top_k=cfg.n_mol_tests):
 
 
 if __name__ == "__main__":
+
+    fep_data = np.genfromtxt('fep_data.csv', delimiter=',', skip_header=1)
+    print("binding energy mean", fep_data[:,0].mean(), "binding energy std", fep_data[:,0].std())
+    print("eror_std", (fep_data[:,0] - fep_data[:,1]).std())
+
+    #plt.scatter(fep_data[:,0],fep_data[:,1])
+    #plt.show()
+
     true_data,docking_data,fep_data = data_model_v1()
     plot_search_space_size(true_data,docking_data,fep_data)
+
+
+
 
 
 # todo: data is probably gaussian
