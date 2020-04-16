@@ -291,6 +291,7 @@ def _gen_mol2(smi, mol_name, outpath, chimera_bin, num_conf=10):
 class Dock_smi:
     def __init__(self, outpath, chimera_dir, dock6_dir, docksetup_dir,
                  cleanup=True,
+                 trustme=False,
                  rec_site_file="2_site/matching_spheres.sph",
                  grid_prefix="3_grid/grid",
                  dock_in_template = "4_dock/anchor_and_grow.in",
@@ -299,26 +300,34 @@ class Dock_smi:
                  flex_drive_file="parameters/flex_drive.tbl"):
         # output path
         self.outpath = outpath
-        if not os.path.exists(outpath): os.makedirs(outpath)
+        if not trustme:
+            if not os.path.exists(outpath): os.makedirs(outpath)
         # chimera bin
         self.chimera_bin = os.path.join(chimera_dir, "bin/chimera")
-        assert os.path.exists(self.chimera_bin), "can't find chimera bin " + self.chimera_bin
+        if not trustme:
+            assert os.path.exists(self.chimera_bin), "can't find chimera bin " + self.chimera_bin
         # dock6 bin and parameter files
         self.dock6_bin = os.path.join(dock6_dir, "bin/dock6")
-        assert os.path.exists(self.dock6_bin), "can't find dock6 bin " + self.dock6_bin
+        if not trustme:
+            assert os.path.exists(self.dock6_bin), "can't find dock6 bin " + self.dock6_bin
         self.vdw_defn_file = os.path.join(dock6_dir,vdw_defn_file)
-        assert os.path.exists(self.vdw_defn_file), "can't find vdw_def_file " + self.vdw_defn_file
+        if not trustme:
+            assert os.path.exists(self.vdw_defn_file), "can't find vdw_def_file " + self.vdw_defn_file
         self.flex_defn_file = os.path.join(dock6_dir,flex_defn_file)
-        assert os.path.exists(self.flex_defn_file), "can't find flex_dfn_file " + self.flex_defn_file
+        if not trustme:
+            assert os.path.exists(self.flex_defn_file), "can't find flex_dfn_file " + self.flex_defn_file
         self.flex_drive_file = os.path.join(dock6_dir, flex_drive_file)
-        assert os.path.exists(self.flex_drive_file), "can't find dock6 bin " + self.flex_drive_file
+        if not trustme:
+            assert os.path.exists(self.flex_drive_file), "can't find dock6 bin " + self.flex_drive_file
         self.cleanup = cleanup
         # docking files
         self.rec_site_file = os.path.join(docksetup_dir,rec_site_file)
-        assert os.path.exists(self.rec_site_file), "can't find rec site file " + self.rec_site_file
+        if not trustme:
+            assert os.path.exists(self.rec_site_file), "can't find rec site file " + self.rec_site_file
         self.grid_prefix = os.path.join(docksetup_dir,grid_prefix)
         self.dock_in_template = os.path.join(docksetup_dir, dock_in_template)
-        assert os.path.exists(self.dock_in_template), "can't find rec site file " + self.dock_in_template
+        if not trustme:
+            assert os.path.exists(self.dock_in_template), "can't find rec site file " + self.dock_in_template
 
     def dock(self, smi, mol_name=None, molgen_conf=10):
         # generate random molecule name if needed
