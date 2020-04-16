@@ -69,7 +69,8 @@ class cfg:
 if __name__ == "__main__":
     if not os.path.exists(cfg.results_dir):
         os.makedirs(cfg.results_dir)
-    ray.init(memory=8*10**9, num_cpus=cfg.num_cpus)
+    #ray.init(memory=8*10**9, num_cpus=cfg.num_cpus)
+    ray.init(address='auto')
 
     dock_smi = Dock_smi(outpath=cfg.dock_dir,
                         chimera_dir=cfg.chimera_dir,
@@ -94,7 +95,7 @@ if __name__ == "__main__":
         docked = ray.get(tasks)
         docked = pd.concat(docked, ignore_index=True)
         df_out = os.path.join(cfg.results_dir, smis[0] + ".parquet")
-        docked.to_parquet(str(df_out), engine="fastparquet", compression="UNCOMPRESSED")
+        docked.to_parquet(df_out, engine="fastparquet", compression="UNCOMPRESSED")
 
         # print(pd.read_parquet(df_out, engine="fastparquet"))
         # print("exps:", "%.3f" % (64. / (time.time() - start)))
