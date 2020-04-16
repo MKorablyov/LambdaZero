@@ -3,7 +3,6 @@ import os.path as osp
 import ray
 
 DATASET_PATH = "/fsx/datasets/zinc15_2D/splits/"
-WORK_PATH = "/fsx/work/docking/"
 RESULTS_PATH = "/fsx/results/docking/"
 
 # for 5 123 456 molecules
@@ -42,7 +41,7 @@ def _find_mid(ip, init):
 
 def _find_bottom(ip, jp, init)
     k = init
-    while osp.exists(osp.join(RESULTS_PATH, ip, jp "{0:#02}.res".format(k))):
+    while osp.exists(osp.join(RESULTS_PATH, ip, jp "{0:#02}.gz".format(k))):
         k = k + 1
         if k == 1000:
             return 'next'
@@ -51,9 +50,9 @@ def _find_bottom(ip, jp, init)
     return k
 
 
-def find_next_batch():
-    i = 0
-    j = 0
+def find_next_batch(init_i=0, init_j=0):
+    i = init_i
+    j = init_j
     k = 0
 
     while True:
@@ -95,15 +94,23 @@ def find_next_batch():
 
 
 @ray.remote(resources={'aws_machine': 1}, num_cpus=1)
-def distribute_mols():
-    os.makedirs(WORK_PATH, exist_ok=True)
+def distribute_mols(init_i=0, init_j=0):
     os.makedirs(RESULTS_PATH, exist_ok=True)
+    i = init_i
+    j = init_j
+    wrapped = False
     while True:
-        res = find_next_batch()
+        res = find_next_batch(i, j)
         if res is None:
-            return 'done'
+            if wrapped:
+                return 'done'
+            # Wrap around the end and try to find more work.
+            wrapped = True
+            i = 0
+            j = 0
+            continue
         i, j, k = res
-        job_ids = [do_docking.remote(i, j, p, WORK_PATH, RESULTS_PATH)
+        job_ids = [do_docking.remote(i, j, p, RESULTS_PATH)
                    for p in range(k, 1000)]
         ray.get(job_ids)
         # Mark the subdir as done
