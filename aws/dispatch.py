@@ -1,9 +1,49 @@
 import os
 import os.path as osp
+
 import ray
+import pandas as pd
+
+from LambdaZero.examples.config import mol_blocks_v4_config
+from LambdaZero.chem import Dock_smi
 
 DATASET_PATH = "/fsx/datasets/zinc15_2D/splits/"
 RESULTS_PATH = "/fsx/results/docking/"
+
+
+class Empty:
+    def __init__(self, **kwargs):
+        pass
+
+    def reset(self):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return None, {}
+
+
+class cfg:
+    # temp
+    ROOT = osp.dirname(osp.abspath(__file__))
+    datasets_dir = osp.join(ROOT, "Datasets")
+    programs_dir = osp.join(ROOT, "Programs")
+
+    # change
+    db_name = "actor_dock"
+    results_dir = osp.join(datasets_dir, db_name, "results")
+    dock_dir = osp.join(datasets_dir, db_name, "dock")
+
+    # env
+    env_config = mol_blocks_v4_config()["env_config"]
+    env_config["random_steps"] = 3
+    env_config["reward"] = Empty
+    env_config["obs"] = Empty
+
+    # docking parameters
+    dock6_dir = osp.join(programs_dir, "dock6")
+    chimera_dir = osp.join(programs_dir, "chimera")
+    docksetup_dir = osp.join(datasets_dir, "brutal_dock/d4/docksetup")
+
 
 # for 5 123 456 molecules
 # Results are organized in a hierarchy (51/23/456.res)
@@ -41,13 +81,22 @@ def _find_mid(ip, init):
 
 def _find_bottom(ip, jp, init)
     k = init
-    while osp.exists(osp.join(RESULTS_PATH, ip, jp "{0:#02}.gz".format(k))):
+    while osp.exists(osp.join(RESULTS_PATH, ip, jp "{0:#02}.parquet".format(k))):
         k = k + 1
         if k == 1000:
             return 'next'
         if not osp.exists(osp.join(DATASET_PATH, 'mol{0}{1}{2:#03}'.format(ip, jp, k))):
             return None
     return k
+
+
+def molpath(i, j, k):
+    return osp.join(DATASET_PATH, "mol{0:#02}{1:#02}{2:#03}".format(i, j, k))
+
+
+def outpath(i, j, k):
+    return osp.join(RESULTS_PATH, "{0:#02}".format(i), "{0:#02}".format(j),
+                    "{0:#03}.parquet".format(k))
 
 
 def find_next_batch(init_i=0, init_j=0):
@@ -60,7 +109,7 @@ def find_next_batch(init_i=0, init_j=0):
         if res is None:
             return None
         i, ip = res
-    
+
         res = _find_mid(ip, j)
         if res is None:
             return None
@@ -91,6 +140,35 @@ def find_next_batch(init_i=0, init_j=0):
             continue
         k = res
         return i, j, k
+
+
+@ray.remote
+def do_docking(i, j, k, results_dir):
+    outpath = "/tmp/docking/{0}/{1}/{2}/".format(i, j, k)
+    os.makedirs(outpath, exist_ok=True)
+    dock_smi = Dock_smi(outpath=outpath,
+                        chimera_dir=cfg.chimera_dir,
+                        dock6_dir=cfg.dock6_dir,
+                        docksetup_dir=cgf.docksetup_dir,
+                        trustme=True)
+
+    results = []
+    # Dock all the molecules in the file
+    with open(molpath(i, j, k), 'r') as f:
+        for n, line in enumerate(f):
+            smi, *rest = line.split()
+            name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
+            coord = np.asarray(coord, dtype='float32').tolist()
+        results.append(pd.DataFrame({"smi": [smi],
+                                     "gridscore": [gridscore],
+                                     "coord": [coord]}))
+    output = pd.concat(results, ignore_index=True)
+
+    # This dance is to avoid partial files in the final output
+    output_path = outpath(i, j, k)
+    output_tmp = output_path + ".tmp"
+    output.to_parquet(output_tmp, engine="fastparquet")
+    os.rename(output_tmp, output_path)
 
 
 @ray.remote(resources={'aws_machine': 1}, num_cpus=1)
