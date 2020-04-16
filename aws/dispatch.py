@@ -8,8 +8,8 @@ RESULTS_PATH = "/fsx/results/docking/"
 
 # for 5 123 456 molecules
 # Results are organized in a hierarchy (51/23/456.res)
-# if 51.done exists then all the molecules under it are done.
-# if 51/23.done exists then all the molecules under it as done.
+# if 51.done exists then all the molecules under 51/ are done.
+# if 51/23.done exists then all the molecules under 51/23/ are done.
 
 
 def _find_top(init):
@@ -106,3 +106,5 @@ def distribute_mols():
         job_ids = [do_docking.remote(i, j, p, WORK_PATH, RESULTS_PATH)
                    for p in range(k, 1000)]
         ray.get(job_ids)
+        # Mark the subdir as done
+        open(osp.join(RESULTS_PATH, "{0:#02}".format(i), "{0:#02}.done".format(j)), 'a').close()
