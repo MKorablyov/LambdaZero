@@ -58,7 +58,7 @@ def _find_top(init):
         if i == 100:
             # There is no higer level so just give up
             return None
-        if not osp.exists(osp.join(DATASET_PATH, 'mol{0:#02}00000'.format(i))):
+        if not osp.exists(osp.join(DATASET_PATH, 'mol{0:#02}0000'.format(i))):
             return None
     ip = "{0:#02}".format(i)
     os.makedirs(ops.join(RESULTS_PATH, ip), exist_ok=True)
@@ -72,7 +72,7 @@ def _find_mid(ip, init):
         j = j + 1
         if j == 100:
             return 'next'
-        if not osp.exists(osp.join(DATASET_PATH, 'mol{0}{1:#02}000'.format(ip, j))):
+        if not osp.exists(osp.join(DATASET_PATH, 'mol{0}{1:#02}00'.format(ip, j))):
             return None
     jp = "{0:#02}".format(j)
     os.makedirs(ops.join(RESULTS_PATH, ip, jp), exist_ok=True)
@@ -83,20 +83,20 @@ def _find_bottom(ip, jp, init):
     k = init
     while osp.exists(osp.join(RESULTS_PATH, ip, jp, "{0:#02}.parquet".format(k))):
         k = k + 1
-        if k == 1000:
+        if k == 100:
             return 'next'
-        if not osp.exists(osp.join(DATASET_PATH, 'mol{0}{1}{2:#03}'.format(ip, jp, k))):
+        if not osp.exists(osp.join(DATASET_PATH, 'mol{0}{1}{2:#02}'.format(ip, jp, k))):
             return None
     return k
 
 
 def molpath(i, j, k):
-    return osp.join(DATASET_PATH, "mol{0:#02}{1:#02}{2:#03}".format(i, j, k))
+    return osp.join(DATASET_PATH, "mol{0:#02}{1:#02}{2:#02}".format(i, j, k))
 
 
 def outpath(i, j, k):
     return osp.join(RESULTS_PATH, "{0:#02}".format(i), "{0:#02}".format(j),
-                    "{0:#03}.parquet".format(k))
+                    "{0:#02}.parquet".format(k))
 
 
 def find_next_batch(init_i=0, init_j=0):
