@@ -205,3 +205,16 @@ def distribute_mols(init_i=0, init_j=0):
 
         # Mark the subdir as done
         open(osp.join(RESULTS_PATH, "{0:#02}".format(i), "{0:#02}.done".format(j)), 'a').close()
+
+
+if __name__ == '__main__':
+    ray.init(address='auto')
+    num_dispatchers = 261  # To have 23000~ per machine
+    total_data = 5997 # Approximative, in thousands
+    parts_per_dispatch = (total_data + num_dispatchers - 1) // num_dispatchers
+    dispatchers = [distribute_mols.remote(
+        init_i=(p * parts_per_dispatch) // 100,
+        init_j=(p * parts_per_dispatch) % 100) for p in range(num_dispatchers)]
+
+    # Wait for the jobs to finish
+    ray.get(dispatchers)
