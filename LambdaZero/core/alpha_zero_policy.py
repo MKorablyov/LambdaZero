@@ -15,7 +15,7 @@ class AlphaZeroPolicy(TorchPolicy):
                  action_distribution_class, mcts_creator, env_creator,
                  **kwargs):
         super().__init__(
-            observation_space, action_space, config, , model=model, loss=loss,
+            observation_space, action_space, config, model=model, loss=loss,
             action_distribution_class=action_distribution_class
         )
 

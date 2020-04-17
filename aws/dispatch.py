@@ -79,9 +79,9 @@ def _find_mid(ip, init):
     return j, jp
 
 
-def _find_bottom(ip, jp, init)
+def _find_bottom(ip, jp, init):
     k = init
-    while osp.exists(osp.join(RESULTS_PATH, ip, jp "{0:#02}.parquet".format(k))):
+    while osp.exists(osp.join(RESULTS_PATH, ip, jp, "{0:#02}.parquet".format(k))):
         k = k + 1
         if k == 1000:
             return 'next'
