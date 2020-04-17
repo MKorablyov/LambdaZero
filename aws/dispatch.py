@@ -156,12 +156,20 @@ def do_docking(i, j, k, results_dir):
     # Dock all the molecules in the file
     with open(molpath(i, j, k), 'r') as f:
         for n, line in enumerate(f):
-            smi, *rest = line.split()
+            smi, zinc_id, _, mwt, logP, _, _, tranche, *features = line.rstrip().split()
+            idx = int(zinc_id[4:])
+            reactivity = tranche[2]
+            features = features or None
             name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
             coord = np.asarray(coord, dtype='float32').tolist()
         results.append(pd.DataFrame({"smi": [smi],
                                      "gridscore": [gridscore],
-                                     "coord": [coord]}))
+                                     "coord": [coord],
+                                     "mwt": [mwt],
+                                     "logP": [logP],
+                                     "zinc_id": [idx],
+                                     "reactivity": [reactivity],
+                                     "features": [features]}))
     output = pd.concat(results, ignore_index=True)
 
     # This dance is to avoid partial files in the final output
