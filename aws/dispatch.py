@@ -24,7 +24,7 @@ class Empty:
 
 class cfg:
     # temp
-    ROOT = osp.dirname(osp.abspath(__file__))
+    ROOT = osp.dirname(osp.dirname(osp.abspath(__file__)))
     datasets_dir = osp.join(ROOT, "Datasets")
     programs_dir = osp.join(ROOT, "Programs")
 
@@ -61,7 +61,7 @@ def _find_top(init):
         if not osp.exists(osp.join(DATASET_PATH, 'mol{0:#02}0000'.format(i))):
             return None
     ip = "{0:#02}".format(i)
-    os.makedirs(ops.join(RESULTS_PATH, ip), exist_ok=True)
+    os.makedirs(osp.join(RESULTS_PATH, ip), exist_ok=True)
     return i, ip
 
 
@@ -75,7 +75,7 @@ def _find_mid(ip, init):
         if not osp.exists(osp.join(DATASET_PATH, 'mol{0}{1:#02}00'.format(ip, j))):
             return None
     jp = "{0:#02}".format(j)
-    os.makedirs(ops.join(RESULTS_PATH, ip, jp), exist_ok=True)
+    os.makedirs(osp.join(RESULTS_PATH, ip, jp), exist_ok=True)
     return j, jp
 
 
@@ -144,12 +144,12 @@ def find_next_batch(init_i=0, init_j=0):
 
 @ray.remote(num_cpus=1)
 def do_docking(i, j, k, results_dir):
-    outpath = "/tmp/docking/{0}/{1}/{2}/".format(i, j, k)
-    os.makedirs(outpath, exist_ok=True)
-    dock_smi = Dock_smi(outpath=outpath,
+    workpath = "/tmp/docking/{0}/{1}/{2}/".format(i, j, k)
+    os.makedirs(workpath, exist_ok=True)
+    dock_smi = Dock_smi(outpath=workpath,
                         chimera_dir=cfg.chimera_dir,
                         dock6_dir=cfg.dock6_dir,
-                        docksetup_dir=cgf.docksetup_dir,
+                        docksetup_dir=cfg.docksetup_dir,
                         trustme=True)
 
     results = []
@@ -197,7 +197,11 @@ def distribute_mols(init_i=0, init_j=0):
             continue
         i, j, k = res
         job_ids = [do_docking.remote(i, j, p, RESULTS_PATH)
-                   for p in range(k, 1000)]
+                   for p in range(k, 100)
+                   if osp.exists(molpath(i, j, p))]
+
+        # Wait for the jobs to finish
         ray.get(job_ids)
+
         # Mark the subdir as done
         open(osp.join(RESULTS_PATH, "{0:#02}".format(i), "{0:#02}.done".format(j)), 'a').close()
