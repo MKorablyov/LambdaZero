@@ -142,7 +142,7 @@ def find_next_batch(init_i=0, init_j=0):
         return i, j, k
 
 
-@ray.remote
+@ray.remote(num_cpus=1)
 def do_docking(i, j, k, results_dir):
     outpath = "/tmp/docking/{0}/{1}/{2}/".format(i, j, k)
     os.makedirs(outpath, exist_ok=True)
@@ -161,7 +161,7 @@ def do_docking(i, j, k, results_dir):
             reactivity = tranche[2]
             features = features or None
             name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
-            coord = np.asarray(coord, dtype='float32').tolist()
+            coord = coord.tolist()
             results.append(pd.DataFrame({"smi": [smi],
                                          "gridscore": [gridscore],
                                          "coord": [coord],
