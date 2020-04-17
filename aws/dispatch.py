@@ -167,7 +167,7 @@ def do_docking(i, j, k, results_dir):
     # This dance is to avoid partial files in the final output
     output_path = outpath(i, j, k)
     output_tmp = output_path + ".tmp"
-    output.to_parquet(output_tmp, engine="fastparquet")
+    output.to_parquet(output_tmp, engine="fastparquet", compression=None)
     os.rename(output_tmp, output_path)
 
 
