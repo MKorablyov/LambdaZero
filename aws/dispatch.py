@@ -162,14 +162,14 @@ def do_docking(i, j, k, results_dir):
             features = features or None
             name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
             coord = np.asarray(coord, dtype='float32').tolist()
-        results.append(pd.DataFrame({"smi": [smi],
-                                     "gridscore": [gridscore],
-                                     "coord": [coord],
-                                     "mwt": [mwt],
-                                     "logP": [logP],
-                                     "zinc_id": [idx],
-                                     "reactivity": [reactivity],
-                                     "features": [features]}))
+            results.append(pd.DataFrame({"smi": [smi],
+                                         "gridscore": [gridscore],
+                                         "coord": [coord],
+                                         "mwt": [mwt],
+                                         "logP": [logP],
+                                         "zinc_id": [idx],
+                                         "reactivity": [reactivity],
+                                         "features": [features]}))
     output = pd.concat(results, ignore_index=True)
 
     # This dance is to avoid partial files in the final output
