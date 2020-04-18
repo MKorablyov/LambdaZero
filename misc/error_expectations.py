@@ -1,6 +1,8 @@
 import numpy as np
 from sklearn import metrics
 from matplotlib import pyplot as plt
+import seaborn as sns
+
 
 class cfg:
     mean = - 9
@@ -80,31 +82,30 @@ def plot_search_space_size(true_data,dock_data,fep_data, top_k=cfg.n_mol_tests):
     plt.xlabel("size of the search space")
     plt.ylabel("binding affinity")
 
-    fig.suptitle("hypothesis 1")
+    fig.suptitle("gaussian hypothesis")
 
-    plt.show()
-
+    #plt.show()
+    plt.savefig("/home/maksym/Desktop/gauss_prior_docking_fep.png")
 
 
 
 
 if __name__ == "__main__":
+    #fep_data = np.genfromtxt('fep_data.csv', delimiter=',', skip_header=1)
+    #plt.scatter(np.abs(fep_data[:, 0] - fep_data[:, 1]))
+    #sns.distplot(np.abs(fep_data[:, 0] - fep_data[:, 1]))
 
-    fep_data = np.genfromtxt('fep_data.csv', delimiter=',', skip_header=1)
-    print("binding energy mean", fep_data[:,0].mean(), "binding energy std", fep_data[:,0].std())
-    print("eror_std", (fep_data[:,0] - fep_data[:,1]).std())
 
+    #plt.show()
+    #print("binding energy mean", fep_data[:,0].mean(), "binding energy std", fep_data[:,0].std())
+    #print("eror_std", (fep_data[:,0] - fep_data[:,1]).std())
     #plt.scatter(fep_data[:,0],fep_data[:,1])
     #plt.show()
-
     true_data,docking_data,fep_data = data_model_v1()
     plot_search_space_size(true_data,docking_data,fep_data)
 
 
-
-
-
-# todo: data is probably gaussian
-# todo: we should not assume errors are gaussian (as we assumed here)
-# todo: model error in a better way
+    # todo: data is probably gaussian
+    # todo: we should not assume errors are gaussian (as we assumed here)
+    # todo: model error in a better way
 
