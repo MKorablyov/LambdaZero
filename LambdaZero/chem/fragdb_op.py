@@ -14,7 +14,7 @@ class FragDB:
         self.frag_counts = []
         self.frag_elem = []
         self.frag_r = []
-        self.frag_symmgroups = {}  # {frag_name: ig_table}
+        self.frag_symmgroups = {}        # {frag_name: ig_table}
 
         # unique fragments
         self.ufrag_names = {}            # {ufrag_name: index} # ufrag_name = {frag_name}_{symmetry_group}
@@ -269,4 +269,3 @@ class FragDB:
             self.ufrag_counts = np.load(os.path.join(fragdb_path, "ufrag_counts.npy"))
             assert len(self.ufrag_names) == len(self.ufrag_counts), "broken database of ufragments"
         print('loaded database state nfrag:', len(self.frag_names))
-

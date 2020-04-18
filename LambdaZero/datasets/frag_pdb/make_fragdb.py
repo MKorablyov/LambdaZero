@@ -6,11 +6,12 @@ from rdkit.Chem import AllChem
 from matplotlib import pyplot as plt
 import pandas as pd
 sys.path.append("../../")
-from affinity_torch.py_tools import chem
+from LambdaZero import chem
 
 class cfg:
-    source_molfile = "/home/maksym/Datasets/pdb/old/lig_noHnoMiss.sdf"
+    #source_molfile = "/home/maksym/Datasets/pdb/old/lig_noHnoMiss.sdf"
     #source_molfile = "/home/maksym/Projects/datasets/pdb/example.sdf"
+    source_molfile = "/home/maksym/Datasets/EGFR_small/EGFR.sdf"
     fragdb_path = "/home/maksym/Datasets/fragdb/fragdb"
     #fragspace_path = "/home/maksym/Desktop/temp_frag/fragspace"
     frags_generic = False
@@ -34,7 +35,7 @@ if __name__ == "__main__":
             print(passed_nmols, broken_nmols)
             if passed_nmols > maxmol:
                 break
-        print("loaded molfile into the database molecules passed:", passed_nmols, "broken_nmols", broken_nmols)
+        print("molecules passed:", passed_nmols, "molecules broken", broken_nmols)
 
     def fragment_mols(molfile):
         mols = Chem.SDMolSupplier(molfile)
@@ -53,10 +54,12 @@ if __name__ == "__main__":
     fragdb.load_state(cfg.fragdb_path, ufrag=False)
 
     fragdb.make_ufrags()
-    block_names, block_smis, _, block_rs = fragdb.filter_ufrags(verbose=False, cutoff_count=500)
+    block_names, block_smis, _, block_rs = fragdb.filter_ufrags(verbose=False, cutoff_count=10)
 
-    blocks = pd.DataFrame({"block_name":block_names,"block_smi": block_smis,"block_r":block_rs} )
-    blocks.to_parquet("/home/maksym/Datasets/fragdb/blocks_PDB_105.parquet")
+    blocks = pd.DataFrame({"block_name":block_names,"block_smi": block_smis,"block_r":block_rs})
+    blocks.to_json("/home/maksym/Datasets/fragdb/blocks_PDB_105.json")
+
+    print(pd.read_json("/home/maksym/Datasets/fragdb/blocks_PDB_105.json"))
 
 
     #fragdb.draw_ufrag("/home/maksym/Datasets/fragdb/ufrag_img")

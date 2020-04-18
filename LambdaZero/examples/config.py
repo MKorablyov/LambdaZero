@@ -16,6 +16,8 @@ from ray.rllib.agents.impala import ImpalaTrainer
 
 # These paths assume that you used the install-[cg]pu.sh script in the root folder.
 ROOT = osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))
+
+#os.getenv("HOME") "/home/maksym/Datasets" #
 datasets_dir = osp.join(ROOT, "Datasets")
 programs_dir = osp.join(ROOT, "Programs")
 summaries_dir = osp.join(ROOT, "model_summaries/ray")
