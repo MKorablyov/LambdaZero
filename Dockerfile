@@ -57,7 +57,7 @@ ENV LZ_ROOT_DIR ${LZ_ROOT_DIR:-/LambdaZero}
 ENV LZ_DATASETS_DIR ${LZ_DATASETS_DIR:-${LZ_ROOT_DIR}/Datasets}
 ENV LZ_PROGRAMS_DIR ${LZ_PROGRAMS_DIR:-${LZ_ROOT_DIR}/Programs}
 
-# Copy LambdaZero project's root to a root directory, e.g., /LambdaZero by default
+# Copy the LambdaZero code to the appropriate directory
 COPY . ${LZ_ROOT_DIR}
 
 RUN pip install --no-cache-dir -e ${LZ_ROOT_DIR} \
