@@ -43,10 +43,19 @@ RUN pip install --no-cache-dir \
         torch-geometric \
         ray[rllib]
 
-# Set environment variables which will persist and be available at runtime
-ENV LZ_ROOT_DIR=/LambdaZero
-ENV LZ_DATASETS_DIR=${LZ_ROOT_DIR}/Datasets
-ENV LZ_PROGRAMS_DIR=${LZ_ROOT_DIR}/Programs
+# Define build time arguments with no defaults
+ARG LZ_ROOT_DIR
+ARG LZ_DATASETS_DIR
+ARG LZ_PROGRAMS_DIR
+
+# Set environment variables which will persist and be available at runtime.
+# Default values will be inserted if none were defined at build time, e.g.,
+#       LZ_ROOT_DIR: /LambdaZero
+#       LZ_DATASETS_DIR: ${LZ_ROOT_DIR}/Datasets
+#       LZ_PROGRAMS_DIR: ${LZ_ROOT_DIR}/Programs
+ENV LZ_ROOT_DIR ${LZ_ROOT_DIR:-/LambdaZero}
+ENV LZ_DATASETS_DIR ${LZ_DATASETS_DIR:-${LZ_ROOT_DIR}/Datasets}
+ENV LZ_PROGRAMS_DIR ${LZ_PROGRAMS_DIR:-${LZ_ROOT_DIR}/Programs}
 
 # Copy LambdaZero project's root to a root directory, e.g., /LambdaZero by default
 COPY . ${LZ_ROOT_DIR}
