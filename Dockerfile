@@ -1,7 +1,5 @@
 FROM pytorch/pytorch:1.4-cuda10.1-cudnn7-runtime
 
-ARG CUDA=cpu
-
 # Install all the conda-available packages
 RUN conda install -y \
         tensorflow \
@@ -24,6 +22,9 @@ RUN conda install -y \
         tabulate \
         fastparquet \
         boto3
+
+# Which cuda to use, defaults to `cpu`
+ARG CUDA=cpu
 
 # Install pytorch-geometric special dependencies
 RUN pip install --no-cache-dir \
