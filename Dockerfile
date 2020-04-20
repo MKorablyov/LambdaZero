@@ -43,16 +43,22 @@ RUN pip install --no-cache-dir \
         torch-geometric \
         ray[rllib]
 
-COPY . LambdaZero
+# Set environment variables which will persist and be available at runtime
+ENV LZ_ROOT_DIR=/LambdaZero
+ENV LZ_DATASETS_DIR=${LZ_ROOT_DIR}/Datasets
+ENV LZ_PROGRAMS_DIR=${LZ_ROOT_DIR}/Programs
 
-RUN pip install --no-cache-dir -e ./LambdaZero \
-    && mkdir -p Datasets \
-    && cd Datasets \
+# Copy LambdaZero project's root to a root directory, e.g., /LambdaZero by default
+COPY . ${LZ_ROOT_DIR}
+
+RUN pip install --no-cache-dir -e ${LZ_ROOT_DIR} \
+    && mkdir -p ${LZ_DATASETS_DIR} \
+    && cd ${LZ_DATASETS_DIR} \
     && git clone --depth 1 https://github.com/MKorablyov/fragdb \
     && git clone --depth 1 https://github.com/MKorablyov/brutal_dock \
     && cd .. \
-    && mkdir -p Programs \
-    && cd Programs \
+    && mkdir -p ${LZ_PROGRAMS_DIR} \
+    && cd ${LZ_PROGRAMS_DIR} \
     && git clone --depth 1 https://github.com/MKorablyov/dock6 \
     && git clone --depth 1 https://github.com/MKorablyov/chimera tmp \
     && cd tmp \
