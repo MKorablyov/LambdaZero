@@ -23,6 +23,9 @@ conda activate "$1"
 conda install -y pytorch::pytorch==1.4.0 pytorch::torchvision pytorch::cpuonly tensorflow conda-forge::rdkit
 #pandas networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3
 
+# Prevent conda from being stupid about versions
+conda config --env --add pinned_packages pytorch==1.4
+
 # Install pytorch-geometric special dependencies
 CUDA=cpu
 pip install torch-scatter==latest+${CUDA} torch-sparse==latest+${CUDA} torch-cluster==latest+${CUDA} torch-spline-conv==latest+${CUDA} -f https://pytorch-geometric.com/whl/torch-1.4.0.html
