@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eu
+set -e
 
 if [ -z "$1" ]; then
     echo "Pass the conda env name as argument: "
