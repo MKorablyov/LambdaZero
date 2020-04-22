@@ -28,22 +28,41 @@ pip install psutil torch-geometric ray[rllib]
 
 pip install -e .
 
-mkdir -p Datasets
-cd Datasets
-git clone --depth 1 https://github.com/MKorablyov/fragdb
-git clone --depth 1 https://github.com/MKorablyov/brutal_dock
-cd ..
+if [ $DATASET_DEFAULT -eq 1 ]; then
+    read -p "Install directory for datasets (NO to skip) [$DATASET_PATH]:" dpath
+    if [ ! -z "$dpath" ]; then
+        DATASET_PATH="$dpath"
+    fi
+fi
 
-mkdir -p Programs
-cd Programs
-git clone --depth 1 https://github.com/MKorablyov/dock6
-git clone --depth 1 https://github.com/MKorablyov/chimera tmp
-cd tmp
-cat xaa xab > chimera.bin
-chmod 755 chimera.bin
-echo '../chimera' | ./chimera.bin
-cd ..
-rm -rf tmp
-cd ..
+if [ "$DATASET_PATH" != "NO" ]; then
+    mkdir -p "$DATASET_PATH"
+    cd $DATASET_PATH
+    git clone --depth 1 https://github.com/MKorablyov/fragdb
+    git clone --depth 1 https://github.com/MKorablyov/brutal_dock
+    cd ..
+fi
 
-echo "Use \"conda activate $1\" to activate the conda environement."
+
+if [ $PROGRAMS_DEFAULT -eq 1 ]; then
+    read -p "Install directory for programs (NO to skip) [$PROGRAMS_PATH]:" ppath
+    if [ ! -z "$ppath" ]; then
+        PROGRAMS_PATH="$ppath"
+    fi
+fi
+
+if [ "$PROGRAMS_PATH" != "NO" ]; then
+    mkdir -p "$PROGRAMS_PATH"
+    cd $PROGRAMS_PATH
+    git clone --depth 1 https://github.com/MKorablyov/dock6
+    git clone --depth 1 https://github.com/MKorablyov/chimera tmp
+    cd tmp
+    cat xaa xab > chimera.bin
+    chmod 755 chimera.bin
+    echo '../chimera' | ./chimera.bin
+    cd ..
+    rm -rf tmp
+    cd ..
+fi
+
+echo "Use \"conda activate $CONDA_ENV_NAME\" to activate the conda environement."
