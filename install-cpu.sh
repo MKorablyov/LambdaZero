@@ -9,12 +9,14 @@ if [ -z "$1" ]; then
 fi
 
 conda create -n "$1" -y python=3.6
-CONDA_BIN=`which conda`
-TMP=`dirname "$CONDA_BIN"`
-CONDA_DIR=`dirname "$TMP"`
+
+# extract the base conda directory
+CONDA_DIR=`conda info | grep 'active env location' | awk '{split($0, array, ":"); print array[2]}'`
+
+echo "### The CONDA_DIR is given by $CONDA_DIR"
 
 # Source the conda shell functions
-. "$CONDA_DIR/etc/profile.d/conda.sh"
+source "$CONDA_DIR/etc/profile.d/conda.sh"
 
 conda activate "$1"
 
