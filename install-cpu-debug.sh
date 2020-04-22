@@ -11,7 +11,9 @@ fi
 conda create -n "$1" -y python=3.6
 
 # extract the base conda directory
-CONDA_DIR=`conda info | grep 'active env location' | awk '{split($0, array, ":"); print array[2]}'`
+# CONDA_DIR=`conda info | grep 'active env location' | awk '{split($0, array, ":"); print array[2]}'`
+
+CONDA_DIR="/usr/share/miniconda"
 
 echo "### The CONDA_DIR is given by $CONDA_DIR"
 
