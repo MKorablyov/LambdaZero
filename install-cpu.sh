@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eu
+set -e
 
 if [ -z "$1" ]; then
     echo "Pass the conda env name as argument: "
@@ -20,8 +20,10 @@ CONDA_DIR=`dirname "$TMP"`
 conda activate "$1"
 
 # Install all the conda-available packages
-conda install -y pytorch::pytorch==1.4.0 pytorch::torchvision pytorch::cpuonly tensorflow conda-forge::rdkit
-#pandas networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3
+conda install -y pytorch::pytorch==1.4.0 pytorch::torchvision pytorch::cpuonly tensorflow conda-forge::rdkit pandas networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3
+
+# Prevent conda from being stupid about versions
+conda config --env --add pinned_packages pytorch==1.4
 
 # Install pytorch-geometric special dependencies
 CUDA=cpu
@@ -31,7 +33,7 @@ pip install torch-scatter==latest+${CUDA} torch-sparse==latest+${CUDA} torch-clu
 pip install https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-cp36-cp36m-manylinux1_x86_64.whl
 
 # Install the pip packages
-pip install psutil torch-geometric ray[rllib] boto3 fastparquet
+pip install psutil torch-geometric ray[rllib]
 
 pip install -e .
 
