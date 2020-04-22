@@ -20,9 +20,11 @@ jobs:
     - name: activate and setup environment, then test
       run: |
           source /usr/share/miniconda/etc/profile.d/conda.sh
-          echo "activate environment"
+          echo "### activate environment"
           conda activate lz
-          echo "setup develop"
+          echo "### run setup develop"
           python setup.py develop
-          echo "running tests"
+          echo "### see what the environment is composed of"
+          pip freeze
+          echo "### running tests"
           pytest LambdaZero/datasets/brutal_dock/tests/ # need a better way of ignoring non-pytest file with "test" in their name.
