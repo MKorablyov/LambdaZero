@@ -19,7 +19,7 @@ CONDA_DIR=`dirname "$TMP"`
 conda activate "$1"
 
 # Install all the conda-available packages
-conda install -y pytorch::pytorch pytorch::torchvision pytorch::cpuonly tensorflow pandas conda-forge::rdkit networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3
+conda install -y pytorch::pytorch pytorch::torchvision pytorch::cpuonly tensorflow pandas conda-forge::rdkit networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3 pytest pytest-cov
 
 # Install pytorch-geometric special dependencies
 CUDA=cpu
