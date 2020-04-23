@@ -1,7 +1,12 @@
 conda create -n "$CONDA_ENV_NAME" -y python=3.6
-CONDA_BIN=`which conda`
-TMP=`dirname "$CONDA_BIN"`
-CONDA_DIR=`dirname "$TMP"`
+
+# extract the base conda directory. This can be tricky if the executable is a symlink.
+# The commands below performs the following steps:
+#   1 - extract the string that contains the root prefix; the output is of the form "root_prefix: [conda base dir]"
+#   2 - use awk to to extract [conda base dir]
+#   3 - use sed to remove any blank spaces
+CONDA_DIR=`conda config --show root_prefix | awk '{split($0, array, ":"); print array[2]}' | sed 's/ //g'`
+
 
 set +u
 # conda uses unboud variables
