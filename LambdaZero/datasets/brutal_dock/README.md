@@ -1,6 +1,8 @@
 ## Pretraining of the MPNN used as a reward model by LambdaZero
 
-As a sub task of LambdaZero is to _learn_ a reward function that bypass expensive Docking simulations or even more expensive Free Energy simulations as accurately and cheaply as possible. Preparing such a model can be done separately as a supervised learning task. The goal is to pre-train a model that will be plugged in LambdaZero's RL algorithm.
+A sub task of LambdaZero is to _learn_ a reward function that bypass expensive Docking simulations or even more expensive 
+Free Energy Perturbation simulations as accurately and cheaply as possible. Preparing such a model can be done separately 
+as a supervised learning task. The goal is to train a model that will be plugged in LambdaZero's RL algorithm.
 
 ### Installation
 
