@@ -13,11 +13,11 @@ jobs:
     steps:
     - name: checkout code 
       uses: actions/checkout@v2
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v2
     - name: create Conda environment 
       run: |
           ./install-cpu-debug.sh lz
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v2
     - name: activate and setup environment, then test
       run: |
           source /usr/share/miniconda/etc/profile.d/conda.sh
