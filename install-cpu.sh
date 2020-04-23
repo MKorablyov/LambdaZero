@@ -11,8 +11,12 @@ fi
 conda create -n "$1" -y python=3.6
 
 # extract the base conda directory
-CONDA_DIR=`conda config --show root_prefix | awk '{split($0, array, ":"); print array[2]}'`
+# 1 - extract the string that contains the root prefix; the output is of the form "root_prefix: [what we want]"
+# 2 - use awk to to extract [what we want]
+# 3 - use sed to remove any blank spaces
+CONDA_DIR=`conda config --show root_prefix | awk '{split($0, array, ":"); print array[2]}' | sed 's/ //g'`
 echo "### The CONDA_DIR is given by $CONDA_DIR"
+
 
 # Source the conda shell functions
 source "$CONDA_DIR/etc/profile.d/conda.sh"
