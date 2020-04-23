@@ -20,7 +20,7 @@ jobs:
       uses: actions/checkout@v2
     - name: create Conda environment 
       run: |
-          ./install-cpu-debug.sh lz
+          ./install-cpu.sh -d NO -p NO --env_name=lz
     - name: activate and setup environment, then test
       run: |
           source /usr/share/miniconda/etc/profile.d/conda.sh
