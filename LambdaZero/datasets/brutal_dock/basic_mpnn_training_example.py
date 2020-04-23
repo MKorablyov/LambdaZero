@@ -11,10 +11,12 @@ import torch.nn.functional as F
 import torch_geometric.nn as gnn
 from torch_geometric.data import DataLoader
 from LambdaZero.chem import mol_to_graph
+from LambdaZero.datasets.brutal_dock import BRUTAL_DOCK_BASE_DIR
 from LambdaZero.environments.molecule import MPNNet
 import matplotlib.pyplot as plt
 
-brutal_dock_path = "/Users/Simon/codes/LambdaZero/Datasets/brutal_dock/"
+data_path = BRUTAL_DOCK_BASE_DIR.joinpath("d4/raw/dock_blocks105_walk40_clust.feather")
+load_model_path = BRUTAL_DOCK_BASE_DIR.joinpath("d4/dock_blocks105_walk40_12_clust_model002")
 
 desc = """ This script trains the Message Passing Neural Net used in LambdaZero
 to predict the value of the reward """
@@ -24,8 +26,8 @@ default_args = {
     'batch_size': 128,
     'lr': 0.0005,
     'maxgraphs': 100,
-    'data': brutal_dock_path + "d4/raw/dock_blocks105_walk40_clust.feather",
-    'loadmodel': brutal_dock_path + "d4/dock_blocks105_walk40_12_clust_model002",
+    'data': data_path,
+    'loadmodel': load_model_path,
 }
 
 help_dict = {
