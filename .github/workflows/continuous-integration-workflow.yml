@@ -1,5 +1,10 @@
 name: test package
 # This workflow is triggered on pushes to the repository.
+# 
+# It is possible to start an interactive ssh session using the command:
+#    - name: Setup tmate session
+#      uses: mxschmitt/action-tmate@v2
+
 on:
   push:
     branches:
@@ -16,8 +21,6 @@ jobs:
     - name: create Conda environment 
       run: |
           ./install-cpu-debug.sh lz
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v2
     - name: activate and setup environment, then test
       run: |
           source /usr/share/miniconda/etc/profile.d/conda.sh
@@ -25,7 +28,5 @@ jobs:
           conda activate lz
           echo "### run setup develop"
           python setup.py develop
-          echo "### see what the environment is composed of"
-          pip freeze
           echo "### running tests"
           pytest LambdaZero/datasets/brutal_dock/tests/ # need a better way of ignoring non-pytest file with "test" in their name.
