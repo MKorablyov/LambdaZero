@@ -29,4 +29,4 @@ jobs:
           echo "### run setup develop"
           python setup.py develop
           echo "### running tests"
-          pytest LambdaZero/datasets/brutal_dock/tests/ # need a better way of ignoring non-pytest file with "test" in their name.
+          pytest 
