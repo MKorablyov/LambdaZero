@@ -1,22 +1,23 @@
 #%% modules
+import argparse
+import random
 import sys
 import time
-import argparse
+
+import matplotlib.pyplot as plt
 import pandas as pd
-import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 import torch_geometric.nn as gnn
 from torch_geometric.data import DataLoader
-from LambdaZero.chem import mol_to_graph
-from LambdaZero.datasets.brutal_dock import BRUTAL_DOCK_BASE_DIR
-from LambdaZero.environments.molecule import MPNNet
-import matplotlib.pyplot as plt
 
-data_path = BRUTAL_DOCK_BASE_DIR.joinpath("d4/raw/dock_blocks105_walk40_clust.feather")
-load_model_path = BRUTAL_DOCK_BASE_DIR.joinpath("d4/dock_blocks105_walk40_12_clust_model002")
+from LambdaZero.chem import mol_to_graph
+from LambdaZero.datasets.brutal_dock import BRUTAL_DOCK_DATA_DIR
+from LambdaZero.environments.molecule import MPNNet
+
+data_path = BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/dock_blocks105_walk40_clust.feather")
+load_model_path = BRUTAL_DOCK_DATA_DIR.joinpath("d4/dock_blocks105_walk40_12_clust_model002")
 
 desc = """ This script trains the Message Passing Neural Net used in LambdaZero
 to predict the value of the reward """
