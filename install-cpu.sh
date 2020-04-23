@@ -19,7 +19,7 @@ echo "### The CONDA_DIR is given by $CONDA_DIR"
 
 
 # Source the conda shell functions
-source "$CONDA_DIR/etc/profile.d/conda.sh"
+source $CONDA_DIR/etc/profile.d/conda.sh
 
 conda activate "$1"
 
