@@ -6,9 +6,9 @@ from torch_geometric.nn import NNConv, Set2Set
 from LambdaZero.datasets.brutal_dock.brutal_dock_model import cfg
 
 
-class Net(nn.Module):
+class MessagePassingNet(nn.Module):
     def __init__(self, num_feat=14, dim=cfg.dim):
-        super(Net, self).__init__()
+        super(MessagePassingNet, self).__init__()
         self.lin0 = th.nn.Linear(num_feat, dim)
 
         nn = Sequential(Linear(4, 128), ReLU(), Linear(128, dim * dim))

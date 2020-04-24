@@ -13,7 +13,7 @@ from LambdaZero import inputs
 
 # import seaborn as sns
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-from LambdaZero.datasets.brutal_dock.models import Net
+from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
@@ -134,7 +134,7 @@ class Environment:
         self.transform = T.Compose([MyTransform(target_norm), Complete(),]) #  T.Distance(norm=False)
 
         # make model
-        self.model = Net().to(device)
+        self.model = MessagePassingNet().to(device)
         if load_model is not None: self.model.load_state_dict(th.load(load_model))
         if not os.path.exists(outpath): os.makedirs(outpath)
         self.outpath = outpath
