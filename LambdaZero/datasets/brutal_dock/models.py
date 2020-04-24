@@ -3,11 +3,8 @@ from torch import nn
 from torch.nn import Sequential, Linear, ReLU, GRU, functional as F
 from torch_geometric.nn import NNConv, Set2Set
 
-from LambdaZero.datasets.brutal_dock.brutal_dock_model import cfg
-
-
 class MessagePassingNet(nn.Module):
-    def __init__(self, num_feat=14, dim=cfg.dim):
+    def __init__(self, num_feat=14, dim=64):
         super(MessagePassingNet, self).__init__()
         self.lin0 = th.nn.Linear(num_feat, dim)
 
