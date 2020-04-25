@@ -39,7 +39,7 @@ class MLFlowLogger:
         return self._run_id
 
     def log_metrics(self, key, value, step):
-        self.mlflow_client.log_metric(self.run_id, key, value, step)
+        self.mlflow_client.log_metric(self.run_id, key, value, step=step)
 
     def finalize(self):
         self.mlflow_client.set_terminated(self.run_id, status='FINISHED')
