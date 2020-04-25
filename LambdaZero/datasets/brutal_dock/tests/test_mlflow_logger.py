@@ -35,27 +35,50 @@ def metrics():
     return x
 
 
-def test_mlflow_logger(tmpdir, experiment_name, tracking_uri, tags, metrics):
+@pytest.fixture
+def key():
+    return 'test_metric'
+
+
+@pytest.fixture
+def mlflow_logger(tmpdir, experiment_name, tracking_uri, tags, key, metrics):
 
     mlflow_logger = MLFlowLogger(experiment_name, tracking_uri, tags)
 
-    key = 'test_metric'
     for step, value in enumerate(metrics):
         mlflow_logger.log_metrics(key, value,  step)
 
+    return mlflow_logger
+
+
+def test_mlflow_logger_name(mlflow_logger, experiment_name, tracking_uri):
     mlflow_client = mlflow.tracking.MlflowClient(tracking_uri)
     experiment = mlflow_client.get_experiment(mlflow_logger.experiment_id)
     assert experiment.name == experiment_name
 
+
+def test_mlflow_logger_tags(mlflow_logger, tags, tracking_uri):
+    mlflow_client = mlflow.tracking.MlflowClient(tracking_uri)
     run = mlflow_client.get_run(mlflow_logger.run_id)
     assert run.data.tags == tags
 
+
+def test_mlflow_logger_metrics(mlflow_logger, key, metrics, tracking_uri):
+    mlflow_client = mlflow.tracking.MlflowClient(tracking_uri)
     metric_history = mlflow_client.get_metric_history(mlflow_logger.run_id, key)
     computed_metrics = np.array([m.value for m in metric_history])
-
     np.testing.assert_array_equal(computed_metrics, metrics)
 
 
+@pytest.mark.parametrize("finalize, status", [(False, "RUNNING"), (True, "FINISHED")])
+def test_mlflow_logger_status(mlflow_logger, tracking_uri, finalize, status):
+
+    mlflow_client = mlflow.tracking.MlflowClient(tracking_uri)
+    if finalize:
+        mlflow_logger.finalize()
+
+    run = mlflow_client.get_run(mlflow_logger.run_id)
+    assert run.info.status == status
 
 
 
