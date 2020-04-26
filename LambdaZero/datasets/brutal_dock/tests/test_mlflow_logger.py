@@ -7,11 +7,6 @@ from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger, StepCoun
 
 
 @pytest.fixture
-def experiment_name():
-    return 'some-fake-experiment-name'
-
-
-@pytest.fixture
 def tags():
     return {"id": "abcdef", "other-test-thing": '123'}
 

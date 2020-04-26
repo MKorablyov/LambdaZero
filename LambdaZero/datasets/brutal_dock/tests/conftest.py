@@ -112,3 +112,8 @@ def tracking_uri():
         logging.info("creating a fake directory")
         yield tmp_dir_str
     logging.info("deleting test folder")
+
+
+@pytest.fixture
+def experiment_name():
+    return 'some-fake-experiment-name'
