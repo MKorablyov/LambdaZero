@@ -28,6 +28,9 @@ class ModelTrainer:
 
     def _model_step(self, batch, model):
         x, y = batch
+        x = x.to(self.device)
+        y = y.to(self.device)
+
         y_hat = model.forward(x)
         loss = self.loss_function(y_hat, y)
         return loss
@@ -37,7 +40,6 @@ class ModelTrainer:
         total_epoch_loss = 0.0
 
         for batch in dataloader:
-            batch = batch.to(self.device)
             optimizer.zero_grad()
             batch_loss = self._model_step(batch, model)
             batch_loss.backward()
@@ -95,4 +97,6 @@ class ModelTrainer:
 
             info = f"Epoch: {epoch:03d}, LR: {lr:5f}, Train Loss: {average_training_loss:.5f}, Val Loss: {average_validation_loss:.5f}"
             logging.info(info)
+
+        return best_validation_loss
 
