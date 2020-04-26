@@ -59,7 +59,6 @@ class ModelTrainer:
         total_epoch_loss = 0.0
 
         for batch in dataloader:
-            batch = batch.to(self.device)
             batch_loss = self._model_step(batch, model)
             batch_loss_value = batch_loss.item()
 
