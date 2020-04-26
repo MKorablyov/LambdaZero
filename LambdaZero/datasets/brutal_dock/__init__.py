@@ -7,3 +7,6 @@ BRUTAL_DOCK_BASE_DIR = Path(__file__).parent
 ROOT_DIR = BRUTAL_DOCK_BASE_DIR.parent.parent.parent
 
 BRUTAL_DOCK_DATA_DIR = ROOT_DIR.joinpath("Datasets/brutal_dock/")
+
+RESULTS_DIR = ROOT_DIR.joinpath("results/")
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
