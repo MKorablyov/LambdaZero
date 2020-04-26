@@ -4,6 +4,19 @@ import mlflow
 import logging
 
 
+class StepCounter:
+    """
+    This class keeps track of how many times a run_id has been called.
+    """
+
+    def __init__(self):
+        self._count = 0
+
+    def increment_and_return_count(self):
+        self._count += 1
+        return self._count
+
+
 class MLFlowLogger:
     def __init__(self, experiment_name: str, tracking_uri: str, tags: Dict[str, str]):
         """
@@ -19,6 +32,7 @@ class MLFlowLogger:
         self.experiment_name = experiment_name
         self.tags = tags
         self._run_id = None
+        self.step_counter = StepCounter()
 
     @property
     def experiment_id(self):
@@ -38,7 +52,8 @@ class MLFlowLogger:
         self._run_id = run.info.run_id
         return self._run_id
 
-    def log_metrics(self, key, value, step):
+    def log_metrics(self, key, value):
+        step = self.step_counter.increment_and_return_count()
         self.mlflow_client.log_metric(self.run_id, key, value, step=step)
 
     def finalize(self):
