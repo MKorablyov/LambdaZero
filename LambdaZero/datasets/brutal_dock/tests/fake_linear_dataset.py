@@ -11,7 +11,7 @@ class FakeLinearDataset(Dataset):
         output_dimension: int,
     ):
         torch.manual_seed(seed)
-        factor = 1.0
+        factor = 10.0
         self.number_of_points = number_of_points
         self.weights = factor * torch.rand(
             input_dimension, output_dimension, requires_grad=False
