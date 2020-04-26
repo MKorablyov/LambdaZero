@@ -104,11 +104,11 @@ def test_model_trainer(mlflow_logger, dataloaders, model, best_model_path):
 
     model_trainer = ModelTrainer(loss_function, device, mlflow_logger)
 
-    best_validation_loss = model_trainer.train_model(model,
-                                                     training_dataloader,
-                                                     validation_dataloader,
-                                                     best_model_path,
-                                                     num_epochs=100)
+    _ = model_trainer.train_model(model,
+                                  training_dataloader,
+                                  validation_dataloader,
+                                  best_model_path,
+                                  num_epochs=100)
 
     train_loss = [x.value for x in mlflow_logger.mlflow_client.get_metric_history(mlflow_logger.run_id, 'train_loss')]
     val_loss = [x.value for x in mlflow_logger.mlflow_client.get_metric_history(mlflow_logger.run_id, 'val_loss')]
