@@ -35,7 +35,7 @@ validation_fraction = 0.1
 
 best_model_path = RESULTS_DIR.joinpath("plumbing_tests")
 d4_feather_data_path = BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/dock_blocks105_walk40_clust.feather")
-raw_data_path = EXPERIMENT_DATA_DIR.joinpath("/raw/dock_blocks105_walk40_clust.feather")
+raw_data_path = EXPERIMENT_DATA_DIR.joinpath("raw/dock_blocks105_walk40_clust.feather")
 
 loss_function = F.mse_loss
 
