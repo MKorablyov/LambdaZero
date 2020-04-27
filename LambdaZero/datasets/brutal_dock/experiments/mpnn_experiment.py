@@ -32,7 +32,7 @@ path_of_this_file = Path(__file__).resolve()
 tracking_uri = str(ROOT_DIR.joinpath("mlruns"))
 
 num_epochs = 10
-batch_size = 128
+batch_size = 1024
 train_fraction = 0.8
 validation_fraction = 0.1
 
