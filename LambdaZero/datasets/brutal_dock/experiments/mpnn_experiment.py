@@ -60,23 +60,19 @@ if __name__ == "__main__":
     test_size = dataset_size - train_size - valid_size
 
     logging.info(f"Splitting data into train, validation, test sets")
-    training_graphs, validation_graphs, _ = \
+    training_dataset, validation_dataset, _ = \
         torch.utils.data.random_split(full_dataset, [train_size, valid_size, test_size])
 
-    logging.info(f"Extracting mean and standard deviation from training data")
-    training_mean, training_std = get_scores_statistics(training_graphs)
-    normalizer = GraphScoreNormalizer(training_mean, training_std)
-
-    logging.info(f"Normalizing data")
-    normalized_training_graphs = [normalizer.normalize_score(g) for g in training_graphs]
-    normalized_validation_graphs = [normalizer.normalize_score(g) for g in validation_graphs]
-
     logging.info(f"Creating dataloaders")
-    training_dataloader = DataLoader(normalized_training_graphs, batch_size=batch_size, num_workers=0)
-    validation_dataloader = DataLoader(normalized_validation_graphs, batch_size=batch_size, num_workers=0)
+    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=0)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=0)
+
+    logging.info(f"Extracting mean and standard deviation from training data")
+    training_mean, training_std = get_scores_statistics(training_dataloader)
 
     logging.info(f"Instantiating trainer and model")
-    model_trainer = MoleculeModelTrainer(loss_function, device, mlflow_logger)
+    model_trainer = MoleculeModelTrainer(loss_function, device, mlflow_logger,
+                                         score_mean=training_mean, score_std=training_std)
 
     model = MessagePassingNet()
 
