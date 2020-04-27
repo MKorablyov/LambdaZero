@@ -4,7 +4,7 @@ from pathlib import Path
 import torch
 from torch_geometric.data import InMemoryDataset
 
-from LambdaZero.datasets.brutal_dock.dataset_utils import get_smiles_and_scores_from_feather, get_molecule_graph_dataset
+from LambdaZero.datasets.brutal_dock.dataset_utils import get_smiles_and_scores_from_feather, get_molecule_graphs_from_smiles_and_scores
 
 
 class D4MoleculesDataset(InMemoryDataset):
@@ -32,7 +32,7 @@ class D4MoleculesDataset(InMemoryDataset):
 
         feather_data_path = Path(self.raw_dir).joinpath(self.raw_file_names[0])
         list_smiles, list_scores = get_smiles_and_scores_from_feather(feather_data_path)
-        data_list = get_molecule_graph_dataset(list_smiles, list_scores)
+        data_list = get_molecule_graphs_from_smiles_and_scores(list_smiles, list_scores)
 
         if self.pre_filter is not None:
             data_list = [data for data in data_list if self.pre_filter(data)]

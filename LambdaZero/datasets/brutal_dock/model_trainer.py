@@ -21,12 +21,19 @@ class AbstractModelTrainer(ABC):
     train_loss_key = 'train_loss'
     validation_loss_key = 'val_loss'
 
-    def __init__(self, loss_function: Callable[[torch.tensor, torch.tensor], torch.tensor], device,
-                 mlflow_logger: MLFlowLogger):
+    def __init__(self, loss_function: Callable[[torch.tensor, torch.tensor], torch.tensor],
+                 device:  torch.device,
+                 mlflow_logger: MLFlowLogger, score_mean: float = 0, score_std: float = 1.):
 
         self.loss_function = loss_function
         self.device = device
         self.mlflow_logger = mlflow_logger
+
+        self.score_mean = torch.tensor(score_mean, device=device, requires_grad=False)
+        self.score_std = torch.tensor(score_std, device=device, requires_grad=False)
+
+    def _normalize_target(self, y):
+        return (y - self.score_mean)/self.score_std
 
     @abstractmethod
     def _model_step(self, batch, model):
@@ -130,8 +137,9 @@ class MoleculeModelTrainer(AbstractModelTrainer):
     def _model_step(self, batch, model):
         batch = batch.to(self.device)
         y = batch.dockscore
+        normalized_score = self._normalize_target(y)
         y_hat = model.forward(batch)
-        loss = self.loss_function(y_hat, y)
+        loss = self.loss_function(y_hat, normalized_score)
         return loss
 
     def _get_size_of_batch(self, batch):
