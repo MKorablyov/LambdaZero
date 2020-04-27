@@ -13,7 +13,7 @@ from torch_geometric.data import DataLoader
 from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR, BRUTAL_DOCK_DATA_DIR
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
-from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR
+from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR, RAW_EXPERIMENT_DATA_DIR
 from LambdaZero.datasets.brutal_dock.graph_score_normalizer import GraphScoreNormalizer
 from LambdaZero.datasets.brutal_dock.logger_utils import create_logging_tags
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
@@ -35,7 +35,7 @@ validation_fraction = 0.1
 
 best_model_path = RESULTS_DIR.joinpath("plumbing_tests")
 d4_feather_data_path = BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/dock_blocks105_walk40_clust.feather")
-raw_data_path = EXPERIMENT_DATA_DIR.joinpath("raw/dock_blocks105_walk40_clust.feather")
+raw_data_path = RAW_EXPERIMENT_DATA_DIR.joinpath("dock_blocks105_walk40_clust.feather")
 
 loss_function = F.mse_loss
 
