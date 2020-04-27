@@ -1,13 +1,13 @@
+import logging
 from pathlib import Path
 from typing import List
 
-import numpy as np
 import pandas as pd
 import torch
+from torch.utils.data import Dataset
 from torch_geometric.data import DataLoader
 
 from LambdaZero.chem import mol_to_graph
-from LambdaZero.datasets.brutal_dock import BRUTAL_DOCK_DATA_DIR
 
 
 def get_smiles_and_scores_from_feather(feather_data_path: Path):
@@ -41,3 +41,16 @@ def get_scores_statistics(training_dataloader: DataLoader):
         std = std_tensor.item()
 
         return mean, std
+
+
+def get_train_and_validation_datasets(full_dataset: Dataset, train_fraction: float, validation_fraction: float):
+    dataset_size = len(full_dataset)
+    train_size = int(train_fraction * dataset_size)
+    valid_size = int(validation_fraction * dataset_size)
+    test_size = dataset_size - train_size - valid_size
+
+    logging.info(f"Splitting data into train, validation, test sets")
+    training_dataset, validation_dataset, _ = \
+        torch.utils.data.random_split(full_dataset, [train_size, valid_size, test_size])
+
+    return training_dataset, validation_dataset

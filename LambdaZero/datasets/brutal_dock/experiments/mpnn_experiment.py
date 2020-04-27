@@ -1,5 +1,8 @@
 """
-TODO : description
+This experiment script applies a Message Passing Neural Net model
+to the D4 docking dataset.
+
+It assumes the D4 docking data is available in a feather file.
 """
 import logging
 import shutil
@@ -11,24 +14,25 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR, BRUTAL_DOCK_DATA_DIR
-from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
+from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics, get_train_and_validation_datasets
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR, RAW_EXPERIMENT_DATA_DIR
 from LambdaZero.datasets.brutal_dock.logger_utils import create_logging_tags
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
-from LambdaZero.datasets.model_evaluator import MoleculeModelEvaluator
 
 torch.manual_seed(0)
 
-path_of_this_file = Path(__file__).resolve()
 
+model = MessagePassingNet()
 experiment_name = 'First MPNN run'
+
+path_of_this_file = Path(__file__).resolve()
 tracking_uri = str(ROOT_DIR.joinpath("mlruns"))
 
 num_epochs = 10
-batch_size = 128
+batch_size = 1024
 train_fraction = 0.8
 validation_fraction = 0.1
 
@@ -53,18 +57,14 @@ if __name__ == "__main__":
     logging.info(f"Creating the full dataset")
     full_dataset = D4MoleculesDataset(str(EXPERIMENT_DATA_DIR))
 
-    dataset_size = len(full_dataset)
-    train_size = int(train_fraction * dataset_size)
-    valid_size = int(validation_fraction * dataset_size)
-    test_size = dataset_size - train_size - valid_size
-
     logging.info(f"Splitting data into train, validation, test sets")
-    training_dataset, validation_dataset, _ = \
-        torch.utils.data.random_split(full_dataset, [train_size, valid_size, test_size])
+    training_dataset, validation_dataset = get_train_and_validation_datasets(full_dataset,
+                                                                             train_fraction,
+                                                                             validation_fraction)
 
     logging.info(f"Creating dataloaders")
-    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=0)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=0)
+    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=0, shuffle=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=0, shuffle=True)
 
     logging.info(f"Extracting mean and standard deviation from training data")
     training_mean, training_std = get_scores_statistics(training_dataloader)
@@ -73,8 +73,6 @@ if __name__ == "__main__":
     model_trainer = MoleculeModelTrainer(loss_function, device, mlflow_logger,
                                          score_mean=training_mean, score_std=training_std)
 
-    model = MessagePassingNet()
-
     logging.info(f"Starting Model Training...")
     best_validation_loss = model_trainer.train_model(model,
                                                      training_dataloader,
@@ -82,21 +80,24 @@ if __name__ == "__main__":
                                                      best_model_path,
                                                      num_epochs=num_epochs)
 
+    logging.info(f"Best validation loss: {best_validation_loss: 5f}")
     mlflow_logger.log_metrics("best_val_loss", best_validation_loss)
 
-    model_evaluator = MoleculeModelEvaluator(device)
-
-    list_normalized_actuals, list_normalized_predicted = model_evaluator.get_actuals_and_predicted(validation_dataloader, model)
-
-    list_actuals = training_std*list_normalized_actuals + training_mean
-    list_predicted = training_std*list_normalized_predicted + training_mean
+    list_actuals, list_predicted = model_trainer.apply_model(model, validation_dataloader)
 
     list_errors = list_actuals-list_predicted
-
     mean_error = np.mean(list_errors)
     std_error = np.std(list_errors)
+
+    info = f"Validation Results [real scale]: " \
+           f"mean validation values : {np.mean(list_actuals):5f}, " \
+           f"std on validation values : {np.std(list_actuals):5f}, " \
+           f"mean error : {mean_error:5f}, " \
+           f"std error : {std_error:5f}."
+    logging.info(info)
 
     mlflow_logger.log_metrics("mean_validation_error_real_scale", mean_error)
     mlflow_logger.log_metrics("std_validation_error_real_scale", std_error)
 
+    logging.info(f"Finalizing.")
     mlflow_logger.finalize()
