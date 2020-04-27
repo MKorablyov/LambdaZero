@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import logging
 from pathlib import Path
 from typing import Callable
+import numpy as np
 
 import torch
 from torch import nn
@@ -35,6 +36,11 @@ class AbstractModelTrainer(ABC):
     def _normalize_target(self, y):
         return (y - self.score_mean)/self.score_std
 
+    def _denormalize_target(self, normalized_y):
+        return self.score_std*normalized_y + self.score_mean
+
+    # TODO: it's now implicit that _model_step must normalize somehow. normalizing and applying the model
+    #  should be done separately.
     @abstractmethod
     def _model_step(self, batch, model):
         """
@@ -51,13 +57,19 @@ class AbstractModelTrainer(ABC):
         """
         pass
 
+    def _get_batch_loss(self, batch, model):
+        y_actual, y_predicted = self._model_step(batch, model)
+        normalized_y_actual = self._normalize_target(y_actual)
+        batch_loss = self.loss_function(normalized_y_actual, y_predicted)
+        return batch_loss
+
     def _train_epoch(self, dataloader: DataLoader, model: nn.Module, optimizer):
         model.train()
         total_epoch_loss = 0.0
 
         for batch in dataloader:
             optimizer.zero_grad()
-            batch_loss = self._model_step(batch, model)
+            batch_loss = self._get_batch_loss(batch, model)
             batch_loss.backward()
             optimizer.step()
 
@@ -70,12 +82,12 @@ class AbstractModelTrainer(ABC):
         average_epoch_loss = total_epoch_loss/len(dataloader.dataset)
         return average_epoch_loss
 
-    def _eval_epoch(self, dataloader: DataLoader, model: nn.Module):
+    def _validation_epoch(self, dataloader: DataLoader, model: nn.Module):
         model.eval()
         total_epoch_loss = 0.0
 
         for batch in dataloader:
-            batch_loss = self._model_step(batch, model)
+            batch_loss = self._get_batch_loss(batch, model)
             batch_loss_value = batch_loss.item()
 
             self.mlflow_logger.log_metrics(self.validation_loss_key, batch_loss_value)
@@ -102,7 +114,7 @@ class AbstractModelTrainer(ABC):
             lr = scheduler.optimizer.param_groups[0]['lr']
             average_training_loss = self._train_epoch(training_dataloader, model, optimizer)
 
-            average_validation_loss = self._eval_epoch(validation_dataloader, model)
+            average_validation_loss = self._validation_epoch(validation_dataloader, model)
 
             scheduler.step(average_validation_loss)
 
@@ -115,6 +127,20 @@ class AbstractModelTrainer(ABC):
 
         return best_validation_loss
 
+    def apply_model(self, model: nn.Module, dataloader: DataLoader):
+        model.eval()
+
+        list_actuals = []
+        list_predicted = []
+        with torch.no_grad():
+            for batch in dataloader:
+                y_actual, normalized_y_predicted = self._model_step(batch, model)
+                y_predicted = self._denormalize_target(normalized_y_predicted)
+                list_actuals.extend(list(y_actual.numpy()))
+                list_predicted.extend(list(y_predicted.numpy()))
+
+        return np.array(list_actuals), np.array(list_predicted)
+
 
 class XYModelTrainer(AbstractModelTrainer):
 
@@ -124,8 +150,7 @@ class XYModelTrainer(AbstractModelTrainer):
         y = y.to(self.device)
 
         y_hat = model.forward(x)
-        loss = self.loss_function(y_hat, y)
-        return loss
+        return y, y_hat
 
     def _get_size_of_batch(self, batch):
         x, y = batch
@@ -137,10 +162,8 @@ class MoleculeModelTrainer(AbstractModelTrainer):
     def _model_step(self, batch, model):
         batch = batch.to(self.device)
         y = batch.dockscore
-        normalized_score = self._normalize_target(y)
         y_hat = model.forward(batch)
-        loss = self.loss_function(y_hat, normalized_score)
-        return loss
+        return y, y_hat
 
     def _get_size_of_batch(self, batch):
         return batch.num_graphs
