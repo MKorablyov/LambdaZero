@@ -39,28 +39,24 @@ class AbstractModelTrainer(ABC):
     def _denormalize_target(self, normalized_y):
         return self.score_std*normalized_y + self.score_mean
 
-    # TODO: it's now implicit that _model_step must normalize somehow. normalizing and applying the model
-    #  should be done separately.
     @abstractmethod
-    def _model_step(self, batch, model):
-        """
-        This method must be implemented. It instructs the trainer
-        on how to make a step over the batch with the model.
-        """
+    def _get_target_from_batch(self, batch):
+        pass
+
+    @abstractmethod
+    def _apply_model_to_batch(self, batch, model):
         pass
 
     @abstractmethod
     def _get_size_of_batch(self, batch):
-        """
-        This method must be implemented. It computes the number
-        of elements in the batch.
-        """
         pass
 
     def _get_batch_loss(self, batch, model):
-        y_actual, y_predicted = self._model_step(batch, model)
+        y_actual = self._get_target_from_batch(batch)
         normalized_y_actual = self._normalize_target(y_actual)
-        batch_loss = self.loss_function(normalized_y_actual, y_predicted)
+
+        normalized_y_predicted = self._apply_model_to_batch(batch, model)
+        batch_loss = self.loss_function(normalized_y_actual, normalized_y_predicted)
         return batch_loss
 
     def _train_epoch(self, dataloader: DataLoader, model: nn.Module, optimizer):
@@ -134,9 +130,11 @@ class AbstractModelTrainer(ABC):
         list_predicted = []
         with torch.no_grad():
             for batch in dataloader:
-                y_actual, normalized_y_predicted = self._model_step(batch, model)
-                y_predicted = self._denormalize_target(normalized_y_predicted)
+                y_actual = self._get_target_from_batch(batch)
                 list_actuals.extend(list(y_actual.numpy()))
+
+                normalized_y_predicted = self._apply_model_to_batch(batch, model)
+                y_predicted = self._denormalize_target(normalized_y_predicted)
                 list_predicted.extend(list(y_predicted.numpy()))
 
         return np.array(list_actuals), np.array(list_predicted)
@@ -144,26 +142,36 @@ class AbstractModelTrainer(ABC):
 
 class XYModelTrainer(AbstractModelTrainer):
 
-    def _model_step(self, batch, model):
+    def _get_xy_from_batch(self, batch):
         x, y = batch
         x = x.to(self.device)
         y = y.to(self.device)
+        return x, y
 
+    def _get_target_from_batch(self, batch):
+        _, y = self._get_xy_from_batch(batch)
+        return y
+
+    def _apply_model_to_batch(self, batch, model):
+        x, _ = self._get_xy_from_batch(batch)
         y_hat = model.forward(x)
-        return y, y_hat
+        return y_hat
 
     def _get_size_of_batch(self, batch):
-        x, y = batch
+        x, y = self._get_xy_from_batch(batch)
         return len(x)
 
 
 class MoleculeModelTrainer(AbstractModelTrainer):
 
-    def _model_step(self, batch, model):
+    def _get_target_from_batch(self, batch):
         batch = batch.to(self.device)
-        y = batch.dockscore
+        return batch.dockscore
+
+    def _apply_model_to_batch(self, batch, model):
+        batch = batch.to(self.device)
         y_hat = model.forward(batch)
-        return y, y_hat
+        return y_hat
 
     def _get_size_of_batch(self, batch):
         return batch.num_graphs
