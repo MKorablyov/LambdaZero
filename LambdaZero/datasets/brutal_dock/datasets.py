@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import torch
@@ -27,6 +28,7 @@ class D4MoleculesDataset(InMemoryDataset):
 
     def process(self):
         # Read data into huge `Data` list.
+        logging.info("Processing the raw data from the Feather file to a Data object saved on disk")
 
         feather_data_path = Path(self.raw_dir).joinpath(self.raw_file_names[0])
         list_smiles, list_scores = get_smiles_and_scores_from_feather(feather_data_path)
