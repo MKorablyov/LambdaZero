@@ -23,11 +23,11 @@ torch.manual_seed(0)
 
 path_of_this_file = Path(__file__).resolve()
 
-experiment_name = 'plumbing tests'
+experiment_name = 'First MPNN run'
 tracking_uri = str(ROOT_DIR.joinpath("mlruns"))
 
-num_epochs = 10
-dataset_size = 100
+num_epochs = 100
+dataset_size = 47410
 batch_size = 128
 
 train_size = int(0.8*dataset_size)
@@ -51,6 +51,7 @@ if __name__ == "__main__":
     list_smiles, list_scores = get_smiles_and_scores_from_feather(d4_feather_data_path)
 
     logging.info(f"Converting SMILES to molecular graphs")
+    #list_graphs = get_molecule_graph_dataset(list_smiles[:dataset_size], list_scores[:dataset_size])
     list_graphs = get_molecule_graph_dataset(list_smiles[:dataset_size], list_scores[:dataset_size])
 
     logging.info(f"Splitting data into train, validation, test sets")
