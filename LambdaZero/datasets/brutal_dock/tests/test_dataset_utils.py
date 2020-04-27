@@ -34,5 +34,5 @@ def test_get_scores_statistics(dockscores, training_graphs):
 
     computed_mean, computed_std = get_scores_statistics(dataloader)
 
-    assert computed_mean == expected_mean
-    assert computed_std == expected_std
+    np.testing.assert_almost_equal(computed_mean, expected_mean)
+    np.testing.assert_almost_equal(computed_std, expected_std)
