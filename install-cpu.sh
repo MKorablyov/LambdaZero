@@ -6,4 +6,4 @@ set -eu
 torch_tensorflow="pytorch::cpuonly tensorflow"
 CUDA=cpu
 
-. .install-mac.sh
+. .install.sh
