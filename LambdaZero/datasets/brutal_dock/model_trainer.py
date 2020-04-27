@@ -29,8 +29,8 @@ class AbstractModelTrainer(ABC):
         self.device = device
         self.mlflow_logger = mlflow_logger
 
-        self.score_mean = score_mean
-        self.score_std = score_std
+        self.score_mean = torch.tensor(score_mean, device=device, requires_grad=False)
+        self.score_std = torch.tensor(score_std, device=device, requires_grad=False)
 
     def _normalize_target(self, y):
         return (y - self.score_mean)/self.score_std
