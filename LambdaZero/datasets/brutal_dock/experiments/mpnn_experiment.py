@@ -18,7 +18,6 @@ from LambdaZero.datasets.brutal_dock.logger_utils import create_logging_tags
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
-from LambdaZero.datasets.model_evaluator import MoleculeModelEvaluator
 
 torch.manual_seed(0)
 
@@ -63,8 +62,8 @@ if __name__ == "__main__":
         torch.utils.data.random_split(full_dataset, [train_size, valid_size, test_size])
 
     logging.info(f"Creating dataloaders")
-    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=0)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=0)
+    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=0, shuffle=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=0, shuffle=True)
 
     logging.info(f"Extracting mean and standard deviation from training data")
     training_mean, training_std = get_scores_statistics(training_dataloader)
@@ -84,9 +83,7 @@ if __name__ == "__main__":
 
     mlflow_logger.log_metrics("best_val_loss", best_validation_loss)
 
-    model_evaluator = MoleculeModelEvaluator(device)
-
-    list_normalized_actuals, list_normalized_predicted = model_evaluator.get_actuals_and_predicted(validation_dataloader, model)
+    list_normalized_actuals, list_normalized_predicted = model_trainer.apply_model(model, validation_dataloader)
 
     list_actuals = training_std*list_normalized_actuals + training_mean
     list_predicted = training_std*list_normalized_predicted + training_mean
