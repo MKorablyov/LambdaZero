@@ -51,7 +51,6 @@ if __name__ == "__main__":
     list_smiles, list_scores = get_smiles_and_scores_from_feather(d4_feather_data_path)
 
     logging.info(f"Converting SMILES to molecular graphs")
-    #list_graphs = get_molecule_graph_dataset(list_smiles[:dataset_size], list_scores[:dataset_size])
     list_graphs = get_molecule_graph_dataset(list_smiles[:dataset_size], list_scores[:dataset_size])
 
     logging.info(f"Splitting data into train, validation, test sets")
