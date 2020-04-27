@@ -30,3 +30,4 @@ class MessagePassingNet(nn.Module):
         out = F.relu(self.lin1(out))
         out = self.lin2(out)
         return out.view(-1)
+
