@@ -18,7 +18,7 @@ def get_smiles_and_scores_from_feather(feather_data_path: Path):
     return list_smiles, list_scores
 
 
-def get_molecule_graph_dataset(list_smiles: List[str], list_scores: List[float]):
+def get_molecule_graphs_from_smiles_and_scores(list_smiles: List[str], list_scores: List[float]):
     list_graphs = [mol_to_graph(smiles, dockscore=score) for (smiles, score) in zip(list_smiles, list_scores)]
     return list_graphs
 
