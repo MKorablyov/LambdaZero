@@ -14,7 +14,6 @@ from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR, BRUTAL_DOCK_D
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR, RAW_EXPERIMENT_DATA_DIR
-from LambdaZero.datasets.brutal_dock.graph_score_normalizer import GraphScoreNormalizer
 from LambdaZero.datasets.brutal_dock.logger_utils import create_logging_tags
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
