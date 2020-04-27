@@ -118,3 +118,18 @@ def test_xy_model_trainer(mlflow_logger, dataloaders, model, best_model_path):
     assert train_ratio < 1e-2, "training error is still large"
     assert val_ratio < 1e-2, "validation error is still large"
 
+
+def test_xy_model_trainer_get_size_of_batch(mlflow_logger, dataloaders, model, batch_size):
+
+    training_dataloader, validation_dataloader = dataloaders
+
+    loss_function = F.mse_loss
+    device = torch.device('cpu')
+
+    model_trainer = XYModelTrainer(loss_function, device, mlflow_logger)
+    batch = iter(training_dataloader).next()
+
+    computed_batch_size = model_trainer._get_size_of_batch(batch)
+
+    assert computed_batch_size == batch_size
+
