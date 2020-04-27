@@ -81,17 +81,22 @@ if __name__ == "__main__":
                                                      best_model_path,
                                                      num_epochs=num_epochs)
 
+    logging.info(f"Best validation loss: {best_validation_loss: 5f}")
     mlflow_logger.log_metrics("best_val_loss", best_validation_loss)
 
-    list_normalized_actuals, list_normalized_predicted = model_trainer.apply_model(model, validation_dataloader)
-
-    list_actuals = training_std*list_normalized_actuals + training_mean
-    list_predicted = training_std*list_normalized_predicted + training_mean
+    list_actuals, list_predicted = model_trainer.apply_model(model, validation_dataloader)
 
     list_errors = list_actuals-list_predicted
 
     mean_error = np.mean(list_errors)
     std_error = np.std(list_errors)
+
+    info = f"Validation Results [real scale]: " \
+           f"mean validation values : {np.mean(list_actuals):5f}, " \
+           f"std on validation values : {np.std(list_actuals):5f}, " \
+           f"mean error : {mean_error:5f}, " \
+           f"std error : {std_error:5f}."
+    logging.info(info)
 
     mlflow_logger.log_metrics("mean_validation_error_real_scale", mean_error)
     mlflow_logger.log_metrics("std_validation_error_real_scale", std_error)
