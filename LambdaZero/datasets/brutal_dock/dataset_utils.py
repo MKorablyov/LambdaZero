@@ -24,7 +24,7 @@ def get_molecule_graph_dataset(list_smiles: List[str], list_scores: List[float])
 
 
 def get_scores_statistics(list_graphs):
-    list_scores = [g.dockingscore for g in list_graphs]
+    list_scores = [g.dockscore for g in list_graphs]
     mean = np.mean(list_scores)
     std = np.std(list_scores)
     return mean, std
