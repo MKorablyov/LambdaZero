@@ -2,6 +2,9 @@
 This file defines pytest fixtures. These are then auto-discovered by pytest
 when the tests are executed.
 """
+import logging
+import tempfile
+
 import pytest
 import torch
 from torch_geometric.data import Data, Batch
@@ -101,3 +104,16 @@ def random_molecule_data(number_of_nodes, number_of_node_features, positions,
 @pytest.fixture
 def random_molecule_batch(random_molecule_data):
     return Batch.from_data_list([random_molecule_data])
+
+
+@pytest.yield_fixture
+def tracking_uri():
+    with tempfile.TemporaryDirectory() as tmp_dir_str:
+        logging.info("creating a fake directory")
+        yield tmp_dir_str
+    logging.info("deleting test folder")
+
+
+@pytest.fixture
+def experiment_name():
+    return 'some-fake-experiment-name'
