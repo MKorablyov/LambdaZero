@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import logging
 from pathlib import Path
 from typing import Callable
@@ -10,9 +11,10 @@ from torch.utils.data import DataLoader
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 
 
-class ModelTrainer:
+class AbstractModelTrainer(ABC):
     """
-    This class trains a pytorch model based on specified parameters.
+    This abstract base class must be derived to implement a specific
+    model stepper. It then trains a pytorch model based on specified parameters.
     """
     optimizer_class = Adam
 
@@ -26,14 +28,13 @@ class ModelTrainer:
         self.device = device
         self.mlflow_logger = mlflow_logger
 
+    @abstractmethod
     def _model_step(self, batch, model):
-        x, y = batch
-        x = x.to(self.device)
-        y = y.to(self.device)
-
-        y_hat = model.forward(x)
-        loss = self.loss_function(y_hat, y)
-        return loss
+        """
+        This method must be implemented. It instructs the trainer
+        on how to make a step over the batch with the model.
+        """
+        pass
 
     def _train_epoch(self, dataloader: DataLoader, model: nn.Module, optimizer):
         model.train()
@@ -99,3 +100,24 @@ class ModelTrainer:
 
         return best_validation_loss
 
+
+class XYModelTrainer(AbstractModelTrainer):
+
+    def _model_step(self, batch, model):
+        x, y = batch
+        x = x.to(self.device)
+        y = y.to(self.device)
+
+        y_hat = model.forward(x)
+        loss = self.loss_function(y_hat, y)
+        return loss
+
+
+class MoleculeModelTrainer(AbstractModelTrainer):
+
+    def _model_step(self, batch, model):
+        batch = batch.to(self.device)
+        y = batch.dockscore
+        y_hat = model.forward(batch)
+        loss = self.loss_function(y_hat, y)
+        return loss

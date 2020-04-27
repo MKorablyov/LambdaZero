@@ -5,12 +5,11 @@ from pathlib import Path
 
 import pytest
 import torch
-
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
-from LambdaZero.datasets.brutal_dock.model_trainer import ModelTrainer
+from LambdaZero.datasets.brutal_dock.model_trainer import XYModelTrainer
 from LambdaZero.datasets.brutal_dock.tests.fake_linear_dataset import FakeLinearDataset
 from LambdaZero.datasets.brutal_dock.tests.linear_regression import LinearRegression
 
@@ -95,14 +94,14 @@ def mlflow_logger(experiment_name, tracking_uri):
     return mlflow_logger
 
 
-def test_model_trainer(mlflow_logger, dataloaders, model, best_model_path):
+def test_xy_model_trainer(mlflow_logger, dataloaders, model, best_model_path):
 
     training_dataloader, validation_dataloader = dataloaders
 
     loss_function = F.mse_loss
     device = torch.device('cpu')
 
-    model_trainer = ModelTrainer(loss_function, device, mlflow_logger)
+    model_trainer = XYModelTrainer(loss_function, device, mlflow_logger)
 
     _ = model_trainer.train_model(model,
                                   training_dataloader,
