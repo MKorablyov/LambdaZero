@@ -36,6 +36,14 @@ class AbstractModelTrainer(ABC):
         """
         pass
 
+    @abstractmethod
+    def _get_size_of_batch(self, batch):
+        """
+        This method must be implemented. It computes the number
+        of elements in the batch.
+        """
+        pass
+
     def _train_epoch(self, dataloader: DataLoader, model: nn.Module, optimizer):
         model.train()
         total_epoch_loss = 0.0
@@ -50,9 +58,9 @@ class AbstractModelTrainer(ABC):
 
             self.mlflow_logger.log_metrics(self.train_loss_key, batch_loss_value)
 
-            total_epoch_loss += batch_loss.item()*len(batch)
+            total_epoch_loss += batch_loss.item()*self._get_size_of_batch(batch)
 
-        average_epoch_loss = total_epoch_loss/len(dataloader)
+        average_epoch_loss = total_epoch_loss/len(dataloader.dataset)
         return average_epoch_loss
 
     def _eval_epoch(self, dataloader: DataLoader, model: nn.Module):
@@ -65,9 +73,9 @@ class AbstractModelTrainer(ABC):
 
             self.mlflow_logger.log_metrics(self.validation_loss_key, batch_loss_value)
 
-            total_epoch_loss += batch_loss.item()*len(batch)
+            total_epoch_loss += batch_loss.item()*self._get_size_of_batch(batch)
 
-        average_epoch_loss = total_epoch_loss/len(dataloader)
+        average_epoch_loss = total_epoch_loss/len(dataloader.dataset)
         return average_epoch_loss
 
     def train_model(self, model: nn.Module, training_dataloader: DataLoader, validation_dataloader: DataLoader,
@@ -112,6 +120,10 @@ class XYModelTrainer(AbstractModelTrainer):
         loss = self.loss_function(y_hat, y)
         return loss
 
+    def _get_size_of_batch(self, batch):
+        x, y = batch
+        return len(x)
+
 
 class MoleculeModelTrainer(AbstractModelTrainer):
 
@@ -121,3 +133,6 @@ class MoleculeModelTrainer(AbstractModelTrainer):
         y_hat = model.forward(batch)
         loss = self.loss_function(y_hat, y)
         return loss
+
+    def _get_size_of_batch(self, batch):
+        return batch.num_graphs
