@@ -43,7 +43,7 @@ def get_scores_statistics(training_dataloader: DataLoader):
         return mean, std
 
 
-def get_train_and_validation_datasets(full_dataset: Dataset, train_fraction: float, validation_fraction: float0):
+def get_train_and_validation_datasets(full_dataset: Dataset, train_fraction: float, validation_fraction: float):
     dataset_size = len(full_dataset)
     train_size = int(train_fraction * dataset_size)
     valid_size = int(validation_fraction * dataset_size)
