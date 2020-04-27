@@ -32,7 +32,8 @@ path_of_this_file = Path(__file__).resolve()
 tracking_uri = str(ROOT_DIR.joinpath("mlruns"))
 
 num_epochs = 10
-batch_size = 1024
+batch_size = 2048
+lr = 1e-4
 train_fraction = 0.8
 validation_fraction = 0.1
 
@@ -78,6 +79,7 @@ if __name__ == "__main__":
                                                      training_dataloader,
                                                      validation_dataloader,
                                                      best_model_path,
+                                                     lr=lr,
                                                      num_epochs=num_epochs)
 
     logging.info(f"Best validation loss: {best_validation_loss: 5f}")
