@@ -92,12 +92,12 @@ class AbstractModelTrainer(ABC):
         for batch in dataloader:
             batch_loss = self._get_batch_loss(batch, model)
             batch_loss_value = batch_loss.item()
-
-            self.mlflow_logger.log_metrics(self.validation_loss_key, batch_loss_value)
-
             total_epoch_loss += batch_loss_value*self._get_size_of_batch(batch)
 
         average_epoch_loss = total_epoch_loss/len(dataloader.dataset)
+
+        self.mlflow_logger.log_metrics_without_incrementing_step(self.validation_loss_key, average_epoch_loss)
+
         return average_epoch_loss
 
     def train_model(self, model: nn.Module, training_dataloader: DataLoader, validation_dataloader: DataLoader,
