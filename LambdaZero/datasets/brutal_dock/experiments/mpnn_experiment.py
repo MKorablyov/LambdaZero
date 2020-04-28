@@ -31,7 +31,7 @@ experiment_name = 'First MPNN run'
 path_of_this_file = Path(__file__).resolve()
 tracking_uri = str(ROOT_DIR.joinpath("mlruns"))
 
-num_epochs = 10
+num_epochs = 100
 batch_size = 4096
 lr = 1e-4
 train_fraction = 0.8
