@@ -289,7 +289,11 @@ def _gen_mol2(smi, mol_name, outpath, chimera_bin, num_conf=10):
 
 
 class Dock_smi:
-    def __init__(self, outpath, chimera_dir, dock6_dir, docksetup_dir,
+    def __init__(self,
+                 outpath,
+                 chimera_dir,       #
+                 dock6_dir,         #
+                 docksetup_dir,     #
                  cleanup=True,
                  trustme=False,
                  rec_site_file="2_site/matching_spheres.sph",
