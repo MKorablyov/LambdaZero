@@ -78,7 +78,7 @@ class AbstractModelTrainer(ABC):
 
             batch_loss_value = batch_loss.item()
 
-            self.mlflow_logger.log_metrics(self.train_loss_key, batch_loss_value)
+            self.mlflow_logger.increment_step_and_log_metrics(self.train_loss_key, batch_loss_value)
 
             total_epoch_loss += batch_loss_value*self._get_size_of_batch(batch)
 
@@ -96,7 +96,7 @@ class AbstractModelTrainer(ABC):
 
         average_epoch_loss = total_epoch_loss/len(dataloader.dataset)
 
-        self.mlflow_logger.log_metrics_without_incrementing_step(self.validation_loss_key, average_epoch_loss)
+        self.mlflow_logger.log_metrics_at_current_step(self.validation_loss_key, average_epoch_loss)
 
         return average_epoch_loss
 

@@ -30,7 +30,7 @@ def mlflow_logger_with_logging(experiment_name, tracking_uri, tags, key, metrics
     mlflow_logger = MLFlowLogger(experiment_name, tracking_uri, tags)
 
     for step, value in enumerate(metrics):
-        mlflow_logger.log_metrics(key, value)
+        mlflow_logger.increment_step_and_log_metrics(key, value)
 
     return mlflow_logger
 
