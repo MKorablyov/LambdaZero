@@ -21,6 +21,7 @@ class AbstractModelTrainer(ABC):
 
     train_loss_key = 'train_loss'
     validation_loss_key = 'val_loss'
+    epoch_key = 'epoch'
 
     def __init__(self, loss_function: Callable[[torch.tensor, torch.tensor], torch.tensor],
                  device:  torch.device,
@@ -59,7 +60,7 @@ class AbstractModelTrainer(ABC):
         batch_loss = self.loss_function(normalized_y_actual, normalized_y_predicted)
         return batch_loss
 
-    def _train_epoch(self, dataloader: DataLoader, model: nn.Module, optimizer):
+    def _train_epoch(self, dataloader: DataLoader, model: nn.Module, optimizer, epoch: int):
         model.train()
         total_epoch_loss = 0.0
 
@@ -79,6 +80,7 @@ class AbstractModelTrainer(ABC):
             batch_loss_value = batch_loss.item()
 
             self.mlflow_logger.increment_step_and_log_metrics(self.train_loss_key, batch_loss_value)
+            self.mlflow_logger.log_metrics_at_current_step(self.epoch_key, epoch)
 
             total_epoch_loss += batch_loss_value*self._get_size_of_batch(batch)
 
@@ -115,7 +117,7 @@ class AbstractModelTrainer(ABC):
         for epoch in range(1, num_epochs + 1):
 
             lr = scheduler.optimizer.param_groups[0]['lr']
-            average_training_loss = self._train_epoch(training_dataloader, model, optimizer)
+            average_training_loss = self._train_epoch(training_dataloader, model, optimizer, epoch)
 
             average_validation_loss = self._validation_epoch(validation_dataloader, model)
 
