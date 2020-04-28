@@ -36,6 +36,7 @@ batch_size = 2048
 lr = 1e-4
 train_fraction = 0.8
 validation_fraction = 0.1
+num_workers = 4
 
 best_model_path = RESULTS_DIR.joinpath("plumbing_tests")
 d4_feather_data_path = BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/dock_blocks105_walk40_clust.feather")
@@ -64,8 +65,10 @@ if __name__ == "__main__":
                                                                              validation_fraction)
 
     logging.info(f"Creating dataloaders")
-    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=0, shuffle=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=0, shuffle=True)
+    training_dataloader = DataLoader(training_dataset, batch_size=batch_size,
+                                     num_workers=num_workers, shuffle=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size,
+                                       num_workers=num_workers, shuffle=True)
 
     logging.info(f"Extracting mean and standard deviation from training data")
     training_mean, training_std = get_scores_statistics(training_dataloader)
