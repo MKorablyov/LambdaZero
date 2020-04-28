@@ -32,9 +32,11 @@ path_of_this_file = Path(__file__).resolve()
 tracking_uri = str(ROOT_DIR.joinpath("mlruns"))
 
 num_epochs = 10
-batch_size = 1024
+batch_size = 4096
+lr = 1e-4
 train_fraction = 0.8
 validation_fraction = 0.1
+num_workers = 4
 
 best_model_path = RESULTS_DIR.joinpath("plumbing_tests")
 d4_feather_data_path = BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/dock_blocks105_walk40_clust.feather")
@@ -63,8 +65,10 @@ if __name__ == "__main__":
                                                                              validation_fraction)
 
     logging.info(f"Creating dataloaders")
-    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=0, shuffle=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=0, shuffle=True)
+    training_dataloader = DataLoader(training_dataset, batch_size=batch_size,
+                                     num_workers=num_workers, shuffle=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size,
+                                       num_workers=num_workers, shuffle=True)
 
     logging.info(f"Extracting mean and standard deviation from training data")
     training_mean, training_std = get_scores_statistics(training_dataloader)
@@ -78,10 +82,11 @@ if __name__ == "__main__":
                                                      training_dataloader,
                                                      validation_dataloader,
                                                      best_model_path,
+                                                     lr=lr,
                                                      num_epochs=num_epochs)
 
     logging.info(f"Best validation loss: {best_validation_loss: 5f}")
-    mlflow_logger.log_metrics("best_val_loss", best_validation_loss)
+    mlflow_logger.increment_step_and_log_metrics("best_val_loss", best_validation_loss)
 
     list_actuals, list_predicted = model_trainer.apply_model(model, validation_dataloader)
 
@@ -96,8 +101,8 @@ if __name__ == "__main__":
            f"std error : {std_error:5f}."
     logging.info(info)
 
-    mlflow_logger.log_metrics("mean_validation_error_real_scale", mean_error)
-    mlflow_logger.log_metrics("std_validation_error_real_scale", std_error)
+    mlflow_logger.increment_step_and_log_metrics("mean_validation_error_real_scale", mean_error)
+    mlflow_logger.increment_step_and_log_metrics("std_validation_error_real_scale", std_error)
 
     logging.info(f"Finalizing.")
     mlflow_logger.finalize()

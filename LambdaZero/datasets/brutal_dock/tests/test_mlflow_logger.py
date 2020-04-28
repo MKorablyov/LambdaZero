@@ -30,7 +30,7 @@ def mlflow_logger_with_logging(experiment_name, tracking_uri, tags, key, metrics
     mlflow_logger = MLFlowLogger(experiment_name, tracking_uri, tags)
 
     for step, value in enumerate(metrics):
-        mlflow_logger.log_metrics(key, value)
+        mlflow_logger.increment_step_and_log_metrics(key, value)
 
     return mlflow_logger
 
@@ -69,4 +69,6 @@ def test_step_counter():
     step_counter = StepCounter()
     for i in range(1, 11):
         assert i == step_counter.increment_and_return_count()
+
+    assert step_counter.count == 10
 

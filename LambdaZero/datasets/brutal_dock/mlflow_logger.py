@@ -12,6 +12,10 @@ class StepCounter:
     def __init__(self):
         self._count = 0
 
+    @property
+    def count(self):
+        return self._count
+
     def increment_and_return_count(self):
         self._count += 1
         return self._count
@@ -52,8 +56,12 @@ class MLFlowLogger:
         self._run_id = run.info.run_id
         return self._run_id
 
-    def log_metrics(self, key, value):
+    def increment_step_and_log_metrics(self, key, value):
         step = self.step_counter.increment_and_return_count()
+        self.mlflow_client.log_metric(self.run_id, key, value, step=step)
+
+    def log_metrics_at_current_step(self, key, value):
+        step = self.step_counter.count
         self.mlflow_client.log_metric(self.run_id, key, value, step=step)
 
     def finalize(self):
