@@ -70,3 +70,5 @@ def test_step_counter():
     for i in range(1, 11):
         assert i == step_counter.increment_and_return_count()
 
+    assert step_counter.count == 10
+
