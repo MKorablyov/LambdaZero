@@ -39,5 +39,5 @@ try:
 except:
     print("[fast_sumtree.py] Could not import C version of SumTree, falling back to Python version")
     print("[fast_sumtree.py] Consider running `python fast_sumtree_setup.py build_ext -i`"
-          " (in LambdaZero/environments/persistent_search/)"
+          " (in LambdaZero/environments/persistent_search/)")
     SumTree = SumTreeSlow
