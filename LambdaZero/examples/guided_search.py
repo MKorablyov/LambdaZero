@@ -248,5 +248,5 @@ if __name__ == '__main__':
         for return_type in ['montecarlo', 'max_desc_r']:
             hps = {'priority_pred': priority_pred,
                    'return_type': return_type,
-                   'save_path': '/home/bengioem/scratch/lz'}
+                   'save_path': os.environ["SCRATCH"]+'/lz'}
             guided_search(hps)
