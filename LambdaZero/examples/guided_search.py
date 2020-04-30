@@ -5,6 +5,8 @@ warnings.filterwarnings('ignore')
 import time
 import os
 import os.path as osp
+import pickle
+import gzip
 
 import ray
 import numpy as np
@@ -238,15 +240,36 @@ def guided_search(exp_hps):
             pickle.dump(logs, gzip.open(f'{exp_path}/logs.pkl.gz', 'wb'))
     print('Saving final tree and stopping actors...')
     save = tree.save.remote(exp_path)
+    pickle.dump(logs, gzip.open(f'{exp_path}/logs.pkl.gz', 'wb'))
     ray.get(pred_dock_actor.stop.remote())
     ray.get(sim_dock_actor.stop.remote())
     ray.get(save)
 
 if __name__ == '__main__':
     ray.init(num_cpus=6)
-    for priority_pred in ['greedy_q', 'boltzmann']:
-        for return_type in ['montecarlo', 'max_desc_r']:
-            hps = {'priority_pred': priority_pred,
-                   'return_type': return_type,
-                   'save_path': os.environ["SCRATCH"]+'/lz'}
-            guided_search(hps)
+    if len(sys.argv) == 2 and sys.argv[1] == 'test':
+        for priority_pred in ['greedy_q', 'boltzmann']:
+            for return_type in ['montecarlo', 'max_desc_r']:
+                hps = {'priority_pred': priority_pred,
+                       'return_type': return_type,
+                       'save_path':  os.environ["SCRATCH"]+'/lz'}
+                guided_search(hps)
+        exit()
+
+    configs = [
+        {'priority_pred': priority_pred,
+         'return_type': return_type,
+         'num_molecules': int(2e6),
+         'prune_at': prune_at,
+         'save_path': '/home/bengioem/scratch/lz'}
+
+        for priority_pred in ['greedy_q', 'boltzmann']
+        for return_type in ['montecarlo', 'max_desc_r']
+        for prune_at in [int(150e3), int(250e3)]
+        for actor_temperature in [1, 5]
+        for score_temperature in [1.5, 5]
+        for run in [0, 1]
+    ]
+
+    array_id = int(os.environ['SLURM_ARRAY_TASK_ID'])
+    guided_search(configs[array_id])
