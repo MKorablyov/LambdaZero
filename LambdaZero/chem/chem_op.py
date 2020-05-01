@@ -289,7 +289,11 @@ def _gen_mol2(smi, mol_name, outpath, chimera_bin, num_conf=10):
 
 
 class Dock_smi:
-    def __init__(self, outpath, chimera_dir, dock6_dir, docksetup_dir,
+    def __init__(self,
+                 outpath,
+                 chimera_dir,       #
+                 dock6_dir,         #
+                 docksetup_dir,     #
                  cleanup=True,
                  trustme=False,
                  rec_site_file="2_site/matching_spheres.sph",
@@ -366,7 +370,8 @@ class Dock_smi:
         gridscore = gridscores[0]
 
         # parse dock coords
-        mol = Chem.MolFromMol2File(mol2file, sanitize=False, cleanupSubstructures=False)
+        mol2file_scored = os.path.join(self.outpath, mol_name + "_scored.mol2")
+        mol = Chem.MolFromMol2File(mol2file_scored, sanitize=False, cleanupSubstructures=False)
         atoms = np.asarray([atm.GetSymbol().lower() for atm in mol.GetAtoms() if atm.GetSymbol().lower() != "h"])
         initmol = Chem.MolFromSmiles(smi)
         initatoms = np.asarray([atm.GetSymbol().lower() for atm in initmol.GetAtoms()])

@@ -114,7 +114,7 @@ class FragDB:
             plt.show()
         return None
 
-    def filter_ufrags(self, cutoff_count=250, verbose=True):
+    def filter_ufrags(self, block_cutoff=250, r_cutoff=100, verbose=True):
         "deletes most of the uni"
         # unique fragments
         sel_ufrag_names = {}
@@ -123,7 +123,7 @@ class FragDB:
         sel_ufrag_r = []
         for ufrag_name in self.ufrag_names:
             ufrag_idx = self.ufrag_names[ufrag_name]
-            if self.ufrag_counts[ufrag_idx] >= cutoff_count:
+            if self.ufrag_counts[ufrag_idx] >= block_cutoff:
                 sel_ufrag_smis.append(self.ufrag_smis[ufrag_idx])
                 sel_ufrag_idx = len(sel_ufrag_counts)
                 sel_ufrag_names[ufrag_name] = sel_ufrag_idx
@@ -131,11 +131,12 @@ class FragDB:
 
                 ufrag_r = self.ufrag_r[ufrag_idx]
                 ufrag_r = np.fliplr(np.cumsum(np.fliplr(ufrag_r), axis=1))
+
                 ufrag_r = np.concatenate([np.array([self.ufrag_stem[ufrag_idx]]),
-                                          np.where(ufrag_r[:,3] >= cutoff_count)[0],
-                                          np.where(ufrag_r[:,2] >= cutoff_count)[0],
-                                          np.where(ufrag_r[:,1] >= cutoff_count)[0],
-                                          np.where(ufrag_r[:,0] >= cutoff_count)[0]])
+                                          np.where(ufrag_r[:,3] >= r_cutoff)[0],
+                                          np.where(ufrag_r[:,2] >= r_cutoff)[0],
+                                          np.where(ufrag_r[:,1] >= r_cutoff)[0],
+                                          np.where(ufrag_r[:,0] >= r_cutoff)[0]])
 
                 sel_ufrag_r.append(ufrag_r)
         # reorder keys values alphabetically
