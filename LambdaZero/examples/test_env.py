@@ -14,12 +14,7 @@ else: config_name = "cfg000"
 trainer, config, memory, summaries_dir, _ = get_config(config_name)
 print("starting with config:", config_name)
 
-
-
 env_config = config["env_config"]
-# print(env_config["max_steps"])
-# time.sleep(100)
-
 env = config["env"](env_config)
 obs = env.reset()
 

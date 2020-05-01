@@ -821,6 +821,18 @@ ppo020 = {
     }
 }
 
+ppo021 = {
+    # 3.2-3.3
+    "base_env_config": mol_blocks_v3_config,
+    "base_trainer_config": ppo_config,
+    "env_config": {
+        "allow_removal": True,
+        "num_blocks": 20,
+        "max_branches": 30,
+        "molMDP_config":{ "blocks_file": osp.join(datasets_dir, "fragdb/example_blocks.json")},
+    }
+}
+
 
 apex001 = {
     "base_env_config": mol_blocks_v3_config,
