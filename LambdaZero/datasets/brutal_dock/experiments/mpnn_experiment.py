@@ -90,19 +90,19 @@ if __name__ == "__main__":
 
     list_actuals, list_predicted = model_trainer.apply_model(model, validation_dataloader)
 
-    list_errors = list_actuals-list_predicted
-    mean_error = np.mean(list_errors)
-    std_error = np.std(list_errors)
+    list_absolute_errors = np.abs(list_actuals-list_predicted)
+    mean_absolute_error = np.mean(list_absolute_errors)
+    std_absolute_error = np.std(list_absolute_errors)
 
     info = f"Validation Results [real scale]: " \
            f"mean validation values : {np.mean(list_actuals):5f}, " \
            f"std on validation values : {np.std(list_actuals):5f}, " \
-           f"mean error : {mean_error:5f}, " \
-           f"std error : {std_error:5f}."
+           f"mean absolute error : {mean_absolute_error:5f}, " \
+           f"std absolute error : {std_absolute_error:5f}."
     logging.info(info)
 
-    mlflow_logger.increment_step_and_log_metrics("mean_validation_error_real_scale", mean_error)
-    mlflow_logger.increment_step_and_log_metrics("std_validation_error_real_scale", std_error)
+    mlflow_logger.increment_step_and_log_metrics("validation_mean_absolute_error_real_scale", mean_absolute_error)
+    mlflow_logger.increment_step_and_log_metrics("validation_std_absolute_error_real_scale", std_absolute_error)
 
     logging.info(f"Finalizing.")
     mlflow_logger.finalize()
