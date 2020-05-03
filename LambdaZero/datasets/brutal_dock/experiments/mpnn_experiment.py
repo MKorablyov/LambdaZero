@@ -14,10 +14,11 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR, BRUTAL_DOCK_DATA_DIR
-from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics, get_train_and_validation_datasets
+from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics, get_split_datasets
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR, RAW_EXPERIMENT_DATA_DIR
 from LambdaZero.datasets.brutal_dock.logger_utils import create_logging_tags
+from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
@@ -59,16 +60,19 @@ if __name__ == "__main__":
     logging.info(f"Creating the full dataset")
     full_dataset = D4MoleculesDataset(str(EXPERIMENT_DATA_DIR))
 
-    logging.info(f"Splitting data into train, validation, test sets")
-    training_dataset, validation_dataset = get_train_and_validation_datasets(full_dataset,
-                                                                             train_fraction,
-                                                                             validation_fraction)
+    logging.info(f"Splitting data into train, validation, and test sets")
+    training_dataset, validation_dataset, test_dataset = get_split_datasets(full_dataset,
+                                                                            train_fraction,
+                                                                            validation_fraction)
 
     logging.info(f"Creating dataloaders")
     training_dataloader = DataLoader(training_dataset, batch_size=batch_size,
                                      num_workers=num_workers, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size,
                                        num_workers=num_workers, shuffle=True)
+
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
+                                 num_workers=num_workers, shuffle=False)
 
     logging.info(f"Extracting mean and standard deviation from training data")
     training_mean, training_std = get_scores_statistics(training_dataloader)
@@ -88,21 +92,13 @@ if __name__ == "__main__":
     logging.info(f"Best validation loss: {best_validation_loss: 5f}")
     mlflow_logger.increment_step_and_log_metrics("best_val_loss", best_validation_loss)
 
-    list_actuals, list_predicted = model_trainer.apply_model(model, validation_dataloader)
-
-    list_absolute_errors = np.abs(list_actuals-list_predicted)
-    mean_absolute_error = np.mean(list_absolute_errors)
-    std_absolute_error = np.std(list_absolute_errors)
-
-    info = f"Validation Results [real scale]: " \
-           f"mean validation values : {np.mean(list_actuals):5f}, " \
-           f"std on validation values : {np.std(list_actuals):5f}, " \
-           f"mean absolute error : {mean_absolute_error:5f}, " \
-           f"std absolute error : {std_absolute_error:5f}."
-    logging.info(info)
-
-    mlflow_logger.increment_step_and_log_metrics("validation_mean_absolute_error_real_scale", mean_absolute_error)
-    mlflow_logger.increment_step_and_log_metrics("validation_std_absolute_error_real_scale", std_absolute_error)
+    for label, dataloader in zip(['validation', 'test'], [validation_dataloader, test_dataloader]):
+        list_actuals, list_predicted = model_trainer.apply_model(model, dataloader)
+        mean_absolute_error, std_absolute_error = get_prediction_statistics(list_actuals, list_predicted)
+        mean_key = f"{label}_mean_absolute_error_real_scale"
+        std_key = f"{label}_std_absolute_error_real_scale"
+        mlflow_logger.increment_step_and_log_metrics(mean_key, mean_absolute_error)
+        mlflow_logger.increment_step_and_log_metrics(std_key, std_absolute_error)
 
     logging.info(f"Finalizing.")
     mlflow_logger.finalize()
