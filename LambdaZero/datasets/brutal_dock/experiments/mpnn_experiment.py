@@ -18,6 +18,7 @@ from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics,
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR, RAW_EXPERIMENT_DATA_DIR
 from LambdaZero.datasets.brutal_dock.logger_utils import create_logging_tags
+from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
@@ -93,16 +94,7 @@ if __name__ == "__main__":
 
     list_actuals, list_predicted = model_trainer.apply_model(model, validation_dataloader)
 
-    list_absolute_errors = np.abs(list_actuals-list_predicted)
-    mean_absolute_error = np.mean(list_absolute_errors)
-    std_absolute_error = np.std(list_absolute_errors)
-
-    info = f"Validation Results [real scale]: " \
-           f"mean validation values : {np.mean(list_actuals):5f}, " \
-           f"std on validation values : {np.std(list_actuals):5f}, " \
-           f"mean absolute error : {mean_absolute_error:5f}, " \
-           f"std absolute error : {std_absolute_error:5f}."
-    logging.info(info)
+    mean_absolute_error, std_absolute_error = get_prediction_statistics(list_actuals, list_predicted)
 
     mlflow_logger.increment_step_and_log_metrics("validation_mean_absolute_error_real_scale", mean_absolute_error)
     mlflow_logger.increment_step_and_log_metrics("validation_std_absolute_error_real_scale", std_absolute_error)
