@@ -59,7 +59,7 @@ if __name__ == "__main__":
     logging.info(f"Creating the full dataset")
     full_dataset = D4MoleculesDataset(str(EXPERIMENT_DATA_DIR))
 
-    logging.info(f"Splitting data into train, validation, test sets")
+    logging.info(f"Splitting data into train, validation, and test sets")
     training_dataset, validation_dataset, test_dataset = get_split_datasets(full_dataset,
                                                                             train_fraction,
                                                                             validation_fraction)
@@ -69,6 +69,9 @@ if __name__ == "__main__":
                                      num_workers=num_workers, shuffle=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size,
                                        num_workers=num_workers, shuffle=True)
+
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
+                                 num_workers=num_workers, shuffle=False)
 
     logging.info(f"Extracting mean and standard deviation from training data")
     training_mean, training_std = get_scores_statistics(training_dataloader)
