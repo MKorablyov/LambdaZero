@@ -92,12 +92,13 @@ if __name__ == "__main__":
     logging.info(f"Best validation loss: {best_validation_loss: 5f}")
     mlflow_logger.increment_step_and_log_metrics("best_val_loss", best_validation_loss)
 
-    list_actuals, list_predicted = model_trainer.apply_model(model, validation_dataloader)
-
-    mean_absolute_error, std_absolute_error = get_prediction_statistics(list_actuals, list_predicted)
-
-    mlflow_logger.increment_step_and_log_metrics("validation_mean_absolute_error_real_scale", mean_absolute_error)
-    mlflow_logger.increment_step_and_log_metrics("validation_std_absolute_error_real_scale", std_absolute_error)
+    for label, dataloader in zip(['validation', 'test'], [validation_dataloader, test_dataloader]):
+        list_actuals, list_predicted = model_trainer.apply_model(model, dataloader)
+        mean_absolute_error, std_absolute_error = get_prediction_statistics(list_actuals, list_predicted)
+        mean_key = f"{label}_mean_absolute_error_real_scale"
+        std_key = f"{label}_std_absolute_error_real_scale"
+        mlflow_logger.increment_step_and_log_metrics(mean_key, mean_absolute_error)
+        mlflow_logger.increment_step_and_log_metrics(std_key, std_absolute_error)
 
     logging.info(f"Finalizing.")
     mlflow_logger.finalize()
