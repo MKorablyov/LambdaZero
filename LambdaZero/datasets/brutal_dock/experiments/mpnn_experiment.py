@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR, BRUTAL_DOCK_DATA_DIR
-from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics, get_train_and_validation_datasets
+from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics, get_split_datasets
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR, RAW_EXPERIMENT_DATA_DIR
 from LambdaZero.datasets.brutal_dock.logger_utils import create_logging_tags
@@ -60,9 +60,9 @@ if __name__ == "__main__":
     full_dataset = D4MoleculesDataset(str(EXPERIMENT_DATA_DIR))
 
     logging.info(f"Splitting data into train, validation, test sets")
-    training_dataset, validation_dataset = get_train_and_validation_datasets(full_dataset,
-                                                                             train_fraction,
-                                                                             validation_fraction)
+    training_dataset, validation_dataset, test_dataset = get_split_datasets(full_dataset,
+                                                                            train_fraction,
+                                                                            validation_fraction)
 
     logging.info(f"Creating dataloaders")
     training_dataloader = DataLoader(training_dataset, batch_size=batch_size,
