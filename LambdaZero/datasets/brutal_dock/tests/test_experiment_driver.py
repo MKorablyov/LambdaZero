@@ -38,7 +38,6 @@ def config(data_dir, work_dir, output_dir):
     run_parameters = dict(data_directory=str(data_dir),
                           working_directory=str(work_dir),
                           output_directory=str(output_dir),
-                          num_workers=0,
                           tracking_uri=str(output_dir.joinpath("mlruns")),
                           experiment_name="TEST",
                           run_name="exp-driver-smoke-test",
@@ -48,6 +47,7 @@ def config(data_dir, work_dir, output_dir):
                           )
 
     training_parameters = dict(num_epochs=10,
+                               num_workers=0,
                                batch_size=2,
                                learning_rate=1e-3,
                                train_fraction=0.8,

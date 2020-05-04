@@ -41,11 +41,11 @@ def experiment_driver(
 
     run_parameters = config.pop(RUN_PARAMETERS_KEY)
     training_parameters = config[TRAINING_PARAMETERS_KEY]
-    net_instantiation_parameters_dict = config[MODEL_PARAMETERS_KEY]
+    model_parameters = config[MODEL_PARAMETERS_KEY]
 
-    data_dir = Path(run_parameters["data_directory"])
-    work_dir = Path(run_parameters["working_directory"])
-    out_dir = Path(run_parameters["output_directory"])
+    data_dir = Path(run_parameters.pop("data_directory"))
+    work_dir = Path(run_parameters.pop("working_directory"))
+    out_dir = Path(run_parameters.pop("output_directory"))
 
     logging_directory = out_dir.joinpath("logs/")
     logging_directory.mkdir(parents=True, exist_ok=True)
@@ -64,15 +64,15 @@ def experiment_driver(
     logging.info(f"Creating dataloaders")
     training_dataloader = DataLoader(training_dataset,
                                      batch_size=training_parameters['batch_size'],
-                                     num_workers=run_parameters['num_workers'],
+                                     num_workers=training_parameters['num_workers'],
                                      shuffle=True)
     validation_dataloader = DataLoader(validation_dataset,
                                        batch_size=training_parameters['batch_size'],
-                                       num_workers=run_parameters['num_workers'],
+                                       num_workers=training_parameters['num_workers'],
                                        shuffle=True)
     test_dataloader = DataLoader(test_dataset,
                                  batch_size=training_parameters['batch_size'],
-                                 num_workers=run_parameters['num_workers'],
+                                 num_workers=training_parameters['num_workers'],
                                  shuffle=False)
 
     logging.info(f"Extracting mean and standard deviation from training data")
@@ -83,6 +83,8 @@ def experiment_driver(
     experiment_logger = MLFlowLogger(run_parameters.pop("experiment_name"),
                                      run_parameters.pop("tracking_uri"),
                                      run_parameters)
+    experiment_logger.log_parameters("training", training_parameters)
+    experiment_logger.log_parameters("model", model_parameters)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_trainer = MoleculeModelTrainer(loss_function,

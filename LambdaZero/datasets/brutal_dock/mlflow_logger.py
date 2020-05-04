@@ -66,6 +66,10 @@ class MLFlowLogger:
         step = self.step_counter.count
         self.mlflow_client.log_metric(self.run_id, key, value, step=step)
 
+    def log_parameters(self, prefix: str, parameters: Dict[str, str]):
+        for key, value in parameters.items():
+            self.mlflow_client.log_param(self.run_id, f"{prefix}--{key}", value)
+
     def finalize(self):
         self.mlflow_client.set_terminated(self.run_id, status='FINISHED')
 
