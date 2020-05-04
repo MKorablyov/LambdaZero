@@ -44,7 +44,8 @@ def test_mlflow_logger_name(mlflow_logger_with_logging, experiment_name, trackin
 def test_mlflow_logger_tags(mlflow_logger_with_logging, tags, tracking_uri):
     mlflow_client = mlflow.tracking.MlflowClient(tracking_uri)
     run = mlflow_client.get_run(mlflow_logger_with_logging.run_id)
-    assert run.data.tags == tags
+    tags_with_reserved_names = MLFlowLogger._create_tags_using_reserved_names(tags)
+    assert run.data.tags == tags_with_reserved_names
 
 
 def test_mlflow_logger_metrics(mlflow_logger_with_logging, key, metrics, tracking_uri):

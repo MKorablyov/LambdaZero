@@ -69,16 +69,17 @@ class MLFlowLogger:
     def finalize(self):
         self.mlflow_client.set_terminated(self.run_id, status='FINISHED')
 
-    def _create_tags_using_reserved_names(self, tags: Dict[str, str]):
+    @classmethod
+    def _create_tags_using_reserved_names(cls, tags: Dict[str, str]):
         """
         Use MLFlow specific reserved names so tags are presented in the correct place in the gui.
         For reserved names, see https: // www.mlflow.org / docs / latest / tracking.html  # tracking
         """
 
-        git_hash = tags.pop("git_hash")
-        execution_file_name = tags.pop("execution_file_name")
-        user = tags.pop("user")
-        run_name = tags.pop("run_name")
+        git_hash = tags.pop("git_hash", 'none')
+        execution_file_name = tags.pop("execution_file_name", 'none')
+        user = tags.pop("user", 'none')
+        run_name = tags.pop("run_name", 'none')
 
         tags_with_correct_names = dict(tags)
         tags_with_correct_names["mlflow.source.git.commit"] = git_hash
