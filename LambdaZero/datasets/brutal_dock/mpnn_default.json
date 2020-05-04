@@ -1,8 +1,7 @@
 {
   "model": {
     "name": "MPNN",
-    "gcn_in": 10,
-    "gcn_out": 128,
+    "gcn_size": 128,
     "edge_hidden": 128,
     "gru_out": 128,
     "gru_layers": 1,

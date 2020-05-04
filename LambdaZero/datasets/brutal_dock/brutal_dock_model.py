@@ -135,7 +135,7 @@ class MPNN(torch.nn.Module):
         Args:
             node_feat (int, optional): number of input features. Defaults to 14.
             edge_feat (int, optional): number of edge features. Defaults to 3.
-            gcn_size (int, optional): size of GCN inputs size. Defaults to 128.
+            gcn_size (int, optional): size of GCN embedding size. Defaults to 128.
             edge_hidden (int, optional): edge hidden embedding size. Defaults to 128.
             gru_out (int, optional): size out GRU output. Defaults to 128.
             gru_layers (int, optional): number of layers in GRU. Defaults to 1.
@@ -244,8 +244,7 @@ class Environment:
         self.model = MPNN(
             node_feat=14,
             edge_feat=4,
-            # gcn_in=config['model'].get('gcn_in', 10),
-            # gcn_out=config['model'].get('gcn_out', 128),
+            gcn_size=config['model'].get('gcn_size', 128),
             edge_hidden=config['model'].get('edge_hidden', 128),
             gru_out=config['model'].get('gru_out', 128),
             gru_layers=config['model'].get('gru_layers', 1),
