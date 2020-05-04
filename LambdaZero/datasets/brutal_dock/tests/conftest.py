@@ -13,28 +13,36 @@ from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_random_mole
 
 
 @pytest.fixture
-def number_of_nodes():
-    """
-    How many atoms in the fake molecule.
-    """
-    return 6
+def number_of_molecules():
+    return 1
 
 
 @pytest.fixture
-def positions(number_of_nodes):
+def list_of_node_count(number_of_molecules):
+    """
+    How many atoms in the fake molecules.
+    """
+    return list(range(3, 3 + number_of_molecules))
+
+
+@pytest.fixture
+def list_positions(list_of_node_count):
     """
     Random positions for the atoms
     """
-    torch.random.manual_seed(34534)
-    pos = torch.rand(number_of_nodes, 3)
+    torch.manual_seed(12312)
+    list_positions = []
+    for number_of_nodes in list_of_node_count:
+        pos = torch.rand(number_of_nodes, 3, requires_grad=False)
+        list_positions.append(pos)
 
-    return pos
+    return list_positions
 
 
 @pytest.fixture
-def dockscore():
-    torch.random.manual_seed(3245)
-    return torch.rand(1)
+def list_dockscores(list_of_node_count):
+    torch.manual_seed(242)
+    return torch.rand((len(list_of_node_count), 1), requires_grad=False)
 
 
 @pytest.fixture
@@ -55,17 +63,31 @@ def number_of_edge_features():
 
 
 @pytest.fixture
-def random_molecule_data(number_of_nodes, number_of_node_features, positions,
-                         number_of_edge_features, dockscore):
-    torch.random.manual_seed(123)
-    fake_molecule_data = get_random_molecule_data(number_of_nodes, number_of_node_features,
-                                                  positions, number_of_edge_features, dockscore)
-    return fake_molecule_data
+def list_random_molecules(list_of_node_count, number_of_node_features, list_positions,
+                          number_of_edge_features, list_dockscores):
+
+    list_molecules = []
+    for number_of_nodes, positions, dockscore in zip(list_of_node_count, list_positions, list_dockscores):
+        fake_molecule_data = get_random_molecule_data(number_of_nodes,
+                                                      number_of_node_features,
+                                                      positions,
+                                                      number_of_edge_features,
+                                                      dockscore)
+        list_molecules.append(fake_molecule_data)
+    return list_molecules
 
 
 @pytest.fixture
-def random_molecule_batch(random_molecule_data):
-    return Batch.from_data_list([random_molecule_data])
+def random_molecule_data(list_random_molecules):
+    """
+    Return a single molecule.
+    """
+    return list_random_molecules[0]
+
+
+@pytest.fixture
+def random_molecule_batch(list_random_molecules):
+    return Batch.from_data_list(list_random_molecules)
 
 
 @pytest.fixture

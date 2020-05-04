@@ -25,12 +25,15 @@ def training_graphs(dockscores):
     return list_graphs
 
 
-def test_get_scores_statistics(dockscores, training_graphs):
+@pytest.mark.parametrize("number_of_molecules", [10])
+def test_get_scores_statistics(list_dockscores, list_random_molecules):
 
-    expected_mean = np.mean(dockscores)
-    expected_std = np.std(dockscores)
+    dockscore_array = list_dockscores.numpy().flatten()
 
-    dataloader = DataLoader(training_graphs, batch_size=10)
+    expected_mean = np.mean(dockscore_array)
+    expected_std = np.std(dockscore_array)
+
+    dataloader = DataLoader(list_random_molecules, batch_size=10)
 
     computed_mean, computed_std = get_scores_statistics(dataloader)
 

@@ -32,7 +32,7 @@ def get_scores_statistics(training_dataloader: DataLoader):
 
         for batch in training_dataloader:
             score_sum += torch.sum(batch.dockscore)
-            score_square_sum += torch.sum(batch.dockscore**2)
+            score_square_sum += torch.sum(batch.dockscore ** 2)
 
         mean_tensor = score_sum/number_of_graphs
         std_tensor = torch.sqrt(score_square_sum/number_of_graphs - mean_tensor**2)
