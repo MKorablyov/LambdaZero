@@ -39,7 +39,7 @@ def config(data_dir, work_dir, output_dir):
                           working_directory=str(work_dir),
                           output_directory=str(output_dir),
                           num_workers=0,
-                          tracking_uri=str(output_dir.joinpath("mlrun")),
+                          tracking_uri=str(output_dir.joinpath("mlruns")),
                           experiment_name="TEST",
                           run_name="exp-driver-smoke-test",
                           git_hash="SOMETESTHASH",
