@@ -34,7 +34,7 @@ def batch_size():
     return 250
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def best_model_path():
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")

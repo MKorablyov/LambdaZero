@@ -106,7 +106,7 @@ def random_molecule_batch(random_molecule_data):
     return Batch.from_data_list([random_molecule_data])
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def tracking_uri():
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
