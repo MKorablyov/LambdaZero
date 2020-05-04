@@ -13,6 +13,7 @@ import torch.nn as nn
 from torch_geometric.data import DataLoader
 from torch_geometric.nn import NNConv, Set2Set
 from torch_geometric.utils import remove_self_loops
+from tqdm import tqdm
 
 from LambdaZero import inputs
 
@@ -26,7 +27,7 @@ def parse_args(args):
     parser = argparse.ArgumentParser(description='Train a reward model (brutal dock)')
 
     parser.add_argument('--log', type=str, default=None,
-                        hlep='If specified, path to the file used as log. Defaults to None (log to terminal)')
+                        help='If specified, path to the file used as log. Defaults to None (log to terminal)')
 
     parser.add_argument('--data_path', type=str, required=True,
                         help='path to dataset')
@@ -37,6 +38,10 @@ def parse_args(args):
     def_ckpt = 'saved_model/'
     parser.add_argument('--ckpt_path', type=str, default=def_ckpt,
                         help=f'Checkpointing path. Defaults to {def_ckpt}')
+
+    # to do: merge with ckpt_path / clean up
+    parser.add_argument('--output_path', type=str, default=def_ckpt,
+                        help=f'Output path. Defaults to {def_ckpt}')
 
     parser.add_argument('--config', type=str, required=True,
                         help='Path to the json file containing the configuration of the model.')
@@ -117,8 +122,7 @@ class MPNN(torch.nn.Module):
     def __init__(self,
                  node_feat: int = 14,
                  edge_feat: int = 4,
-                 gcn_in: int = 10,
-                 gcn_out: int = 128,
+                 gcn_size: int = 128,
                  edge_hidden: int = 128,
                  gru_out: int = 128,
                  gru_layers: int = 1,
@@ -131,8 +135,7 @@ class MPNN(torch.nn.Module):
         Args:
             node_feat (int, optional): number of input features. Defaults to 14.
             edge_feat (int, optional): number of edge features. Defaults to 3.
-            gcn_in (int, optional): size of GCN inputs size. Defaults to 10.
-            gcn_out (int, optional): size of GCN outsize embedding size. Defaults to 128.
+            gcn_size (int, optional): size of GCN inputs size. Defaults to 128.
             edge_hidden (int, optional): edge hidden embedding size. Defaults to 128.
             gru_out (int, optional): size out GRU output. Defaults to 128.
             gru_layers (int, optional): number of layers in GRU. Defaults to 1.
@@ -140,16 +143,16 @@ class MPNN(torch.nn.Module):
             out_size (int, optional): output size. Defaults to 1.
         """
         super(MPNN, self).__init__()
-        self.lin0 = nn.Linear(node_feat, gcn_in)
+        self.lin0 = nn.Linear(node_feat, gcn_size)
 
         edge_network = nn.Sequential(
             nn.Linear(edge_feat, edge_hidden),
             nn.ReLU(),
-            nn.Linear(edge_hidden, gcn_in * gcn_out)
+            nn.Linear(edge_hidden, gcn_size ** 2)
         )
 
-        self.conv = NNConv(gcn_in, gcn_out, edge_network, aggr='mean')
-        self.gru = nn.GRU(gcn_out, gru_out, num_layers=gru_layers)
+        self.conv = NNConv(gcn_size, gcn_size, edge_network, aggr='mean')
+        self.gru = nn.GRU(gcn_size, gru_out, num_layers=gru_layers)
 
         self.set2set = Set2Set(gru_out, processing_steps=3)
         self.fully_connected = nn.Sequential(
@@ -241,8 +244,8 @@ class Environment:
         self.model = MPNN(
             node_feat=14,
             edge_feat=4,
-            gcn_in=config['model'].get('gcn_in', 10),
-            gcn_out=config['model'].get('gcn_out', 128),
+            # gcn_in=config['model'].get('gcn_in', 10),
+            # gcn_out=config['model'].get('gcn_out', 128),
             edge_hidden=config['model'].get('edge_hidden', 128),
             gru_out=config['model'].get('gru_out', 128),
             gru_layers=config['model'].get('gru_layers', 1),
@@ -256,7 +259,6 @@ class Environment:
         self.outpath = outpath
 
     def load_dataset(self, db_root, file_names):
-
         dataset = inputs.BrutalDock(db_root, props=cfg.molprops, transform=self.transform, file_names=file_names)
         self.dataset = dataset
 
@@ -280,11 +282,11 @@ class Environment:
     def train_epoch(self, loader, model, optimizer):
         model.train()
         loss_all = 0
-        for data in loader:
+        for data in tqdm(loader):
             data = data.to(device)
             optimizer.zero_grad()
             preds = model(data)
-            loss = F.mse_loss(preds, data.y)
+            loss = F.mse_loss(preds.squeeze(1), data.y)
             loss.backward()
             optimizer.step()
             loss_all += loss.item() * data.num_graphs
@@ -294,7 +296,7 @@ class Environment:
         model.eval()
         ys = []
         preds = []
-        for data in loader:
+        for data in tqdm(loader):
             data = data.to(device)
             ys.append(data.y.detach().cpu().numpy())
             preds.append(model(data).detach().cpu().numpy())
@@ -348,8 +350,8 @@ class Environment:
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
     with open(args.config, 'r') as f:
-        config = json.loads(f)
-
-    env = Environment(cfg.target_norm, cfg.test_prob, cfg.valid_prob, cfg.b_size, cfg.outpath, config, cfg.load_model)
-    env.load_dataset(cfg.db_root, cfg.file_names)
+        config = json.load(f)
+    env = Environment(cfg.target_norm, cfg.test_prob, cfg.valid_prob, cfg.b_size, args.output_path, config,
+                      cfg.load_model)
+    env.load_dataset(args.data_path, cfg.file_names)
     env.train_model(cfg.num_epochs, cfg.model_name)
