@@ -20,7 +20,7 @@ def fake_smiles_and_gridscore_dataframe():
     return df
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def root_dir(fake_smiles_and_gridscore_dataframe):
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
@@ -33,7 +33,7 @@ def root_dir(fake_smiles_and_gridscore_dataframe):
     logging.info("deleting test folder")
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def processed_dir(root_dir):
     processed_dir = Path(root_dir).joinpath("processed")
     return str(processed_dir)
