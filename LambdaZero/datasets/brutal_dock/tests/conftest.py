@@ -9,6 +9,7 @@ import pytest
 import torch
 from torch_geometric.data import Batch
 
+from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_random_molecule_data
 from LambdaZero.datasets.brutal_dock.tests.fake_molecule_dataset import FakeMoleculeDataset
 
@@ -51,7 +52,7 @@ def number_of_node_features():
     """
     How many features are on a graph node. Free parameter.
     """
-    return 17
+    return 3
 
 
 @pytest.fixture
@@ -94,6 +95,12 @@ def random_molecule_batch(list_random_molecules):
 @pytest.fixture
 def random_molecule_dataset(list_random_molecules):
     return FakeMoleculeDataset(list_random_molecules)
+
+
+@pytest.fixture
+def mpnn_model(number_of_node_features):
+    mpnn = MessagePassingNet(num_feat=number_of_node_features, dim=8)
+    return mpnn
 
 
 @pytest.fixture

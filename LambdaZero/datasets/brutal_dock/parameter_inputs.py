@@ -10,7 +10,7 @@ from LambdaZero.datasets.brutal_dock import ROOT_DIR
 
 MODEL_PARAMETERS_KEY = "model"
 TRAINING_PARAMETERS_KEY = "training"
-RUN_IDENTIFICATION_PARAMETERS_KEY = "run_identification"
+RUN_PARAMETERS_KEY = "run_parameters"
 
 
 def get_input_arguments():
@@ -73,17 +73,17 @@ def augment_configuration_with_run_parameters(
 ):
     input_and_run_config = dict(input_config)
 
-    run_id_dict = input_and_run_config[RUN_IDENTIFICATION_PARAMETERS_KEY]
+    run_parameters_dict = input_and_run_config[RUN_PARAMETERS_KEY]
 
-    run_id_dict["git_hash"] = get_git_hash()
-    run_id_dict["user"] = get_user()
+    run_parameters_dict["git_hash"] = get_git_hash()
+    run_parameters_dict["user"] = get_user()
 
-    run_id_dict["working_directory"] = working_directory
-    run_id_dict["output_directory"] = output_directory
-    run_id_dict["data_directory"] = data_directory
+    run_parameters_dict["working_directory"] = working_directory
+    run_parameters_dict["output_directory"] = output_directory
+    run_parameters_dict["data_directory"] = data_directory
 
-    run_id_dict["execution_file_name"] = str(executable_file_path.relative_to(ROOT_DIR))
+    run_parameters_dict["execution_file_name"] = str(executable_file_path.relative_to(ROOT_DIR))
 
-    input_and_run_config[RUN_IDENTIFICATION_PARAMETERS_KEY] = run_id_dict
+    input_and_run_config[RUN_PARAMETERS_KEY] = run_parameters_dict
 
     return input_and_run_config
