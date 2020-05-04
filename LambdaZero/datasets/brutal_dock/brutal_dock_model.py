@@ -55,12 +55,12 @@ class cfg:
         programs_dir = "/home/mkkr/Programs"
         summaries_dir = "/home/mkkr/scratch/model_summaries"
 
-    load_model = None #os.path.join(datasets_dir, "brutal_dock/d4/d4_100k_mine_model_001")
+    load_model = None  # os.path.join(datasets_dir, "brutal_dock/d4/d4_100k_mine_model_001")
     db_root = os.path.join(datasets_dir, "brutal_dock/d4")
     db_name = "dock_blocks105_walk40_12_clust"
     molprops = ["gridscore", "klabel"]
     target = "gridscore"
-    file_names = ["dock_blocks105_walk40_clust", "dock_blocks105_walk40_2_clust"] # fixme ifcoord in molmdp
+    file_names = ["dock_blocks105_walk40_clust", "dock_blocks105_walk40_2_clust"]  # fixme ifcoord in molmdp
     target_norm = [-26.3, 12.3]
     test_prob = 0.1
     valid_prob = 0.1
@@ -70,22 +70,24 @@ class cfg:
     outpath = "/home/maksym/Desktop/model_summaries/brutal_dock"
     model_name = db_name + "model002"
 
-#df = pd.read_feather(os.path.join(cfg.db_root, "raw", cfg.file_names[1])+".feather")
-#gridscores = df["gridscore"].to_numpy()
-#print(gridscores.mean(), gridscores.std())
-#time.sleep(200)
+# df = pd.read_feather(os.path.join(cfg.db_root, "raw", cfg.file_names[1])+".feather")
+# gridscores = df["gridscore"].to_numpy()
+# print(gridscores.mean(), gridscores.std())
+# time.sleep(200)
 
 
 class MyTransform(object):
-    def __init__(self,target_norm,target=cfg.target):
+    def __init__(self, target_norm, target=cfg.target):
         self.target = target
         self.target_norm = target_norm
+
     def __call__(self, data):
         # Specify target.
         y = getattr(data, self.target)
         y = (y - self.target_norm[0]) / self.target_norm[1]
         data.y = y
         return data
+
 
 class Complete(object):
     def __call__(self, data):
@@ -113,10 +115,10 @@ class Complete(object):
 # to do: move to a different .py file
 class MPNN(torch.nn.Module):
     def __init__(self,
-                 input_feat: int =14,
+                 node_feat: int = 14,
+                 edge_feat: int = 4,
                  gcn_in: int = 10,
                  gcn_out: int = 128,
-                 nedge: int = 4,
                  edge_hidden: int = 128,
                  gru_out: int = 128,
                  gru_layers: int = 1,
@@ -127,10 +129,10 @@ class MPNN(torch.nn.Module):
         message passing neural network.
 
         Args:
-            input_feat (int, optional): number of input features. Defaults to 14.
+            node_feat (int, optional): number of input features. Defaults to 14.
+            edge_feat (int, optional): number of edge features. Defaults to 3.
             gcn_in (int, optional): size of GCN inputs size. Defaults to 10.
             gcn_out (int, optional): size of GCN outsize embedding size. Defaults to 128.
-            nedge (int, optional): number of edge features. Defaults to 4.
             edge_hidden (int, optional): edge hidden embedding size. Defaults to 128.
             gru_out (int, optional): size out GRU output. Defaults to 128.
             gru_layers (int, optional): number of layers in GRU. Defaults to 1.
@@ -138,10 +140,10 @@ class MPNN(torch.nn.Module):
             out_size (int, optional): output size. Defaults to 1.
         """
         super(MPNN, self).__init__()
-        self.lin0 = nn.Linear(input_feat, gcn_in)
+        self.lin0 = nn.Linear(node_feat, gcn_in)
 
         edge_network = nn.Sequential(
-            nn.Linear(nedge, edge_hidden),
+            nn.Linear(edge_feat, edge_hidden),
             nn.ReLU(),
             nn.Linear(edge_hidden, gcn_in * gcn_out)
         )
@@ -198,14 +200,14 @@ def knn_split(klabels, probs):
 
     klabel_sort = np.argsort(klabels)
     klabel_unq, klabel_count = np.unique(klabels, return_counts=True)
-    klabel_slices = np.concatenate([np.asarray([0]), np.cumsum(klabel_count)],0)
+    klabel_slices = np.concatenate([np.asarray([0]), np.cumsum(klabel_count)], 0)
 
     splits = [[] for _ in range(nsplits)]
     for i, klabel in enumerate(klabel_unq):
         klabel_idx = klabel_sort[klabel_slices[i]:klabel_slices[i + 1]]
         draw = np.random.choice(np.arange(nsplits), 1, p=probs, replace=True)[0]
         splits[draw].append(klabel_idx)
-    splits = (np.concatenate(sp,0) for sp in splits)
+    splits = (np.concatenate(sp, 0) for sp in splits)
     return splits
 
 
@@ -229,16 +231,28 @@ class Environment:
         self.valid_prob = valid_prob
         self.b_size = b_size
         # load and normalize dataset
-        self.transform = T.Compose([MyTransform(target_norm), Complete(),]) #  T.Distance(norm=False)
+        self.transform = T.Compose([MyTransform(target_norm), Complete(), ])  # T.Distance(norm=False)
 
         # make model
         model_name = config['model']['name']
         if model_name != 'MPNN':
             raise ValueError(f'Model type {model_name} is not implemented.')
         # initialize model
-        self.model = MPNN(config['model']).to(device)
-        if load_model is not None: self.model.load_state_dict(torch.load(load_model))
-        if not os.path.exists(outpath): os.makedirs(outpath)
+        self.model = MPNN(
+            node_feat=14,
+            edge_feat=4,
+            gcn_in=config['model'].get('gcn_in', 10),
+            gcn_out=config['model'].get('gcn_out', 128),
+            edge_hidden=config['model'].get('edge_hidden', 128),
+            gru_out=config['model'].get('gru_out', 128),
+            gru_layers=config['model'].get('gru_layers', 1),
+            linear_hidden=config['model'].get('linear_hidden', 128),
+            out_size=1
+        ).to(device)
+        if load_model is not None:
+            self.model.load_state_dict(torch.load(load_model))
+        if not os.path.exists(outpath):
+            os.makedirs(outpath)
         self.outpath = outpath
 
     def load_dataset(self, db_root, file_names):
@@ -249,11 +263,10 @@ class Environment:
         # Split datasets.
         klabels = [dataset[i].klabel for i in range(len(dataset))]
         test_probs = [self.test_prob, self.valid_prob, 1. - self.test_prob - self.valid_prob]
-        splits = knn_split(klabels,test_probs)
+        splits = knn_split(klabels, test_probs)
         self.test_idx, self.val_idx, self.train_idx = (torch.from_numpy(sp) for sp in splits)
 
         # if reset_split:
-        #if reset_split:
         #    self.test_idx, self.val_idx, self.train_idx = _group_split(, self.test_prob, self.valid_prob)
         # else:
         #     self.test_idx, self.val_idx, self.train_idx = _knn_split(dataset, self.test_prob, self.valid_prob,
@@ -296,11 +309,12 @@ class Environment:
     def train_model(self, num_epochs, save_model, lr=0.001, sched_factor=0.7, sched_patience=5, min_lr=0.00001,
                     load_model=None):
 
-        if load_model is not None: self.model.load_state_dict(torch.load(load_model))
+        if load_model is not None:
+            self.model.load_state_dict(torch.load(load_model))
         self.model.train()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=sched_factor,
-                                                            patience=sched_patience, min_lr=min_lr)
+                                                               patience=sched_patience, min_lr=min_lr)
         best_val_error = None
         for epoch in range(1, num_epochs + 1):
             lr = scheduler.optimizer.param_groups[0]['lr']
