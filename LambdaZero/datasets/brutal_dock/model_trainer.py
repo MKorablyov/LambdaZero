@@ -113,7 +113,7 @@ class AbstractModelTrainer(ABC):
                                                                patience=sched_patience,
                                                                min_lr=min_lr)
 
-        best_validation_loss = None
+        best_validation_loss = float("inf")
         for epoch in range(1, num_epochs + 1):
 
             lr = scheduler.optimizer.param_groups[0]['lr']
@@ -123,7 +123,7 @@ class AbstractModelTrainer(ABC):
 
             scheduler.step(average_validation_loss)
 
-            if best_validation_loss is None or average_validation_loss <= best_validation_loss:
+            if average_validation_loss <= best_validation_loss:
                 best_validation_loss = average_validation_loss
                 torch.save(model.state_dict(), best_model_output_path)
 
