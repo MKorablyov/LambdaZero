@@ -10,6 +10,7 @@ import torch
 from torch_geometric.data import Batch
 
 from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_random_molecule_data
+from LambdaZero.datasets.brutal_dock.tests.fake_molecule_dataset import FakeMoleculeDataset
 
 
 @pytest.fixture
@@ -88,6 +89,11 @@ def random_molecule_data(list_random_molecules):
 @pytest.fixture
 def random_molecule_batch(list_random_molecules):
     return Batch.from_data_list(list_random_molecules)
+
+
+@pytest.fixture
+def random_molecule_dataset(list_random_molecules):
+    return FakeMoleculeDataset(list_random_molecules)
 
 
 @pytest.fixture
