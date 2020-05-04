@@ -9,7 +9,7 @@ import pytest
 import torch
 from torch_geometric.data import Batch
 
-from LambdaZero.datasets.brutal_dock.tests.testing_data_utils import get_list_edge_indices_for_a_ring, \
+from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_list_edge_indices_for_a_ring, \
     get_random_molecule_data
 
 
