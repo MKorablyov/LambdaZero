@@ -30,6 +30,10 @@ def get_input_arguments():
         "--data_directory", help="Directory where to fetch preprocessed data",
     )
 
+    parser.add_argument(
+        "--tracking_uri", help="Directory where the experiment logger will store metric logs",
+    )
+
     parser.add_argument("--input", help="path to input configuration file, in json format")
 
     args = parser.parse_args(sys.argv[1:])
@@ -67,23 +71,35 @@ def write_configuration_file(json_config_path: str, config_dict: dict):
 def augment_configuration_with_run_parameters(
     input_config: dict,
     executable_file_path: Path,
-    working_directory: str,
-    output_directory: str,
-    data_directory: str,
+    args: argparse.ArgumentParser,
 ):
     input_and_run_config = dict(input_config)
 
     run_parameters_dict = input_and_run_config[RUN_PARAMETERS_KEY]
+    run_parameters_dict["tracking_uri"] = args.tracking_uri
 
     run_parameters_dict["git_hash"] = get_git_hash()
     run_parameters_dict["user"] = get_user()
 
-    run_parameters_dict["working_directory"] = working_directory
-    run_parameters_dict["output_directory"] = output_directory
-    run_parameters_dict["data_directory"] = data_directory
+    run_parameters_dict["working_directory"] = args.working_directory
+    run_parameters_dict["output_directory"] = args.output_directory
+    run_parameters_dict["data_directory"] = args.data_directory
 
     run_parameters_dict["execution_file_name"] = str(executable_file_path.relative_to(ROOT_DIR))
 
     input_and_run_config[RUN_PARAMETERS_KEY] = run_parameters_dict
+
+    return input_and_run_config
+
+
+def get_input_and_run_configuration(executable_file_path: Path):
+    args = get_input_arguments()
+
+    input_config = read_configuration_file(args.input)
+
+    input_and_run_config = augment_configuration_with_run_parameters(
+        input_config,
+        executable_file_path,
+        args)
 
     return input_and_run_config
