@@ -1,0 +1,22 @@
+{
+    "run_parameters": {
+        "experiment_name": "Message Passing Neural Network",
+        "run_name": "debugging"
+    },
+    "training": {
+        "num_epochs": 100,
+        "num_workers": 4,
+        "batch_size": 4096,
+        "learning_rate": 0.0001,
+        "train_fraction": 0.8,
+        "validation_fraction": 0.1
+    },
+    "model": {
+        "name": "MPNN",
+        "gcn_size": 128,
+        "edge_hidden": 128,
+        "gru_out": 128,
+        "gru_layers": 1,
+        "linear_hidden": 128
+    }
+}
