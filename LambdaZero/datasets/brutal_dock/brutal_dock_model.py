@@ -21,6 +21,10 @@ from LambdaZero import inputs
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR
+from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
+
+device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 def parse_args(args):
 
@@ -47,6 +51,9 @@ def parse_args(args):
                         help='Path to the json file containing the configuration of the model.')
 
     return parser.parse_args(args)
+model_summary_dir = RESULTS_DIR.joinpath("model_summaries")
+model_summary_dir.mkdir(parents=True, exist_ok=True)
+
 
 
 class cfg:
@@ -56,9 +63,9 @@ class cfg:
         programs_dir = "/home/maksym/Programs"
         summaries_dir = "/home/maksym/Desktop/model_summaries"
     else:
-        datasets_dir = "/home/mkkr/scratch/Datasets"
-        programs_dir = "/home/mkkr/Programs"
-        summaries_dir = "/home/mkkr/scratch/model_summaries"
+        datasets_dir = str(ROOT_DIR.joinpath("Datasets"))
+        programs_dir = str(ROOT_DIR.joinpath("Programs"))
+        summaries_dir = str(model_summary_dir)
 
     load_model = None  # os.path.join(datasets_dir, "brutal_dock/d4/d4_100k_mine_model_001")
     db_root = os.path.join(datasets_dir, "brutal_dock/d4")
@@ -72,7 +79,7 @@ class cfg:
     b_size = 16
     dim = 64
     num_epochs = 120
-    outpath = "/home/maksym/Desktop/model_summaries/brutal_dock"
+    outpath = str(model_summary_dir.joinpath("brutal_dock"))
     model_name = db_name + "model002"
 
 # df = pd.read_feather(os.path.join(cfg.db_root, "raw", cfg.file_names[1])+".feather")

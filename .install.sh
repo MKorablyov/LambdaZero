@@ -17,7 +17,7 @@ conda activate "$CONDA_ENV_NAME"
 set -u
 
 # Install all the conda-available packages
-conda install -y $torch_tensorflow pytorch::pytorch==1.4.0 pytorch::torchvision conda-forge::rdkit pandas networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3 pytest pytest-cov pyarrow
+conda install -y $torch_tensorflow pytorch::pytorch==1.4.0 pytorch::torchvision conda-forge::rdkit pandas networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3 pytest pytest-cov pyarrow mlflow
 
 # Prevent conda from being stupid about versions
 conda config --env --add pinned_packages pytorch==1.4
