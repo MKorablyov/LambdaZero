@@ -8,7 +8,7 @@ name: test package
 on:
   push:
     branches:
-      - train-reward-model
+      - '*'
 
 jobs:
   build:
