@@ -6,7 +6,7 @@ as a supervised learning task. The goal is to train a model that will be plugged
 
 ### Installation
 
-LambdaZero must be installed using `install-cpu.sh` of `install-gpu.sh` from the root directory of the project. Then it might be necessary to install additional components required by `pandas` to read the dataset (which are not required for the default use of LambdaZero):
+LambdaZero must be installed using `install-cpu.sh` or `install-gpu.sh` from the root directory of the project. Then it might be necessary to install additional components required by `pandas` to read the dataset (which are not required for the default use of LambdaZero):
 
     conda install snappy
     pip install pyarrow  # conda install pyarrow failed for me
@@ -33,7 +33,7 @@ The dataset raw file (for D4, not for covid) contains smiles strings (our input)
     .../LambdaZero/Datasets/brutal_dock/d4/raw/dock_blocks105_walk40_clust.feather
     .../LambdaZero/Datasets/brutal_dock/d4/raw/dock_blocks105_walk40_2_clust.feather
 
-The dataframe columns are `'simles'` and `'gridscore'`. The column `'klabel'` is also used by `brutal_dock_model.py`, but I donn't know its purpose at the time of this writing. The targets (`gridscore`) must be normalized for training `(y-y.mean())/y.std()` to be comparable with the original model.
+The dataframe columns are `'smiles'` and `'gridscore'`. The column `'klabel'` is also used by `brutal_dock_model.py`, but I donn't know its purpose at the time of this writing. The targets (`gridscore`) must be normalized for training `(y-y.mean())/y.std()` to be comparable with the original model.
 
 `brutal_dock_model.py` first builds the molecular graphs for each SMILES string and put those in a custom dataset object (grandchildren of `torch-geometric.Dataset`). The latter is saved for later use in
 
