@@ -52,6 +52,7 @@ class MessagePassingNet(torch.nn.Module):
         h = out.unsqueeze(0)
 
         for i in range(3):
+            # blocks are reused here - this is subcase, generally in MPNN different instances would be used for each layer
             m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
             out, h = self.gru(m.unsqueeze(0), h)
             out = out.squeeze(0)
