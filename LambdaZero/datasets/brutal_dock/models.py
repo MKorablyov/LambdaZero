@@ -4,7 +4,37 @@ from torch.nn import functional as F
 from torch_geometric.nn import NNConv, Set2Set
 
 
-class MessagePassingNet(torch.nn.Module):
+class ModelBase(torch.nn.Module):
+    """
+    This base class for models implements useful factory methods so it is
+    easy to create a model instance given a specific class and input parameters.
+    """
+
+    def __init__(self, **kargs):
+        super(ModelBase, self).__init__()
+
+    @classmethod
+    def create_model_for_training(
+            cls,
+            model_instantiation_kwargs,
+    ):
+        """
+        Factory method to create a new model for the purpose of training.
+        :param model_instantiation_kwargs:
+            dictionary containing all the specific parameters needed to instantiate model.
+        :return:
+            instance of the model.
+        """
+        model = cls(**model_instantiation_kwargs)
+
+        return model
+
+    @staticmethod
+    def load_model_object_from_path(model_path: str):
+        return torch.load(model_path, map_location=torch.device("cpu"))
+
+
+class MessagePassingNet(ModelBase):
     def __init__(self,
                  node_feat: int = 14,
                  edge_feat: int = 4,
