@@ -51,7 +51,8 @@ def experiment_driver(
     set_logging_directory(logging_directory)
 
     logging.info(f"Instantiating full dataset")
-    dataset = dataset_class.create_dataset(work_dir, data_dir)
+    dataset = dataset_class.create_dataset(root_dir=work_dir,
+                                           original_raw_data_dir=data_dir)
 
     logging.info(f"Instantiating model for training")
     model = model_class.create_model_for_training(model_parameters)
