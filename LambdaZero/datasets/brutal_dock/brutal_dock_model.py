@@ -7,27 +7,24 @@ import sys
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torch_geometric.transforms as T
-import torch.nn as nn
 from torch_geometric.data import DataLoader
 from torch_geometric.nn import NNConv, Set2Set
 from torch_geometric.utils import remove_self_loops
 from tqdm import tqdm
 
 from LambdaZero import inputs
+from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR
 
-# import seaborn as sns
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+model_summary_dir = RESULTS_DIR.joinpath("model_summaries")
+model_summary_dir.mkdir(parents=True, exist_ok=True)
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR
-from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
-
-device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 def parse_args(args):
-
     parser = argparse.ArgumentParser(description='Train a reward model (brutal dock)')
 
     parser.add_argument('--log', type=str, default=None,
@@ -51,8 +48,8 @@ def parse_args(args):
                         help='Path to the json file containing the configuration of the model.')
 
     return parser.parse_args(args)
-model_summary_dir = RESULTS_DIR.joinpath("model_summaries")
-model_summary_dir.mkdir(parents=True, exist_ok=True)
+
+
 
 
 
@@ -81,11 +78,6 @@ class cfg:
     num_epochs = 120
     outpath = str(model_summary_dir.joinpath("brutal_dock"))
     model_name = db_name + "model002"
-
-# df = pd.read_feather(os.path.join(cfg.db_root, "raw", cfg.file_names[1])+".feather")
-# gridscores = df["gridscore"].to_numpy()
-# print(gridscores.mean(), gridscores.std())
-# time.sleep(200)
 
 
 class MyTransform(object):
@@ -124,7 +116,7 @@ class Complete(object):
         return data
 
 
-# to do: move to a different .py file
+# TODO: move to a different .py file
 class MPNN(torch.nn.Module):
     def __init__(self,
                  node_feat: int = 14,
