@@ -8,14 +8,21 @@ from torch_geometric.data import InMemoryDataset
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_smiles_and_scores_from_feather, get_molecule_graphs_from_smiles_and_scores
 
 
-class D4MoleculesDataset(InMemoryDataset):
+class MoleculesDatasetBase(InMemoryDataset):
+    def __init__(self, root_dir: str, original_raw_data_dir: str, transform=None, pre_transform=None):
+        self.original_raw_data_dir_path = Path(original_raw_data_dir)
+        super(MoleculesDatasetBase, self).__init__(root_dir, transform=transform, pre_transform=pre_transform)
+
+    @classmethod
+    def create_dataset(cls, root_dir: str, original_raw_data_dir: str):
+        return cls(root_dir, original_raw_data_dir)
+
+
+class D4MoleculesDataset(MoleculesDatasetBase):
     feather_filename = 'dock_blocks105_walk40_clust.feather'
 
     def __init__(self, root_dir: str, original_raw_data_dir: str):
-        self.original_raw_data_dir_path = Path(original_raw_data_dir)
-
-        super(D4MoleculesDataset, self).__init__(root_dir, transform=None, pre_transform=None)
-
+        super(D4MoleculesDataset, self).__init__(root_dir, original_raw_data_dir)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
@@ -26,7 +33,8 @@ class D4MoleculesDataset(InMemoryDataset):
     def processed_file_names(self):
         return ['d4_processed_data.pt']
 
-    # TODO: This download method could be in a base class
+    # TODO: this should really be in the base class, but putting it there naively breaks the
+    #  code because pytorch_geometric's funny way of looking for the download method by introspection.
     def download(self):
         # Download to `self.raw_dir`.
         raw_dir_path = Path(self.raw_dir)
