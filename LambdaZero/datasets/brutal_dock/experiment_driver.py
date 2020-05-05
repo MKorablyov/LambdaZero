@@ -22,7 +22,8 @@ loss_function = F.mse_loss
 def experiment_driver(
     config: Dict[str, Any],
     dataset_class: Type[MoleculesDatasetBase],
-    model_class: Type[ModelBase]
+    model_class: Type[ModelBase],
+    random_seed: int=0,
 ) -> float:
     """
     This method drives the execution of an experiment. It is responsible for
@@ -34,7 +35,7 @@ def experiment_driver(
         model_class: class for the model, which should derive from ModelBase.
     """
 
-    torch.manual_seed(0)
+    torch.manual_seed(random_seed)
 
     logging.info(f"Parsing input arguments")
     run_parameters = config.pop(RUN_PARAMETERS_KEY)
