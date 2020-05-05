@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, abstractmethod
 import logging
 from pathlib import Path
@@ -8,6 +9,7 @@ import torch
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 
@@ -67,7 +69,7 @@ class AbstractModelTrainer(ABC):
         number_of_batches = len(dataloader)
         batch_counter = 0
 
-        for batch in dataloader:
+        for batch in tqdm(dataloader, desc="TRAIN", file=sys.stdout):
             batch_counter += 1
             info = f" - training : batch  {batch_counter} of {number_of_batches}"
             logging.info(info)
@@ -91,7 +93,7 @@ class AbstractModelTrainer(ABC):
         model.eval()
         total_epoch_loss = 0.0
 
-        for batch in dataloader:
+        for batch in tqdm(dataloader, desc="VALID", file=sys.stdout):
             batch_loss = self._get_batch_loss(batch, model)
             batch_loss_value = batch_loss.item()
             total_epoch_loss += batch_loss_value*self._get_size_of_batch(batch)
@@ -138,7 +140,8 @@ class AbstractModelTrainer(ABC):
         list_actuals = []
         list_predicted = []
         with torch.no_grad():
-            for batch in dataloader:
+            for batch in tqdm(dataloader, desc="EVAL", file=sys.stdout):
+
                 y_actual = self._get_target_from_batch(batch)
                 list_actuals.extend(list(y_actual.numpy()))
 
