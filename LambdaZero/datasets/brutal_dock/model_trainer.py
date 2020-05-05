@@ -67,13 +67,8 @@ class AbstractModelTrainer(ABC):
         total_epoch_loss = 0.0
 
         number_of_batches = len(dataloader)
-        batch_counter = 0
 
         for batch in tqdm(dataloader, desc="TRAIN", file=sys.stdout):
-            batch_counter += 1
-            info = f" - training : batch  {batch_counter} of {number_of_batches}"
-            logging.info(info)
-
             optimizer.zero_grad()
             batch_loss = self._get_batch_loss(batch, model)
             batch_loss.backward()
