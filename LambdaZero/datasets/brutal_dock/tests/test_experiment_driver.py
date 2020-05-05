@@ -3,7 +3,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from torch_geometric.data import InMemoryDataset
 
+from LambdaZero.core.alpha_zero_policy import torch
+from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
@@ -11,17 +14,44 @@ from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY,
 
 
 @pytest.fixture
-def data_dir():
+def expected_raw_file():
+    return 'dock_blocks105_walk40_clust.feather'
+
+
+@pytest.fixture
+def expected_processed_file():
+    return 'd4_processed_data.pt'
+
+
+@pytest.fixture
+def data_dir(expected_raw_file):
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
-        yield Path(tmp_dir_str)
+        data_dir_path = Path(tmp_dir_str).joinpath('raw/')
+        data_dir_path.mkdir(exist_ok=True)
+        data_dir_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
+        yield data_dir_path
     logging.info("deleting test folder")
 
 
 @pytest.fixture
-def work_dir():
+def work_dir(expected_raw_file, expected_processed_file, random_molecule_dataset):
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
+        raw_path = Path(tmp_dir_str).joinpath('raw/')
+        raw_path.mkdir(exist_ok=True)
+        raw_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
+
+        processed_path = Path(tmp_dir_str).joinpath('processed/')
+        processed_path.mkdir(exist_ok=True)
+        processed_file_path = processed_path.joinpath(expected_processed_file)
+
+        # This is a bit dirty. The collate method should really be a class method;
+        # looking at that code, there is no reference to "self" internally. Here
+        # we just want to spoof what this method does so we can shove our dataset
+        # in the right place.
+        torch.save(InMemoryDataset.collate(InMemoryDataset, random_molecule_dataset), str(processed_file_path))
+
         yield Path(tmp_dir_str)
     logging.info("deleting test folder")
 
@@ -71,6 +101,7 @@ def config(data_dir, work_dir, output_dir, number_of_node_features):
 
 
 @pytest.mark.parametrize("number_of_molecules", [20])
-def test_smoke_test_experiment_driver(config, random_molecule_dataset):
-
-    _ = experiment_driver(config, random_molecule_dataset, MessagePassingNet)
+def test_smoke_test_experiment_driver(config):
+    dataset_class = D4MoleculesDataset
+    model_class = MessagePassingNet
+    _ = experiment_driver(config, dataset_class, model_class)
