@@ -43,7 +43,7 @@ def root_dir():
 
 def test_d4_molecules_dataset(root_dir, original_raw_data_dir, fake_smiles_and_gridscore_dataframe):
 
-    dataset = D4MoleculesDataset(root_dir, original_raw_data_dir)
+    dataset = D4MoleculesDataset.create_dataset(root_dir, original_raw_data_dir)
 
     assert dataset.processed_dir == str(Path(root_dir).joinpath('processed/'))
 
