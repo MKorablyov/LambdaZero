@@ -26,6 +26,7 @@ class D4MoleculesDataset(InMemoryDataset):
     def processed_file_names(self):
         return ['d4_processed_data.pt']
 
+    # TODO: This download method could be in a base class
     def download(self):
         # Download to `self.raw_dir`.
         raw_dir_path = Path(self.raw_dir)
