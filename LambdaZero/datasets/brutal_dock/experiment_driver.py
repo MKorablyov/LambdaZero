@@ -14,7 +14,7 @@ from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \
-    TRAINING_PARAMETERS_KEY
+    TRAINING_PARAMETERS_KEY, write_configuration_file
 
 loss_function = F.mse_loss
 
@@ -91,6 +91,14 @@ def experiment_driver(
                                      run_parameters)
     experiment_logger.log_parameters("training", training_parameters)
     experiment_logger.log_parameters("model", model_parameters)
+
+    logging.info(f"Writing configuration to artifact directory")
+    json_config_path = str(out_dir.joinpath("config.json"))
+    config = dict(RUN_PARAMETERS_KEY=run_parameters,
+                  TRAINING_PARAMETERS_KEY= training_parameters,
+                  MODEL_PARAMETERS_KEY=model_parameters)
+    write_configuration_file(json_config_path, config)
+    experiment_logger.log_artifact(json_config_path)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_trainer = MoleculeModelTrainer(loss_function,
