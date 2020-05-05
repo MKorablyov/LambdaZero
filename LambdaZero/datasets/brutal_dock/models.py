@@ -1,3 +1,5 @@
+import logging
+
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
@@ -32,6 +34,23 @@ class ModelBase(torch.nn.Module):
     @staticmethod
     def load_model_object_from_path(model_path: str):
         return torch.load(model_path, map_location=torch.device("cpu"))
+
+    @classmethod
+    def load_model_from_file(cls, model_path, model_instantiation_kwargs):
+        """
+        Factory method to instantiate model for evaluation.
+        :param model_path: path to saved model on disk
+        :param model_instantiation_kwargs: parameters needed for model instantiation
+        :return: model object
+        """
+
+        logging.info(f"Instantiating model from checkoint file {model_path}")
+
+        model_object = cls.load_model_object_from_path(model_path)
+        model = cls(**model_instantiation_kwargs)
+        model.load_state_dict(model_object)
+
+        return model
 
 
 class MessagePassingNet(ModelBase):

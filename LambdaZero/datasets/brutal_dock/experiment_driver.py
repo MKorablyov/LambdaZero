@@ -113,7 +113,7 @@ def experiment_driver(
     experiment_logger.increment_step_and_log_metrics("best_val_loss", best_validation_loss)
 
     logging.info(f"Instantiate best model observed in training, loading from {best_model_path}")
-    best_model = model_class.load_model_object_from_path(best_model_path)
+    best_model = model_class.load_model_from_file(best_model_path, model_parameters)
 
     for label, dataloader in zip(['validation', 'test'], [validation_dataloader, test_dataloader]):
         list_actuals, list_predicted = model_trainer.apply_model(best_model, dataloader)
