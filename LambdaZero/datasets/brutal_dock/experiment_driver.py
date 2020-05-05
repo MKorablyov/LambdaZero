@@ -46,6 +46,9 @@ def experiment_driver(
     work_dir = Path(run_parameters.pop("working_directory"))
     out_dir = Path(run_parameters.pop("output_directory"))
 
+    work_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     logging_directory = out_dir.joinpath("logs/")
     logging_directory.mkdir(parents=True, exist_ok=True)
     set_logging_directory(logging_directory)
