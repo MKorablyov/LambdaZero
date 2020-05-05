@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
+from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
     MODEL_PARAMETERS_KEY
 
@@ -34,7 +35,7 @@ def output_dir():
 
 
 @pytest.fixture
-def config(data_dir, work_dir, output_dir):
+def config(data_dir, work_dir, output_dir, number_of_node_features):
     run_parameters = dict(data_directory=str(data_dir),
                           working_directory=str(work_dir),
                           output_directory=str(output_dir),
@@ -54,11 +55,13 @@ def config(data_dir, work_dir, output_dir):
                                validation_fraction=0.1)
 
     model_parameters = dict(name="MPNN",
-                            gcn_size=128,
-                            edge_hidden=128,
-                            gru_out=128,
+                            node_feat=number_of_node_features,
+                            edge_feat=4,
+                            gcn_size=8,
+                            edge_hidden=8,
+                            gru_out=8,
                             gru_layers=1,
-                            linear_hidden=128)
+                            linear_hidden=8)
 
     config = {RUN_PARAMETERS_KEY: run_parameters,
               TRAINING_PARAMETERS_KEY: training_parameters,
@@ -68,6 +71,6 @@ def config(data_dir, work_dir, output_dir):
 
 
 @pytest.mark.parametrize("number_of_molecules", [20])
-def test_smoke_test_experiment_driver(config, random_molecule_dataset, mpnn_model):
+def test_smoke_test_experiment_driver(config, random_molecule_dataset):
 
-    _ = experiment_driver(config, random_molecule_dataset, mpnn_model)
+    _ = experiment_driver(config, random_molecule_dataset, MessagePassingNet)

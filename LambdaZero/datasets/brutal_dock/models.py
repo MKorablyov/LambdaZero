@@ -36,6 +36,7 @@ class ModelBase(torch.nn.Module):
 
 class MessagePassingNet(ModelBase):
     def __init__(self,
+                 name: str = "MPNN",
                  node_feat: int = 14,
                  edge_feat: int = 4,
                  gcn_size: int = 128,
@@ -49,6 +50,7 @@ class MessagePassingNet(ModelBase):
         message passing neural network.
 
         Args:
+            name (str, optional): name of this model
             node_feat (int, optional): number of input features. Defaults to 14.
             edge_feat (int, optional): number of edge features. Defaults to 3.
             gcn_size (int, optional): size of GCN embedding size. Defaults to 128.
@@ -59,6 +61,8 @@ class MessagePassingNet(ModelBase):
             out_size (int, optional): output size. Defaults to 1.
         """
         super(MessagePassingNet, self).__init__()
+        self.name = name
+
         self.lin0 = nn.Linear(node_feat, gcn_size)
 
         edge_network = nn.Sequential(

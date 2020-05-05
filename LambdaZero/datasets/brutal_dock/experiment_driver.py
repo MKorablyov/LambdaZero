@@ -1,29 +1,26 @@
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Type
 
 import torch
-from torch import nn
-
-from torch_geometric.data import Dataset, DataLoader
-
 import torch.nn.functional as F
+from torch_geometric.data import Dataset, DataLoader
 
 from LambdaZero.datasets.brutal_dock import set_logging_directory
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_split_datasets, get_scores_statistics
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
+from LambdaZero.datasets.brutal_dock.models import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \
     TRAINING_PARAMETERS_KEY
-
 
 loss_function = F.mse_loss
 
 def experiment_driver(
     config: Dict[str, Any],
     dataset: Dataset,
-    model: nn.Module
+    model_class: Type[ModelBase]
 ) -> float:
     """
     This method drives the execution of an experiment. It is responsible for
@@ -32,13 +29,12 @@ def experiment_driver(
     input:
         config: dictionary containing all the needed parameters
         dataset: the full instantiated dataset, which will be split within this driver
-        model: the instantiated model, which will be trained and evaluated.
+        model_class: class for the model, which should derive from ModelBase.
     """
 
     torch.manual_seed(0)
 
     logging.info(f"Parsing input arguments")
-
     run_parameters = config.pop(RUN_PARAMETERS_KEY)
     training_parameters = config[TRAINING_PARAMETERS_KEY]
     model_parameters = config[MODEL_PARAMETERS_KEY]
@@ -50,6 +46,9 @@ def experiment_driver(
     logging_directory = out_dir.joinpath("logs/")
     logging_directory.mkdir(parents=True, exist_ok=True)
     set_logging_directory(logging_directory)
+
+    logging.info(f"Instantiating model for training")
+    model = model_class.create_model_for_training(model_parameters)
 
     logging.info(f"Splitting data into train, validation, and test sets")
     training_dataset, validation_dataset, test_dataset = \
@@ -95,6 +94,7 @@ def experiment_driver(
 
     logging.info(f"Starting Model Training...")
     best_model_path = out_dir.joinpath("best_model.ckpt")
+
     best_validation_loss = model_trainer.train_model(model,
                                                      training_dataloader,
                                                      validation_dataloader,
