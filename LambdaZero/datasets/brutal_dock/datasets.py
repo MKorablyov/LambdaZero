@@ -1,4 +1,5 @@
 import logging
+import shutil
 from pathlib import Path
 
 import torch
@@ -10,8 +11,11 @@ from LambdaZero.datasets.brutal_dock.dataset_utils import get_smiles_and_scores_
 class D4MoleculesDataset(InMemoryDataset):
     feather_filename = 'dock_blocks105_walk40_clust.feather'
 
-    def __init__(self, root_dir: str):
+    def __init__(self, root_dir: str, original_raw_data_dir: str):
+        self.original_raw_data_dir_path = Path(original_raw_data_dir)
+
         super(D4MoleculesDataset, self).__init__(root_dir, transform=None, pre_transform=None)
+
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
@@ -24,7 +28,15 @@ class D4MoleculesDataset(InMemoryDataset):
 
     def download(self):
         # Download to `self.raw_dir`.
-        raise NotImplementedError("Raw data is not where it is expected: review code")
+        raw_dir_path = Path(self.raw_dir)
+
+        for raw_file_name in self.raw_file_names:
+            raw_data_path = raw_dir_path.joinpath(raw_file_name)
+            original_data_path = self.original_raw_data_dir_path.joinpath(raw_file_name)
+
+            if not raw_data_path.is_file():
+                logging.info(f"Copying {original_data_path} to {raw_data_path})")
+                shutil.copy(str(original_data_path), str(raw_data_path))
 
     def process(self):
         # Read data into huge `Data` list.
