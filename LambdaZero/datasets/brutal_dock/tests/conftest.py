@@ -99,7 +99,14 @@ def random_molecule_dataset(list_random_molecules):
 
 @pytest.fixture
 def mpnn_model(number_of_node_features):
-    mpnn = MessagePassingNet(num_feat=number_of_node_features, dim=8)
+    mpnn = MessagePassingNet(node_feat=number_of_node_features,
+                             edge_feat=4,
+                             gcn_size=8,
+                             edge_hidden=8,
+                             gru_out=8,
+                             gru_layers=1,
+                             linear_hidden=8,
+                             out_size=1)
     return mpnn
 
 
