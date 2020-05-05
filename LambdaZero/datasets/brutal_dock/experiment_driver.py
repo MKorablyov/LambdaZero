@@ -4,10 +4,11 @@ from typing import Dict, Any, Type
 
 import torch
 import torch.nn.functional as F
-from torch_geometric.data import Dataset, DataLoader
+from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock import set_logging_directory
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_split_datasets, get_scores_statistics
+from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
@@ -20,7 +21,7 @@ loss_function = F.mse_loss
 
 def experiment_driver(
     config: Dict[str, Any],
-    dataset: Dataset,
+    dataset_class: Type[MoleculesDatasetBase],
     model_class: Type[ModelBase]
 ) -> float:
     """
@@ -47,6 +48,9 @@ def experiment_driver(
     logging_directory = out_dir.joinpath("logs/")
     logging_directory.mkdir(parents=True, exist_ok=True)
     set_logging_directory(logging_directory)
+
+    logging.info(f"Instantiating full dataset")
+    dataset = dataset_class.create_dataset(work_dir, data_dir)
 
     logging.info(f"Instantiating model for training")
     model = model_class.create_model_for_training(model_parameters)
