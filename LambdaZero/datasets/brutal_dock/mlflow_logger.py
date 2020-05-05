@@ -70,6 +70,9 @@ class MLFlowLogger:
         for key, value in parameters.items():
             self.mlflow_client.log_param(self.run_id, f"{prefix}--{key}", value)
 
+    def log_artifact(self, path: str):
+        self.mlflow_client.log_artifact(self.run_id, path)
+
     def finalize(self):
         self.mlflow_client.set_terminated(self.run_id, status='FINISHED')
 
