@@ -5,7 +5,6 @@ to the D4 docking dataset.
 It assumes the D4 docking data is available in a feather file.
 """
 import logging
-import shutil
 from pathlib import Path
 
 import torch
@@ -18,13 +17,17 @@ from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
     MODEL_PARAMETERS_KEY, augment_configuration_with_run_parameters
 
+# Specify which model class we want to instantiate and train
+model_class = MessagePassingNet
+dataset_class = D4MoleculesDataset
+
 torch.manual_seed(0)
 
 
 path_of_this_file = Path(__file__).resolve()
 
-d4_feather_data_path = BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/dock_blocks105_walk40_clust.feather")
-raw_data_path = RAW_EXPERIMENT_DATA_DIR.joinpath("dock_blocks105_walk40_clust.feather")
+data_dir = BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/")
+work_dir = EXPERIMENT_DATA_DIR
 
 
 def get_config():
@@ -63,23 +66,8 @@ if __name__ == "__main__":
     input_config = get_config()
     augmented_config = augment_configuration_with_run_parameters(input_config,
                                                                  path_of_this_file,
-                                                                 RESULTS_DIR,
-                                                                 RESULTS_DIR,
-                                                                 RAW_EXPERIMENT_DATA_DIR)
+                                                                 working_directory=work_dir,
+                                                                 output_directory=RESULTS_DIR,
+                                                                 data_directory=data_dir)
 
-    # TODO: this is very idiosyncratic to this specific dataset. Should be generalized,
-    #  and maybe done within the driver itself
-    if not raw_data_path.is_file():
-        logging.info(f"Copying {d4_feather_data_path} to {raw_data_path})")
-        shutil.copy(str(d4_feather_data_path), str(raw_data_path))
-
-    logging.info(f"Creating the full dataset")
-    dataset = D4MoleculesDataset(str(EXPERIMENT_DATA_DIR))
-
-    logging.info(f"Instantiating the model")
-
-    # TODO: instantiating the model should be done within the driver to insure the correct
-    #  parameters are used
-    model = MessagePassingNet()
-
-    best_validation_loss = experiment_driver(augmented_config, dataset, model)
+    best_validation_loss = experiment_driver(augmented_config, dataset_class, model_class)
