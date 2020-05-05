@@ -1,0 +1,32 @@
+name: test package
+# This workflow is triggered on pushes to the repository.
+# 
+# It is possible to start an interactive ssh session using the command:
+#    - name: Setup tmate session
+#      uses: mxschmitt/action-tmate@v2
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  build:
+
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout code 
+      uses: actions/checkout@v2
+    - name: create Conda environment 
+      run: |
+          ./install-cpu.sh -d NO -p NO --env_name=lz
+    - name: activate and setup environment, then test
+      run: |
+          source /usr/share/miniconda/etc/profile.d/conda.sh
+          echo "### activate environment"
+          conda activate lz
+          echo "### run setup develop"
+          python setup.py develop
+          echo "### running tests"
+          pytest 

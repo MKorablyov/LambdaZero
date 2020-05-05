@@ -1,3 +1,5 @@
+### TODO: This file is to compile on a mac: it shouldn't exist, the main file should detect the OS.
+
 conda create -n "$CONDA_ENV_NAME" -y python=3.6
 
 # extract the base conda directory. This can be tricky if the executable is a symlink.
@@ -17,8 +19,8 @@ conda activate "$CONDA_ENV_NAME"
 set -u
 
 # Install all the conda-available packages
-conda install -y $torch_tensorflow pytorch::pytorch==1.4.0 pytorch::torchvision conda-forge::rdkit pandas networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3 pytest pytest-cov pyarrow mlflow
-
+conda install -y $torch_tensorflow pytorch::pytorch==1.4.0 pytorch::torchvision conda-forge::rdkit pandas networkx scikit-image scikit-learn numba isodate jsonschema redis-py pyyaml colorama filelock aiohttp beautifulsoup4 future lz4 tabulate fastparquet boto3 pytest pytest-cov pyarrow ipython mlflow
+ 
 # Prevent conda from being stupid about versions
 conda config --env --add pinned_packages pytorch==1.4
 
@@ -26,7 +28,9 @@ conda config --env --add pinned_packages pytorch==1.4
 pip install torch-scatter==latest+${CUDA} torch-sparse==latest+${CUDA} torch-cluster==latest+${CUDA} torch-spline-conv==latest+${CUDA} -f https://pytorch-geometric.com/whl/torch-1.4.0.html
 
 # Need to install this first
-pip install https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-cp36-cp36m-manylinux1_x86_64.whl
+pip install https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-cp36-cp36m-macosx_10_13_intel.whl
+
+
 
 # Install the pip packages
 pip install psutil torch-geometric ray[rllib]

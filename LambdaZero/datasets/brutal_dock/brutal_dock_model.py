@@ -1,20 +1,25 @@
-import os,sys,time, socket,random
+import os
+import socket
+
 import numpy as np
+import pandas as pd
 import torch as th
 import torch.nn.functional as F
-from torch.nn import Sequential, Linear, ReLU, GRU
 import torch_geometric.transforms as T
-from torch_geometric.nn import NNConv, Set2Set
 from torch_geometric.data import DataLoader
 from torch_geometric.utils import remove_self_loops
-import pandas as pd
-from matplotlib import pyplot as plt
-import matplotlib.cm as cm
-#import seaborn as sns
-#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from LambdaZero import inputs
+
+# import seaborn as sns
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR
+from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
+
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+
+model_summary_dir = RESULTS_DIR.joinpath("model_summaries")
+model_summary_dir.mkdir(parents=True, exist_ok=True)
 
 
 
@@ -25,9 +30,9 @@ class cfg:
         programs_dir = "/home/maksym/Programs"
         summaries_dir = "/home/maksym/Desktop/model_summaries"
     else:
-        datasets_dir = "/home/mkkr/scratch/Datasets"
-        programs_dir = "/home/mkkr/Programs"
-        summaries_dir = "/home/mkkr/scratch/model_summaries"
+        datasets_dir = str(ROOT_DIR.joinpath("Datasets"))
+        programs_dir = str(ROOT_DIR.joinpath("Programs"))
+        summaries_dir = str(model_summary_dir)
 
     load_model = None #os.path.join(datasets_dir, "brutal_dock/d4/d4_100k_mine_model_001")
     db_root = os.path.join(datasets_dir, "brutal_dock/d4")
@@ -41,7 +46,7 @@ class cfg:
     b_size = 16
     dim = 64
     num_epochs = 120
-    outpath = "/home/maksym/Desktop/model_summaries/brutal_dock"
+    outpath = str(model_summary_dir.joinpath("brutal_dock"))
     model_name = db_name + "model002"
 
 #df = pd.read_feather(os.path.join(cfg.db_root, "raw", cfg.file_names[1])+".feather")
@@ -82,33 +87,6 @@ class Complete(object):
         data.edge_attr = edge_attr
         data.edge_index = edge_index
         return data
-
-class Net(th.nn.Module):
-    def __init__(self, num_feat=14, dim=cfg.dim):
-        super(Net, self).__init__()
-        self.lin0 = th.nn.Linear(num_feat, dim)
-
-        nn = Sequential(Linear(4, 128), ReLU(), Linear(128, dim * dim))
-        self.conv = NNConv(dim, dim, nn, aggr='mean')
-        self.gru = GRU(dim, dim)
-
-        self.set2set = Set2Set(dim, processing_steps=3)
-        self.lin1 = th.nn.Linear(2 * dim, dim)
-        self.lin2 = th.nn.Linear(dim, 1)
-
-    def forward(self, data):
-        out = F.relu(self.lin0(data.x))
-        h = out.unsqueeze(0)
-
-        for i in range(3):
-            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
-            out, h = self.gru(m.unsqueeze(0), h)
-            out = out.squeeze(0)
-
-        out = self.set2set(out, data.batch)
-        out = F.relu(self.lin1(out))
-        out = self.lin2(out)
-        return out.view(-1)
 
 
 def _random_split(dataset, test_prob, valid_prob,
@@ -160,7 +138,7 @@ class Environment:
         self.transform = T.Compose([MyTransform(target_norm), Complete(),]) #  T.Distance(norm=False)
 
         # make model
-        self.model = Net().to(device)
+        self.model = MessagePassingNet().to(device)
         if load_model is not None: self.model.load_state_dict(th.load(load_model))
         if not os.path.exists(outpath): os.makedirs(outpath)
         self.outpath = outpath
