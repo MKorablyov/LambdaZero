@@ -21,29 +21,31 @@ def fake_smiles_and_gridscore_dataframe():
 
 
 @pytest.fixture
-def root_dir(fake_smiles_and_gridscore_dataframe):
+def original_raw_data_dir(fake_smiles_and_gridscore_dataframe):
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
         raw_dir = Path(tmp_dir_str).joinpath("raw")
         raw_dir.mkdir()
         file_path = raw_dir.joinpath(D4MoleculesDataset.feather_filename)
         fake_smiles_and_gridscore_dataframe.to_feather(file_path)
-        yield tmp_dir_str
+        yield str(raw_dir)
 
     logging.info("deleting test folder")
 
 
 @pytest.fixture
-def processed_dir(root_dir):
-    processed_dir = Path(root_dir).joinpath("processed")
-    return str(processed_dir)
+def root_dir():
+    with tempfile.TemporaryDirectory() as tmp_dir_str:
+        yield tmp_dir_str
+
+    logging.info("deleting test folder")
 
 
-def test_d4_molecules_dataset(root_dir, processed_dir, fake_smiles_and_gridscore_dataframe):
+def test_d4_molecules_dataset(root_dir, original_raw_data_dir, fake_smiles_and_gridscore_dataframe):
 
-    dataset = D4MoleculesDataset(root_dir)
+    dataset = D4MoleculesDataset(root_dir, original_raw_data_dir)
 
-    assert processed_dir == dataset.processed_dir
+    assert dataset.processed_dir == str(Path(root_dir).joinpath('processed/'))
 
     assert len(fake_smiles_and_gridscore_dataframe) == len(dataset)
 
