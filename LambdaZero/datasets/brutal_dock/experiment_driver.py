@@ -112,8 +112,11 @@ def experiment_driver(
     logging.info(f"Best validation loss: {best_validation_loss: 5f}")
     experiment_logger.increment_step_and_log_metrics("best_val_loss", best_validation_loss)
 
+    logging.info(f"Instantiate best model observed in training, loading from {best_model_path}")
+    best_model = model_class.load_model_object_from_path(best_model_path)
+
     for label, dataloader in zip(['validation', 'test'], [validation_dataloader, test_dataloader]):
-        list_actuals, list_predicted = model_trainer.apply_model(model, dataloader)
+        list_actuals, list_predicted = model_trainer.apply_model(best_model, dataloader)
         mean_absolute_error, std_absolute_error = get_prediction_statistics(list_actuals, list_predicted)
         mean_key = f"{label}_mean_absolute_error_real_scale"
         std_key = f"{label}_std_absolute_error_real_scale"
