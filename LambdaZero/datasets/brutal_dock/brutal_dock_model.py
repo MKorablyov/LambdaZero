@@ -7,16 +7,15 @@ import sys
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch_geometric.transforms as T
 from torch_geometric.data import DataLoader
-from torch_geometric.nn import NNConv, Set2Set
 from torch_geometric.utils import remove_self_loops
 from tqdm import tqdm
 
 from LambdaZero import inputs
 from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR
+from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 
 model_summary_dir = RESULTS_DIR.joinpath("model_summaries")
 model_summary_dir.mkdir(parents=True, exist_ok=True)
@@ -116,64 +115,6 @@ class Complete(object):
         return data
 
 
-# TODO: move to a different .py file
-class MPNN(torch.nn.Module):
-    def __init__(self,
-                 node_feat: int = 14,
-                 edge_feat: int = 4,
-                 gcn_size: int = 128,
-                 edge_hidden: int = 128,
-                 gru_out: int = 128,
-                 gru_layers: int = 1,
-                 linear_hidden: int = 128,
-                 out_size: int = 1
-                 ):
-        """
-        message passing neural network.
-
-        Args:
-            node_feat (int, optional): number of input features. Defaults to 14.
-            edge_feat (int, optional): number of edge features. Defaults to 3.
-            gcn_size (int, optional): size of GCN embedding size. Defaults to 128.
-            edge_hidden (int, optional): edge hidden embedding size. Defaults to 128.
-            gru_out (int, optional): size out GRU output. Defaults to 128.
-            gru_layers (int, optional): number of layers in GRU. Defaults to 1.
-            linear_hidden (int, optional): hidden size in fully-connected network. Defaults to 128.
-            out_size (int, optional): output size. Defaults to 1.
-        """
-        super(MPNN, self).__init__()
-        self.lin0 = nn.Linear(node_feat, gcn_size)
-
-        edge_network = nn.Sequential(
-            nn.Linear(edge_feat, edge_hidden),
-            nn.ReLU(),
-            nn.Linear(edge_hidden, gcn_size ** 2)
-        )
-
-        self.conv = NNConv(gcn_size, gcn_size, edge_network, aggr='mean')
-        self.gru = nn.GRU(gcn_size, gru_out, num_layers=gru_layers)
-
-        self.set2set = Set2Set(gru_out, processing_steps=3)
-        self.fully_connected = nn.Sequential(
-            nn.Linear(2 * gru_out, linear_hidden),
-            nn.ReLU(),
-            nn.Linear(linear_hidden, out_size)
-        )
-
-    def forward(self, data):
-        out = F.relu(self.lin0(data.x))
-        h = out.unsqueeze(0)
-
-        for i in range(3):
-            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
-            out, h = self.gru(m.unsqueeze(0), h)
-            out = out.squeeze(0)
-
-        out = self.set2set(out, data.batch)
-        out = self.fully_connected(out)
-        return out
-
-
 def _random_split(dataset, test_prob, valid_prob,
                   test_idx=torch.tensor([], dtype=torch.long),
                   train_idx=torch.tensor([], dtype=torch.long),
@@ -240,7 +181,7 @@ class Environment:
         if model_name != 'MPNN':
             raise ValueError(f'Model type {model_name} is not implemented.')
         # initialize model
-        self.model = MPNN(
+        self.model = MessagePassingNet(
             node_feat=14,
             edge_feat=4,
             gcn_size=config['model'].get('gcn_size', 128),
