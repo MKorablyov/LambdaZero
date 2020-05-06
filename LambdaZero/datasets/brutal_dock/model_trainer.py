@@ -102,7 +102,7 @@ class AbstractModelTrainer(ABC):
     def train_model(self, model: nn.Module, training_dataloader: DataLoader, validation_dataloader: DataLoader,
                     best_model_output_path: Path, num_epochs: int,
                     lr=0.001, sched_factor=0.7, sched_patience=5, min_lr=0.00001):
-
+        model.to(self.device)
         optimizer = self.optimizer_class(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                                mode='min',
