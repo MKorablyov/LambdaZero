@@ -13,6 +13,9 @@ to execute this experiment, invoke the script as:
 import logging
 from pathlib import Path
 
+from orion.client import report_results
+
+
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
@@ -31,3 +34,6 @@ if __name__ == "__main__":
 
     input_and_run_config = get_input_and_run_configuration(path_of_this_file)
     best_validation_loss = experiment_driver(input_and_run_config, dataset_class, model_class)
+
+    report_results([dict( name="best_validation_loss", type="objective", value=best_validation_loss)])
+
