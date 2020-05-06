@@ -14,8 +14,8 @@ from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY,
 
 
 @pytest.fixture
-def expected_raw_file():
-    return 'dock_blocks105_walk40_clust.feather'
+def expected_raw_files():
+    return ['dock_blocks105_walk40_clust.feather', 'dock_blocks105_walk40_2_clust.feather']
 
 
 @pytest.fixture
@@ -24,23 +24,25 @@ def expected_processed_file():
 
 
 @pytest.fixture
-def data_dir(expected_raw_file):
+def data_dir(expected_raw_files):
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
         data_dir_path = Path(tmp_dir_str).joinpath('raw/')
         data_dir_path.mkdir(exist_ok=True)
-        data_dir_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
+        for expected_raw_file in expected_raw_files:
+            data_dir_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
         yield data_dir_path
     logging.info("deleting test folder")
 
 
 @pytest.fixture
-def work_dir(expected_raw_file, expected_processed_file, random_molecule_dataset):
+def work_dir(expected_raw_files, expected_processed_file, random_molecule_dataset):
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
         raw_path = Path(tmp_dir_str).joinpath('raw/')
         raw_path.mkdir(exist_ok=True)
-        raw_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
+        for expected_raw_file in expected_raw_files:
+            raw_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
 
         processed_path = Path(tmp_dir_str).joinpath('processed/')
         processed_path.mkdir(exist_ok=True)
