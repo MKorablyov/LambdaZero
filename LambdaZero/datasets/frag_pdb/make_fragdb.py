@@ -11,10 +11,13 @@ from LambdaZero import chem
 class cfg:
     #source_molfile = "/home/maksym/Datasets/pdb/old/lig_noHnoMiss.sdf"
     #source_molfile = "/home/maksym/Projects/datasets/pdb/example.sdf"
-    source_molfile = "/home/maksym/Datasets/EGFR_small/EGFR.sdf"
+    source_molfile = "/home/maksym/Datasets/fragdb/lig_pdb_noh_miss_small.sdf"
     fragdb_path = "/home/maksym/Datasets/fragdb/fragdb"
     #fragspace_path = "/home/maksym/Desktop/temp_frag/fragspace"
     frags_generic = False
+    block_cutoff = 100
+    r_cutoff = 100
+
 
 if __name__ == "__main__":
     fragdb = chem.FragDB()
@@ -49,17 +52,19 @@ if __name__ == "__main__":
                 print("error:", e)
                 broken_nmols += 1
             print("passed/broken", passed_nmols,"/", broken_nmols)
-    #fragdb_from_molfile(cfg.source_molfile)
-    #fragdb.save_state(cfg.fragdb_path)
+    fragdb_from_molfile(cfg.source_molfile)
+    fragdb.save_state(cfg.fragdb_path)
     fragdb.load_state(cfg.fragdb_path, ufrag=False)
 
     fragdb.make_ufrags()
-    block_names, block_smis, _, block_rs = fragdb.filter_ufrags(verbose=False, cutoff_count=10)
+    block_names, block_smis, _, block_rs = fragdb.filter_ufrags(verbose=False,
+                                                                block_cutoff=cfg.block_cutoff,
+                                                                r_cutoff=cfg.r_cutoff)
 
     blocks = pd.DataFrame({"block_name":block_names,"block_smi": block_smis,"block_r":block_rs})
-    blocks.to_json("/home/maksym/Datasets/fragdb/blocks_PDB_105.json")
+    blocks.to_json("/home/maksym/Datasets/fragdb/example_blocks.json")
 
-    print(pd.read_json("/home/maksym/Datasets/fragdb/blocks_PDB_105.json"))
+    print(pd.read_json("/home/maksym/Datasets/fragdb/example_blocks.json"))
 
 
     #fragdb.draw_ufrag("/home/maksym/Datasets/fragdb/ufrag_img")
