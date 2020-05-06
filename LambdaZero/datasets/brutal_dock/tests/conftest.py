@@ -109,7 +109,6 @@ def mpnn_model(number_of_node_features):
     return mpnn
 
 
-
 @pytest.fixture
 def tracking_uri():
     with tempfile.TemporaryDirectory() as tmp_dir_str:
