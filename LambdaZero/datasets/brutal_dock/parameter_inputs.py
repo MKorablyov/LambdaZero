@@ -34,7 +34,7 @@ def get_input_arguments():
         "--tracking_uri", help="Directory where the experiment logger will store metric logs",
     )
 
-    parser.add_argument("--input", help="path to input configuration file, in json format")
+    parser.add_argument("--config", help="path to input configuration file, in json format")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -95,7 +95,7 @@ def augment_configuration_with_run_parameters(
 def get_input_and_run_configuration(executable_file_path: Path):
     args = get_input_arguments()
 
-    input_config = read_configuration_file(args.input)
+    input_config = read_configuration_file(args.config)
 
     input_and_run_config = augment_configuration_with_run_parameters(
         input_config,
