@@ -89,8 +89,10 @@ def experiment_driver(
 
     logging.info(f"Instantiating model trainer")
 
+    tracking_uri = Path(run_parameters.pop("tracking_uri"))
+    tracking_uri.mkdir(parents=True, exist_ok=True)
     experiment_logger = MLFlowLogger(run_parameters.pop("experiment_name"),
-                                     run_parameters.pop("tracking_uri"),
+                                     str(tracking_uri),
                                      run_parameters)
     experiment_logger.log_parameters("training", training_parameters)
     experiment_logger.log_parameters("model", model_parameters)
