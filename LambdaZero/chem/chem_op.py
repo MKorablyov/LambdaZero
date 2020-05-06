@@ -370,7 +370,8 @@ class Dock_smi:
         gridscore = gridscores[0]
 
         # parse dock coords
-        mol = Chem.MolFromMol2File(mol2file, sanitize=False, cleanupSubstructures=False)
+        mol2file_scored = os.path.join(self.outpath, mol_name + "_scored.mol2")
+        mol = Chem.MolFromMol2File(mol2file_scored, sanitize=False, cleanupSubstructures=False)
         atoms = np.asarray([atm.GetSymbol().lower() for atm in mol.GetAtoms() if atm.GetSymbol().lower() != "h"])
         initmol = Chem.MolFromSmiles(smi)
         initatoms = np.asarray([atm.GetSymbol().lower() for atm in initmol.GetAtoms()])
