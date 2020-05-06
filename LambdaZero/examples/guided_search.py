@@ -297,5 +297,3 @@ if __name__ == '__main__':
 
         array_id = int(os.environ['SLURM_ARRAY_TASK_ID'])
         guided_search(configs[array_id])
-=======
->>>>>>> 8cbe471fe3053ba645e8fed0c72461bf63584f1c
