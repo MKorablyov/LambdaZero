@@ -4,7 +4,7 @@ to the D4 docking dataset.
 
 to execute this experiment, invoke the script as:
 
-    python mpnn_experiment.py --input=[INPUT]
+    python mpnn_experiment.py --config=[INPUT CONFIGURATION]
                               --working_directory=[WORKING_DIRECTORY]
                               --output_directory=[OUTPUT_DIRECTORY]
                               --data_directory=[DATA_DIRECTORY]
