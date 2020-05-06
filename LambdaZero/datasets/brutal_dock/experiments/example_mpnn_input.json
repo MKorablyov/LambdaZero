@@ -7,7 +7,7 @@
         "num_epochs": 250,
         "num_workers": 4,
         "batch_size": 4096,
-        "learning_rate": 0.0001,
+        "learning_rate": 0.001,
         "train_fraction": 0.8,
         "validation_fraction": 0.1
     },
