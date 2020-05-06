@@ -2,7 +2,13 @@
 This experiment script applies a Message Passing Neural Net model
 to the D4 docking dataset.
 
-It assumes the D4 docking data is available in a feather file.
+to execute this experiment, invoke the script as:
+
+    python mpnn_experiment.py --input=[INPUT]
+                              --working_directory=[WORKING_DIRECTORY]
+                              --output_directory=[OUTPUT_DIRECTORY]
+                              --data_directory=[DATA_DIRECTORY]
+                              --tracking_uri=[TRACKING_URI]
 """
 import logging
 from pathlib import Path
