@@ -112,4 +112,4 @@ class MessagePassingNet(ModelBase):
 
         out = self.set2set(out, data.batch)
         out = self.fully_connected(out)
-        return out
+        return out.view(-1)
