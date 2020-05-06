@@ -7,7 +7,8 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock import set_logging_directory
-from LambdaZero.datasets.brutal_dock.dataset_utils import get_split_datasets, get_scores_statistics
+from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
+from LambdaZero.datasets.brutal_dock.dataset_splitting import get_split_datasets
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
