@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import pandas as pd
 import torch
@@ -10,10 +10,10 @@ from torch_geometric.data import DataLoader
 from LambdaZero.chem import mol_to_graph
 
 
-def get_smiles_and_scores_from_feather(feather_data_path: Path):
+def get_smiles_and_scores_from_feather(feather_data_path: Path) -> Tuple[List[str], List[float]]:
     df = pd.read_feather(feather_data_path)
-    list_smiles = df['smiles'].values
-    list_scores = df['gridscore'].to_numpy()
+    list_smiles = list(df['smiles'].values)
+    list_scores = list(df['gridscore'].to_numpy())
     return list_smiles, list_scores
 
 
