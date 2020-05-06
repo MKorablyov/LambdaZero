@@ -47,3 +47,7 @@ share/python-wheels/
 *.pkl.gz
 *.pkl
 
+
+*.coverage
+*coverage.xml
+*htmlcov/

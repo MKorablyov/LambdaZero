@@ -11,6 +11,8 @@ from rdkit.Chem.rdchem import HybridizationType
 from rdkit import RDConfig
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem.rdchem import BondType as BT
+
+import ray
 rdBase.DisableLog('rdApp.error')
 
 
@@ -30,6 +32,8 @@ from sklearn.decomposition import PCA as sk_PCA
 #from ..py_tools import geom
 #from ..py_tools import chem
 #from ..py_tools import multithread as mtr
+
+from LambdaZero import chem
 
 # def mtable_featurizer(elem, charge=None,organic=False):
 #     """
@@ -661,6 +665,7 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
+@ray.remote
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
     "mol to graph convertor"
     mol = chem.build_mol(smiles, num_conf=num_conf, noh=noh)["mol"].to_list()[0]
@@ -804,26 +809,29 @@ class BrutalDock(InMemoryDataset):
     def download(self):
         pass
 
-    def process(self):
-        raise Exception("fixe implement multithread mtr preprocessor using ray")
-
+    def process(self):       
         print("processing", self.raw_paths)
+        ray.init()
         for i in range(len(self.raw_file_names)):
             if not os.path.exists(self.processed_file_names[i]):
                 docked_index = pd.read_feather(self.raw_paths[i])
-
-                props = {pr:pr for pr in self._props}
-                args, outs, errs = mtr.run(mol_to_graph, docked_index,
-                                           cols={"smiles":"smiles", **props},
-                                           tabular=False, chunksize=self._chunksize)
+                smiles = docked_index["smiles"].tolist()
+                props = {pr:docked_index[pr].tolist() for pr in self._props}
+                graph_ray_funs = []
+                for j in range(len(smiles)):
+                    graph_ray_funs.append(
+                        mol_to_graph.remote(smiles[j], **{pr:props[pr][j] for pr in props})
+                    )
+                
                 graphs = []
-                for graph in outs:
+                for graph_ray_function in graph_ray_funs:
+                    graph = ray.get(graph_ray_function)
                     if self.pre_filter is not None and not self.pre_filter(graph): continue
                     if self.pre_transform is not None: graph = self.pre_transform(graph)
                     graphs.append(graph)
                 # save to the disk
                 th.save(self.collate(graphs), self.processed_paths[i])
-
+        ray.shutdown()
 
 
 if __name__ == "__main__":
