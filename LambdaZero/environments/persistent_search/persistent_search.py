@@ -134,6 +134,7 @@ class PersistentSearchTree:
         self.exp_path = config["exp_path"]
         self.return_type = config.get('return_type', 'max_desc_r')
         assert self.return_type in ['max_desc_r', 'montecarlo']
+        self.update_prio_on_refresh = config.get('update_prio_on_refresh', False)
 
         self.root = Node(0, BlockMoleculeDataNoCache(), [], None)
         self.root.n_legal_acts = len(self.get_legal_actions(self.root.mol))
@@ -181,6 +182,7 @@ class PersistentSearchTree:
             if idx not in self.nodes:
                 print('Not sampling empty node',idx)
                 q[len(data)] = np.random.uniform(0, 1)
+                self.sumtree.set(idx, 0)
                 continue
             node = self.nodes[idx]
             la = self.get_legal_actions(node.mol)
@@ -224,6 +226,8 @@ class PersistentSearchTree:
         def f(node):
             if node.n_legal_acts == 0:
                 node.max_descendant_r = node.reward
+                if self.update_prio_on_refresh:
+                    self.sumtree.set(node.id, 0)
                 return node.reward
             max_r = node.reward
             for i, n in node.children.items():
@@ -232,6 +236,8 @@ class PersistentSearchTree:
                 n = self.nodes[n]
                 max_r = max(max_r, f(n))
             node.max_descendant_r = max_r
+            if self.update_prio_on_refresh and node.n_legal_acts > len(node.children):
+                self.sumtree.set(node.id, self.score_fn(node))
             return max_r
         print('update values')
         t0 = time.time()
@@ -272,7 +278,7 @@ class PersistentSearchTree:
             if idxs[j] not in self.nodes: continue
             node = self.nodes[idxs[j]]
             node.value = float(vs[j].copy())
-            self.sumtree.set(idxs[j], self.score_fn(node.reward, node.value))
+            self.sumtree.set(idxs[j], self.score_fn(node))
 
     def update_r_at(self, idxs, rs):
         self.nodes_lock.acquire() # just let whatever's modifying the nodes finish
@@ -282,7 +288,7 @@ class PersistentSearchTree:
             if idxs[j] not in self.nodes: continue
             node = self.nodes[idxs[j]]
             node.fast_reward = float(rs[j].copy())
-            self.sumtree.set(idxs[j], self.score_fn(node.reward, node.value))
+            self.sumtree.set(idxs[j], self.score_fn(node))
 
     def get_num_stored(self):
         return len(self.nodes)
@@ -381,14 +387,14 @@ class PersistentSearchTree:
         for i, r in zip(idx, rewards):
             if i in self.nodes:
                 self.nodes[i].sim_dock_reward = float(r)
-                self.sumtree.set(i, self.score_fn(self.nodes[i].reward, self.nodes[i].value))
+                self.sumtree.set(i, self.score_fn(self.nodes[i]))
 
     def set_pred_dock_reward(self, idx, rewards, qeds):
         for i, r, qed in zip(idx, rewards, qeds):
             if i in self.nodes:
                 self.nodes[i].pred_dock_reward = float(r)
                 self.nodes[i].qed = qed
-                self.sumtree.set(i, self.score_fn(self.nodes[i].reward, self.nodes[i].value))
+                self.sumtree.set(i, self.score_fn(self.nodes[i]))
 
     def is_full(self):
         return self.num_explored_nodes >= self.max_size - 1
@@ -628,7 +634,8 @@ class RLActor:
                 v = (torch.softmax(qsa_pred / self.temperature, 1) * qsa_pred).sum(1)
             elif self.priority_pred == 'greedy_q':
                 v = qsa_pred.max(1).values
-        self.tree.update_v_at.remote(idx, v.data.cpu().numpy())
+        if self.priority_pred in ['boltzmann', 'greedy_q']:
+            self.tree.update_v_at.remote(idx, v.data.cpu().numpy())
         return q_loss.item(), r_loss.item()
 
 
@@ -644,7 +651,8 @@ class RLActor:
                     v = (torch.softmax(qsa_pred / self.temperature, 1) * qsa_pred).sum(1)
                 elif self.priority_pred == 'greedy_q':
                     v = qsa_pred.max(1).values
-            self.tree.update_v_at.remote(idxs, v.data.cpu().numpy())
+            if self.priority_pred in ['boltzmann', 'greedy_q']:
+                self.tree.update_v_at.remote(idxs, v.data.cpu().numpy())
         return torch.softmax(qsa_pred / self.temperature, 1).cpu().data.numpy()
 
 

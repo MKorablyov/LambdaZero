@@ -5,6 +5,8 @@ warnings.filterwarnings('ignore')
 import time
 import os
 import os.path as osp
+import pickle
+import gzip
 
 import ray
 import numpy as np
@@ -12,6 +14,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import NNConv, Set2Set
+
+import LambdaZero.environments.persistent_search.persistent_search as m
+print('>>>',m)
 
 from LambdaZero.chem import atomic_numbers
 from LambdaZero.environments.persistent_search.persistent_search import PersistentSearchTree, PredDockRewardActor, SimDockRewardActor, RLActor, MBPrep
@@ -40,7 +45,7 @@ class MPNNet_v2(nn.Module):
         out = F.leaky_relu(self.lin0(data.x))
         h = out.unsqueeze(0)
 
-        for i in range(9):
+        for i in range(12):
             m = F.leaky_relu(self.conv(out, data.edge_index, data.edge_attr))
             out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
             out = out.squeeze(0)
@@ -99,6 +104,7 @@ def guided_search(exp_hps):
         'return_type': 'montecarlo', # MonteCarlo vs Max descendant reward
         'num_molecules': int(10e3), # Total number of molecules to try
         'prune_at': int(5e3), # Prune the search tree when it is this big
+        'update_prio_on_refresh': False,
     }
     hyperparameters.update(exp_hps)
 
@@ -122,6 +128,11 @@ def guided_search(exp_hps):
     }
 
     score_temperature = hyperparameters['score_temperature']
+    if hyperparameters['priority_pred'] in ['greedy_q', 'boltzmann']:
+        score_fn = lambda n: np.exp(n.value / score_temperature)
+    elif hyperparameters['priority_pred'] == 'max_desc_r':
+        score_fn = lambda n: np.exp(n.max_descendant_r / score_temperature)
+
     env_config = {
         "blocks_file": osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"),
         "obs_config": obs_config,
@@ -133,6 +144,7 @@ def guided_search(exp_hps):
         "max_atoms": 50,
         "max_branches": 20,
         'num_molecules': hyperparameters['num_molecules'],
+        #'seeding_nodes': 'top_mols_50k_05_May_02_00_10_22.pkl.gz',
         #'seeding_nodes': 'top_mols_5k_04_Apr_22.pkl.gz',
         #'seeding_nodes': 'top_mols_50k_04_Apr_27.pkl.gz',
         'graph_add_stem_mask': True,
@@ -140,7 +152,10 @@ def guided_search(exp_hps):
         'prune_at': hyperparameters['prune_at'],
         #'num_molecules': int(10e6),
         #'prune_at': int(1e3),
-        'score_fn': lambda r, v: np.exp((r*0+v)/score_temperature),
+        #'score_fn': lambda r, v: np.exp((r*0+v)/score_temperature),
+        #'score_fn': lambda n: np.exp((n.value - n.max_descendant_r)/score_temperature),
+        'score_fn': score_fn,
+        'update_prio_on_refresh': hyperparameters['update_prio_on_refresh'],
     }
     env_config['num_actions'] = env_config['num_blocks'] * env_config['max_branches']
 
@@ -244,9 +259,18 @@ def guided_search(exp_hps):
 
 if __name__ == '__main__':
     ray.init(num_cpus=6)
-    for priority_pred in ['greedy_q', 'boltzmann']:
-        for return_type in ['montecarlo', 'max_desc_r']:
-            hps = {'priority_pred': priority_pred,
-                   'return_type': return_type,
-                   'save_path': os.environ["SCRATCH"]+'/lz'}
-            guided_search(hps)
+    guided_search({'priority_pred': 'max_desc_r', #'greedy_q',
+                   'update_prio_on_refresh': True,
+                   'return_type':'max_desc_r',
+                   #'save_path': os.environ["SCRATCH"]+'/lz',
+                   'save_path': '/network/tmp1/bengioe/lz',
+                   'num_molecules': int(10e6),
+                   'prune_at': int(200e3),
+                   'score_temperature': 1.5})
+    if 0:
+        for priority_pred in ['greedy_q', 'boltzmann']:
+            for return_type in ['montecarlo', 'max_desc_r']:
+                hps = {'priority_pred': priority_pred,
+                       'return_type': return_type,
+                       'save_path': os.environ["SCRATCH"]+'/lz'}
+                guided_search(hps)
