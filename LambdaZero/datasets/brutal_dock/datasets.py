@@ -19,7 +19,7 @@ class MoleculesDatasetBase(InMemoryDataset):
 
 
 class D4MoleculesDataset(MoleculesDatasetBase):
-    feather_filename = 'dock_blocks105_walk40_clust.feather'
+    feather_filenames = ["dock_blocks105_walk40_clust.feather", "dock_blocks105_walk40_2_clust.feather"]
 
     def __init__(self, root_dir: str, original_raw_data_dir: str):
         super(D4MoleculesDataset, self).__init__(root_dir, original_raw_data_dir)
@@ -27,7 +27,7 @@ class D4MoleculesDataset(MoleculesDatasetBase):
 
     @property
     def raw_file_names(self):
-        return [self.feather_filename]
+        return self.feather_filenames
 
     @property
     def processed_file_names(self):
@@ -51,8 +51,14 @@ class D4MoleculesDataset(MoleculesDatasetBase):
         # Read data into huge `Data` list.
         logging.info("Processing the raw data from the Feather file to a Data object saved on disk")
 
-        feather_data_path = Path(self.raw_dir).joinpath(self.raw_file_names[0])
-        list_smiles, list_scores = get_smiles_and_scores_from_feather(feather_data_path)
+        list_smiles = []
+        list_scores = []
+        for raw_file_name in self.raw_file_names:
+            feather_data_path = Path(self.raw_dir).joinpath(raw_file_name)
+            sub_list_smiles, sub_list_scores = get_smiles_and_scores_from_feather(feather_data_path)
+            list_smiles.extend(sub_list_smiles)
+            list_scores.extend(sub_list_scores)
+
         data_list = get_molecule_graphs_from_smiles_and_scores(list_smiles, list_scores)
 
         if self.pre_filter is not None:
