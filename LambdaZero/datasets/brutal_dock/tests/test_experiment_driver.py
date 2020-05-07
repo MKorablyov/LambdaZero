@@ -91,7 +91,6 @@ def config(data_dir, work_dir, output_dir, number_of_node_features):
                             edge_feat=4,
                             gcn_size=8,
                             edge_hidden=8,
-                            gru_out=8,
                             gru_layers=1,
                             linear_hidden=8)
 
