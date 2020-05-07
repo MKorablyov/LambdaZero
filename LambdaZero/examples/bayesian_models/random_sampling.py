@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import torch as th
+from sklearn.model_selection import train_test_split
 import random
 from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
@@ -31,7 +32,6 @@ class Model(th.nn.Module):
     def forward(self, x):
         fc = self.fc1(x)
         rel = self.relu(fc)
-        #out1 = self.relu(self.fc1(x))
         return self.fc2(rel)
 
 def train(model, states, labels):
@@ -41,23 +41,19 @@ def train(model, states, labels):
     epochs = cfg.epochs
     criterion =  th.nn.MSELoss()
     optimizer = th.optim.SGD(net.parameters(), lr = 0.001)
-    running_loss = 0
 
     for _ in range(epochs):
-        for i, j in enumerate(states):
-            x = j
-            #print(labels[i])
-            y = labels[i] #th.from_numpy(labels[i].astype(np.float32))
-            #print(x)
+        for j in range(0, len(states), batch_size):
+            x = states[j:j+batch_size]
+            y = labels[j:j + batch_size] 
             optimizer.zero_grad()
-            #print(x.shape)
             outputs = net(x)
             loss = criterion(outputs, th.tensor([y], dtype = th.float32))
             loss.backward()
             optimizer.step()
-            running_loss += loss
+            
 
-    return model, running_loss
+    return model, loss
 
 def evaluate(model, states, labels):
     criterion = th.nn.MSELoss()
@@ -68,12 +64,12 @@ def evaluate(model, states, labels):
 
 if __name__ == '__main__':
     df = pd.read_parquet(cfg.data)
-    #print(df['fingerprint'].values[0].shape)
-    
     x = th.from_numpy(np.vstack(df['fingerprint'].values).astype(np.float32))
-    y = list(df['dockscore'].values)#th.from_numpy(np.vstack(df['dockscore'].values).astype(np.float32))
+    y = list(df['dockscore'].values)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2)
+    
     model = Model(x.shape[0], 1)
-    model, MSE = train(model, x, y)
+    model, MSE = train(model, x_train, y_train)
     print('running MSE after training: {}'.format(MSE.item()))
-    predictions, MSE = evaluate(model, x, y)
+    predictions, MSE = evaluate(model, x_test, y_test)
     print('MSE after eval: {}'.format(MSE.item()))
