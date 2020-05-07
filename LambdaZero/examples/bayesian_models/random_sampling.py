@@ -10,7 +10,7 @@ class cfg:
     # data could be found here: https://github.com/MKorablyov/brutal_dock/tree/master/d4/raw
     data = 'd4_10k_clust.parquet'#"/home/maksym/Datasets/brutal_dock/d4/raw/d4_100k_clust.parquet"
     batch_size = 500
-    epochs = 500
+    epochs = 6
 
 #sns.distplot(df["dockscore"])
 #plt.show()
