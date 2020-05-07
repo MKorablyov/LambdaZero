@@ -21,20 +21,20 @@ def get_split_datasets(full_dataset: Dataset, train_fraction: float, validation_
 
 def _split_labels_in_groups(list_klabels: List[int], list_probabilities: List[float]) -> List[List[int]]:
     """
-    This method assigns each unique klabel to a set of labels. The set is chosen with
+    This method assigns each unique klabel to a group of labels. The group is chosen with
     probability given in list_probabilities.
     """
     assert np.isclose(np.sum(list_probabilities), 1.0), "probabilities do not sum up to 1"
 
     unique_labels = np.unique(list_klabels)
 
-    set_indices = np.arange(len(list_probabilities))
+    group_numbers = np.arange(len(list_probabilities))
 
-    list_groups = [[] for _ in set_indices]
+    list_groups = [[] for _ in group_numbers]
 
     for label in unique_labels:
-        group_index = np.random.choice(set_indices, p=list_probabilities)
-        list_groups[group_index].append(label)
+        group_number = np.random.choice(group_numbers, p=list_probabilities)
+        list_groups[group_number].append(label)
 
     return list_groups
 
