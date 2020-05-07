@@ -42,7 +42,7 @@ def list_positions(list_of_node_count):
 
 
 @pytest.fixture
-def list_dockscores(list_of_node_count):
+def list_gridscores(list_of_node_count):
     torch.manual_seed(242)
     return torch.rand((len(list_of_node_count), 1), requires_grad=False)
 
@@ -66,15 +66,15 @@ def number_of_edge_features():
 
 @pytest.fixture
 def list_random_molecules(list_of_node_count, number_of_node_features, list_positions,
-                          number_of_edge_features, list_dockscores):
+                          number_of_edge_features, list_gridscores):
 
     list_molecules = []
-    for number_of_nodes, positions, dockscore in zip(list_of_node_count, list_positions, list_dockscores):
+    for number_of_nodes, positions, gridscore in zip(list_of_node_count, list_positions, list_gridscores):
         fake_molecule_data = get_random_molecule_data(number_of_nodes,
                                                       number_of_node_features,
                                                       positions,
                                                       number_of_edge_features,
-                                                      dockscore)
+                                                      gridscore)
         list_molecules.append(fake_molecule_data)
     return list_molecules
 

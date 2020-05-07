@@ -173,7 +173,7 @@ class MoleculeModelTrainer(AbstractModelTrainer):
 
     def _get_target_from_batch(self, batch):
         batch = batch.to(self.device)
-        return batch.dockscore
+        return batch.gridscore
 
     def _apply_model_to_batch(self, batch, model):
         batch = batch.to(self.device)
