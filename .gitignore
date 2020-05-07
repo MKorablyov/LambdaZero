@@ -42,6 +42,8 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.err
+*.out
 
 # stuff that se3conv from MationGeiger creates
 *.pkl.gz

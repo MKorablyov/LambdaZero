@@ -1,12 +1,13 @@
 
 import warnings
 warnings.filterwarnings('ignore')
-
+import sys
 import time
 import os
 import os.path as osp
 import pickle
 import gzip
+import psutil
 
 import ray
 import numpy as np
@@ -15,11 +16,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import NNConv, Set2Set
 
-import LambdaZero.environments.persistent_search.persistent_search as m
-print('>>>',m)
 
 from LambdaZero.chem import atomic_numbers
-from LambdaZero.environments.persistent_search.persistent_search import PersistentSearchTree, PredDockRewardActor, SimDockRewardActor, RLActor, MBPrep
+from LambdaZero.environments.persistent_search.persistent_search import PersistentSearchTree, PredDockRewardActor, SimDockRewardActor, RLActor, MBPrep, RandomRLActor
 from LambdaZero.examples.config import datasets_dir, programs_dir
 warnings.filterwarnings('ignore')
 
@@ -59,7 +58,6 @@ class MPNNet_v2(nn.Module):
         out = self.set2set(out, data.batch)
         r = self.lin3(out)[:, 0]
         return r, add_logits.reshape((add_logits.shape[0], -1))
-
 
 
 class MolAC_GCN(nn.Module):
@@ -105,6 +103,8 @@ def guided_search(exp_hps):
         'num_molecules': int(10e3), # Total number of molecules to try
         'prune_at': int(5e3), # Prune the search tree when it is this big
         'update_prio_on_refresh': False,
+        'num_rollout_actors': 0,
+        'num_docking_threads': 1,
     }
     hyperparameters.update(exp_hps)
 
@@ -179,12 +179,13 @@ def guided_search(exp_hps):
     pred_dock_actor = PredDockRewardActor.options(max_concurrency=2).remote(**reward_config)
     sim_dock_actor = SimDockRewardActor.options(max_concurrency=2).remote(
         os.environ['SLURM_TMPDIR'],
-        programs_dir, datasets_dir
+        programs_dir, datasets_dir,
+        hyperparameters['num_docking_threads'],
     )
 
     tree = ray.remote(PersistentSearchTree).options(max_concurrency=mbsize * 2).remote(env_config)
 
-    time.sleep(1)
+    time.sleep(0.5)
     avg_q_loss = avg_r_loss = 0
     num_actions = env_config['num_actions']
     ray.get(tree.update_values.remote())
@@ -199,12 +200,26 @@ def guided_search(exp_hps):
         hyperparameters['actor_temperature'],
         hyperparameters['priority_pred'])
 
+    rollout_actors = [rl_actor]
+    batch_actors = []
+    for i in range(hyperparameters['num_rollout_actors']):
+        act_batcher_i = MBPrep.remote(env_config, tree, mbsize)
+        rl_actor_i = RLActor.options(max_concurrency=2).remote(
+            MolAC_GCN, obs_config,
+            device, [], act_batcher_i, tree,
+            hyperparameters['actor_temperature'],
+            hyperparameters['priority_pred'])
+        batch_actors.append(act_batcher_i)
+        rollout_actors.append(rl_actor_i)
 
-    time.sleep(1.5)
+
+    time.sleep(0.5)
     print("Starting reward threads")
     pred_dock_actor_thread = pred_dock_actor.run.remote(tree, 256)
-    sim_dock_actor_thread = sim_dock_actor.run.remote(tree, 10)
-    idxs, available_actions = zip(*ray.get(tree.sample_many.remote(mbsize, idxs_and_aa=True)))
+    sim_dock_actor_thread = sim_dock_actor.run.remote(tree, 12)
+
+    idxs_available_actions = [list(zip(*ray.get(tree.sample_many.remote(mbsize, idxs_and_aa=True))))
+                              for i in range(len(rollout_actors))]
 
     logs = {
         'q_loss': [],
@@ -215,14 +230,26 @@ def guided_search(exp_hps):
     for step in range(env_config['num_molecules'] // mbsize):
         t0 = time.time()
         train_cb = rl_actor.train.remote()
-        policies = ray.get(rl_actor.get_pol.remote(idxs, update_r=True))
-        actions = []
-        for aa, pol in zip(available_actions, policies):
-            p = np.zeros(pol.shape, dtype=np.float64) # Necessary because of how np.random works
-            p[aa] = pol[aa]
-            p /= p.sum()
-            actions.append(np.random.multinomial(1, p).argmax())
-        idxs, available_actions = ray.get(tree.take_actions.remote(idxs, actions, do_restart=True))
+        all_policies = [
+            rla.get_pol.remote(idxs, update_r=True)
+            for rla, (idxs, available_actions) in zip(rollout_actors, idxs_available_actions)]
+        all_policies = ray.get(all_policies)
+        # update the newly created nodes that weren't touched by the above update_r
+        qidxs = ray.get(tree.pop_from_new_queue.remote())
+        if len(qidxs):
+            rl_actor.get_pol.remote(qidxs, update_r=True)
+        # take actions
+
+        new_iaa = []
+        for policies, (idxs, available_actions) in zip(all_policies, idxs_available_actions):
+            actions = []
+            for aa, pol in zip(available_actions, policies):
+                p = np.zeros(pol.shape, dtype=np.float64) # Necessary because of how np.random works
+                p[aa] = pol[aa]
+                p /= p.sum()
+                actions.append(np.random.multinomial(1, p).argmax())
+            new_iaa.append(tree.take_actions.remote(idxs, actions, do_restart=True))
+        idxs_available_actions = ray.get(new_iaa)
         q_loss, r_loss = ray.get(train_cb)
         avg_q_loss = 0.99 * avg_q_loss + 0.01 * q_loss
         avg_r_loss = 0.99 * avg_r_loss + 0.01 * r_loss
@@ -232,7 +259,7 @@ def guided_search(exp_hps):
         if not step % 50:
             top_r = ray.get(tree.get_top_k_nodes.remote(10))
             print(step, env_config['num_molecules'] // mbsize,
-                  f'{t1-t0:.3f}',f'{(t1-t0)*1000/mbsize:.1f}ms/mol',
+                  f'{t1-t0:.3f}',f'{(t1-t0)*1000/(mbsize * len(rollout_actors)):.1f}ms/mol',
                   f'{q_loss:.3f} {r_loss:.3f}',
                   f'{avg_q_loss:.3f} {avg_r_loss:.3f}')
             print(' '.join(f'{i[0]:.3f}' for i in top_r))
@@ -243,12 +270,20 @@ def guided_search(exp_hps):
             if nstored > env_config['prune_at']:
                 ray.get(tree.prune_tree.remote())
 
+            for rla in rollout_actors[1:]:
+                rla.set_parameters_from.remote(rollout_actors[0])
+
         if not step % 50:
             tree.update_values.remote()
             if ray.get(tree.is_full.remote()):
                 break
 
-        if step and not step % 500:
+            tot_mem = sum([p.memory_info().rss
+                           for p in psutil.process_iter(['name', 'username', 'memory_info'])
+                           if p.username() == psutil.Process(os.getpid()).username()]) / 1024 / 1024
+            print(f'{tot_mem:.1f}M, {tot_mem/1024:.3f}G')
+
+        if step and not step % 2000:
             ray.get(tree.save.remote(exp_path))
             pickle.dump(logs, gzip.open(f'{exp_path}/logs.pkl.gz', 'wb'))
     print('Saving final tree and stopping actors...')
@@ -259,15 +294,7 @@ def guided_search(exp_hps):
     ray.get(save)
 
 if __name__ == '__main__':
-    ray.init(num_cpus=6)
-    guided_search({'priority_pred': 'max_desc_r', #'greedy_q',
-                   'update_prio_on_refresh': True,
-                   'return_type':'max_desc_r',
-                   #'save_path': os.environ["SCRATCH"]+'/lz',
-                   'save_path': '/network/tmp1/bengioe/lz',
-                   'num_molecules': int(10e6),
-                   'prune_at': int(200e3),
-                   'score_temperature': 1.5})
+    ray.init(num_cpus=12)
 
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
         for priority_pred in ['greedy_q', 'boltzmann']:
@@ -276,8 +303,8 @@ if __name__ == '__main__':
                        'return_type': return_type,
                        'save_path': os.environ["SCRATCH"]+'/lz'}
                 guided_search(hps)
-    elif 0:
 
+    elif 'array' in sys.argv:
         configs = [
             {'priority_pred': priority_pred,
              'return_type': return_type,
@@ -294,6 +321,35 @@ if __name__ == '__main__':
             for score_temperature in [1.5, 5]
             for run in [0, 1]
         ]
-
         array_id = int(os.environ['SLURM_ARRAY_TASK_ID'])
         guided_search(configs[array_id])
+
+    elif 'array_May6' in sys.argv:
+        configs = [
+            {'priority_pred': 'max_desc_r',
+             'return_type': 'max_desc_r',
+             'num_molecules': int(10e6),
+             'prune_at': prune_at,
+             'actor_temperature': actor_temperature,
+             'score_temperature': score_temperature,
+             'num_rollout_actors': 2,
+             'num_docking_threads': 4,
+             'save_path': '/home/bengioem/scratch/lz'}
+
+            for prune_at in [int(150e3), int(250e3)]
+            for actor_temperature in [1, 5]
+            for score_temperature in [1.5, 5]
+            for run in [0]
+        ]
+        array_id = int(os.environ['SLURM_ARRAY_TASK_ID'])
+        guided_search(configs[array_id])
+    elif 1:
+
+        guided_search({'priority_pred': 'max_desc_r', #'greedy_q',
+                       'update_prio_on_refresh': True,
+                       'return_type':'max_desc_r',
+                       'save_path': os.environ["SCRATCH"]+'/lz',
+                       #'save_path': '/network/tmp1/bengioe/lz',
+                       'num_molecules': int(10e6),
+                       'prune_at': int(200e3),
+                       'score_temperature': 1.5})

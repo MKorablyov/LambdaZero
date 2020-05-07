@@ -81,7 +81,8 @@ class Node:
         if self.sim_dock_reward is not None:
             return min(self.sim_dock_reward, self.sim_dock_reward * qed)
         if self.pred_dock_reward is not None:
-            return min(self.pred_dock_reward, self.pred_dock_reward * qed)
+            rp = max(self.fast_reward, self.pred_dock_reward * qed) # optimistic
+            return rp if rp > 0 else self.pred_dock_reward
         return self.fast_reward
 
 
@@ -148,7 +149,7 @@ class PersistentSearchTree:
         self.num_explored_nodes = 1
         self.prune_factor = 0.25
         self.dummy_mol = self.bdata.add_block_to(self.bdata.add_block_to(self.root.mol, 0, 0), 0, 0)
-
+        self.new_node_queue = []
 
 
         if 'seeding_nodes' in config:
@@ -172,6 +173,13 @@ class PersistentSearchTree:
             mask = torch.tensor([self.get_legal_actions(i, return_mask=True) for i in mols])
             return mols, mask
         return mols
+
+    def pop_from_new_queue(self):
+        self.nodes_lock.acquire()
+        r = self.new_node_queue
+        self.new_node_queue = []
+        self.nodes_lock.release()
+        return r
 
 
     def sample_many(self, n, just_idxs=False, idxs_and_aa=False):
@@ -286,6 +294,8 @@ class PersistentSearchTree:
         #print(idxs, rs)
         for j in range(len(idxs)):
             if idxs[j] not in self.nodes: continue
+            if idxs[j] in self.new_node_queue:
+                self.new_node_queue.pop(self.new_node_queue.index(idxs[j]))
             node = self.nodes[idxs[j]]
             node.fast_reward = float(rs[j].copy())
             self.sumtree.set(idxs[j], self.score_fn(node))
@@ -367,6 +377,7 @@ class PersistentSearchTree:
               self.num_explored_nodes, len(self.nodes))
 
     def get_top_k_nodes(self, k, pred_dock=False, sim_dock=False):
+        t0 = time.time()
         top_k = [(-10, None, None)]
         self.nodes_lock.acquire()
         for i, n in self.nodes.items():
@@ -381,6 +392,9 @@ class PersistentSearchTree:
                 top_k.append((r, i, n.mol))
                 top_k = sorted(top_k, key=lambda x:x[0])[-k:]
         self.nodes_lock.release() # Todo code version without lock
+        t1 = time.time()
+        if t1-t0 > 0.1:
+            print(f'get_top_k_nodes took {t1-t0:.2f}s', k, sim_dock, pred_dock)
         return top_k
 
     def set_sim_dock_reward(self, idx, rewards):
@@ -399,8 +413,9 @@ class PersistentSearchTree:
     def is_full(self):
         return self.num_explored_nodes >= self.max_size - 1
 
-    def take_actions(self, idxs, actions, do_restart=False):
+    def take_actions(self, idxs, actions, do_restart=False, return_rejects=False):
         new_idxs = []
+        rejects = []
         for i, a in zip(idxs, actions):
             if i in self.nodes:
                 new_idx = self.take_action(i, a)
@@ -417,6 +432,8 @@ class PersistentSearchTree:
                 # available actions
                 aas.append(np.int32([i for i in self.get_legal_actions(node.mol)
                                      if i not in node.children.keys()]))
+            if return_rejects:
+                return new_idxs, aas, rejects
             return new_idxs, aas
 
     def take_action(self, idx, action, precomputed=None):
@@ -429,8 +446,8 @@ class PersistentSearchTree:
         stem_idx = action // self.num_blocks
         block_idx = action % self.num_blocks
         if idx not in self.nodes: # Node probably got pruned
-            self.nodes_lock.release()
             return None
+
         node = self.nodes[idx]
         new_mol = self.bdata.add_block_to(node.mol, block_idx, stem_idx)
         legal_actions = self.get_legal_actions(new_mol)
@@ -464,6 +481,7 @@ class PersistentSearchTree:
         self.refresh(new_idx)
 
         self.nodes[new_idx] = new_node
+        self.new_node_queue.append(new_idx)
         self.num_explored_nodes += 1
         self.nodes_lock.release()
 
@@ -560,13 +578,14 @@ class PredDockRewardActor(PredDockReward):
 @ray.remote
 class SimDockRewardActor:
 
-    def __init__(self, tmp_dir, programs_dir, datasets_dir):
+    def __init__(self, tmp_dir, programs_dir, datasets_dir, num_threads=1):
         self.dock = chem.Dock_smi(tmp_dir,
                                   osp.join(programs_dir, 'chimera'),
                                   osp.join(programs_dir, 'dock6'),
                                   osp.join(datasets_dir, 'brutal_dock/d4/docksetup/'))
         self.target_norm = [-26.3, 12.3]
         self.running = True
+        self.num_threads = num_threads
 
     def run(self, tree, n):
         while self.running:
@@ -578,18 +597,30 @@ class SimDockRewardActor:
     def do_iterations(self, tree, n):
         mols = ray.get(tree.get_top_k_nodes.remote(n, sim_dock=True))
         # mols is a list of BlockMoleculeData objects
-        rewards = []
-        idxs = []
-        t0 = time.time()
-        for _, i, mol in mols:
-            if mol is None: continue
+        mols = [i for i in mols if i[2] is not None]
+        n = len(mols)
+        rewards = [None] * n
+        idxs = [None] * n
+        def f(i, idx):
             try:
-                _, r, _ = self.dock.dock(Chem.MolToSmiles(mol.mol))
-            except: # Sometimes the prediction fails
+                _, r, _ = self.dock.dock(Chem.MolToSmiles(mols[i][2].mol))
+            except Exception as e: # Sometimes the prediction fails
+                print(e)
                 r = 0
-            # Normalize
-            rewards.append(-(r-self.target_norm[0])/self.target_norm[1])
-            idxs.append(i)
+            rewards[i] = -(r-self.target_norm[0])/self.target_norm[1]
+            idxs[i] = idx
+        t0 = time.time()
+        threads = []
+        thread_at = self.num_threads
+        for i, (_, idx, mol) in enumerate(mols):
+            threads.append(threading.Thread(target=f, args=(i, idx)))
+            if i < self.num_threads:
+                threads[-1].start()
+        while None in rewards:
+            if sum([i.is_alive() for i in threads]) < self.num_threads and thread_at < n:
+                threads[thread_at].start()
+                thread_at += 1
+            time.sleep(0.5)
         t1 = time.time()
         print(f"Ran {n} docking simulations in {t1-t0:.2f}s ({(t1-t0)/n:.2f}s/mol)")
         tree.set_sim_dock_reward.remote(idxs, rewards)
@@ -608,10 +639,20 @@ class RLActor:
         self.temperature = temperature
         self.priority_pred = priority_pred
         # This is a temporary hack because of some annoying warnings
-        import os
-        import sys
-        f = open(os.devnull, 'w')
-        sys.stdout = f
+        if 0:
+            import os
+            import sys
+            f = open(os.devnull, 'w')
+            sys.stdout = f
+
+    def get_parameters(self):
+        return self.model.state_dict()
+
+    def set_parameters_from(self, rl_actor):
+        self.model.load_state_dict(ray.get(rl_actor.get_parameters.remote()))
+
+    def set_parameters(self, state_dict):
+        self.model.load_state_dict(state_dict)
 
     def train(self):
         idx, action_mask, graphs, qsa, qsa_mask, rewards = self.train_batcher.get()
@@ -640,20 +681,20 @@ class RLActor:
 
 
     def get_pol(self, idxs, update_r=True):
-        idxs, action_mask, graphs = ray.get(self.act_batcher.get_from.remote(idxs))
-        graphs.to(self.device)
-        action_mask = action_mask.to(self.device).float()
-        r_pred, qsa_pred = self.model(graphs, action_mask)
-        if update_r:
-            self.tree.update_r_at.remote(idxs, r_pred.data.cpu().numpy())
-            with torch.no_grad():
+        with torch.no_grad():
+            idxs, action_mask, graphs = ray.get(self.act_batcher.get_from.remote(idxs))
+            graphs.to(self.device)
+            action_mask = action_mask.to(self.device).float()
+            r_pred, qsa_pred = self.model(graphs, action_mask)
+            if update_r:
+                self.tree.update_r_at.remote(idxs, r_pred.data.cpu().numpy())
                 if self.priority_pred == 'boltzmann':
                     v = (torch.softmax(qsa_pred / self.temperature, 1) * qsa_pred).sum(1)
                 elif self.priority_pred == 'greedy_q':
                     v = qsa_pred.max(1).values
-            if self.priority_pred in ['boltzmann', 'greedy_q']:
-                self.tree.update_v_at.remote(idxs, v.data.cpu().numpy())
-        return torch.softmax(qsa_pred / self.temperature, 1).cpu().data.numpy()
+                if self.priority_pred in ['boltzmann', 'greedy_q']:
+                    self.tree.update_v_at.remote(idxs, v.data.cpu().numpy())
+            return torch.softmax(qsa_pred / self.temperature, 1).cpu().data.numpy()
 
 
 
@@ -704,3 +745,26 @@ class MBPrep:
             mask[i, idxs] = 1
         return (idx, torch.stack(legal_action_mask), Batch.from_data_list(graphs),
                 qsa, mask, torch.tensor(rewards).float())
+
+
+@ray.remote(num_gpus=0.1)
+class RandomRLActor:
+    def __init__(self, model, obs_config, device, train_batcher,
+                 act_batcher, tree, temperature, priority_pred):
+        self.nact = obs_config['num_blocks'] * obs_config['max_branches']
+
+    def get_parameters(self):
+        pass
+
+    def set_parameters_from(self, rl_actor):
+        pass
+
+    def set_parameters(self, state_dict):
+        pass
+
+    def train(self):
+        return 0, 0
+
+
+    def get_pol(self, idxs, update_r=True):
+        return np.ones((len(idxs), self.nact)) / self.nact
