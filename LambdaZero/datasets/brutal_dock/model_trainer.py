@@ -138,11 +138,11 @@ class AbstractModelTrainer(ABC):
             for batch in tqdm(dataloader, desc="EVAL", file=sys.stdout):
 
                 y_actual = self._get_target_from_batch(batch)
-                list_actuals.extend(list(y_actual.numpy()))
+                list_actuals.extend(list(y_actual.cpu().numpy()))
 
                 normalized_y_predicted = self._apply_model_to_batch(batch, model)
                 y_predicted = self._denormalize_target(normalized_y_predicted)
-                list_predicted.extend(list(y_predicted.numpy()))
+                list_predicted.extend(list(y_predicted.cpu().numpy()))
 
         return np.array(list_actuals), np.array(list_predicted)
 
@@ -176,6 +176,7 @@ class MoleculeModelTrainer(AbstractModelTrainer):
         return batch.gridscore
 
     def _apply_model_to_batch(self, batch, model):
+        model.to(self.device)
         batch = batch.to(self.device)
         y_hat = model.forward(batch)
         return y_hat
