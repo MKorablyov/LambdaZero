@@ -4,19 +4,19 @@ from typing import List, Tuple
 import pandas as pd
 import torch
 from torch_geometric.data import DataLoader
+from tqdm import tqdm
 
-from LambdaZero.chem import mol_to_graph
-
-
-def get_smiles_and_scores_from_feather(feather_data_path: Path) -> Tuple[List[str], List[float]]:
-    df = pd.read_feather(feather_data_path)
-    list_smiles = list(df['smiles'].values)
-    list_scores = list(df['gridscore'].to_numpy())
-    return list_smiles, list_scores
+from LambdaZero.chem import mol_to_graph, sys
 
 
-def get_molecule_graphs_from_smiles_and_scores(list_smiles: List[str], list_scores: List[float]):
-    list_graphs = [mol_to_graph(smiles, dockscore=score) for (smiles, score) in zip(list_smiles, list_scores)]
+def get_molecule_graphs_from_raw_data_dataframe(raw_data_df: pd.DataFrame):
+    list_graphs = []
+    for _, row in tqdm(raw_data_df.iterrows(), desc="MOL_TO_GRAPH", file=sys.stdout):
+        graph = mol_to_graph(row["smiles"],
+                             gridscore=row.get("gridscore", None),
+                             dockscore=row.get("dockscore", None),
+                             klabel=row.get("klabel", None))
+        list_graphs.append(graph)
     return list_graphs
 
 

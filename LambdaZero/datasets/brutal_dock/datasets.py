@@ -1,11 +1,12 @@
 import logging
 import shutil
 from pathlib import Path
+import pandas as pd
 
 import torch
 from torch_geometric.data import InMemoryDataset
 
-from LambdaZero.datasets.brutal_dock.dataset_utils import get_smiles_and_scores_from_feather, get_molecule_graphs_from_smiles_and_scores
+from LambdaZero.datasets.brutal_dock.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
 
 
 class MoleculesDatasetBase(InMemoryDataset):
@@ -51,15 +52,14 @@ class D4MoleculesDataset(MoleculesDatasetBase):
         # Read data into huge `Data` list.
         logging.info("Processing the raw data from the Feather file to a Data object saved on disk")
 
-        list_smiles = []
-        list_scores = []
+        list_df = []
         for raw_file_name in self.raw_file_names:
             feather_data_path = Path(self.raw_dir).joinpath(raw_file_name)
-            sub_list_smiles, sub_list_scores = get_smiles_and_scores_from_feather(feather_data_path)
-            list_smiles.extend(sub_list_smiles)
-            list_scores.extend(sub_list_scores)
+            df = pd.read_feather(feather_data_path)
+            list_df.append(df)
 
-        data_list = get_molecule_graphs_from_smiles_and_scores(list_smiles, list_scores)
+        raw_data_df = pd.concat(list_df).reset_index(drop=True)
+        data_list = get_molecule_graphs_from_raw_data_dataframe(raw_data_df)
 
         if self.pre_filter is not None:
             data_list = [data for data in data_list if self.pre_filter(data)]
