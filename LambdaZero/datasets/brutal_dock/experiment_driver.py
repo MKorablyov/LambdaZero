@@ -5,10 +5,11 @@ from typing import Dict, Any, Type
 import torch
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader
+import numpy as np
 
 from LambdaZero.datasets.brutal_dock import set_logging_directory
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
-from LambdaZero.datasets.brutal_dock.dataset_splitting import get_split_datasets
+from LambdaZero.datasets.brutal_dock.dataset_splitting import get_split_datasets, get_split_datasets_by_knn
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
@@ -37,6 +38,7 @@ def experiment_driver(
     """
 
     torch.manual_seed(random_seed)
+    np.random.seed(random_seed)
 
     logging.info(f"Parsing input arguments")
     run_parameters = config.pop(RUN_PARAMETERS_KEY)
@@ -63,9 +65,9 @@ def experiment_driver(
 
     logging.info(f"Splitting data into train, validation, and test sets")
     training_dataset, validation_dataset, test_dataset = \
-        get_split_datasets(dataset,
-                           training_parameters['train_fraction'],
-                           training_parameters['validation_fraction'])
+        get_split_datasets_by_knn(dataset,
+                                  training_parameters['train_fraction'],
+                                  training_parameters['validation_fraction'])
 
     logging.info(f"size of training set {len(training_dataset)}")
     logging.info(f"size of validation set {len(validation_dataset)}")
