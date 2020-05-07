@@ -4,6 +4,7 @@ when the tests are executed.
 """
 import logging
 import tempfile
+import numpy as np
 
 import pytest
 import torch
@@ -42,9 +43,16 @@ def list_positions(list_of_node_count):
 
 
 @pytest.fixture
-def list_gridscores(list_of_node_count):
+def list_gridscores(number_of_molecules):
     torch.manual_seed(242)
-    return torch.rand((len(list_of_node_count), 1), requires_grad=False)
+    return torch.rand((number_of_molecules, 1), requires_grad=False)
+
+
+@pytest.fixture
+def list_klabels(number_of_molecules):
+    np.random.seed(213423)
+    klabels = np.random.choice(list(range(10)), number_of_molecules)
+    return torch.from_numpy(klabels).view(-1, 1)
 
 
 @pytest.fixture
@@ -66,15 +74,17 @@ def number_of_edge_features():
 
 @pytest.fixture
 def list_random_molecules(list_of_node_count, number_of_node_features, list_positions,
-                          number_of_edge_features, list_gridscores):
+                          number_of_edge_features, list_gridscores, list_klabels):
 
     list_molecules = []
-    for number_of_nodes, positions, gridscore in zip(list_of_node_count, list_positions, list_gridscores):
+    for number_of_nodes, positions, gridscore, klabel in \
+            zip(list_of_node_count, list_positions, list_gridscores, list_klabels):
         fake_molecule_data = get_random_molecule_data(number_of_nodes,
                                                       number_of_node_features,
                                                       positions,
                                                       number_of_edge_features,
-                                                      gridscore)
+                                                      gridscore,
+                                                      klabel)
         list_molecules.append(fake_molecule_data)
     return list_molecules
 

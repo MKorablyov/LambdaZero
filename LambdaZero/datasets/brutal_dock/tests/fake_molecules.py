@@ -12,7 +12,7 @@ def get_list_edge_indices_for_a_ring(number_of_nodes):
 
 
 def get_random_molecule_data(number_of_nodes, number_of_node_features, positions,
-                             number_of_edge_features, gridscore):
+                             number_of_edge_features, gridscore, klabel):
     """
     Simple "molecule" in torch geometric. The molecule will be a simple atomic ring.
 
@@ -32,6 +32,7 @@ def get_random_molecule_data(number_of_nodes, number_of_node_features, positions
     node_data = torch.rand(number_of_nodes, number_of_node_features)
 
     fake_molecule_data = Data(gridscore=gridscore,
+                              klabel=klabel,
                               edge_attr=edge_attr,
                               edge_index=edge_index,
                               pos=positions,
