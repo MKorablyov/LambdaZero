@@ -2,14 +2,14 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Type
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader
-import numpy as np
 
 from LambdaZero.datasets.brutal_dock import set_logging_directory
+from LambdaZero.datasets.brutal_dock.dataset_splitting import get_split_datasets_by_knn
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
-from LambdaZero.datasets.brutal_dock.dataset_splitting import get_split_datasets, get_split_datasets_by_knn
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
