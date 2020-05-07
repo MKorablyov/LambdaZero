@@ -40,6 +40,10 @@ def _split_labels_in_groups(list_klabels: List[int], list_probabilities: List[fl
 
 
 def _get_group_indices(list_klabels: List[int], list_groups: List[List[int]]):
+    """
+    This method assigns each klabel to a group, and returns the corresponding
+    lists of indices.
+    """
     all_indices = np.arange(len(list_klabels))
     list_group_indices = []
 
