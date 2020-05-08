@@ -1,8 +1,7 @@
 import itertools
 
-import pytest
 import numpy as np
-from torch_geometric.data import DataLoader
+import pytest
 
 from LambdaZero.datasets.brutal_dock.dataset_splitting import _split_labels_in_groups, _get_group_indices, \
     get_split_datasets_by_knn
