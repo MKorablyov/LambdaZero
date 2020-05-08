@@ -57,6 +57,9 @@ def test_dataset_splitter_non_overlapping_sets(splitter_class, random_molecule_d
 
     list_of_sets = [training_tags, validation_tags, testing_tags]
 
+    for tag in all_test_tags:
+        assert tag in training_tags or tag in validation_tags or tag in testing_tags
+
     for split_set in list_of_sets:
         assert split_set.issubset(all_test_tags)
 
