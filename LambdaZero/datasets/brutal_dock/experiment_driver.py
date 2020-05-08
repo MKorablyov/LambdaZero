@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock import set_logging_directory
-from LambdaZero.datasets.brutal_dock.dataset_splitting import get_split_datasets_by_knn
+from LambdaZero.datasets.brutal_dock.dataset_splitting import KnnDatasetSplitter
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
@@ -64,10 +64,10 @@ def experiment_driver(
     model = model_class.create_model_for_training(model_parameters)
 
     logging.info(f"Splitting data into train, validation, and test sets")
-    training_dataset, validation_dataset, test_dataset = \
-        get_split_datasets_by_knn(dataset,
-                                  training_parameters['train_fraction'],
-                                  training_parameters['validation_fraction'])
+    splitter = KnnDatasetSplitter(training_parameters["train_fraction"],
+                                  training_parameters["validation_fraction"],
+                                  random_seed=random_seed)
+    training_dataset, validation_dataset, test_dataset = splitter.get_split_datasets(dataset)
 
     logging.info(f"size of training set {len(training_dataset)}")
     logging.info(f"size of validation set {len(validation_dataset)}")

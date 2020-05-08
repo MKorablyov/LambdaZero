@@ -1,5 +1,6 @@
 import torch
 from torch_geometric.data import Data
+import numpy as np
 
 
 def get_list_edge_indices_for_a_ring(number_of_nodes):
@@ -36,6 +37,7 @@ def get_random_molecule_data(number_of_nodes, number_of_node_features, positions
                               edge_attr=edge_attr,
                               edge_index=edge_index,
                               pos=positions,
-                              x=node_data)
+                              x=node_data,
+                              test_tag=np.random.randint(1, 1e9))
 
     return fake_molecule_data
