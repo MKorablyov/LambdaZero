@@ -1,11 +1,10 @@
 import logging
-import string
 import tempfile
 from pathlib import Path
 
 import numpy as np
-import pytest
 import pandas as pd
+import pytest
 
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 
