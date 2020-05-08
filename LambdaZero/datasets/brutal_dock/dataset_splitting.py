@@ -29,49 +29,49 @@ class AbstractDatasetSplitter:
 
         return train_size, valid_size, test_size
 
+    @abstractmethod
+    def _get_train_validation_and_test_indices(self, random_generator: RandomState,
+                                               full_dataset: Dataset,
+                                               train_size: int, valid_size: int,
+                                               test_size: int) -> Tuple[List[int], List[int], List[int]]:
+
+        pass
+
     def get_split_datasets(self, full_dataset: Dataset) -> Tuple[Dataset, Dataset, Dataset]:
-        train_size, valid_size, test_size = self._get_dataset_sizes(full_dataset)
         logging.info(f"Splitting data into train, validation, test sets")
+
+        train_size, valid_size, test_size = self._get_dataset_sizes(full_dataset)
 
         # Initialize the random number generator with its original state, to insure
         # the same "random numbers" are produced every time, even if this method is called many times.
         self.random_generator.set_state(self.random_generator_state)
 
-        training_dataset, validation_dataset, test_dataset = \
-            self._get_train_validation_and_test(self.random_generator, full_dataset, train_size, valid_size, test_size)
-
-        return training_dataset, validation_dataset, test_dataset
-
-    @abstractmethod
-    def _get_train_validation_and_test(self, random_generator, full_dataset, train_size, valid_size, test_size):
-        pass
-
-
-class RandomDatasetSplitter(AbstractDatasetSplitter):
-
-    @classmethod
-    def _get_train_valid_test_indices(cls, random_generator: RandomState, list_indices: List[int],
-                                      train_size: int, valid_size: int, test_size: int):
-        random_generator.shuffle(list_indices)
-        train_indices = list_indices[:train_size]
-        valid_indices = list_indices[train_size: train_size+valid_size]
-        test_indices = list_indices[train_size+valid_size:]
-        assert len(test_indices) == test_size, "something is wrong with the size of the test set"
-        return train_indices, valid_indices, test_indices
-
-    def _get_train_validation_and_test(self, random_generator: RandomState, full_dataset: Dataset,
-                                       train_size: int, valid_size: int, test_size: int):
-
-        list_indices = list(range(len(full_dataset)))
-
         train_indices, valid_indices, test_indices = \
-            self._get_train_valid_test_indices(random_generator, list_indices, train_size, valid_size, test_size)
+                self._get_train_validation_and_test_indices(self.random_generator, full_dataset,
+                                                           train_size, valid_size, test_size)
 
         training_dataset = Subset(full_dataset, train_indices)
         validation_dataset = Subset(full_dataset, valid_indices)
         test_dataset = Subset(full_dataset, test_indices)
 
         return training_dataset, validation_dataset, test_dataset
+
+
+class RandomDatasetSplitter(AbstractDatasetSplitter):
+
+    def _get_train_validation_and_test_indices(self, random_generator: RandomState,
+                                               full_dataset: Dataset,
+                                               train_size: int, valid_size: int,
+                                               test_size: int) -> Tuple[List[int], List[int], List[int]]:
+
+        list_indices = list(range(len(full_dataset)))
+
+        random_generator.shuffle(list_indices)
+        train_indices = list_indices[:train_size]
+        valid_indices = list_indices[train_size: train_size+valid_size]
+        test_indices = list_indices[train_size+valid_size:]
+        assert len(test_indices) == test_size, "something is wrong with the size of the test set"
+        return train_indices, valid_indices, test_indices
 
 
 class KnnDatasetSplitter(AbstractDatasetSplitter):
@@ -115,7 +115,10 @@ class KnnDatasetSplitter(AbstractDatasetSplitter):
 
         return list_group_indices
 
-    def _get_train_validation_and_test(self, random_generator, full_dataset, train_size, valid_size, test_size):
+    def _get_train_validation_and_test_indices(self, random_generator: RandomState,
+                                               full_dataset: Dataset,
+                                               train_size: int, valid_size: int,
+                                               test_size: int) -> Tuple[List[int], List[int], List[int]]:
 
         list_klabels = full_dataset.data["klabel"].numpy()
 
@@ -124,14 +127,11 @@ class KnnDatasetSplitter(AbstractDatasetSplitter):
         list_probabilities = [train_size/total_size, valid_size/total_size, test_size/total_size]
 
         list_groups = self._split_labels_in_groups(random_generator, list_klabels, list_probabilities)
-        list_group_indices = self._get_group_indices(list_klabels, list_groups)
+        train_indices, validation_indices, test_indices = self._get_group_indices(list_klabels, list_groups)
 
-        split = []
-        for group_indices in list_group_indices:
-            random_generator.shuffle(group_indices)
-            randomized_indices = list(group_indices)
-            subset = Subset(full_dataset, randomized_indices)
-            split.append(subset)
+        random_generator.shuffle(train_indices)
+        random_generator.shuffle(validation_indices)
+        random_generator.shuffle(test_indices)
 
-        return split
+        return train_indices, validation_indices, test_indices
 
