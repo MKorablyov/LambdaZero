@@ -35,7 +35,7 @@ class D4MoleculesDataset(MoleculesDatasetBase):
         return ['d4_processed_data.pt']
 
     # TODO: this should really be in the base class, but putting it there naively breaks the
-    #  code because pytorch_geometric's funny way of looking for the download method by introspection.
+    #  code because of pytorch_geometric's funny way of looking for the download method by introspection.
     def download(self):
         # Download to `self.raw_dir`.
         raw_dir_path = Path(self.raw_dir)
