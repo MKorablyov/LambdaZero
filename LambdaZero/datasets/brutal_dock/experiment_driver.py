@@ -78,7 +78,6 @@ def experiment_driver(
     dataset = dataset_class.create_dataset(root_dir=work_dir,
                                            original_raw_data_dir=data_dir)
 
-    logging.info(f"Preparing data")
     splitter = KnnDatasetSplitter(training_parameters["train_fraction"],
                                   training_parameters["validation_fraction"],
                                   random_seed=random_seed)
