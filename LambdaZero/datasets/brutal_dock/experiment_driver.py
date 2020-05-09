@@ -16,13 +16,13 @@ from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \
-    TRAINING_PARAMETERS_KEY, write_configuration_file
+    TRAINING_PARAMETERS_KEY, write_configuration_file, CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, TAGS_KEY
 
 loss_function = F.mse_loss
 
 
 def experiment_driver(
-    config: Dict[str, Any],
+    input_and_run_config: Dict[str, Any],
     dataset_class: Type[MoleculesDatasetBase],
     model_class: Type[ModelBase],
     random_seed: int = 0,
@@ -40,21 +40,39 @@ def experiment_driver(
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
 
-    logging.info(f"Parsing input arguments")
-    run_parameters = config.pop(RUN_PARAMETERS_KEY)
+    config = input_and_run_config[CONFIG_KEY]
+    non_config_parameters = input_and_run_config[NON_CONFIG_KEY]
+
+    paths_dict = non_config_parameters[PATHS_KEY]
+    tags_dict = non_config_parameters[TAGS_KEY]
+
+    run_parameters = config[RUN_PARAMETERS_KEY]
     training_parameters = config[TRAINING_PARAMETERS_KEY]
     model_parameters = config[MODEL_PARAMETERS_KEY]
 
-    data_dir = Path(run_parameters.pop("data_directory"))
-    work_dir = Path(run_parameters.pop("working_directory"))
-    out_dir = Path(run_parameters.pop("output_directory"))
+    data_dir = Path(paths_dict["data_directory"])
+    work_dir = Path(paths_dict["working_directory"])
+    out_dir = Path(paths_dict["output_directory"])
+    tracking_uri = Path(paths_dict["tracking_uri"])
 
     work_dir.mkdir(parents=True, exist_ok=True)
     out_dir.mkdir(parents=True, exist_ok=True)
+    tracking_uri.mkdir(parents=True, exist_ok=True)
 
     logging_directory = out_dir.joinpath("logs/")
     logging_directory.mkdir(parents=True, exist_ok=True)
     set_logging_directory(logging_directory)
+
+    experiment_logger = MLFlowLogger(run_parameters["experiment_name"],
+                                     str(tracking_uri),
+                                     tags_dict)
+    experiment_logger.log_parameters("training", training_parameters)
+    experiment_logger.log_parameters("model", model_parameters)
+
+    logging.info(f"Writing configuration to artifact directory")
+    json_config_path = str(out_dir.joinpath("config.json"))
+    write_configuration_file(json_config_path, config)
+    experiment_logger.log_artifact(json_config_path)
 
     logging.info(f"Instantiating full dataset")
     dataset = dataset_class.create_dataset(root_dir=work_dir,
@@ -91,22 +109,6 @@ def experiment_driver(
     training_mean, training_std = get_scores_statistics(training_dataloader)
 
     logging.info(f"Instantiating model trainer")
-
-    tracking_uri = Path(run_parameters.pop("tracking_uri"))
-    tracking_uri.mkdir(parents=True, exist_ok=True)
-    experiment_logger = MLFlowLogger(run_parameters.pop("experiment_name"),
-                                     str(tracking_uri),
-                                     run_parameters)
-    experiment_logger.log_parameters("training", training_parameters)
-    experiment_logger.log_parameters("model", model_parameters)
-
-    logging.info(f"Writing configuration to artifact directory")
-    json_config_path = str(out_dir.joinpath("config.json"))
-    config = {TRAINING_PARAMETERS_KEY: training_parameters,
-              MODEL_PARAMETERS_KEY: model_parameters}
-
-    write_configuration_file(json_config_path, config)
-    experiment_logger.log_artifact(json_config_path)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_trainer = MoleculeModelTrainer(loss_function,

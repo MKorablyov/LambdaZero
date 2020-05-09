@@ -3,14 +3,21 @@ import json
 import sys
 from pathlib import Path
 import getpass
+from typing import Dict
 
 import git
 
 from LambdaZero.datasets.brutal_dock import ROOT_DIR
 
+CONFIG_KEY = "config"
 MODEL_PARAMETERS_KEY = "model"
 TRAINING_PARAMETERS_KEY = "training"
 RUN_PARAMETERS_KEY = "run_parameters"
+
+NON_CONFIG_KEY = "non_config"
+TAGS_KEY = "tags"
+PATHS_KEY = "paths"
+
 
 
 def get_input_arguments():
@@ -68,38 +75,36 @@ def write_configuration_file(json_config_path: str, config_dict: dict):
         json.dump(config_dict, f, indent=4, default=default_json_writer)
 
 
-def augment_configuration_with_run_parameters(
-    input_config: dict,
+def get_non_configuration_parameters(
+    config: Dict[str, str],
     executable_file_path: Path,
     args: argparse.ArgumentParser,
 ):
-    input_and_run_config = dict(input_config)
+    paths = {"tracking_uri": args.tracking_uri,
+             "working_directory": args.working_directory,
+             "output_directory": args.output_directory,
+             "data_directory":  args.data_directory,
+             }
 
-    run_parameters_dict = input_and_run_config[RUN_PARAMETERS_KEY]
-    run_parameters_dict["tracking_uri"] = args.tracking_uri
+    tags = {"git_hash":  get_git_hash(),
+            "user": get_user(),
+            "execution_file_name": str(executable_file_path.relative_to(ROOT_DIR)),
+            "run_name": config["run_name"]
+            }
 
-    run_parameters_dict["git_hash"] = get_git_hash()
-    run_parameters_dict["user"] = get_user()
+    non_config_dict = {PATHS_KEY: paths,
+                       TAGS_KEY: tags}
 
-    run_parameters_dict["working_directory"] = args.working_directory
-    run_parameters_dict["output_directory"] = args.output_directory
-    run_parameters_dict["data_directory"] = args.data_directory
-
-    run_parameters_dict["execution_file_name"] = str(executable_file_path.relative_to(ROOT_DIR))
-
-    input_and_run_config[RUN_PARAMETERS_KEY] = run_parameters_dict
-
-    return input_and_run_config
+    return non_config_dict
 
 
 def get_input_and_run_configuration(executable_file_path: Path):
     args = get_input_arguments()
 
-    input_config = read_configuration_file(args.config)
+    config = read_configuration_file(args.config)
+    non_config = get_non_configuration_parameters(config, executable_file_path, args)
 
-    input_and_run_config = augment_configuration_with_run_parameters(
-        input_config,
-        executable_file_path,
-        args)
+    config_and_augmented = {CONFIG_KEY: config,
+                            NON_CONFIG_KEY: non_config}
 
-    return input_and_run_config
+    return config_and_augmented

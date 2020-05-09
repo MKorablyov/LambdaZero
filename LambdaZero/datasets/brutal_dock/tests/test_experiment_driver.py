@@ -10,7 +10,7 @@ from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
-    MODEL_PARAMETERS_KEY
+    MODEL_PARAMETERS_KEY, TAGS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY
 
 
 @pytest.fixture
@@ -67,17 +67,20 @@ def output_dir():
 
 
 @pytest.fixture
-def config(data_dir, work_dir, output_dir, number_of_node_features):
-    run_parameters = dict(data_directory=str(data_dir),
-                          working_directory=str(work_dir),
-                          output_directory=str(output_dir),
-                          tracking_uri=str(output_dir.joinpath("mlruns")),
-                          experiment_name="TEST",
-                          run_name="exp-driver-smoke-test",
-                          git_hash="SOMETESTHASH",
-                          user="test-user",
-                          execution_file_name="test_file_name.py"
-                          )
+def input_and_run_config(data_dir, work_dir, output_dir, number_of_node_features):
+
+    paths = dict(data_directory=str(data_dir),
+                 working_directory=str(work_dir),
+                 output_directory=str(output_dir),
+                 tracking_uri=str(output_dir.joinpath("mlruns")))
+
+    tags = dict(git_hash="SOMETESTHASH",
+                user="test-user",
+                execution_file_name="test_file_name.py",
+                run_name="exp-driver-smoke-test")
+
+    run_parameters = dict(experiment_name="TEST",
+                          run_name="exp-driver-smoke-test")
 
     training_parameters = dict(num_epochs=10,
                                num_workers=0,
@@ -98,11 +101,17 @@ def config(data_dir, work_dir, output_dir, number_of_node_features):
               TRAINING_PARAMETERS_KEY: training_parameters,
               MODEL_PARAMETERS_KEY: model_parameters}
 
-    return config
+    non_config = {PATHS_KEY: paths,
+                  TAGS_KEY: tags}
+
+    config_and_augmented = {CONFIG_KEY: config,
+                            NON_CONFIG_KEY: non_config}
+
+    return config_and_augmented
 
 
 @pytest.mark.parametrize("number_of_molecules", [20])
-def test_smoke_test_experiment_driver(config):
+def test_smoke_test_experiment_driver(input_and_run_config):
     dataset_class = D4MoleculesDataset
     model_class = MessagePassingNet
-    _ = experiment_driver(config, dataset_class, model_class)
+    _ = experiment_driver(input_and_run_config, dataset_class, model_class)
