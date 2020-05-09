@@ -78,10 +78,7 @@ def experiment_driver(
     dataset = dataset_class.create_dataset(root_dir=work_dir,
                                            original_raw_data_dir=data_dir)
 
-    logging.info(f"Instantiating model for training")
-    model = model_class.create_model_for_training(model_parameters)
-
-    logging.info(f"Splitting data into train, validation, and test sets")
+    logging.info(f"Preparing data")
     splitter = KnnDatasetSplitter(training_parameters["train_fraction"],
                                   training_parameters["validation_fraction"],
                                   random_seed=random_seed)
@@ -91,7 +88,6 @@ def experiment_driver(
     logging.info(f"size of validation set {len(validation_dataset)}")
     logging.info(f"size of test set {len(test_dataset)}")
 
-    logging.info(f"Creating dataloaders")
     training_dataloader = DataLoader(training_dataset,
                                      batch_size=training_parameters['batch_size'],
                                      num_workers=training_parameters['num_workers'],
@@ -107,6 +103,9 @@ def experiment_driver(
 
     logging.info(f"Extracting mean and standard deviation from training data")
     training_mean, training_std = get_scores_statistics(training_dataloader)
+
+    logging.info(f"Instantiating model for training")
+    model = model_class.create_model_for_training(model_parameters)
 
     logging.info(f"Instantiating model trainer")
 
