@@ -4,18 +4,18 @@
         "run_name": "debugging"
     },
     "training": {
-        "num_epochs": 5,
+        "num_epochs": 2,
         "num_workers": 4,
-        "batch_size": 4096,
+        "batch_size": 1024,
         "learning_rate": 0.001,
         "train_fraction": 0.8,
         "validation_fraction": 0.1
     },
     "model": {
         "name": "MPNN",
-        "gcn_size": 32,
-        "edge_hidden": 32,
+        "gcn_size": 16,
+        "edge_hidden": 16,
         "gru_layers": 1,
-        "linear_hidden": 32 
+        "linear_hidden":16
     }
 }
