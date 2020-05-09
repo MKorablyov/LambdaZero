@@ -89,7 +89,7 @@ def get_non_configuration_parameters(
     tags = {"git_hash":  get_git_hash(),
             "user": get_user(),
             "execution_file_name": str(executable_file_path.relative_to(ROOT_DIR)),
-            "run_name": config["run_name"]
+            "run_name": config[RUN_PARAMETERS_KEY]["run_name"]
             }
 
     non_config_dict = {PATHS_KEY: paths,
