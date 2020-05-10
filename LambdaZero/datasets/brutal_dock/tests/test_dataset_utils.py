@@ -8,29 +8,32 @@ from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 
 
 @pytest.fixture
-def dockscores():
+def gridscores():
     np.random.seed(12312)
     return np.random.rand(1000)
 
 
 @pytest.fixture
-def training_graphs(dockscores):
+def training_graphs(gridscores):
 
     list_graphs = []
-    for dockscore in dockscores:
+    for gridscore in gridscores:
         graph = Data()
-        graph.dockscore = dockscore
+        graph.gridscore = gridscore
         list_graphs.append(graph)
 
     return list_graphs
 
 
-def test_get_scores_statistics(dockscores, training_graphs):
+@pytest.mark.parametrize("number_of_molecules", [10])
+def test_get_scores_statistics(list_gridscores, random_molecule_dataset):
 
-    expected_mean = np.mean(dockscores)
-    expected_std = np.std(dockscores)
+    gridscore_array = list_gridscores.numpy().flatten()
 
-    dataloader = DataLoader(training_graphs, batch_size=10)
+    expected_mean = np.mean(gridscore_array)
+    expected_std = np.std(gridscore_array)
+
+    dataloader = DataLoader(random_molecule_dataset, batch_size=10)
 
     computed_mean, computed_std = get_scores_statistics(dataloader)
 

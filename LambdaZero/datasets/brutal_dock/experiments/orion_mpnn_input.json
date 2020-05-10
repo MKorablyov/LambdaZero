@@ -1,0 +1,22 @@
+{
+
+    "run_parameters": {
+        "experiment_name": "Message Passing Neural Network",
+        "run_name": "testrun1"
+    },
+    "training": {
+        "num_epochs": 25,
+        "num_workers": 4,
+        "batch_size": 64,
+        "learning_rate": "orion~loguniform(1e-6, 1e-3)",
+        "train_fraction": 0.8,
+        "validation_fraction": 0.1
+    },
+    "model": {
+        "name": "MPNN",
+        "gcn_size": "orion~choices([32, 64, 128, 256])",
+        "edge_hidden": "orion~choices([32, 64, 128, 256])",
+        "gru_layers": 1,
+        "linear_hidden": "orion~choices([128, 256, 512])"
+    }
+}
