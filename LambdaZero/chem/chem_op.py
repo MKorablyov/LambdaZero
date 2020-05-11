@@ -261,7 +261,7 @@ def build_mol(smiles=None,num_conf=1, minimize=False, noh=True,charges=True):
     return pd.DataFrame({"mol":[mol], "elem":[elem], "coord":[coord]})
 
 
-def _gen_mol2(smi, mol_name, outpath, chimera_bin, num_conf=10):
+def _gen_mol2(smi, mol_name, outpath, chimera_bin, charge_method, num_conf):
     # generate num_conf 3D conformers from smiles
     mol = Chem.MolFromSmiles(smi)
     Chem.SanitizeMol(mol)
@@ -279,10 +279,10 @@ def _gen_mol2(smi, mol_name, outpath, chimera_bin, num_conf=10):
     mol2_file = os.path.join(outpath, mol_name + ".mol2")
     chimera_cmd = "printf \"open {}" \
               "\naddh" \
-              "\naddcharge all method gas" \
+              "\naddcharge all method {}" \
               "\nwrite format mol2 0 {}" \
               "\nstop now\"  | {} --nogui".format(
-        mol_file, mol2_file, chimera_bin)
+        mol_file, charge_method, mol2_file, chimera_bin)
     process = subprocess.Popen(chimera_cmd, shell=True, stdout=subprocess.PIPE)
     process.wait()
     return mol2_file
@@ -296,7 +296,8 @@ class Dock_smi:
                  docksetup_dir,     #
                  cleanup=True,
                  trustme=False,
-                 rec_site_file="2_site/matching_spheres.sph",
+                 gas_charge=True,
+                 rec_site_file="2_site/selected_spheres.sph",
                  grid_prefix="3_grid/grid",
                  dock_in_template = "4_dock/anchor_and_grow.in",
                  vdw_defn_file="parameters/vdw_AMBER_parm99.defn",
@@ -304,6 +305,11 @@ class Dock_smi:
                  flex_drive_file="parameters/flex_drive.tbl"):
         # output path
         self.outpath = outpath
+        if gas_charge:
+            self.charge_method = "gas"
+        else:
+            self.charge_method = "am1-bcc"
+
         if not trustme:
             if not os.path.exists(outpath): os.makedirs(outpath)
         # chimera bin
@@ -333,11 +339,11 @@ class Dock_smi:
         if not trustme:
             assert os.path.exists(self.dock_in_template), "can't find rec site file " + self.dock_in_template
 
-    def dock(self, smi, mol_name=None, molgen_conf=10):
+    def dock(self, smi, mol_name=None, molgen_conf=20):
         # generate random molecule name if needed
         if mol_name is None: mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
         # do smiles conversion and docking
-        mol2_file = _gen_mol2(smi, mol_name, self.outpath, self.chimera_bin, num_conf=molgen_conf)
+        mol2_file = _gen_mol2(smi, mol_name, self.outpath, self.chimera_bin, self.charge_method, num_conf=molgen_conf)
         gridscore, coord = self._dock_dock6(smi, mol2_file, mol_name,
                                             self.outpath, self.dock_in_template, self.dock6_bin)
         if self.cleanup:
