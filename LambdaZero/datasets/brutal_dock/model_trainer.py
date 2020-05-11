@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, abstractmethod
 import logging
 from pathlib import Path
@@ -8,6 +9,7 @@ import torch
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 
@@ -65,13 +67,8 @@ class AbstractModelTrainer(ABC):
         total_epoch_loss = 0.0
 
         number_of_batches = len(dataloader)
-        batch_counter = 0
 
-        for batch in dataloader:
-            batch_counter += 1
-            info = f" - training : batch  {batch_counter} of {number_of_batches}"
-            logging.info(info)
-
+        for batch in tqdm(dataloader, desc="TRAIN", file=sys.stdout):
             optimizer.zero_grad()
             batch_loss = self._get_batch_loss(batch, model)
             batch_loss.backward()
@@ -91,7 +88,7 @@ class AbstractModelTrainer(ABC):
         model.eval()
         total_epoch_loss = 0.0
 
-        for batch in dataloader:
+        for batch in tqdm(dataloader, desc="VALID", file=sys.stdout):
             batch_loss = self._get_batch_loss(batch, model)
             batch_loss_value = batch_loss.item()
             total_epoch_loss += batch_loss_value*self._get_size_of_batch(batch)
@@ -105,7 +102,7 @@ class AbstractModelTrainer(ABC):
     def train_model(self, model: nn.Module, training_dataloader: DataLoader, validation_dataloader: DataLoader,
                     best_model_output_path: Path, num_epochs: int,
                     lr=0.001, sched_factor=0.7, sched_patience=5, min_lr=0.00001):
-
+        model.to(self.device)
         optimizer = self.optimizer_class(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                                mode='min',
@@ -138,13 +135,14 @@ class AbstractModelTrainer(ABC):
         list_actuals = []
         list_predicted = []
         with torch.no_grad():
-            for batch in dataloader:
+            for batch in tqdm(dataloader, desc="EVAL", file=sys.stdout):
+
                 y_actual = self._get_target_from_batch(batch)
-                list_actuals.extend(list(y_actual.numpy()))
+                list_actuals.extend(list(y_actual.cpu().numpy()))
 
                 normalized_y_predicted = self._apply_model_to_batch(batch, model)
                 y_predicted = self._denormalize_target(normalized_y_predicted)
-                list_predicted.extend(list(y_predicted.numpy()))
+                list_predicted.extend(list(y_predicted.cpu().numpy()))
 
         return np.array(list_actuals), np.array(list_predicted)
 
@@ -175,9 +173,10 @@ class MoleculeModelTrainer(AbstractModelTrainer):
 
     def _get_target_from_batch(self, batch):
         batch = batch.to(self.device)
-        return batch.dockscore
+        return batch.gridscore
 
     def _apply_model_to_batch(self, batch, model):
+        model.to(self.device)
         batch = batch.to(self.device)
         y_hat = model.forward(batch)
         return y_hat
