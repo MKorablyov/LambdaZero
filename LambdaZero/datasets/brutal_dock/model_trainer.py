@@ -100,8 +100,8 @@ class AbstractModelTrainer(ABC):
         return average_epoch_loss
 
     def train_model(self, model: nn.Module, training_dataloader: DataLoader, validation_dataloader: DataLoader,
-                    best_model_output_path: Path, num_epochs: int, patience: int,
-                    lr=0.001, sched_factor=0.7, sched_patience=5, min_lr=0.00001):
+                    best_model_output_path: Path, num_epochs: int, patience: int = 10,
+                    lr: float = 0.001, sched_factor: float = 0.7, sched_patience: int = 5, min_lr: float = 0.00001):
         model.to(self.device)
         optimizer = self.optimizer_class(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
