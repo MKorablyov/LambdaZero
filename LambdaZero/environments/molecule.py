@@ -465,6 +465,8 @@ class BlockMolEnv_v4:
         mol_attr, self.num_steps, self.num_simulations, self.reward.previous_reward, self.molMDP.molecule._mol \
             = deepcopy(state)
         [setattr(self.molMDP.molecule, key, value) for key, value in mol_attr.items()]
+        self.molMDP.molecule._mol = None
+        self.molMDP.molecule.blocks = [self.molMDP.block_mols[i] for i in self.molMDP.molecule.blockidxs]
         return self.observ(self.molMDP.molecule, self.num_steps)
 
     def render(self, outpath):
