@@ -37,6 +37,13 @@ pip install orion psutil torch-geometric ray[rllib]
 
 pip install -e .
 
+
+# Install Chemprop
+pip install -e git+https://github.com/chemprop/chemprop.git#egg=chemprop
+pip install typed-argument-parser
+
+
+
 if [ $DATASET_DEFAULT -eq 1 ]; then
     read -p "Install directory for datasets (NO to skip) [$DATASET_PATH]:" dpath
     if [ ! -z "$dpath" ]; then
