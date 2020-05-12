@@ -5,12 +5,13 @@
         "run_name": "testrun1"
     },
     "training": {
-        "num_epochs": 25,
+        "num_epochs": 100,
         "num_workers": 4,
         "batch_size": 64,
         "learning_rate": "orion~loguniform(1e-6, 1e-3)",
         "train_fraction": 0.8,
-        "validation_fraction": 0.1
+        "validation_fraction": 0.1,
+        "patience": 10
     },
     "model": {
         "name": "MPNN",
