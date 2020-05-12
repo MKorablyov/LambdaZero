@@ -33,7 +33,7 @@ pip install https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-
 
 
 # Install the pip packages
-pip install psutil torch-geometric ray[rllib]
+pip install orion psutil torch-geometric ray[rllib]
 
 pip install -e .
 

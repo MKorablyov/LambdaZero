@@ -52,7 +52,9 @@ class MLFlowLogger:
     def run_id(self):
         if self._run_id is not None:
             return self._run_id
-        run = self.mlflow_client.create_run(experiment_id=self.experiment_id, tags=self.tags)
+
+        tags_with_reserved_names = self._create_tags_using_reserved_names(self.tags)
+        run = self.mlflow_client.create_run(experiment_id=self.experiment_id, tags=tags_with_reserved_names)
         self._run_id = run.info.run_id
         return self._run_id
 
@@ -64,6 +66,36 @@ class MLFlowLogger:
         step = self.step_counter.count
         self.mlflow_client.log_metric(self.run_id, key, value, step=step)
 
+    def log_parameters(self, prefix: str, parameters: Dict[str, str]):
+        for key, value in parameters.items():
+            self.mlflow_client.log_param(self.run_id, f"{prefix}--{key}", value)
+
+    def log_artifact(self, path: str):
+        self.mlflow_client.log_artifact(self.run_id, path)
+
     def finalize(self):
         self.mlflow_client.set_terminated(self.run_id, status='FINISHED')
+
+    @classmethod
+    def _create_tags_using_reserved_names(cls, tags: Dict[str, str]):
+        """
+        Use MLFlow specific reserved names so tags are presented in the correct place in the gui.
+        For reserved names, see https: // www.mlflow.org / docs / latest / tracking.html  # tracking
+        """
+
+        git_hash = tags.pop("git_hash", 'none')
+        execution_file_name = tags.pop("execution_file_name", 'none')
+        user = tags.pop("user", 'none')
+        run_name = tags.pop("run_name", 'none')
+
+        tags_with_correct_names = dict(tags)
+        tags_with_correct_names["mlflow.source.git.commit"] = git_hash
+        tags_with_correct_names["mlflow.source.name"] = execution_file_name
+        tags_with_correct_names["mlflow.user"] = user
+        tags_with_correct_names["mlflow.runName"] = run_name
+        return tags_with_correct_names
+
+
+
+
 

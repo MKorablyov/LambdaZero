@@ -1,24 +1,22 @@
-import logging
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import pandas as pd
 import torch
-from torch.utils.data import Dataset
 from torch_geometric.data import DataLoader
+from tqdm import tqdm
 
-from LambdaZero.chem import mol_to_graph
-
-
-def get_smiles_and_scores_from_feather(feather_data_path: Path):
-    df = pd.read_feather(feather_data_path)
-    list_smiles = df['smiles'].values
-    list_scores = df['gridscore'].to_numpy()
-    return list_smiles, list_scores
+from LambdaZero.chem import mol_to_graph, sys
 
 
-def get_molecule_graphs_from_smiles_and_scores(list_smiles: List[str], list_scores: List[float]):
-    list_graphs = [mol_to_graph(smiles, dockscore=score) for (smiles, score) in zip(list_smiles, list_scores)]
+def get_molecule_graphs_from_raw_data_dataframe(raw_data_df: pd.DataFrame):
+    list_graphs = []
+    for _, row in tqdm(raw_data_df.iterrows(), desc="MOL_TO_GRAPH", file=sys.stdout):
+        graph = mol_to_graph(row["smiles"],
+                             gridscore=row.get("gridscore", None),
+                             dockscore=row.get("dockscore", None),
+                             klabel=row.get("klabel", None))
+        list_graphs.append(graph)
     return list_graphs
 
 
@@ -31,8 +29,8 @@ def get_scores_statistics(training_dataloader: DataLoader):
         score_square_sum = torch.zeros(1)
 
         for batch in training_dataloader:
-            score_sum += torch.sum(batch.dockscore)
-            score_square_sum += torch.sum(batch.dockscore**2)
+            score_sum += torch.sum(batch.gridscore)
+            score_square_sum += torch.sum(batch.gridscore ** 2)
 
         mean_tensor = score_sum/number_of_graphs
         std_tensor = torch.sqrt(score_square_sum/number_of_graphs - mean_tensor**2)
@@ -42,15 +40,3 @@ def get_scores_statistics(training_dataloader: DataLoader):
 
         return mean, std
 
-
-def get_split_datasets(full_dataset: Dataset, train_fraction: float, validation_fraction: float):
-    dataset_size = len(full_dataset)
-    train_size = int(train_fraction * dataset_size)
-    valid_size = int(validation_fraction * dataset_size)
-    test_size = dataset_size - train_size - valid_size
-
-    logging.info(f"Splitting data into train, validation, test sets")
-    training_dataset, validation_dataset, test_dataset = \
-        torch.utils.data.random_split(full_dataset, [train_size, valid_size, test_size])
-
-    return training_dataset, validation_dataset, test_dataset
