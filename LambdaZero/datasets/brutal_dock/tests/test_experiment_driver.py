@@ -8,7 +8,7 @@ from torch_geometric.data import InMemoryDataset
 from LambdaZero.core.alpha_zero_policy import torch
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
-from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
+from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
     MODEL_PARAMETERS_KEY, TAGS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY
 

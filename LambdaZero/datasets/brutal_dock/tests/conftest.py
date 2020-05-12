@@ -10,7 +10,7 @@ import pytest
 import torch
 from torch_geometric.data import Batch
 
-from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
+from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_random_molecule_data
 from LambdaZero.datasets.brutal_dock.tests.fake_molecule_dataset import FakeMoleculeDataset
 

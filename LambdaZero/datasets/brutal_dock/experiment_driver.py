@@ -14,7 +14,7 @@ from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
-from LambdaZero.datasets.brutal_dock.models import ModelBase
+from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \
     TRAINING_PARAMETERS_KEY, write_configuration_file, CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, TAGS_KEY
 
