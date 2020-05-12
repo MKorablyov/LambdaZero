@@ -41,4 +41,6 @@ class ChempropNet(ModelBase):
 
         self.chemprop_model = MoleculeModel(args=args, featurizer=False)
 
+    def forward(self, data):
+        return self.chemprop_model.forward(data)
 
