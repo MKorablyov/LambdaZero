@@ -100,8 +100,8 @@ class AbstractModelTrainer(ABC):
         return average_epoch_loss
 
     def train_model(self, model: nn.Module, training_dataloader: DataLoader, validation_dataloader: DataLoader,
-                    best_model_output_path: Path, num_epochs: int,
-                    lr=0.001, sched_factor=0.7, sched_patience=5, min_lr=0.00001):
+                    best_model_output_path: Path, num_epochs: int, patience: int = 10,
+                    lr: float = 0.001, sched_factor: float = 0.7, sched_patience: int = 5, min_lr: float = 0.00001):
         model.to(self.device)
         optimizer = self.optimizer_class(model.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
@@ -111,6 +111,7 @@ class AbstractModelTrainer(ABC):
                                                                min_lr=min_lr)
 
         best_validation_loss = float("inf")
+        step_worse = 0
         for epoch in range(1, num_epochs + 1):
 
             lr = scheduler.optimizer.param_groups[0]['lr']
@@ -121,8 +122,18 @@ class AbstractModelTrainer(ABC):
             scheduler.step(average_validation_loss)
 
             if average_validation_loss <= best_validation_loss:
+                step_worse = 0
                 best_validation_loss = average_validation_loss
                 torch.save(model.state_dict(), best_model_output_path)
+            else:
+                step_worse += 1
+
+            # early stopping
+            if step_worse == patience:
+                info = f"Early stopping point reached at epoch {epoch - patience:03d}"
+                logging.info(info)
+                model.load_state_dict(torch.load(best_model_output_path))
+                break
 
             info = f"Epoch: {epoch:03d}, LR: {lr:5f}, Train Loss: {average_training_loss:.5f}, Val Loss: {average_validation_loss:.5f}"
             logging.info(info)

@@ -87,7 +87,8 @@ def input_and_run_config(data_dir, work_dir, output_dir, number_of_node_features
                                batch_size=2,
                                learning_rate=1e-3,
                                train_fraction=0.8,
-                               validation_fraction=0.1)
+                               validation_fraction=0.1,
+                               patience=1)
 
     model_parameters = dict(name="MPNN",
                             node_feat=number_of_node_features,
