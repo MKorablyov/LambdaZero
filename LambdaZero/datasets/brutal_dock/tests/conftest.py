@@ -130,3 +130,13 @@ def tracking_uri():
 @pytest.fixture
 def experiment_name():
     return 'some-fake-experiment-name'
+
+
+@pytest.fixture
+def realistic_smiles():
+    list_smiles = ['CC(C)=CC(C)(C)O', 'CC(C)=CC(=O)NC(C#N)P(=O)(O)O',
+                   'O=[SH](=O)S(=O)(=O)O', 'CC(C)=CN1CCN(P(=O)(O)O)CC1',
+                   'CC(C)(O)C(F)(F)F', 'Nn1cnc2c([PH](=O)[O-])ncnc21',
+                   'c1ccc2cc(N3CCOCC3)ccc2c1', 'CC(C)(O)Br', 'CC(=O)N[SH](=O)=O',
+                   'CC(C)=CC1CC(C(NC(=O)C(C)O)NC(=O)S(=O)(=O)O)N(c2ccc3ccccc3c2)C1C(C)C']
+    return list_smiles
