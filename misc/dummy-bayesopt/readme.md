@@ -15,7 +15,7 @@ In particular we are interested in using Bayesian Optimization to decide on whic
 oracle, FEP (ie treat it as a contextual bandit problem). 
 
 
-![overview of process](notes/overview/imgs/process.png)
+![overview of process](notes/misc_imgs/process.png)
 
 
 
@@ -136,7 +136,7 @@ has already seen.
 At the moment we are getting graph level representations of molecules using Morgan fingerprints. Longer term we want
 to feed into our models learnt embeddings (eg from a trained MPNN), see image below. Perhaps need to discuss how best to do this.
 
-![ML networks](notes/overview/imgs/networks.png)
+![ML networks](notes/misc_imgs/networks.png)
 
 
 
