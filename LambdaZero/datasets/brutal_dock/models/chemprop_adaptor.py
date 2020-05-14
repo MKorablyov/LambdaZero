@@ -35,6 +35,12 @@ def _get_number_of_hydrogens_from_molecular_graph(molecule_graph: Data) -> List[
     return _get_integers_from_node_features(molecule_graph, _NUMBER_OF_HYDROGEN_INDEX)
 
 
+def _assert_that_each_atom_pair_appears_only_once(set_of_bonds: Set[Tuple[int, int, BondType]]):
+    pairs = [(idx1, idx2) for idx1, idx2, _ in set_of_bonds]
+    assert len(set(pairs)) == len(pairs), "a pair of indices appears more than once!"
+
+
+
 def _get_bonds_from_molecular_graph(molecule_graph: Data) -> Set[Tuple[int, int, BondType]]:
     bond_atom_index_pairs = molecule_graph.edge_index.t().numpy().astype(int)
     bond_atom_index_pairs.sort(axis=1)
@@ -47,6 +53,8 @@ def _get_bonds_from_molecular_graph(molecule_graph: Data) -> Set[Tuple[int, int,
     for (idx1, idx2), bond_type in zip(bond_atom_index_pairs, bond_types):
 
         set_of_bonds.add((idx1, idx2, bond_type))
+
+    _assert_that_each_atom_pair_appears_only_once(set_of_bonds)
 
     return set_of_bonds
 
