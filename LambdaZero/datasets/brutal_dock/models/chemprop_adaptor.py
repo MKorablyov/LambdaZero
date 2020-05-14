@@ -40,7 +40,6 @@ def _assert_that_each_atom_pair_appears_only_once(set_of_bonds: Set[Tuple[int, i
     assert len(set(pairs)) == len(pairs), "a pair of indices appears more than once!"
 
 
-
 def _get_bonds_from_molecular_graph(molecule_graph: Data) -> Set[Tuple[int, int, BondType]]:
     bond_atom_index_pairs = molecule_graph.edge_index.t().numpy().astype(int)
     bond_atom_index_pairs.sort(axis=1)
