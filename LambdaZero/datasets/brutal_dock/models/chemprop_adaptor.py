@@ -86,4 +86,17 @@ def graph_to_mol(molecule_graph: Data) -> Mol:
     AllChem.EmbedMolecule(molecule)
     AllChem.MMFFOptimizeMolecule(molecule)
 
+    new_molecule = RWMol(molecule)
+
+    for atom, number_of_hydrogens in zip(new_molecule.GetAtoms(), hydrogen_counts):
+        atom.SetNoImplicit(True)
+        atom.SetNumExplicitHs(number_of_hydrogens)
+
+    molecule = editable_molecule.GetMol()
+    [atom.SetNoImplicit(True) for atom in molecule.GetAtoms()]
+
+    Chem.SanitizeMol(molecule)
+    AllChem.EmbedMolecule(molecule)
+    AllChem.MMFFOptimizeMolecule(molecule)
+
     return molecule
