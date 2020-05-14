@@ -10,7 +10,7 @@ import numpy as np
 
 import pandas as pd
 from chemprop.features import MolGraph
-from rdkit.Chem.rdchem import Mol
+from rdkit.Chem.rdchem import Mol, AtomValenceException, KekulizeException
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 
 from LambdaZero.chem import mol_to_graph
@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
         try:
             mol_from_adaptor = graph_to_mol(molecule_graph)
-        except:
+        except (AtomValenceException, KekulizeException):
             print(f"-----------------------------------------")
             print(f"problem with {smiles}")
             count_problematic_conversion += 1
