@@ -133,10 +133,23 @@ def experiment_name():
 
 
 @pytest.fixture
-def realistic_smiles():
+def easy_smiles():
     list_smiles = ['CC(C)=CC(C)(C)O', 'CC(C)=CC(=O)NC(C#N)P(=O)(O)O',
                    'O=[SH](=O)S(=O)(=O)O', 'CC(C)=CN1CCN(P(=O)(O)O)CC1',
-                   'CC(C)(O)C(F)(F)F', 'Nn1cnc2c([PH](=O)[O-])ncnc21',
-                   'c1ccc2cc(N3CCOCC3)ccc2c1', 'CC(C)(O)Br', 'CC(=O)N[SH](=O)=O',
-                   'CC(C)=CC1CC(C(NC(=O)C(C)O)NC(=O)S(=O)(=O)O)N(c2ccc3ccccc3c2)C1C(C)C']
+                   'CC(C)(O)C(F)(F)F', 'c1ccc2cc(N3CCOCC3)ccc2c1', 'CC(C)(O)Br',
+                   'CC(=O)N[SH](=O)=O', 'CC(C)=CC1CC(C(NC(=O)C(C)O)NC(=O)S(=O)(=O)O)N(c2ccc3ccccc3c2)C1C(C)C']
+    return list_smiles
+
+
+@pytest.fixture
+def hard_smiles():
+    list_smiles = ['Nn1cnc2c([PH](=O)[O-])ncnc21']
+    return list_smiles
+
+
+@pytest.fixture
+def realistic_smiles(easy_smiles, hard_smiles):
+    list_smiles = []
+    list_smiles.extend(easy_smiles)
+    list_smiles.extend(hard_smiles)
     return list_smiles
