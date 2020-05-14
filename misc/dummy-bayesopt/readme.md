@@ -67,72 +67,109 @@ Again I don't think it is fully decided on what is the best benchmark to check.
 **todo:** please add to this!
 
 
-#### BayesOpt
+#### 1 BayesOpt
 
 In no particular order:
 
-##### Tune the setup, use more representative values for batch size etc
+##### 1.1 Tune the setup, use more representative values for batch size etc
 Also should decide on how we want to evaluate.
+<br />
 
-##### Add in the previous (more noisy oracles) output in as features to ML models
 
-##### Decide on how best to benchmark how well an acquisition scheme works
+##### 1.2 Add in the previous (more noisy oracles) output in as features to ML models
+<br />
+
+
+##### 1.3 Decide on how best to benchmark how well an acquisition scheme works
 Ie are we going to look at final best molecule found or choose some measure of regret
+<br />
 
-##### Consider using the original Dopamine dataset
+
+##### 1.4  Consider using the original Dopamine dataset
 The dataset we are using is a subset of Dopamine, sampled so that we have a uniform distribution over Dock6 scores.
 This means that randomly we may find a good point with more chance than the original dataset which had a longer tail.
+<br />
 
-##### Explore prior tuning/hyperpriors for Bayes Regression
+
+
+##### 1.5 Explore prior tuning/hyperpriors for Bayes Regression
 On Bayes Learning call 13.May we discussed tuning the parameters over the noise and weights distribution to learn them
 or potentially using hyperpriors.
 This is important as in low data regimes the model is not performing well.
 The notebooks `JupyterNotebooks/BayesModelFP.ipynb` and `JupyterNotebooks/BayesianModel1dDemo.ipynb` may be useful 
 for this task. Would be good to add log likelihood to the first notebook.
+<br />
 
-##### Change the Bayesian Regression sampling so that can sample first from weights then batch.
+
+
+##### 1.6 Change the Bayesian Regression sampling so that can sample first from weights then batch.
 At the moment the Gaussian posterior uncertainty over weights is propagated through predictions which return a MVN distribution
 over the predicted points. This will not be amenable to larger datasets 
+<br />
 
-##### Add random and greedy acquisition function baselines.
 
-##### Explore different  likelihoods
+
+##### 1.7 Add random and greedy acquisition function baselines.
+<br />
+
+
+
+##### 1.8 Explore different  likelihoods
 eg the likelihood suggested by Bianca 13.May http://web.mit.edu/dubeya/www/files/alphats_ijcai19.pdf
 If the model becomes intractable we can always use Pyro for sampling or VI.
+<br />
 
-##### Explore mean function
+
+##### 1.9 Explore mean function
 Consider the mean function here: https://arxiv.org/pdf/1502.05700.pdf
+<br />
 
-##### Code up step 2
+
+##### 1.10 Code up step 2
 In the overview figure above we have a stage where we go back and use a ML model to find more examples from cheap docking
 to suggest for expensive docking. This is not currently implemented.
+<br />
 
-##### Match the APIs being discussed for RECOVER
+
+#####  1.11 Match the APIs being discussed for RECOVER
 This task also will be using Active Learning/Bayes Opt and so if we match the APIs here with those there we can reuse much
 of the Bayesian models/acquisition function parts if we want.
+<br />
 
 
-#### Engineering
+
+<br />
+<br />
+
+#### 2 Engineering
 
 These are mostly problems for scaling the process up for the larger ZINC dataset, once we are happy with the performance
 and models in the dummy problem, hence perhaps for addressing later.
 
-##### Interacting with oracles
+##### 2.1 Interacting with oracles
 How do we communicate with an oracle to set off a batch of expensive docking simulations for example.
+<br />
 
-##### Parallelising
+
+
+##### 2.2 Parallelising
 On the large dataset when running the acquisition function we may want to run it in parallel if querying over a large
 number of candidate molecules.
+<br />
 
 
-##### Dealing with versionable datasets
+##### 2.3 Dealing with versionable datasets
 In stage 2 (diagram above) we will have a feedback loop which trains a ML model, collects data and then retrains the model
 based on this new data. We need a way to record the different versions of this data so that we know which the ML model
 has already seen.
+<br />
 
-#### Feature Representation
 
-##### Talk to feature representation team so that they understand our problem
+<br />
+<br />
+#### 3 Feature Representation
+
+##### 3.1 Talk to feature representation team so that they understand our problem
 At the moment we are getting graph level representations of molecules using Morgan fingerprints. Longer term we want
 to feed into our models learnt embeddings (eg from a trained MPNN), see image below. Perhaps need to discuss how best to do this.
 
