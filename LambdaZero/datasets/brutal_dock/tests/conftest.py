@@ -5,14 +5,17 @@ when the tests are executed.
 import logging
 import tempfile
 import numpy as np
+import pandas as pd
 
 import pytest
 import torch
 from torch_geometric.data import Batch
 
+from LambdaZero.datasets.brutal_dock.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_random_molecule_data
 from LambdaZero.datasets.brutal_dock.tests.fake_molecule_dataset import FakeMoleculeDataset
+from LambdaZero.datasets.brutal_dock.tests.testing_utils import generate_random_string
 
 
 @pytest.fixture
@@ -153,3 +156,31 @@ def realistic_smiles(easy_smiles, hard_smiles):
     list_smiles.extend(easy_smiles)
     list_smiles.extend(hard_smiles)
     return list_smiles
+
+
+@pytest.fixture
+def smiles_and_scores_dataframe(realistic_smiles):
+
+    np.random.seed(213421)
+    number_of_smiles = len(realistic_smiles)
+    klabels = np.random.choice([1, 2, 3], number_of_smiles)
+    gridscores = np.random.rand(number_of_smiles)
+    mol_names = [generate_random_string(15) for _ in range(number_of_smiles)]
+
+    df = pd.DataFrame(data={'smiles': realistic_smiles,
+                            'mol_name': mol_names,
+                            'gridscore': gridscores,
+                            'klabel': klabels})
+
+    return df
+
+
+@pytest.fixture
+def list_real_molecules(smiles_and_scores_dataframe):
+    list_graphs = get_molecule_graphs_from_raw_data_dataframe(smiles_and_scores_dataframe)
+    return list_graphs
+
+
+@pytest.fixture
+def real_molecule_batch(list_real_molecules):
+    return Batch.from_data_list(list_real_molecules)
