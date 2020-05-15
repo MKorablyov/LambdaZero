@@ -137,16 +137,33 @@ def experiment_name():
 
 @pytest.fixture
 def easy_smiles():
-    list_smiles = ['CC(C)=CC(C)(C)O', 'CC(C)=CC(=O)NC(C#N)P(=O)(O)O',
-                   'O=[SH](=O)S(=O)(=O)O', 'CC(C)=CN1CCN(P(=O)(O)O)CC1',
-                   'CC(C)(O)C(F)(F)F', 'c1ccc2cc(N3CCOCC3)ccc2c1', 'CC(C)(O)Br',
-                   'CC(=O)N[SH](=O)=O', 'CC(C)=CC1CC(C(NC(=O)C(C)O)NC(=O)S(=O)(=O)O)N(c2ccc3ccccc3c2)C1C(C)C']
+    list_smiles = ['CC(C)=CC(C)(C)O',
+                   'CC(C)=CC(=O)NC(C#N)P(=O)(O)O',
+                   'O=[SH](=O)S(=O)(=O)O',
+                   'CC(C)=CN1CCN(P(=O)(O)O)CC1',
+                   'CC(C)(O)C(F)(F)F',
+                   'c1ccc2cc(N3CCOCC3)ccc2c1',
+                   'CC(C)(O)Br',
+                   'CC(=O)N[SH](=O)=O',
+                   'CC(C)=CC1CC(C(NC(=O)C(C)O)NC(=O)S(=O)(=O)O)N(c2ccc3ccccc3c2)C1C(C)C',
+                   'C1=C(c2ccc[nH]2)CCCC1',
+                   'O=C(NCF)C1=CCCCC1',
+                   'CC(=Cc1cc[nH]c1)CCCl',
+                   'CC(=O)NC(=O)NC1=CN(I)C=CC1']
+
     return list_smiles
 
 
 @pytest.fixture
 def hard_smiles():
-    list_smiles = ['Nn1cnc2c([PH](=O)[O-])ncnc21']
+    list_smiles = ['Nn1cnc2c([PH](=O)[O-])ncnc21',
+                   'N=C[n+]1cccc(-[n+]2cccc(C(NC(=O)c3csc(N4C=CCC(S)=C4)n3)[NH+]3CCOCC3)c2)c1',
+                   'O=C(NC([NH+]1CCOCC1)[PH](=O)O)n1ccc(S(=O)(=O)O)nc1=O',
+                   'CC(O)c1cn(C(C)O)c(=O)[nH]c1=O',
+                   'CC(=O)NCc1ccn(C2CNc3nc(-c4ccc[nH]4)[nH]c(=O)c3N2)c(=O)n1',
+                   'C[SH+]c1cc[nH]c1',
+                   'O=c1[nH]cc(-n2cnc3c(C4C(C5CNc6nc(C(F)(F)F)[nH]c(=O)c6N5)CCOC4[n+]4ccccc4)ncnc32)c(=O)[nH]1',
+                   ]
     return list_smiles
 
 
@@ -163,7 +180,7 @@ def smiles_and_scores_dataframe(realistic_smiles):
 
     np.random.seed(213421)
     number_of_smiles = len(realistic_smiles)
-    klabels = np.random.choice([1, 2, 3], number_of_smiles)
+    klabels = np.random.choice(np.arange(20), number_of_smiles)
     gridscores = np.random.rand(number_of_smiles)
     mol_names = [generate_random_string(15) for _ in range(number_of_smiles)]
 
@@ -184,3 +201,8 @@ def list_real_molecules(smiles_and_scores_dataframe):
 @pytest.fixture
 def real_molecule_batch(list_real_molecules):
     return Batch.from_data_list(list_real_molecules)
+
+
+@pytest.fixture
+def real_molecule_dataset(list_real_molecules):
+    return FakeMoleculeDataset(list_real_molecules)
