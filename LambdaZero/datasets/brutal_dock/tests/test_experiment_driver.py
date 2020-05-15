@@ -150,8 +150,10 @@ def input_and_run_config(paths, model_parameters):
 def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_config):
     dataset_class = D4MoleculesDataset
 
-    with pytest.warns(UserWarning) as user_warning:
+    # Passing None to warns records the warnings; see https://docs.pytest.org/en/3.0.2/recwarn.html
+    with pytest.warns(None) as record:
         _ = experiment_driver(input_and_run_config, dataset_class, model_class)
 
-    assert len(user_warning) == 0
+    for warning in record.list:
+        assert warning.category != UserWarning, "A user warning was raised"
 
