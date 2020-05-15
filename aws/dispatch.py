@@ -42,7 +42,7 @@ class cfg:
     # docking parameters
     dock6_dir = osp.join(programs_dir, "dock6")
     chimera_dir = osp.join(programs_dir, "chimera")
-    docksetup_dir = osp.join(datasets_dir, "brutal_dock/d4/docksetup")
+    docksetup_dir = osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup")
 
 
 # for 5 123 456 molecules
@@ -150,6 +150,7 @@ def do_docking(i, j, k, results_dir):
                         chimera_dir=cfg.chimera_dir,
                         dock6_dir=cfg.dock6_dir,
                         docksetup_dir=cfg.docksetup_dir,
+                        #gas_charge=True,
                         trustme=True)
 
     results = []
