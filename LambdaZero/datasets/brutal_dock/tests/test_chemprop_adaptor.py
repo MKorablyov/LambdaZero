@@ -24,7 +24,7 @@ def test_graph_to_mol_easy(easy_smiles):
             assert expected == computed, f"The attribute {attribute} is not the same"
 
 
-@pytest.mark.skip(reason="The adaptor is broken. This test shows a concrete example of how it fails. Cannot fix now.")
+@pytest.mark.skip(reason="The adaptor is broken. This test shows a concrete examples of how it fails. Cannot fix now.")
 def test_graph_to_mol_hard(hard_smiles):
     for smiles in hard_smiles:
 
