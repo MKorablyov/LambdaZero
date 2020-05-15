@@ -71,9 +71,8 @@ auth:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 head_node:
     InstanceType: m5a.24xlarge
-    #ImageId: ami-0dbb717f493016a1a
     #ImageId: ami-0dca5a27e7adb8c0b
-    ImageId: ami-0bce1ecfa99db29b1
+    ImageId: ami-09ce8ee3d6fed1909
     SubnetIds:
      #- subnet-08ce821a820f36705 # c
      - subnet-0acad998b2f6fa54a # a
@@ -96,9 +95,7 @@ head_node:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
     InstanceType: c5.18xlarge
-    #ImageId: ami-0dbb717f493016a1a
-    #ImageId: ami-0dca5a27e7adb8c0b
-    ImageId: ami-0bce1ecfa99db29b1
+    ImageId: ami-09ce8ee3d6fed1909
     SubnetIds:
      - subnet-0782bb0f3b195fa9b # c
      #- subnet-025b0d94456268676 # f
