@@ -1,6 +1,6 @@
 {
     "run_parameters": {
-        "experiment_name": "Message Passing Neural Network",
+        "experiment_name": "Chemprop",
         "run_name": "debugging"
     },
     "training": {
