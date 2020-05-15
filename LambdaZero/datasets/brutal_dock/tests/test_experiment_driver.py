@@ -8,6 +8,7 @@ from torch_geometric.data import InMemoryDataset
 from LambdaZero.core.alpha_zero_policy import torch
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
+from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
     MODEL_PARAMETERS_KEY, TAGS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY
@@ -75,12 +76,44 @@ def output_dir():
 
 
 @pytest.fixture
-def input_and_run_config(data_dir, work_dir, output_dir, number_of_node_features):
-
+def paths(data_dir, work_dir, output_dir):
     paths = dict(data_directory=str(data_dir),
                  working_directory=str(work_dir),
                  output_directory=str(output_dir),
                  tracking_uri=str(output_dir.joinpath("mlruns")))
+    return paths
+
+
+@pytest.fixture
+def model_class(model_name):
+    if model_name == "MPNN":
+        return MessagePassingNet
+    elif model_name == "chemprop":
+        return ChempropNet
+
+@pytest.fixture
+def model_parameters(model_name, number_of_node_features):
+    parameters = None
+    if model_name == "MPNN":
+        parameters = dict(name="MPNN",
+                          node_feat=number_of_node_features,
+                          edge_feat=4,
+                          gcn_size=8,
+                          edge_hidden=8,
+                          gru_layers=1,
+                          linear_hidden=8)
+
+    elif model_name == "chemprop":
+        parameters = dict(name="chemprop",
+                          depth=2,
+                          ffn_num_layers=2,
+                          ffn_hidden_size=8
+                          )
+    return parameters
+
+
+@pytest.fixture
+def input_and_run_config(paths, model_parameters):
 
     tags = dict(git_hash="SOMETESTHASH",
                 user="test-user",
@@ -97,14 +130,6 @@ def input_and_run_config(data_dir, work_dir, output_dir, number_of_node_features
                                train_fraction=0.8,
                                validation_fraction=0.1)
 
-    model_parameters = dict(name="MPNN",
-                            node_feat=number_of_node_features,
-                            edge_feat=4,
-                            gcn_size=8,
-                            edge_hidden=8,
-                            gru_layers=1,
-                            linear_hidden=8)
-
     config = {RUN_PARAMETERS_KEY: run_parameters,
               TRAINING_PARAMETERS_KEY: training_parameters,
               MODEL_PARAMETERS_KEY: model_parameters}
@@ -118,7 +143,7 @@ def input_and_run_config(data_dir, work_dir, output_dir, number_of_node_features
     return config_and_augmented
 
 
-def test_smoke_test_experiment_driver(input_and_run_config):
+@pytest.mark.parametrize("model_name", ["chemprop", "MPNN"])
+def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_config):
     dataset_class = D4MoleculesDataset
-    model_class = MessagePassingNet
     _ = experiment_driver(input_and_run_config, dataset_class, model_class)
