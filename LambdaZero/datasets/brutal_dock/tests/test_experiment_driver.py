@@ -2,6 +2,8 @@ import logging
 import tempfile
 from pathlib import Path
 
+import warnings
+
 import pytest
 from torch_geometric.data import InMemoryDataset
 
@@ -91,6 +93,7 @@ def model_class(model_name):
     elif model_name == "chemprop":
         return ChempropNet
 
+
 @pytest.fixture
 def model_parameters(model_name, number_of_node_features):
     parameters = None
@@ -146,4 +149,9 @@ def input_and_run_config(paths, model_parameters):
 @pytest.mark.parametrize("model_name", ["chemprop", "MPNN"])
 def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_config):
     dataset_class = D4MoleculesDataset
-    _ = experiment_driver(input_and_run_config, dataset_class, model_class)
+
+    with pytest.warns(UserWarning) as user_warning:
+        _ = experiment_driver(input_and_run_config, dataset_class, model_class)
+
+    assert len(user_warning) == 0
+
