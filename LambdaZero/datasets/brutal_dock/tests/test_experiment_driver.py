@@ -14,6 +14,14 @@ from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY,
 
 
 @pytest.fixture
+def number_of_node_features(real_molecule_dataset):
+    molecule_graph = real_molecule_dataset[0]
+    node_features = molecule_graph.x
+    number_features = node_features.shape[1]
+    return number_features
+
+
+@pytest.fixture
 def expected_raw_files():
     return ['dock_blocks105_walk40_clust.feather', 'dock_blocks105_walk40_2_clust.feather']
 
@@ -36,7 +44,7 @@ def data_dir(expected_raw_files):
 
 
 @pytest.fixture
-def work_dir(expected_raw_files, expected_processed_file, random_molecule_dataset):
+def work_dir(expected_raw_files, expected_processed_file, real_molecule_dataset):
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
         raw_path = Path(tmp_dir_str).joinpath('raw/')
@@ -52,7 +60,7 @@ def work_dir(expected_raw_files, expected_processed_file, random_molecule_datase
         # looking at that code, there is no reference to "self" internally. Here
         # we just want to spoof what this method does so we can shove our dataset
         # in the right place.
-        torch.save(InMemoryDataset.collate(InMemoryDataset, random_molecule_dataset), str(processed_file_path))
+        torch.save(InMemoryDataset.collate(InMemoryDataset, real_molecule_dataset), str(processed_file_path))
 
         yield Path(tmp_dir_str)
     logging.info("deleting test folder")
@@ -110,7 +118,6 @@ def input_and_run_config(data_dir, work_dir, output_dir, number_of_node_features
     return config_and_augmented
 
 
-@pytest.mark.parametrize("number_of_molecules", [20])
 def test_smoke_test_experiment_driver(input_and_run_config):
     dataset_class = D4MoleculesDataset
     model_class = MessagePassingNet
