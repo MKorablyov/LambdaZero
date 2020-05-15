@@ -12,7 +12,7 @@ max_workers: 10
 # The initial number of worker nodes to launch in addition to the head
 # node. When the cluster is first brought up (or when it is refreshed with a
 # subsequent `ray up`) this number of nodes will be started.
-initial_workers: 4
+initial_workers: 5
 
 # Whether or not to autoscale aggressively. If this is enabled, if at any point
 #   we would start more workers, we start at least enough to bring us to
@@ -46,7 +46,7 @@ autoscaling_mode: default
 target_utilization_fraction: 0.8
 
 # If a node is idle for this many minutes, it will be removed.
-idle_timeout_minutes: 5
+idle_timeout_minutes: 10
 
 # Cloud-provider specific configuration.
 provider:
@@ -74,12 +74,12 @@ head_node:
     #ImageId: ami-0dbb717f493016a1a
     ImageId: ami-0dca5a27e7adb8c0b
     SubnetIds:
-     - subnet-0acad998b2f6fa54a
-     - subnet-05e2f01382fc77a2d
-     - subnet-08ce821a820f36705
-     - subnet-020042f567b8cc4a7
-     - subnet-0f8810f5729329669
-     - subnet-0d2d97d3e5e60336b
+     - subnet-08ce821a820f36705 # a
+     - subnet-0acad998b2f6fa54a # b
+     - subnet-05e2f01382fc77a2d # c
+     - subnet-020042f567b8cc4a7 # d
+     #- subnet-0f8810f5729329669
+     #- subnet-0d2d97d3e5e60336b # f
 
     # You can provision additional disk space with a conf as follows
     #BlockDeviceMappings:
@@ -94,23 +94,23 @@ head_node:
 # For more documentation on available fields, see:
 # http://boto3.readthedocs.io/en/latest/reference/services/ec2.html#EC2.ServiceResource.create_instances
 worker_nodes:
-    InstanceType: c5.24xlarge
+    InstanceType: c5.18xlarge
     #ImageId: ami-0dbb717f493016a1a
     ImageId: ami-0dca5a27e7adb8c0b
     SubnetIds:
-     - subnet-024698d61cadd77f4
+     - subnet-0782bb0f3b195fa9b # c
      - subnet-025b0d94456268676
-     - subnet-0782bb0f3b195fa9b
      - subnet-054e3e5cd9790b170
-     - subnet-07977cb16e9264a4e
-     - subnet-0952c6b3851a0651a
+     #- subnet-07977cb16e9264a4e
+     #- subnet-0952c6b3851a0651a
+     - subnet-024698d61cadd77f4  # This is a but is pricier
 
     # Run workers on spot by default. Comment this out to use on-demand.
     InstanceMarketOptions:
         MarketType: spot
         # Additional options can be found in the boto docs, e.g.
         SpotOptions:
-            MaxPrice: 3,06
+            MaxPrice: "3.06"
 
     # Additional options in the boto docs.
 
@@ -124,7 +124,7 @@ file_mounts: {
 # enabled, these commands will run outside the container and before docker
 # is setup.
 initialization_commands:
-   - sudo mount -t lustre -o noatime,flock fs-025ed2ceb7bd10473.fsx.us-east-1.amazonaws.com@tcp:/hm5wpbmv /fsx
+   - sudo mount -t lustre -o noatime,flock fs-025ed2ceb7bd10473.fsx.us-east-1.amazonaws.com@tcp:/hm5wpbmv /fsx || sudo mount -t lustre -o remount,noatime,flock fs-025ed2ceb7bd10473.fsx.us-east-1.amazonaws.com@tcp:/hm5wpbmv /fsx
 
 # List of shell commands to run to set up nodes.
 setup_commands: []

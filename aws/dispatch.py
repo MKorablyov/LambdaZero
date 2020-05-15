@@ -179,7 +179,7 @@ def do_docking(i, j, k, results_dir):
     os.rename(output_tmp, output_path)
 
 
-@ray.remote(resources={'aws_machine': 1}, num_cpus=1)
+@ray.remote(resources={'aws-machine': 1}, num_cpus=1)
 def distribute_mols(init_i=0, init_j=0):
     os.makedirs(RESULTS_PATH, exist_ok=True)
     i = init_i
@@ -209,9 +209,9 @@ def distribute_mols(init_i=0, init_j=0):
 
 if __name__ == '__main__':
     ray.init(address='auto')
-    num_dispatchers = 261  # To have 23000~ per machine
+    num_dispatchers = 352  # To have 17000~ per machine
     total_data = 5997 # Approximative, in thousands
-    parts_per_dispatch = (total_data + num_dispatchers - 1) // num_dispatchers
+    parts_per_dispatch = total_data // num_dispatchers
     dispatchers = [distribute_mols.remote(
         init_i=(p * parts_per_dispatch) // 100,
         init_j=(p * parts_per_dispatch) % 100) for p in range(num_dispatchers)]
