@@ -131,7 +131,8 @@ def input_and_run_config(paths, model_parameters):
                                batch_size=2,
                                learning_rate=1e-3,
                                train_fraction=0.8,
-                               validation_fraction=0.1)
+                               validation_fraction=0.1,
+                               patience=1)
 
     config = {RUN_PARAMETERS_KEY: run_parameters,
               TRAINING_PARAMETERS_KEY: training_parameters,

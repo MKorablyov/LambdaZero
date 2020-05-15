@@ -123,7 +123,8 @@ def experiment_driver(
                                                      validation_dataloader,
                                                      best_model_path,
                                                      lr=training_parameters["learning_rate"],
-                                                     num_epochs=training_parameters["num_epochs"])
+                                                     num_epochs=training_parameters["num_epochs"],
+                                                     patience=training_parameters["patience"])
 
     logging.info(f"Best validation loss: {best_validation_loss: 5f}")
     experiment_logger.increment_step_and_log_metrics("best_val_loss", best_validation_loss)
