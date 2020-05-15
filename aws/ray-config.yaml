@@ -75,11 +75,11 @@ head_node:
     #ImageId: ami-0dca5a27e7adb8c0b
     ImageId: ami-0bce1ecfa99db29b1
     SubnetIds:
-     - subnet-08ce821a820f36705 # a
-     #- subnet-0acad998b2f6fa54a # b
-     #- subnet-05e2f01382fc77a2d # c
+     #- subnet-08ce821a820f36705 # c
+     - subnet-0acad998b2f6fa54a # a
+     #- subnet-05e2f01382fc77a2d # b
      #- subnet-020042f567b8cc4a7 # d
-     #- subnet-0f8810f5729329669
+     #- subnet-0f8810f5729329669 # e
      #- subnet-0d2d97d3e5e60336b # f
 
     # You can provision additional disk space with a conf as follows
@@ -101,10 +101,10 @@ worker_nodes:
     ImageId: ami-0bce1ecfa99db29b1
     SubnetIds:
      - subnet-0782bb0f3b195fa9b # c
-     - subnet-025b0d94456268676
-     - subnet-054e3e5cd9790b170
-     #- subnet-07977cb16e9264a4e
-     #- subnet-0952c6b3851a0651a
+     #- subnet-025b0d94456268676 # f
+     - subnet-054e3e5cd9790b170 # d
+     #- subnet-07977cb16e9264a4e # e
+     - subnet-0952c6b3851a0651a # b
      - subnet-024698d61cadd77f4  # This is 'a' but is pricier
 
     # Run workers on spot by default. Comment this out to use on-demand.
