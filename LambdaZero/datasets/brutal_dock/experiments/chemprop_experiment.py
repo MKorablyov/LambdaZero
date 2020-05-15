@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """
-This experiment script applies a Message Passing Neural Net model
-to the D4 docking dataset.
+This experiment script applies the Chemprop model to the D4 docking dataset.
 
 to execute this experiment, invoke the script as:
 
