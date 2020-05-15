@@ -59,5 +59,6 @@ class ChempropNet(ModelBase):
 
     def forward(self, batch: Batch):
         list_smiles = self._get_list_of_smiles_from_batch(batch)
-        return self.chemprop_model.forward(list_smiles)
+        chemprop_output = self.chemprop_model.forward(list_smiles)
+        return chemprop_output.flatten()
 
