@@ -24,9 +24,8 @@ class ChempropNet(ModelBase):
         Args:
             name (str): name of this model
             depth (int):  Number of message passing steps
-            ffn_num_layers (int): number of edge features. Defaults to 3.
-            ffn_hidden_size (int): Hidden dim for higher-capacity FFN (defaults to hidden_size)
             ffn_num_layers (int): Number of layers in FFN after MPN encoding
+            ffn_hidden_size (int): Hidden dim for higher-capacity FFN (defaults to hidden_size)
         """
 
         super(ChempropNet, self).__init__()
