@@ -1,4 +1,5 @@
 from chemprop.args import TrainArgs
+from torch_geometric.data import Batch
 
 from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase
 from chemprop.models import MoleculeModel
@@ -7,6 +8,8 @@ from chemprop.models import MoleculeModel
 class ChempropNet(ModelBase):
     """
     This model class adapts the chemprop model to fit in within LambdaZero's framework.
+    The Forward method assumes that the pytorch_geometric batch of molecules contains
+    a field "smiles". This is used internally by chemprop to extract features.
     """
 
     def __init__(self, name: str,
@@ -41,6 +44,6 @@ class ChempropNet(ModelBase):
 
         self.chemprop_model = MoleculeModel(args=args, featurizer=False)
 
-    def forward(self, data):
-        return self.chemprop_model.forward(data)
+    def forward(self, batch: Batch):
+        return self.chemprop_model.forward(batch.smiles)
 
