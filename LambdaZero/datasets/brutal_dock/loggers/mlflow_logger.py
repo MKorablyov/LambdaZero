@@ -60,12 +60,14 @@ class MLFlowLogger(ExperimentLogger):
         self.mlflow_client.set_terminated(self.run_id, status='FINISHED')
 
     @classmethod
-    def _create_tags_using_reserved_names(cls, tags: Dict[str, str]):
+    def _create_tags_using_reserved_names(cls, input_tags: Dict[str, str]):
         """
         Use MLFlow specific reserved names so tags are presented in the correct place in the gui.
         For reserved names, see https: // www.mlflow.org / docs / latest / tracking.html  # tracking
         """
 
+        # make a local copy to not modify the input parameter
+        tags = dict(input_tags)
         git_hash = tags.pop("git_hash", 'none')
         execution_file_name = tags.pop("execution_file_name", 'none')
         user = tags.pop("user", 'none')
