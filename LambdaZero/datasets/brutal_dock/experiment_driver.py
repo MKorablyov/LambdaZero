@@ -37,6 +37,7 @@ def experiment_driver(
         config: dictionary containing all the needed parameters
         dataset: the full instantiated dataset, which will be split within this driver
         model_class: class for the model, which should derive from ModelBase.
+        logger_class: class responsible for keeping track of model metrics
     """
 
     torch.manual_seed(random_seed)
