@@ -23,15 +23,18 @@ class WandbLogger(ExperimentLogger):
         """
         super().__init__(run_parameters, tracking_uri, tags)
 
-        experiment_name = run_parameters.pop("experiment_name", 'none')
-        run_name = run_parameters.pop("run_name", 'none')
+        # copy to avoid changing input
+        parameters = dict(run_parameters)
+
+        experiment_name = parameters.pop("experiment_name", 'none')
+        run_name = parameters.pop("run_name", 'none')
 
         wandb.init(project=experiment_name,
                    entity=ENTITY,
                    name=run_name,
                    dir=tracking_uri,
                    notes=notes,
-                   tags=run_parameters
+                   tags=parameters
                    )
 
     def watch_model(self, model: nn.Module):
