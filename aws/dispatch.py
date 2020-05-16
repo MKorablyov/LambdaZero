@@ -168,7 +168,8 @@ def do_docking(i, j, k, results_dir):
             try:
                 name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
                 coord = coord.tolist()
-            except AssertionError:
+            except:
+                print("Failed to dock for: {0} in {1}/{2}/{3}".format(smi, i, j, k))
                 coord = None
                 gridscore = None
             results.append(pd.DataFrame({"smi": [smi],
