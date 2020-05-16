@@ -21,6 +21,8 @@ from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY,
 loss_function = F.mse_loss
 
 
+import wandb
+
 def experiment_driver(
     input_and_run_config: Dict[str, Any],
     dataset_class: Type[MoleculesDatasetBase],
@@ -49,6 +51,13 @@ def experiment_driver(
     run_parameters = config[RUN_PARAMETERS_KEY]
     training_parameters = config[TRAINING_PARAMETERS_KEY]
     model_parameters = config[MODEL_PARAMETERS_KEY]
+
+    wandb.init(config=config,
+               project="first-steps",
+               entity="lambdazero",
+               name=run_parameters["experiment_name"],
+               notes='debugging wandb'
+               )
 
     data_dir = Path(paths_dict["data_directory"])
     work_dir = Path(paths_dict["working_directory"])
@@ -105,6 +114,7 @@ def experiment_driver(
 
     logging.info(f"Instantiating model for training")
     model = model_class.create_model_for_training(model_parameters)
+    wandb.watch(model)
 
     logging.info(f"Instantiating model trainer")
 
@@ -142,6 +152,8 @@ def experiment_driver(
 
     logging.info(f"Finalizing.")
     experiment_logger.finalize()
+
+    # wandb.save(str(best_model_path))
 
     return best_validation_loss
 
