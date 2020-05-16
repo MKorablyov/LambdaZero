@@ -188,8 +188,8 @@ def do_docking(i, j, k, results_dir):
     # This dance is to avoid partial files in the final output
     output_path = outpath(i, j, k)
     ofd, output_tmp = tempfile.mkstemp(dir=osp.dirname(output_path),
-                                       suffix='.tmp'))
-    ofd.close()
+                                       suffix='.tmp')
+    os.close(ofd)
     output.to_parquet(output_tmp, engine="fastparquet", compression=None)
     os.rename(output_tmp, output_path)
 
