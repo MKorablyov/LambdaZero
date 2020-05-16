@@ -90,7 +90,8 @@ def dataloaders(linear_dataset, number_of_points, batch_size):
 @pytest.fixture
 def mlflow_logger(experiment_name, tracking_uri):
     tags = {'model_type': 'trivial_linear_regresssion'}
-    mlflow_logger = MLFlowLogger(experiment_name, tracking_uri, tags)
+    run_parameters = {'experiment_name': experiment_name, 'run_name': 'TEST'}
+    mlflow_logger = MLFlowLogger(run_parameters, tracking_uri, tags)
     return mlflow_logger
 
 
