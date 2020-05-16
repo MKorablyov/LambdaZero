@@ -1,5 +1,6 @@
 import os
 import os.path as osp
+import tempfile
 
 import ray
 import pandas as pd
@@ -186,7 +187,9 @@ def do_docking(i, j, k, results_dir):
 
     # This dance is to avoid partial files in the final output
     output_path = outpath(i, j, k)
-    output_tmp = output_path + ".tmp"
+    ofd, output_tmp = tempfile.mkstemp(dir=osp.dirname(output_path),
+                                       suffix='.tmp'))
+    ofd.close()
     output.to_parquet(output_tmp, engine="fastparquet", compression=None)
     os.rename(output_tmp, output_path)
 
