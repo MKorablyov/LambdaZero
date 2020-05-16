@@ -8,6 +8,7 @@ from torch_geometric.data import InMemoryDataset
 from LambdaZero.core.alpha_zero_policy import torch
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
+from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.loggers.wandb_logger import set_wandb_to_dryrun
 from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
@@ -116,5 +117,5 @@ def input_and_run_config(data_dir, work_dir, output_dir, number_of_node_features
 def test_smoke_test_experiment_driver(input_and_run_config):
     dataset_class = D4MoleculesDataset
     model_class = MessagePassingNet
-    set_wandb_to_dryrun()
-    _ = experiment_driver(input_and_run_config, dataset_class, model_class)
+    logger_class = MLFlowLogger
+    _ = experiment_driver(input_and_run_config, dataset_class, model_class, logger_class)
