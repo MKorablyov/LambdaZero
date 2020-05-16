@@ -1,3 +1,4 @@
+import os
 from typing import Dict
 
 from torch import nn
@@ -7,6 +8,10 @@ import wandb
 from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
 
 ENTITY = "lambdazero"  # this is the name of the group in our wandb account
+
+
+def set_wandb_to_dryrun():
+    os.environ["WANDB_MODE"] = "dryrun"
 
 
 class WandbLogger(ExperimentLogger):
