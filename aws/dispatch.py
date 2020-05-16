@@ -165,8 +165,12 @@ def do_docking(i, j, k, results_dir):
             idx = int(zinc_id[4:])
             reactivity = tranche[2]
             features = features or None
-            name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
-            coord = coord.tolist()
+            try:
+                name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
+                coord = coord.tolist()
+            except AssertionError:
+                coord = None
+                gridscore = None
             results.append(pd.DataFrame({"smi": [smi],
                                          "gridscore": [gridscore],
                                          "coord": [coord],
