@@ -296,7 +296,7 @@ class Dock_smi:
                  docksetup_dir,     #
                  cleanup=True,
                  trustme=False,
-                 rec_site_file="2_site/matching_spheres.sph",
+                 rec_site_file="2_site/selected_spheres.sph",
                  grid_prefix="3_grid/grid",
                  dock_in_template = "4_dock/anchor_and_grow.in",
                  vdw_defn_file="parameters/vdw_AMBER_parm99.defn",
