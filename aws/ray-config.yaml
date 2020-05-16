@@ -123,7 +123,7 @@ file_mounts: {
 # enabled, these commands will run outside the container and before docker
 # is setup.
 initialization_commands:
-   - sudo apt install -y lustre-client-modules-$(uname -r)
+   - sudo apt-get install -y lustre-client-modules-$(uname -r)
    - sudo mount -t lustre -o noatime,flock fs-025ed2ceb7bd10473.fsx.us-east-1.amazonaws.com@tcp:/hm5wpbmv /fsx || sudo mount -t lustre -o remount,noatime,flock fs-025ed2ceb7bd10473.fsx.us-east-1.amazonaws.com@tcp:/hm5wpbmv /fsx
 
 # List of shell commands to run to set up nodes.
