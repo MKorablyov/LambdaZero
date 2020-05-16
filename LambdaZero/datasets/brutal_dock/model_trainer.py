@@ -12,7 +12,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
+from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 
 
 class AbstractModelTrainer(ABC):

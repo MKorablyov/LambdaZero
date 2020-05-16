@@ -12,7 +12,7 @@ from LambdaZero.datasets.brutal_dock.dataset_splitting import KnnDatasetSplitter
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
-from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
+from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \

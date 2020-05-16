@@ -3,7 +3,7 @@ import numpy as np
 
 import pytest
 
-from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger, StepCounter
+from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger, StepCounter
 
 
 @pytest.fixture
