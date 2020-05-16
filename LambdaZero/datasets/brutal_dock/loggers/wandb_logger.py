@@ -16,7 +16,7 @@ class WandbLogger(ExperimentLogger):
 
         Ignore the tags.
         """
-        super().__init__()
+        super().__init__(run_parameters, tracking_uri, tags)
 
         experiment_name = run_parameters.pop("experiment_name", 'none')
         run_name = run_parameters.pop("run_name", 'none')
