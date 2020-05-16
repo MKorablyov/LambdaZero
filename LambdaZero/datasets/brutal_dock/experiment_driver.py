@@ -11,8 +11,9 @@ from LambdaZero.datasets.brutal_dock import set_logging_directory
 from LambdaZero.datasets.brutal_dock.dataset_splitting import KnnDatasetSplitter
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
+from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
+from LambdaZero.datasets.brutal_dock.loggers.wandb_logger import WandbLogger
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
-from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \
@@ -21,12 +22,11 @@ from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY,
 loss_function = F.mse_loss
 
 
-import wandb
-
 def experiment_driver(
     input_and_run_config: Dict[str, Any],
     dataset_class: Type[MoleculesDatasetBase],
     model_class: Type[ModelBase],
+    logger_class: Type[ExperimentLogger] = WandbLogger,
     random_seed: int = 0,
 ) -> float:
     """
@@ -52,13 +52,6 @@ def experiment_driver(
     training_parameters = config[TRAINING_PARAMETERS_KEY]
     model_parameters = config[MODEL_PARAMETERS_KEY]
 
-    wandb.init(config=config,
-               project="first-steps",
-               entity="lambdazero",
-               name=run_parameters["experiment_name"],
-               notes='debugging wandb'
-               )
-
     data_dir = Path(paths_dict["data_directory"])
     work_dir = Path(paths_dict["working_directory"])
     out_dir = Path(paths_dict["output_directory"])
@@ -72,11 +65,11 @@ def experiment_driver(
     logging_directory.mkdir(parents=True, exist_ok=True)
     set_logging_directory(logging_directory)
 
-    experiment_logger = MLFlowLogger(run_parameters["experiment_name"],
+    experiment_logger = logger_class(run_parameters,
                                      str(tracking_uri),
                                      tags_dict)
-    experiment_logger.log_parameters("training", training_parameters)
-    experiment_logger.log_parameters("model", model_parameters)
+
+    experiment_logger.log_configuration(config)
 
     logging.info(f"Writing configuration to artifact directory")
     json_config_path = str(out_dir.joinpath("config.json"))
@@ -114,7 +107,7 @@ def experiment_driver(
 
     logging.info(f"Instantiating model for training")
     model = model_class.create_model_for_training(model_parameters)
-    wandb.watch(model)
+    experiment_logger.watch_model(model)
 
     logging.info(f"Instantiating model trainer")
 
@@ -150,10 +143,11 @@ def experiment_driver(
         experiment_logger.increment_step_and_log_metrics(mean_key, mean_absolute_error)
         experiment_logger.increment_step_and_log_metrics(std_key, std_absolute_error)
 
+    logging.info(f"Log best model")
+    experiment_logger.log_artifact(str(best_model_path))
+
     logging.info(f"Finalizing.")
     experiment_logger.finalize()
-
-    # wandb.save(str(best_model_path))
 
     return best_validation_loss
 
