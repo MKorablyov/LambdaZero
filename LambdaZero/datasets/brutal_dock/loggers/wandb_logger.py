@@ -4,33 +4,37 @@ from torch import nn
 
 import wandb
 
+from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
+
 ENTITY = "lambdazero"  # this is the name of the group in our wandb account
 
 
-class WandbLogger:
-    def __init__(self, experiment_name: str, tracking_uri: str, notes: str = None):
+class WandbLogger(ExperimentLogger):
+    def __init__(self, run_parameters: Dict[str, str], tracking_uri: str, tags: Dict[str, str], notes: str = None):
         """
         Class to manage the Weights-and-Biases logger.
-        Args:
-            experiment_name (str): The name of the experiment
-            kwargs : dictionary of parameters for specific logger.
+
+        Ignore the tags.
         """
         super().__init__()
 
-        wandb.init(project="first-steps",
+        experiment_name = run_parameters.pop("experiment_name", 'none')
+        run_name = run_parameters.pop("run_name", 'none')
+
+        wandb.init(project=experiment_name,
                    entity=ENTITY,
-                   name=experiment_name,
+                   name=run_name,
                    dir=tracking_uri,
-                   notes=notes
+                   notes=notes,
+                   tags=run_parameters
                    )
 
     def watch_model(self, model: nn.Module):
         wandb.watch(model)
 
-    def log_metrics(self, key: str, value: float):
+    def _log_metrics(self, key: str, value: float, step: int):
         logging_dict = {key: value}
-        wandb.log(logging_dict)
-        pass
+        wandb.log(logging_dict, step=step)
 
     def log_configuration(self, config: Dict):
         wandb.config.update(config)
