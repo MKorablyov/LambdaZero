@@ -11,8 +11,9 @@ from LambdaZero.datasets.brutal_dock import set_logging_directory
 from LambdaZero.datasets.brutal_dock.dataset_splitting import KnnDatasetSplitter
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
+from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
+from LambdaZero.datasets.brutal_dock.loggers.wandb_logger import WandbLogger
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
-from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \
@@ -25,6 +26,7 @@ def experiment_driver(
     input_and_run_config: Dict[str, Any],
     dataset_class: Type[MoleculesDatasetBase],
     model_class: Type[ModelBase],
+    logger_class: Type[ExperimentLogger] = WandbLogger,
     random_seed: int = 0,
 ) -> float:
     """
@@ -35,6 +37,7 @@ def experiment_driver(
         config: dictionary containing all the needed parameters
         dataset: the full instantiated dataset, which will be split within this driver
         model_class: class for the model, which should derive from ModelBase.
+        logger_class: class responsible for keeping track of model metrics
     """
 
     torch.manual_seed(random_seed)
@@ -63,11 +66,11 @@ def experiment_driver(
     logging_directory.mkdir(parents=True, exist_ok=True)
     set_logging_directory(logging_directory)
 
-    experiment_logger = MLFlowLogger(run_parameters["experiment_name"],
+    experiment_logger = logger_class(run_parameters,
                                      str(tracking_uri),
                                      tags_dict)
-    experiment_logger.log_parameters("training", training_parameters)
-    experiment_logger.log_parameters("model", model_parameters)
+
+    experiment_logger.log_configuration(config)
 
     logging.info(f"Writing configuration to artifact directory")
     json_config_path = str(out_dir.joinpath("config.json"))
@@ -105,6 +108,7 @@ def experiment_driver(
 
     logging.info(f"Instantiating model for training")
     model = model_class.create_model_for_training(model_parameters)
+    experiment_logger.watch_model(model)
 
     logging.info(f"Instantiating model trainer")
 
@@ -139,6 +143,9 @@ def experiment_driver(
         std_key = f"{label}_std_absolute_error_real_scale"
         experiment_logger.increment_step_and_log_metrics(mean_key, mean_absolute_error)
         experiment_logger.increment_step_and_log_metrics(std_key, std_absolute_error)
+
+    logging.info(f"Log best model")
+    experiment_logger.log_artifact(str(best_model_path))
 
     logging.info(f"Finalizing.")
     experiment_logger.finalize()

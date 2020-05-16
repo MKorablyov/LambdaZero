@@ -3,7 +3,13 @@ import numpy as np
 
 import pytest
 
-from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger, StepCounter
+from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
+from LambdaZero.datasets.brutal_dock.loggers.step_counter import StepCounter
+
+
+@pytest.fixture
+def run_parameters(experiment_name):
+    return {'experiment_name': experiment_name, 'run_name': 'TEST'}
 
 
 @pytest.fixture
@@ -25,9 +31,9 @@ def key():
 
 
 @pytest.fixture
-def mlflow_logger_with_logging(experiment_name, tracking_uri, tags, key, metrics):
+def mlflow_logger_with_logging(run_parameters, tracking_uri, tags, key, metrics):
 
-    mlflow_logger = MLFlowLogger(experiment_name, tracking_uri, tags)
+    mlflow_logger = MLFlowLogger(run_parameters, tracking_uri, tags)
 
     for step, value in enumerate(metrics):
         mlflow_logger.increment_step_and_log_metrics(key, value)

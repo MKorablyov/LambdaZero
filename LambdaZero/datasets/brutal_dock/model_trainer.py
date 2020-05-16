@@ -11,7 +11,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
+from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
 
 
 class AbstractModelTrainer(ABC):
@@ -27,11 +27,11 @@ class AbstractModelTrainer(ABC):
 
     def __init__(self, loss_function: Callable[[torch.tensor, torch.tensor], torch.tensor],
                  device:  torch.device,
-                 mlflow_logger: MLFlowLogger, score_mean: float = 0, score_std: float = 1.):
+                 experiment_logger: ExperimentLogger, score_mean: float = 0, score_std: float = 1.):
 
         self.loss_function = loss_function
         self.device = device
-        self.mlflow_logger = mlflow_logger
+        self.experiment_logger = experiment_logger
 
         self.score_mean = torch.tensor(score_mean, device=device, requires_grad=False)
         self.score_std = torch.tensor(score_std, device=device, requires_grad=False)
@@ -76,8 +76,9 @@ class AbstractModelTrainer(ABC):
 
             batch_loss_value = batch_loss.item()
 
-            self.mlflow_logger.increment_step_and_log_metrics(self.train_loss_key, batch_loss_value)
-            self.mlflow_logger.log_metrics_at_current_step(self.epoch_key, epoch)
+            self.experiment_logger.increment_step_and_log_metrics(self.train_loss_key, batch_loss_value)
+
+            self.experiment_logger.log_metrics_at_current_step(self.epoch_key, epoch)
 
             total_epoch_loss += batch_loss_value*self._get_size_of_batch(batch)
 
@@ -95,7 +96,7 @@ class AbstractModelTrainer(ABC):
 
         average_epoch_loss = total_epoch_loss/len(dataloader.dataset)
 
-        self.mlflow_logger.log_metrics_at_current_step(self.validation_loss_key, average_epoch_loss)
+        self.experiment_logger.log_metrics_at_current_step(self.validation_loss_key, average_epoch_loss)
 
         return average_epoch_loss
 

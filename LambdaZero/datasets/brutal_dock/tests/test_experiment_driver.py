@@ -10,6 +10,8 @@ from torch_geometric.data import InMemoryDataset
 from LambdaZero.core.alpha_zero_policy import torch
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
+from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
+from LambdaZero.datasets.brutal_dock.models import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
@@ -150,10 +152,11 @@ def input_and_run_config(paths, model_parameters):
 @pytest.mark.parametrize("model_name", ["chemprop", "MPNN"])
 def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_config):
     dataset_class = D4MoleculesDataset
+    logger_class = MLFlowLogger
 
     # Passing None to warns records the warnings; see https://docs.pytest.org/en/3.0.2/recwarn.html
     with pytest.warns(None) as record:
-        _ = experiment_driver(input_and_run_config, dataset_class, model_class)
+        _ = experiment_driver(input_and_run_config, dataset_class, model_class, logger_class)
 
     for warning in record.list:
         assert warning.category != UserWarning, "A user warning was raised"
