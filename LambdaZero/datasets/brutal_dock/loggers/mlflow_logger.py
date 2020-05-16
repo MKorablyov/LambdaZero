@@ -3,40 +3,20 @@ from typing import Dict
 import mlflow
 import logging
 
-
-class StepCounter:
-    """
-    This class keeps track of how many times a run_id has been called.
-    """
-
-    def __init__(self):
-        self._count = 0
-
-    @property
-    def count(self):
-        return self._count
-
-    def increment_and_return_count(self):
-        self._count += 1
-        return self._count
+from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
 
 
-class MLFlowLogger:
-    def __init__(self, experiment_name: str, tracking_uri: str, tags: Dict[str, str]):
+class MLFlowLogger(ExperimentLogger):
+    def __init__(self, run_parameters: Dict[str, str], tracking_uri: str, tags: Dict[str, str]):
         """
-
         Class to manage the internals of mlflow, for easy experiment logging.
-        Args:
-            experiment_name (str): The name of the experiment
-            tracking_uri (str): path where the logger will write.
-            tags (dict): job identifiers
         """
-        super().__init__()
+        super().__init__(run_parameters, tracking_uri, tags)
+
         self.mlflow_client = mlflow.tracking.MlflowClient(tracking_uri)
-        self.experiment_name = experiment_name
+        self.experiment_name = run_parameters.pop("experiment_name", 'none')
         self.tags = tags
         self._run_id = None
-        self.step_counter = StepCounter()
 
     @property
     def experiment_id(self):
@@ -58,17 +38,20 @@ class MLFlowLogger:
         self._run_id = run.info.run_id
         return self._run_id
 
-    def increment_step_and_log_metrics(self, key, value):
-        step = self.step_counter.increment_and_return_count()
+    def _log_metrics(self, key: str, value: float, step: int):
         self.mlflow_client.log_metric(self.run_id, key, value, step=step)
 
-    def log_metrics_at_current_step(self, key, value):
-        step = self.step_counter.count
-        self.mlflow_client.log_metric(self.run_id, key, value, step=step)
-
-    def log_parameters(self, prefix: str, parameters: Dict[str, str]):
+    def _log_parameters(self, prefix: str, parameters: Dict[str, str]):
         for key, value in parameters.items():
             self.mlflow_client.log_param(self.run_id, f"{prefix}--{key}", value)
+
+    def log_configuration(self, config: Dict):
+
+        for key, value in config.items():
+            if type(value) is dict:
+                self._log_parameters(key, value)
+            else:
+                self.mlflow_client.log_param(self.run_id, key, value)
 
     def log_artifact(self, path: str):
         self.mlflow_client.log_artifact(self.run_id, path)
@@ -94,8 +77,4 @@ class MLFlowLogger:
         tags_with_correct_names["mlflow.user"] = user
         tags_with_correct_names["mlflow.runName"] = run_name
         return tags_with_correct_names
-
-
-
-
 
