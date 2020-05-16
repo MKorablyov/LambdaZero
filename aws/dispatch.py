@@ -142,7 +142,7 @@ def find_next_batch(init_i=0, init_j=0):
         return i, j, k
 
 
-@ray.remote(num_cpus=2)
+@ray.remote(num_cpus=1)
 def do_docking(i, j, k, results_dir):
     real_home = os.getenv('REAL_HOME', os.getenv('HOME'))
     os.environ['REAL_HOME'] = real_home
