@@ -219,7 +219,7 @@ def distribute_mols(init_i=0, init_j=0):
 
 if __name__ == '__main__':
     ray.init(address='auto')
-    num_dispatchers = 352  # To have 17000~ per machine
+    num_dispatchers = 176  # To have 17000~ per machine
     total_data = 5997 # Approximative, in thousands
     parts_per_dispatch = total_data // num_dispatchers
     dispatchers = [distribute_mols.remote(
