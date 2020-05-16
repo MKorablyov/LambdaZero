@@ -115,7 +115,8 @@ def find_next_batch(init_i=0, init_j=0):
             return None
         if res == 'next':
             # Create the .done file
-            open(osp.join(RESULTS_PATH, ip + ".done"), 'a').close()
+            if j == 0:
+                open(osp.join(RESULTS_PATH, ip + ".done"), 'a').close()
             i += 1
             if i == 100:
                 return None
@@ -129,7 +130,8 @@ def find_next_batch(init_i=0, init_j=0):
             return None
         if res == 'next':
             # Create the .done file
-            open(osp.join(RESULTS_PATH, ip, jp + ".done"), 'a').close()
+            if k == 0:
+                open(osp.join(RESULTS_PATH, ip, jp + ".done"), 'a').close()
             j += 1
             if j == 100:
                 i += 1
