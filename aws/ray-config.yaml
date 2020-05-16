@@ -144,4 +144,4 @@ head_start_ray_commands:
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands:
     - conda activate lzc && ray stop
-    - "ulimit -n 65536; conda activate lzc && ray start --num_cpus=36 --address=$RAY_HEAD_IP:6379 --object-manager-port=8076 --resources '{\"aws-machine\": 1}'"
+    - "ulimit -n 65536; conda activate lzc && ray start --num-cpus=36 --address=$RAY_HEAD_IP:6379 --object-manager-port=8076 --resources '{\"aws-machine\": 1}'"
