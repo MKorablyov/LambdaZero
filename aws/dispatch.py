@@ -196,18 +196,13 @@ def distribute_mols(init_i=0, init_j=0):
     os.makedirs(RESULTS_PATH, exist_ok=True)
     i = init_i
     j = init_j
-    wrapped = False
     while True:
         res = find_next_batch(i, j)
         if res is None:
-            if wrapped:
                 return 'done'
-            # Wrap around the end and try to find more work.
-            wrapped = True
-            i = 0
-            j = 0
-            continue
         i, j, k = res
+        if i != init_i:
+            return 'done'
         job_ids = [do_docking.remote(i, j, p, RESULTS_PATH)
                    for p in range(k, 100)
                    if osp.exists(molpath(i, j, p))]
@@ -224,9 +219,11 @@ if __name__ == '__main__':
     num_dispatchers = 176  # To have 17000~ per machine
     total_data = 5997 # Approximative, in thousands
     parts_per_dispatch = total_data // num_dispatchers
-    dispatchers = [distribute_mols.remote(
-        init_i=(p * parts_per_dispatch) // 100,
-        init_j=(p * parts_per_dispatch) % 100) for p in range(num_dispatchers)]
+    #dispatchers = [distribute_mols.remote(
+    #    init_i=(p * parts_per_dispatch) // 100,
+    #    init_j=(p * parts_per_dispatch) % 100) for p in range(num_dispatchers)]
 
+    dispatchers = [distribute_mols.remote(
+        init_i=i, init_j=0) for i in range(59)]
     # Wait for the jobs to finish
     ray.get(dispatchers)
