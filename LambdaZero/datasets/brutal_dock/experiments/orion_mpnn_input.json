@@ -1,8 +1,8 @@
 {
 
     "run_parameters": {
-        "experiment_name": "Message Passing Neural Network",
-        "run_name": "testrun1"
+        "experiment_name": "Orion-MPNN",
+        "run_name": "orion"
     },
     "training": {
         "num_epochs": 100,
