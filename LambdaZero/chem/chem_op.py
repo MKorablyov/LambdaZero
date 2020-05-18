@@ -296,10 +296,7 @@ class Dock_smi:
                  docksetup_dir,     #
                  cleanup=True,
                  trustme=False,
-<<<<<<< HEAD
                  gas_charge=True,
-=======
->>>>>>> eaeb69a71e4ea6bc002546079561d373248f7312
                  rec_site_file="2_site/selected_spheres.sph",
                  grid_prefix="3_grid/grid",
                  dock_in_template = "4_dock/anchor_and_grow.in",
@@ -392,7 +389,6 @@ class Dock_smi:
         return gridscore, coord
 
 
-
 class ScaffoldSplit:
     def __init__(self, mols_smiles, incude_chirality=False):
         scaffolds = []
@@ -431,6 +427,7 @@ def get_fp(mol, fp_length, fp_radiis, from_atoms=None):
         fps_.append(arr)
     fps = np.asarray(np.concatenate(fps_, axis=0),dtype=np.float32)
     return fps
+
 
 def get_fingerprint(smiles, radius=2,length=1024):
   """Get Morgan Fingerprint of a specific SMILES string.
@@ -511,6 +508,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
         atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
     return atmfeat, coord, bond, bondfeat
 
+
 def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
@@ -526,6 +524,7 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
+
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
     "mol to graph convertor"

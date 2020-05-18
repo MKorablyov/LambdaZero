@@ -3,24 +3,18 @@ from copy import deepcopy
 from ray.rllib.agents.trainer import with_base_config
 from ray.rllib.utils import merge_dicts
 
-from LambdaZero.environments.molecule import MolMDP, QEDReward, PredDockReward
-from LambdaZero.environments.molecule import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnv_v5
-from LambdaZero.core.alpha_zero_trainer import AlphaZeroTrainer
-
-
 from ray.rllib.agents.dqn import ApexTrainer
 from ray.rllib.agents.a3c import A3CTrainer
 from ray.rllib.agents.dqn import DQNTrainer
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.impala import ImpalaTrainer
 
-# These paths assume that you used the install-[cg]pu.sh script in the root folder.
-ROOT = osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))
+from LambdaZero.environments.molecule import MolMDP, QEDReward, PredDockReward
+from LambdaZero.environments.molecule import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnv_v5
+from LambdaZero.core.alpha_zero_trainer import AlphaZeroTrainer
+from LambdaZero.utils import get_external_dirs
 
-#os.getenv("HOME") "/home/maksym/Datasets" #
-datasets_dir = osp.join(ROOT, "Datasets")
-programs_dir = osp.join(ROOT, "Programs")
-summaries_dir = osp.join(ROOT, "model_summaries/ray")
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 
 def dock_metrics(info):

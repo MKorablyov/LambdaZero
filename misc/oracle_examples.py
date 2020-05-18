@@ -31,45 +31,45 @@ class cfg:
     docksetup_dir = osp.join(datasets_dir, "brutal_dock/d4/docksetup")
 
 
+
+# # generate random molecules
+# molMDP = MolMDP(blocks_file="/home/maksym/Datasets/fragdb/blocks_PDB_105.json")
+# for i in range(10):
+#     molMDP.reset()
+#     molMDP.random_walk(5)
+#     print(Chem.MolToSmiles(molMDP.molecule.mol))
 #
-# generate random molecules
-molMDP = MolMDP(blocks_file="/home/maksym/Datasets/fragdb/blocks_PDB_105.json")
-for i in range(10):
-    molMDP.reset()
-    molMDP.random_walk(5)
-    print(Chem.MolToSmiles(molMDP.molecule.mol))
+#
+# # evaluate random molecules with predicted dock reward
+# reward = PredDockReward(load_model=cfg.dockscore_model,
+#                         natm_cutoff=[45, 50],
+#                         qed_cutoff=[0.2, 0.7],
+#                         soft_stop=False,
+#                         exp=None,
+#                         delta=False,
+#                         simulation_cost=0.0,
+#                         device="cuda")
+# reward.reset()
+# print("predicted reward:", reward(molMDP.molecule,env_stop=False,simulate=True,num_steps=1))
+#
+#
+# # evaluate random molecules with docking
+# dock_smi = chem.Dock_smi(outpath=cfg.out_dir,
+#                          chimera_dir=cfg.chimera_dir,
+#                          dock6_dir=cfg.dock6_dir,
+#                          docksetup_dir=cfg.docksetup_dir)
+#
+# name, energy, coord = dock_smi.dock(Chem.MolToSmiles(molMDP.molecule.mol))
+# print("dock energy:", energy)
 
 
-# evaluate random molecules with predicted dock reward
-reward = PredDockReward(load_model=cfg.dockscore_model,
-                        natm_cutoff=[45, 50],
-                        qed_cutoff=[0.2, 0.7],
-                        soft_stop=False,
-                        exp=None,
-                        delta=False,
-                        simulation_cost=0.0,
-                        device="cuda")
-reward.reset()
-print("predicted reward:", reward(molMDP.molecule,env_stop=False,simulate=True,num_steps=1))
 
-
-# evaluate random molecules with docking
 dock_smi = chem.Dock_smi(outpath=cfg.out_dir,
                          chimera_dir=cfg.chimera_dir,
                          dock6_dir=cfg.dock6_dir,
-                         docksetup_dir=cfg.docksetup_dir)
-
-name, energy, coord = dock_smi.dock(Chem.MolToSmiles(molMDP.molecule.mol))
-print("dock energy:", energy)
-
-
-smi = "[O-]C(=O)[C@H](C[C@@H]1CCNC1=O)NC(=O)[C@H](CC2CCCCC2)NC(=O)c3[nH]c4ccccc4c3"
-docksetup_dir = osp.join(cfg.datasets_dir, "brutal_dock/mpro_6lze/docksetup")
-dock_smi = chem.Dock_smi(outpath=cfg.out_dir,
-                         chimera_dir=cfg.chimera_dir,
-                         dock6_dir=cfg.dock6_dir,
-                         docksetup_dir=docksetup_dir,
+                         docksetup_dir= osp.join(cfg.datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
                          gas_charge=True)
+smi = "[O-]C(=O)[C@H](C[C@@H]1CCNC1=O)NC(=O)[C@H](CC2CCCCC2)NC(=O)c3[nH]c4ccccc4c3"
 name, energy, coord = dock_smi.dock(smi)
 print("dock energy:", energy)
 

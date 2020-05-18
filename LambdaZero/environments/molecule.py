@@ -23,6 +23,7 @@ from torch.nn import Sequential, Linear, ReLU, GRU
 from torch_geometric.nn import NNConv, Set2Set
 from torch_geometric.utils import remove_self_loops
 
+import fragdb
 from LambdaZero import chem
 
 
