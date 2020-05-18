@@ -296,10 +296,7 @@ class Dock_smi:
                  docksetup_dir,     #
                  cleanup=True,
                  trustme=False,
-<<<<<<< HEAD
                  gas_charge=True,
-=======
->>>>>>> eaeb69a71e4ea6bc002546079561d373248f7312
                  rec_site_file="2_site/selected_spheres.sph",
                  grid_prefix="3_grid/grid",
                  dock_in_template = "4_dock/anchor_and_grow.in",
