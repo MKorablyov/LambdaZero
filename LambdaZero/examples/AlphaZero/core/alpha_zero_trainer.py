@@ -1,4 +1,4 @@
-import logging, time
+import logging
 from ray.rllib.agents import with_common_config
 from ray.rllib.agents.trainer_template import build_trainer
 from ray.rllib.models.catalog import ModelCatalog
@@ -9,7 +9,7 @@ from ray.rllib.utils import try_import_tf, try_import_torch
 from ray.tune.registry import ENV_CREATOR, _global_registry
 
 from .alpha_zero_policy import AlphaZeroPolicy
-from .mcts import MCTS
+from LambdaZero.utils.mcts import MCTS
 from .ranked_rewards import get_r2_env_wrapper
 from ..optimizer.sync_batches_replay_optimizer import SyncBatchesReplayOptimizer
 
