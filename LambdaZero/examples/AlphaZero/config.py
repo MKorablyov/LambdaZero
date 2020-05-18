@@ -9,9 +9,10 @@ from ray.rllib.agents.dqn import DQNTrainer
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.impala import ImpalaTrainer
 
-from LambdaZero.environments.molecule import MolMDP, QEDReward, PredDockReward
-from LambdaZero.environments.molecule import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnv_v5
-from LambdaZero.core.alpha_zero_trainer import AlphaZeroTrainer
+from LambdaZero.environments import MolMDP, QEDReward, PredDockReward
+from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnv_v5
+
+from .core.alpha_zero_trainer import AlphaZeroTrainer
 from LambdaZero.utils import get_external_dirs
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()

@@ -4,7 +4,7 @@ import numpy as np
 from ray.rllib.policy.policy import Policy, LEARNER_STATS_KEY
 from ray.rllib.policy.torch_policy import TorchPolicy
 from ray.rllib.utils.annotations import override
-from LambdaZero.core.mcts import Node, RootParentNode
+from .mcts import Node, RootParentNode
 from ray.rllib.utils import try_import_torch
 
 torch, _ = try_import_torch()

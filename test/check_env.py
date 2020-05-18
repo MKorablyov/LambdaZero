@@ -7,7 +7,7 @@ from copy import deepcopy
 from matplotlib import pyplot as plt
 from rdkit import Chem
 
-from affinity_models.alpha_zero.examples.config import get_config
+#from affinity_models.alpha_zero.examples.config import get_config
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
 else: config_name = "cfg000"

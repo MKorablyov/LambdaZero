@@ -429,23 +429,51 @@ def get_fp(mol, fp_length, fp_radiis, from_atoms=None):
     return fps
 
 
-def get_fingerprint(smiles, radius=2,length=1024):
-  """Get Morgan Fingerprint of a specific SMILES string.
-  Args:
-    smiles: String. The SMILES string of the molecule.
-    hparams: tf.contrib.training.HParams. Hyper parameters.
-  Returns:
-    np.array. shape = [hparams.fingerprint_length]. The Morgan fingerprint.
-  """
-  if smiles is None:
-    return np.zeros((length,))
-  molecule = Chem.MolFromSmiles(smiles)
-  if molecule is None:
-    return np.zeros((length,))
-  fingerprint = AllChem.GetMorganFingerprintAsBitVect(molecule, radius, length)
-  arr = np.zeros((1,))
-  DataStructs.ConvertToNumpyArray(fingerprint, arr)
-  return pd.DataFrame({"fingerprint":[arr]})
+class FPEmbedding_v2:
+    def __init__(self, mol_fp_len, mol_fp_radiis, stem_fp_len, stem_fp_radiis):
+        self.mol_fp_len = mol_fp_len
+        self.mol_fp_radiis = mol_fp_radiis
+        self.stem_fp_len = stem_fp_len
+        self.stem_fp_radiis = stem_fp_radiis
+
+    def __call__(self, molecule):
+        mol = molecule.mol
+        mol_fp = get_fp(mol, self.mol_fp_len, self.mol_fp_radiis)
+
+        # get fingerprints and also handle empty case
+        stem_fps = [get_fp(mol, self.stem_fp_len, self.stem_fp_radiis, [idx])
+                    for idx in molecule.stem_atmidxs]
+
+        jbond_fps = [(get_fp(mol, self.stem_fp_len, self.stem_fp_radiis, [idx[0]]) +
+                     get_fp(mol, self.stem_fp_len, self.stem_fp_radiis, [idx[1]]))/2.
+                     for idx in molecule.jbond_atmidxs]
+
+        if len(stem_fps) > 0: stem_fps = np.stack(stem_fps, 0)
+        else: stem_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
+        if len(jbond_fps) > 0: jbond_fps = np.stack(jbond_fps, 0)
+        else: jbond_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
+        return mol_fp, stem_fps, jbond_fps
+
+
+# def get_fingerprint(smiles, radius=2,length=1024):
+# fixme: make a part of get_fp
+#
+#   """Get Morgan Fingerprint of a specific SMILES string.
+#   Args:
+#     smiles: String. The SMILES string of the molecule.
+#     hparams: tf.contrib.training.HParams. Hyper parameters.
+#   Returns:
+#     np.array. shape = [hparams.fingerprint_length]. The Morgan fingerprint.
+#   """
+#   if smiles is None:
+#     return np.zeros((length,))
+#   molecule = Chem.MolFromSmiles(smiles)
+#   if molecule is None:
+#     return np.zeros((length,))
+#   fingerprint = AllChem.GetMorganFingerprintAsBitVect(molecule, radius, length)
+#   arr = np.zeros((1,))
+#   DataStructs.ConvertToNumpyArray(fingerprint, arr)
+#   return pd.DataFrame({"fingerprint":[arr]})
 
 
 def onehot(arr,num_classes,dtype=np.int):

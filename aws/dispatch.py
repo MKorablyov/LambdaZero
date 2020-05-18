@@ -5,7 +5,7 @@ import tempfile
 import ray
 import pandas as pd
 
-from LambdaZero.examples.config import mol_blocks_v4_config
+from LambdaZero.examples.AlphaZero.config import mol_blocks_v4_config
 from LambdaZero.chem import Dock_smi
 
 DATASET_PATH = "/fsx/datasets/zinc15_2D/splits/"

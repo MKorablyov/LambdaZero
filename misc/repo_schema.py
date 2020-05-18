@@ -1,13 +1,3 @@
-# Datasets
-    # brutal_dock
-    # actor_dock
-    # fragdb
-
-# Programs
-    # dock6
-    # chimera
-    # smina
-
 # LambdaZero
     # chem
         # Dock6
@@ -32,8 +22,17 @@
         # AlphaZero
         # PPO
         # Ape-X
-        # oracle_tutorials
-
-
+        # oracle_examples
 
 # API-doc generator
+
+
+# Datasets
+    # brutal_dock
+    # actor_dock
+    # fragdb
+
+# Programs
+    # dock6
+    # chimera
+    # smina
