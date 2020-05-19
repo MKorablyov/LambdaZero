@@ -28,7 +28,6 @@ E           __init__(_object*, std::__1::basic_string<char, std::__1::char_trait
     _ = Chem.Atom(numpy_atomic_number)
 
 
-
 def test_graph_to_mol_easy(easy_smiles):
     for smiles in easy_smiles:
 
