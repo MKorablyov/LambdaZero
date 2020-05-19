@@ -7,22 +7,13 @@ from rdkit.Chem import QED
 import os.path as osp
 from rdkit import Chem
 
-
-
 import LambdaZero.chem
 import LambdaZero.utils
-
 import LambdaZero.environments
-
-#from LambdaZero.environments.molecule import PredDockReward
 
 
 class cfg:
-
     datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
-
-    #datasets_dir = osp.join("/home/maksym", "Datasets")
-    #programs_dir = osp.join("/home/maksym/", "Programs")
     num_cpus = 8
 
     db_name = "actor_dock"
@@ -82,8 +73,6 @@ dock_smi = LambdaZero.chem.Dock_smi(outpath=cfg.out_dir,
 smi = "[O-]C(=O)[C@H](C[C@@H]1CCNC1=O)NC(=O)[C@H](CC2CCCCC2)NC(=O)c3[nH]c4ccccc4c3"
 name, energy, coord = dock_smi.dock(smi)
 print("dock energy:", energy)
-
-
 
 
 # ray remote function

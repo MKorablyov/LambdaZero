@@ -25,7 +25,7 @@ def experiment_driver(
     input_and_run_config: Dict[str, Any],
     dataset_class: Type[MoleculesDatasetBase],
     model_class: Type[ModelBase],
-    random_seed: int = 0,
+    random_seed: int = 177,
 ) -> float:
     """
     This method drives the execution of an experiment. It is responsible for
