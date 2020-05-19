@@ -1,512 +1,237 @@
-class EarlyStopping:
-# Taken from https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
-    """Early stops the training if validation loss doesn't improve after a given patience."""
-    def __init__(self, patience=7, verbose=False, delta=0):
-        """
-        Args:
-            patience (int): How long to wait after last time validation loss improved.
-                            Default: 7
-            verbose (bool): If True, prints a message for each validation loss improvement. 
-                            Default: False
-            delta (float): Minimum change in the monitored quantity to qualify as an improvement.
-                            Default: 0
-        """
-        self.patience = patience
-        self.verbose = verbose
-        self.counter = 0
-        self.best_score = None
-        self.early_stop = False
-        self.val_loss_min = np.Inf
-        self.delta = delta
-
-    def __call__(self, val_loss, model):
-
-        score = -val_loss
-
-        if self.best_score is None:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model)
-        elif score < self.best_score + self.delta:
-            self.counter += 1
-            print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model)
-            self.counter = 0
-
-    def save_checkpoint(self, val_loss, model):
-        '''Saves model when validation loss decrease.'''
-        if self.verbose:
-            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        th.save(model.state_dict(), 'checkpoint.pt')
-        self.val_loss_min = val_loss
-
 import pandas as pd
 import numpy as np
-import torch as th
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-import gc
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 import random
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 import torch.nn.functional as F
+from abc import ABC, abstractmethod
 
-device = 'cuda:0' if th.cuda.is_available() else 'cpu'
+class AcquisitionFunction(ABC):
+    """
+    A base class for all acquisition functions. All subclasses should
+    override the `__call__` method.
+    """
+
+    def random_selection(self, set_in, b): #set_in: input set; b: how many batch size we want to take
+
+        selection = np.random.choice(len(set_in), b) #take a random choice from 0 to len(set_in), do it for b times
+        selected = set_in[[selection]]
+        rest_selection = set_in[np.delete(range(len(set_in) - 1), selection)]
+        set_in = TensorDataset(selected[0], selected[1])
+        set_rest = TensorDataset(rest_selection[0], rest_selection[1])
+
+        return set_in, set_rest
+
+    @abstractmethod
+    def __call__(self, df, b):
+        pass
+
+class RandomAcquisition(AcquisitionFunction):
+
+    def __call__(self, df, b):
+      x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
+      y = torch.Tensor(list(df['preds'].values))
+      set_in = TensorDataset(x, y)
+      return self.random_selection(set_in, b)
+
+class GreedyAcquisition(AcquisitionFunction):
+
+    def __call__(self, df, b):
+      df = df.sort_values('preds', ascending = False)
+      x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
+      y = torch.Tensor(list(df['preds'].values))
+      x_in = x[:b]
+      x_rest = x[b:]
+      y_in = y[:b]
+      y_rest = y[b:]
+      set_in = TensorDataset(x_in, y_in)
+      set_rest = TensorDataset(x_rest, y_rest)
+      return set_in, set_rest
+
+class EGreedyAcquisition(AcquisitionFunction):
+
+    def __call__(self, df, b):
+      dist = torch.randn(len(df['preds'].values)) * cfg.std + cfg.mean
+      df['preds'] = df['preds'].values + dist.detach().cpu().numpy()
+      df = df.sort_values('preds', ascending = False)
+      x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
+      y = torch.Tensor(list(df['preds'].values))
+      x_in = x[:b]
+      x_rest = x[b:]
+      y_in = y[:b]
+      y_rest = y[b:]
+      set_in = TensorDataset(x_in, y_in)
+      set_rest = TensorDataset(x_rest, y_rest)
+
+      return set_in, set_rest
 
 class cfg:
-    # data could be found here: https://github.com/MKorablyov/brutal_dock/tree/master/d4/raw
-    data = 'd4_250k_clust.parquet'#"/home/maksym/Datasets/brutal_dock/d4/raw/d4_100k_clust.parquet"
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    data = 'd4_250k_clust.parquet'
     batch_size = 500
-    epochs = 6
-    std = 1.
+    epochs = 25
+    std = 0.5
     mean = 0.
-    patience = 10
-    mode = 'y'
-    # k = 10
+    max_len = 8000
+    acquisition_mode = 'Greedy' #Random, Greedy, EGreedy
+    acquisition_map = {'Random':RandomAcquisition(), 'Greedy': GreedyAcquisition(), 'EGreedy': EGreedyAcquisition()}
+    acquisition_fxn = acquisition_map[acquisition_mode]
 
-#sns.distplot(df["dockscore"])
-#plt.show()
+class CustomBatch:
+    def __init__(self, data):
+        transposed_data = list(zip(*data)) 
+        self.x = torch.stack(transposed_data[0])
+        self.y = torch.stack(transposed_data[1])
 
-# total_budget = 3000
+class utils:
+  def collate_wrapper(batch):
+      return CustomBatch(batch)
 
-# strategies
-# S1: greedy
-# batch_size = 500, num_interations = 6
+  def get_top_k(df, k):
+      df = df.sort_values('ys', ascending = True)
+      y = df['ys'].values
+      preds = df['preds'].values
+      return preds[:k], y[:k]
 
-def train_random(x, y, model, optimizer, x_test, y_test):
-    model.train()
-    batch_size = cfg.batch_size
-    loss_all = 0
-    losses = []
-    test_mse = []
-    bound = 0
-    model = model.to(device)
-    scheduler = ReduceLROnPlateau(optimizer, 'min')
+class FingerprintDataset:
+  def __init__(self):
+      pass
+
+  def generate_fingerprint_dataset(self, filename = 'd4_250k_clust.parquet', batch_size = 500, x_name = 'fingerprint', y_name = 'dockscore'):
+      data = pd.read_parquet(filename, engine='pyarrow')
+
+      # remove the 20% of worst energy
+      data = data.sort_values(y_name)[:-int(round(len(data)*0.2))]
+      
+      # takes the value from fingerprint column, stack vertically and turn to a tensor
+      x_data = torch.from_numpy(np.vstack(data[x_name].values).astype(np.float32))
+      y_data = torch.Tensor(list(data[y_name].values)) 
+      
+      # split the data
+      self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x_data, y_data, test_size = 0.2)
+      self.x_train, self.x_val, self.y_train, self.y_val = train_test_split(self.x_train, self.y_train, test_size = 0.2)
+
+  def train_set(self):
+      train_dataset = TensorDataset(self.x_train, self.y_train)
+      train_loader = DataLoader(train_dataset, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
+      return train_dataset, train_loader
+
+  def test_set(self):
+      test_dataset = TensorDataset(self.x_test, self.y_test)
+      test_loader = DataLoader(test_dataset, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
+      return test_dataset, test_loader
+
+  def val_set(self):
+      val_dataset = TensorDataset(self.x_val, self.y_val)
+      val_loader = DataLoader(val_dataset, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
+      return val_dataset, val_loader
+
+class Trainer:
+  def __init__(self, model = None, acquisition_fxn = None):
+    if model == None:
+      self.model = torch.nn.Sequential(nn.Linear(1024, 512), nn.ReLU(), nn.Linear(512, 1))
+    else:
+      self.model = model
+    if acquisition_fxn == None:
+      self.acquisition_fxn = RandomAcquisition()
+    else:
+      self.acquisition_fxn = acquisition_fxn
+
+  def train(self):
+    fpd = FingerprintDataset()
+    fpd.generate_fingerprint_dataset(cfg.data)
+    model = self.model
+    acquisition_fxn = self.acquisition_fxn
+    train_set, train_loader = fpd.train_set()
+    test_set, test_loader = fpd.test_set()
+    optimizer = torch.optim.Adam(model.parameters())
+    losses = [] # record loss on the train set
+    test_losses = []
     top_mol = []
     top_y = []
-    early_stopping = EarlyStopping(patience=cfg.patience, verbose=True)
-
-    for i in tqdm(range(0, len(x), batch_size)):
-        if bound == 0:
-            bound = i + batch_size
-            x_in = x[0:bound]
-            x_in = x_in.to(device)
-            y_in = y[0:bound]
-            y_in = y_in.to(device)
-
-            x_rest = x[bound:]
-            x_rest = x_rest.to(device)
-            y_rest = y[bound:]
-            y_rest = y_rest.to(device)     
-
-        x_in = x_in.to(device)
-        y_in = y_in.to(device)
-        x_rest = x_rest.to(device)
-        y_rest = y_rest.to(device)
-
+    
+    for index in tqdm(range(len(train_set) // cfg.batch_size)):
+        if index == 0:
+            set_in, set_rest = acquisition_fxn.random_selection(train_set, cfg.batch_size)
+        train_loader = DataLoader(set_in, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
         model.train()
-        assert model.training
-
+        
         for _ in range(cfg.epochs):
-            optimizer.zero_grad()
-            pred = model(x_in)
-            loss = F.mse_loss(pred.squeeze(1), y_in)
-            loss.backward()
-            optimizer.step()
-
-        scheduler.step(loss)
-        loss_all += loss.item()
-        losses.append(loss)
-
-        mse, _, _, _ = test_epoch(x_test, y_test, model)
-        test_mse.append(mse)
-
-        early_stopping(mse, model)
-        
-        if early_stopping.early_stop:
-            print("Early stopping")
-            break
-
-        model.eval()
-        preds = model(x_rest)
-        df = pd.DataFrame({'x': list(x_rest.detach().cpu().numpy()), 'y':list(y_rest.detach().cpu().numpy()), 'preds':list(preds.detach().cpu().numpy().squeeze())})
-        df = df.sample(frac=1)
-
-        x_rest = np.vstack(df['x'].values)
-        y_rest = np.vstack(df['preds'].values).squeeze()
-        
-        df['differences'] = df['y'] - df['preds']
-        df = df.sort_values('differences')
-
-        top_pred, top_val = get_top_k(df, 1, cfg.mode)
-        top_mol.append(top_pred)
-        top_y.append(top_val)
-
-        x_in = x_in.detach().cpu().numpy()
-        y_in = y_in.detach().cpu().numpy()
-
-        x_in = np.concatenate((x_in, x_rest[:cfg.batch_size]))
-        y_in = np.concatenate((y_in, y_rest[:cfg.batch_size]))
-        x_rest = x_rest[cfg.batch_size:]
-        y_rest = y_rest[cfg.batch_size:]
-
-        in_tmp = np.c_[x_in.reshape(len(x_in), -1), y_in.reshape(len(y_in), -1)]
-        rest_tmp = np.c_[x_rest.reshape(len(x_rest), -1), y_rest.reshape(len(y_rest), -1)]
-
-        np.random.shuffle(in_tmp)
-        np.random.shuffle(rest_tmp)
-        
-        x_in = in_tmp[:, :x_in.size//len(x_in)].reshape(x_in.shape)
-        y_in = in_tmp[:, x_in.size//len(x_in):].reshape(y_in.shape)
-        x_rest = rest_tmp[:, :x_rest.size//len(x_rest)].reshape(x_rest.shape)
-        y_rest = rest_tmp[:, x_rest.size//len(x_rest):].reshape(y_rest.shape)
-
-        x_in = th.from_numpy(x_in).float().to(device)
-        y_in = th.from_numpy(y_in).float().to(device)
-        x_rest = th.from_numpy(x_rest).float().to(device)
-        y_rest = th.from_numpy(y_rest).float().to(device)
-
-    return loss_all / len(x), losses, test_mse, top_mol, top_y
-
-def train_greedy(x, y, model, optimizer, x_test, y_test):
-    model.train()
-    batch_size = cfg.batch_size
-    loss_all = 0
-    losses = []
-    test_mse = []
-    bound = 0
-    top_mol = []
-    top_y = []
-    model = model.to(device)
-    scheduler = ReduceLROnPlateau(optimizer, 'min')
-    early_stopping = EarlyStopping(patience=cfg.patience, verbose=True)
-
-    for i in tqdm(range(0, len(x), batch_size)):
-        if bound == 0:
-            bound = i + batch_size
-            x_in = x[0:bound]
-            x_in = x_in.to(device)
-            y_in = y[0:bound]
-            y_in = y_in.to(device)
-
-            x_rest = x[bound:]
-            x_rest = x_rest.to(device)
-            y_rest = y[bound:]
-            y_rest = y_rest.to(device)     
-
-        x_in = x_in.to(device)
-        y_in = y_in.to(device)
-        x_rest = x_rest.to(device)
-        y_rest = y_rest.to(device)
-
-        model.train()
-        assert model.training
-        for _ in range(cfg.epochs):
-            for j in range(0, len(x_in), batch_size):
-
+            for _, batch in enumerate(train_loader):
                 optimizer.zero_grad()
-                pred = model(x_in[i:i+batch_size])
-                loss = F.mse_loss(pred.squeeze(1), y_in[i:i+batch_size])
+                pred = model(batch.x)
+                loss = F.mse_loss(pred.squeeze(), batch.y)
                 loss.backward()
                 optimizer.step()
 
-        loss_all += loss.item()
+        test_mse, _ = self.test_epoch(test_loader, model)
+        test_losses.append(test_mse)
         losses.append(loss)
-
-        mse, _, _, _ = test_epoch(x_test, y_test, model)
-        early_stopping(mse, model)
-        test_mse.append(mse)
-
-        if early_stopping.early_stop:
-            print("Early stopping")
-            break
-
+        rest_loader = DataLoader(set_rest, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
         model.eval()
-        preds = model(x_rest)
+        preds = []
+        ys = []
+        xs = []
         
-        df = pd.DataFrame({'x': list(x_rest.detach().cpu().numpy()), 'y':list(y_rest.detach().cpu().numpy()), 'preds':list(preds.detach().cpu().numpy().squeeze())})
-        df = df.sort_values('preds', ascending = False)
+        for b in rest_loader:
+          pred = model(b.x).detach().cpu().numpy().squeeze()
+          preds.append(pred)
+          xs.append(b.x)
+          ys.append(b.y)
 
-        x_rest = np.vstack(df['x'].values)
-        y_rest = np.vstack(df['preds'].values).squeeze()
-        
-        df['differences'] = df['y'] - df['preds']
-        df = df.sort_values('differences')
-
-        top_pred, top_val = get_top_k(df, 1, cfg.mode)
-        top_mol.append(top_pred)
+        xs = np.concatenate(xs, axis = 0)
+        ys = np.concatenate(ys, axis=0)
+        preds = np.concatenate(preds, axis=0)
+        df = pd.DataFrame({'xs': list(xs), 'ys':ys, 'preds':preds})
+        top_pred, top_val = utils.get_top_k(df, 1)
+        top_mol.append(top_pred) 
         top_y.append(top_val)
-        
-        try:
-            x_in = x_in.detach().cpu().numpy()
-            y_in = y_in.detach().cpu().numpy()
 
-            x_in = np.concatenate((x_in, x_rest[:cfg.batch_size]))
-            y_in = np.concatenate((y_in, y_rest[:cfg.batch_size]))
-            x_rest = x_rest[cfg.batch_size:]
-            y_rest = y_rest[cfg.batch_size:]
+        new_set_in, set_rest = acquisition_fxn(df, cfg.batch_size)
+        set_in = torch.utils.data.ConcatDataset([set_in, new_set_in])
 
-            in_tmp = np.c_[x_in.reshape(len(x_in), -1), y_in.reshape(len(y_in), -1)]
-            rest_tmp = np.c_[x_rest.reshape(len(x_rest), -1), y_rest.reshape(len(y_rest), -1)]
+        if len(set_in) > cfg.max_len:
+          break
 
-            np.random.shuffle(in_tmp)
-            np.random.shuffle(rest_tmp)
-            
-            x_in = in_tmp[:, :x_in.size//len(x_in)].reshape(x_in.shape)
-            y_in = in_tmp[:, x_in.size//len(x_in):].reshape(y_in.shape)
-            x_rest = rest_tmp[:, :x_rest.size//len(x_rest)].reshape(x_rest.shape)
-            y_rest = rest_tmp[:, x_rest.size//len(x_rest):].reshape(y_rest.shape)
+    self.losses = losses
+    self.test_losses = test_losses
+    self.top_mol = top_mol
+    self.top_y = top_y
+    self.model = model
 
-            x_in = th.from_numpy(x_in).float().to(device)
-            y_in = th.from_numpy(y_in).float().to(device)
-            x_rest = th.from_numpy(x_rest).float().to(device)
-            y_rest = th.from_numpy(y_rest).float().to(device)
-         
-        except:
-            break
-
-    return loss_all / len(x), losses, test_mse, top_mol, top_y
-
-def train_greedy_error(x, y, model, optimizer, x_test, y_test):
-    model.train()
-    batch_size = cfg.batch_size
-    loss_all = 0
-    losses = []
-    test_mse = []
-    top_mol = []
-    top_y = []
-    bound = 0
-    std = cfg.std
-    mean = cfg.mean
-    crit = th.nn.MSELoss()
-    model = model.to(device)
-    scheduler = ReduceLROnPlateau(optimizer, 'min')
-    early_stopping = EarlyStopping(patience=cfg.patience, verbose=True)
-
-    for i in tqdm(range(0, len(x), batch_size)):
-        if bound == 0:
-            bound = i + batch_size
-            x_in = x[0:bound]
-            x_in = x_in.to(device)
-            y_in = y[0:bound]
-            y_in = y_in.to(device)
-
-            x_rest = x[bound:]
-            x_rest = x_rest.to(device)
-            y_rest = y[bound:]
-            y_rest = y_rest.to(device)
-
-        x_in = x_in.to(device)
-        y_in = y_in.to(device)
-        x_rest = x_rest.to(device)
-        y_rest = y_rest.to(device)
-
-        model.train()
-        for _ in range(cfg.epochs):
-            for j in range(0, len(x_in), batch_size):
-                optimizer.zero_grad()
-                pred = model(x_in[i:i+batch_size])
-                loss = F.mse_loss(pred.squeeze(1), y_in[i:i+batch_size])
-                loss.backward()
-                optimizer.step()
-
-        loss_all += loss.item()
-        losses.append(loss)
-        
-        mse, _, _, _ = test_epoch(x_test, y_test, model)
-        test_mse.append(mse)
-
-        early_stopping(mse, model)
-        
-        if early_stopping.early_stop:
-            print("Early stopping")
-            break
-        
-        preds = model(x_rest)
-        dist = th.randn(preds.size()) * std + mean
-        dist = dist.to(device)
-        preds = preds + dist
-
-        df = pd.DataFrame({'x': list(x_rest.detach().cpu().numpy()), 'y':list(y_rest.detach().cpu().numpy()), 'preds':list(preds.detach().cpu().numpy().squeeze())})
-        df = df.sort_values('preds', ascending = False)
-
-        x_rest = np.vstack(df['x'].values)
-        y_rest = np.vstack(df['preds'].values).squeeze()
-        
-        df['differences'] = df['y'] - df['preds']
-        df = df.sort_values('differences')
-
-        top_pred, top_val = get_top_k(df, 1, cfg.mode)
-        top_mol.append(top_pred)
-        top_y.append(top_val)
-        
-        x_in = np.concatenate((x_in.detach().cpu().numpy(), x_rest[-cfg.batch_size:]))
-        y_in = np.concatenate((y_in.detach().cpu().numpy(), y_rest[-cfg.batch_size:]))
-        x_rest = x_rest[:-cfg.batch_size]
-        y_rest = y_rest[:-cfg.batch_size]
-
-        in_tmp = np.c_[x_in.reshape(len(x_in), -1), y_in.reshape(len(y_in), -1)]
-        rest_tmp = np.c_[x_rest.reshape(len(x_rest), -1), y_rest.reshape(len(y_rest), -1)]
-        
-        np.random.shuffle(in_tmp)
-        np.random.shuffle(rest_tmp)
-
-        x_in = in_tmp[:, :x_in.size//len(x_in)].reshape(x_in.shape)
-        y_in = in_tmp[:, x_in.size//len(x_in):].reshape(y_in.shape)
-        x_rest = rest_tmp[:, :x_rest.size//len(x_rest)].reshape(x_rest.shape)
-        y_rest = rest_tmp[:, x_rest.size//len(x_rest):].reshape(y_rest.shape)
-
-        x_in = th.from_numpy(x_in).float().to(device)
-        y_in = th.from_numpy(y_in).float().to(device)
-        x_rest = th.from_numpy(x_rest).float().to(device)
-        y_rest = th.from_numpy(y_rest).float().to(device)
-        
-    return loss_all / len(x), losses, test_mse, top_mol, top_y
-
-def test_epoch(x, y, model):
+  def test_epoch(self, loader, model):
     model.eval()
+    xs = []
     ys = []
     preds = []
-    batch_size = cfg.batch_size
+    
+    for data in loader:
+        xs.append(data.x.detach().cpu().numpy())
+        ys.append(data.y.detach().cpu().numpy())
+        preds.append(model(data.x).detach().cpu().numpy())
 
-    for i in range(0, len(x), batch_size):
-        x_in = x[i:i+batch_size]
-        x_in = x_in.to(device)
-        y_in = y[i:i+batch_size]
-        ys.append(y_in.detach().cpu().numpy())
-        preds.append(model(x_in).detach().cpu().numpy())
-        
+    xs = np.concatenate(xs, axis = 0)
     ys = np.concatenate(ys, axis=0)
     preds = np.concatenate(preds, axis=0)
-    mse = np.mean((ys - preds)**2)
-    mae = np.mean(np.abs(ys - preds))
+    mse = F.mse_loss(torch.from_numpy(preds.squeeze()).to(cfg.device), torch.from_numpy(ys.squeeze()).to(cfg.device))
+    test_out = pd.DataFrame({"xs":list(xs), "ys": ys.squeeze(), "preds": preds.squeeze()})
+    return mse, test_out
 
-    return mse, mae, ys, preds
+  def generate_plot(self):
+    plt.plot(np.linspace(0, len(self.test_losses) * cfg.batch_size, len(self.test_losses)), self.test_losses, color="r", linestyle="-", marker="^", linewidth=1,label="Test")
+    plt.plot(np.linspace(0, len(self.losses) * cfg.batch_size, len(self.losses)), self.losses, color="b", linestyle="-", marker="s", linewidth=1,label="Train")
+    plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
+    plt.title(cfg.acquisition_mode)
+    plt.xlabel("Sample Size")
+    plt.ylabel("MSE")
+    plt.show()
 
-
-class Model(th.nn.Module):
-    def __init__(self, inp_size, output_size):
-        super(Model, self).__init__()
-        self.fc1 = th.nn.Linear(1024, 1536)
-        self.tanh = th.nn.ReLU()
-        self.fc2 = th.nn.Linear(1536, 512)
-        self.tanh2 = th.nn.ReLU()
-        self.fc3 = th.nn.Linear(512, output_size)
-
-    def forward(self, x):
-        fc = self.fc1(x)
-        tanh = self.tanh(fc)
-        tanh2 = self.tanh2(self.fc2(tanh))
-        return self.fc3(tanh2)
-
-def get_top_k(df, k, mode = 'difference'):
-    if mode == 'y':
-        df = df.sort_values('y', ascending = True)
-    elif mode == 'difference':
-        df = df.sort_values('difference')
-    y = df['y'].values
-    preds = df['preds'].values
-    return preds[:k], y[:k]
-
-df1 = pd.read_parquet(cfg.data)
-df1 = df1.iloc[np.random.permutation(len(df1))]
-x = th.from_numpy(np.vstack(df1['fingerprint'].values).astype(np.float32))
-y = th.Tensor(list(df1['dockscore'].values))
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2)
-x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size = 0.2)
-
-x_test = np.asarray([t.numpy() for t in x_test], dtype = np.float32)
-y_test = np.asarray([t.numpy() for t in y_test], dtype = np.float32)
-x_test = th.FloatTensor(x_test)
-y_test = th.FloatTensor(y_test)
-
-#RANDOM
-model = Model(1024, 1)#(x.shape[0], 1)
-model = model.to(device)
-
-optimizer = th.optim.Adam(model.parameters())
-    
-x_train = np.asarray([t.numpy() for t in x_train], dtype = np.float32)
-y_train = np.asarray([t.numpy() for t in y_train], dtype = np.float32)
-x_train = th.FloatTensor(x_train)
-y_train = th.FloatTensor(y_train)
-
-avg_loss, train_mse, test_mse, top_mol_rand, top_y_rand = train_random(x_train, y_train, model, optimizer, x_test, y_test)
-mse, mae, ys, preds = test_epoch(x_val, y_val, model)
-
-plt.plot(np.linspace(0, len(test_mse) * cfg.batch_size, len(test_mse)), test_mse, color="r", linestyle="-", marker="^", linewidth=1,label="Test")
-plt.plot(np.linspace(0, len(train_mse) * cfg.batch_size, len(train_mse)), train_mse, color="b", linestyle="-", marker="s", linewidth=1,label="Train")
-plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-plt.title('Random')
-plt.xlabel("Sample Size")
-plt.ylabel("MSE")
-plt.show()
-
-#GREEDY
-model = Model(1024, 1)#(x.shape[0], 1)
-model = model.to(device)
-optimizer = th.optim.Adam(model.parameters())
-    
-x_train = np.asarray([t.numpy() for t in x_train], dtype = np.float32)
-y_train = np.asarray([t.numpy() for t in y_train], dtype = np.float32)
-x_train = th.FloatTensor(x_train)
-y_train = th.FloatTensor(y_train)
-
-avg_loss, train_mse, test_mse, top_mol_greedy, top_y_greedy = train_greedy(x_train, y_train, model, optimizer, x_test, y_test)
-mse, mae, ys, preds = test_epoch(x_val, y_val, model)
-
-plt.plot(np.linspace(0, len(test_mse) * cfg.batch_size, len(test_mse)), test_mse, color="r", linestyle="-", marker="^", linewidth=1,label="Test")
-plt.plot(np.linspace(0, len(train_mse) * cfg.batch_size, len(train_mse)), train_mse, color="b", linestyle="-", marker="s", linewidth=1,label="Train")
-plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-plt.title('Greedy')
-plt.xlabel("Sample Size")
-plt.ylabel("MSE")
-plt.show()
-
-#EPSILON GREEDY
-model = Model(1024, 1)#(x.shape[0], 1)
-model = model.to(device)
-
-optimizer = th.optim.Adam(model.parameters(), lr=0.0001)
-    
-x_train = np.asarray([t.numpy() for t in x_train], dtype = np.float32)
-y_train = np.asarray([t.numpy() for t in y_train], dtype = np.float32)
-x_train = th.FloatTensor(x_train)
-y_train = th.FloatTensor(y_train)
-
-avg_loss, train_mse, test_mse, top_mol_eps, top_y_eps = train_greedy_error(x_train, y_train, model, optimizer, x_test, y_test)
-mse, mae, ys, preds = test_epoch(x_val, y_val, model)
-
-plt.plot(np.linspace(0, len(test_mse) * cfg.batch_size, len(test_mse)), test_mse, color="r", linestyle="-", marker="^", linewidth=1,label="Test")
-plt.plot(np.linspace(0, len(train_mse) * cfg.batch_size, len(train_mse)), train_mse, color="b", linestyle="-", marker="s", linewidth=1,label="Train")
-plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-plt.title('Epsilon Greedy')
-plt.xlabel("Sample Size")
-plt.ylabel("MSE")
-plt.show()
-
-top_y = top_y_rand
-if len(top_y) < len(top_y_greedy):
-    top_y = top_y_greedy
-
-if len(top_y) < len(top_y_eps):
-    top_y = top_y_eps
-
-while len(top_mol_rand) < len(top_y):
-    top_mol_rand.append(None)
-while len(top_mol_greedy) < len(top_y):
-    top_mol_greedy.append(None)
-while len(top_mol_eps) < len(top_y):
-    top_mol_eps.append(None)
-
-plt.scatter(np.linspace(0, len(top_y) * cfg.batch_size, len(top_y)), top_mol_rand, label = 'Random')
-plt.scatter(np.linspace(0, len(top_y) * cfg.batch_size, len(top_y)), top_mol_greedy, label = 'Greedy')
-plt.scatter(np.linspace(0, len(top_y) * cfg.batch_size, len(top_y)), top_mol_eps, label = 'Epsilon Greedy')
-plt.scatter(np.linspace(0, len(top_y) * cfg.batch_size, len(top_y)), top_y, label = 'Actual')
-plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-plt.xlabel('Search Space')
-plt.ylabel('Score')
-plt.show()
+  
+if __name__ == '__main__':
+    trainer = Trainer(acquisition_fxn = cfg.acquisition_fxn)
+    trainer.train()
+    trainer.generate_plot()

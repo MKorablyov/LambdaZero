@@ -147,10 +147,7 @@ def find_next_batch(init_i=0, init_j=0):
 
 @ray.remote(num_cpus=1)
 def do_docking(i, j, k, results_dir):
-    real_home = os.getenv('REAL_HOME', os.getenv('HOME'))
-    os.environ['REAL_HOME'] = real_home
-    os.environ['HOME'] = real_home + "/homes/{0}/{1}/{2}/".format(i, j, k)
-    os.makedirs(os.environ['HOME'], exist_ok=True)
+    os.environ['HOME'] = tempfile.mkdtemp()
     workpath = "/tmp/docking/{0}/{1}/{2}/".format(i, j, k)
     os.makedirs(workpath, exist_ok=True)
     dock_smi = Dock_smi(outpath=workpath,
@@ -189,7 +186,7 @@ def do_docking(i, j, k, results_dir):
     output_path = outpath(i, j, k)
     ofd, output_tmp = tempfile.mkstemp(dir=osp.dirname(output_path),
                                        suffix='.tmp')
-    ofd.close()
+    os.close(ofd)
     output.to_parquet(output_tmp, engine="fastparquet", compression=None)
     os.rename(output_tmp, output_path)
 
@@ -199,18 +196,13 @@ def distribute_mols(init_i=0, init_j=0):
     os.makedirs(RESULTS_PATH, exist_ok=True)
     i = init_i
     j = init_j
-    wrapped = False
     while True:
         res = find_next_batch(i, j)
         if res is None:
-            if wrapped:
                 return 'done'
-            # Wrap around the end and try to find more work.
-            wrapped = True
-            i = 0
-            j = 0
-            continue
         i, j, k = res
+        if i != init_i:
+            return 'done'
         job_ids = [do_docking.remote(i, j, p, RESULTS_PATH)
                    for p in range(k, 100)
                    if osp.exists(molpath(i, j, p))]
@@ -227,9 +219,11 @@ if __name__ == '__main__':
     num_dispatchers = 176  # To have 17000~ per machine
     total_data = 5997 # Approximative, in thousands
     parts_per_dispatch = total_data // num_dispatchers
-    dispatchers = [distribute_mols.remote(
-        init_i=(p * parts_per_dispatch) // 100,
-        init_j=(p * parts_per_dispatch) % 100) for p in range(num_dispatchers)]
+    #dispatchers = [distribute_mols.remote(
+    #    init_i=(p * parts_per_dispatch) // 100,
+    #    init_j=(p * parts_per_dispatch) % 100) for p in range(num_dispatchers)]
 
+    dispatchers = [distribute_mols.remote(
+        init_i=i, init_j=0) for i in range(59)]
     # Wait for the jobs to finish
     ray.get(dispatchers)
