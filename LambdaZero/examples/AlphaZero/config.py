@@ -1,4 +1,3 @@
-from LambdaZero.environments import BlockMolEnv_v3
 
 az000 = {
     "rllib_config":{
@@ -24,7 +23,7 @@ az000 = {
 #     "base_env_config": mol_blocks_v3_config,
 #     "base_trainer_config": alphazero_config,
 # }
-#
+
 # az002 = { # max 3.2
 #     "mcts_config": {
 #         "num_simulations": 30

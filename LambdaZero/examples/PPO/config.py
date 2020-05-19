@@ -1,6 +1,6 @@
 import socket
 from copy import deepcopy
-from ray.rllib.agents.dqn import ApexTrainer
+
 
 from LambdaZero.environments import BlockMolEnv_v3
 from LambdaZero.utils import get_external_dirs

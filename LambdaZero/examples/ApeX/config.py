@@ -1,13 +1,17 @@
-#
-# apex001 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "max_steps": 7,
-#                    "allow_removal": True}
-# }
-#
+from LambdaZero.environments import BlockMolEnv_v3
+
+apex001 = {
+    "rllib_config":{
+        "buffer_size": 100000, # 16kb/sample # 100000
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "max_blocks": 9,
+            "max_steps": 7,
+            "allow_removal": True
+        }
+    }
+}
+
 # apex002 = {
 #     "base_env_config": mol_blocks_v3_config,
 #     "base_trainer_config": apex_config,
@@ -17,7 +21,7 @@
 #                    "max_steps": 7,
 #                    "allow_removal": True}
 # }
-#
+
 # apex003 = {
 #     "base_env_config": mol_blocks_v3_config,
 #     "base_trainer_config": apex_config,
@@ -27,7 +31,7 @@
 #                    "max_steps": 7,
 #                    "allow_removal": True}
 # }
-#
+
 # apex004 = {
 #     "base_env_config": mol_blocks_v3_config,
 #     "base_trainer_config": apex_config,

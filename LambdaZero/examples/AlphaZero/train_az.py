@@ -79,7 +79,7 @@ if machine == "Ikarus":
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
-    ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
+    #ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
     tune.run(config["trainer"],
         stop=config["stop"],
         max_failures=0,
