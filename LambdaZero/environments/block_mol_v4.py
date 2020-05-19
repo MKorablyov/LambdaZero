@@ -1,10 +1,16 @@
 import numpy as np
+import os.path as osp
 from copy import deepcopy
 from gym.spaces import Discrete, Dict, Box
+from ray.rllib.utils import merge_dicts
 
 import LambdaZero.chem
 from .molMDP import MolMDP
 from rdkit import Chem
+
+import LambdaZero.utils
+from .reward import PredDockReward
+
 
 class FPObs_v1:
     def __init__(self, config, molMDP):
@@ -66,14 +72,48 @@ class FPObs_v1:
                }
         return obs
 
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
+DEFAULT_CONFIG = {
+    "obs_config": {"mol_fp_len": 512,
+                  "mol_fp_radiis": [3],
+                  "stem_fp_len": 64,
+                  "stem_fp_radiis": [4, 3, 2]
+                  },
 
+    "molMDP_config": {
+        "blocks_file": osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"),
+    },
+
+    "reward_config" : {
+        "soft_stop": True,
+        "load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
+        "natm_cutoff": [45, 50],
+        "qed_cutoff": [0.2, 0.7],
+        "exp": None,
+        "delta": False,
+        "simulation_cost": 0.00,
+        "device": "cuda",
+    },
+    "reward": PredDockReward,
+    "num_blocks": 105,
+    "max_steps": 7,
+    "max_blocks": 7,
+    "max_atoms": 50,
+    "max_branches": 20,
+    "random_blocks": 2,
+    "max_simulations": 1,
+    "allow_removal": True
+}
 
 
 class BlockMolEnv_v4:
     mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems", "blockidxs"]
 
     def __init__(self, config):
+
+        config = merge_dicts(DEFAULT_CONFIG, config)
+
         self.num_blocks = config["num_blocks"]
         self.max_blocks = config["max_blocks"]
         self.max_steps = config["max_steps"]

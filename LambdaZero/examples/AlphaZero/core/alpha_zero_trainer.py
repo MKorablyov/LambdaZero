@@ -11,7 +11,7 @@ from ray.tune.registry import ENV_CREATOR, _global_registry
 from .alpha_zero_policy import AlphaZeroPolicy
 from LambdaZero.utils.mcts import MCTS
 from .ranked_rewards import get_r2_env_wrapper
-from ..optimizer.sync_batches_replay_optimizer import SyncBatchesReplayOptimizer
+from LambdaZero.examples.AlphaZero.optimizer.sync_batches_replay_optimizer import SyncBatchesReplayOptimizer
 
 tf = try_import_tf()
 torch, nn = try_import_torch()
