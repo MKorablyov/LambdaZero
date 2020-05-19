@@ -1,0 +1,50 @@
+name: lz
+
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.6.*
+  - pip
+  - tensorflow
+  - pytorch==1.4.0
+  - torchvision
+  - rdkit
+  - pandas
+  - networkx
+  - scikit-image
+  - numba
+  - isodate
+  - jsonschema
+  - redis-py
+  - pyyaml
+  - colorama
+  - filelock
+  - aiohttp
+  - beautifulsoup4
+  - future
+  - lz4
+  - tabulate
+  - fastparquet
+  - boto3
+  - pytest
+  - pytest-cov
+  - pyarrow
+  - mlflow
+  - tqdm
+  - pip:
+    - -f https://pytorch-geometric.com/whl/torch-1.4.0.html
+    - torch-scatter==latest+cpu
+    - torch-sparse==latest+cpu
+    - torch-cluster==latest+cpu
+    - torch-spline-conv==latest+cpu
+    - https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-cp36-cp36m-macosx_10_13_intel.whl
+    - orion
+    - wandb
+    - psutil
+    - torch-geometric
+    - ray[rllib]
+    - git+https://github.com/chemprop/chemprop.git#egg=chemprop
+    - typed-argument-parser
