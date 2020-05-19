@@ -1,12 +1,8 @@
 import socket
 from copy import deepcopy
-
-
 from ray.rllib.agents.dqn import ApexTrainer
 
 from LambdaZero.environments import BlockMolEnv_v3
-
-from LambdaZero.examples.AlphaZero.core.alpha_zero_trainer import AlphaZeroTrainer
 from LambdaZero.utils import get_external_dirs
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()

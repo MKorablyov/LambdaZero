@@ -41,8 +41,8 @@ config = merge_dicts(DEFAULT_CONFIG, config)
 # convenience option to debug on maksym's personal laptop
 machine = socket.gethostname()
 if machine == "Ikarus":
-    config["num_workers"] = 5
-    config["memory"] = 25 * 10**9
+    config["rllib_config"]["num_workers"] = 5
+    config["rllib_config"]["memory"] = 25 * 10**9
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])

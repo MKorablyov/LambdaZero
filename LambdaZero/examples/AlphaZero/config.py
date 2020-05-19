@@ -1,98 +1,24 @@
+from LambdaZero.environments import BlockMolEnv_v3
 
-
-
-def alphazero_config():
-    machine = socket.gethostname()
-    if machine == "Ikarus":
-        num_workers = 4
-        memory = 25 * 10 ** 9
-    else:
-        num_workers = 19
-        memory = 60 * 10 ** 9
-    config = {
-                 "num_workers": num_workers,
-                 "sample_batch_size": 200,
-                 "train_batch_size": 4000,
-                 "sgd_minibatch_size": 128,
-                 "lr": 1e-3,
-                 "num_sgd_iter": 1,
-                 "mcts_config": {
-                     "puct_coefficient": 1.5,
-                     "num_simulations": 800,
-                     "temperature": 1.0,
-                     "dirichlet_epsilon": 0.020,
-                     "dirichlet_noise": 0.003,
-                     "argmax_tree_policy": False,
-                     "add_dirichlet_noise": True,
-                 },
-                 "ranked_rewards": {
-                     "enable": True,
-                     "percentile": 75,
-                     "buffer_max_length": 1000,
-                     # add rewards obtained from random policy to
-                     # "warm start" the buffer
-                     "initialize_buffer": True,
-                     "num_init_rewards": 100,
-                 },
-                 "model": {
-                     "custom_model": "MolActorCritic_thv1",
-                     #"custom_options": {"allow_removal": False}
-                 },
-                 "evaluation_interval": 1,
-                 # Number of episodes to run per evaluation period.
-                 "evaluation_num_episodes": 1,
-                 "num_cpus_per_worker": 1,
-                 "num_gpus": 0.4,
-                 "num_gpus_per_worker": 0.075,
+az000 = {
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config":  {
+            "obs_config":{
+            "mol_fp_len": 512,
+            "mol_fp_radiis": [2,3],
+            "stem_fp_len": 64,
+            "stem_fp_radiis": [2,3,4]
+            },
+            "max_blocks": 7,
+            "reward_config": {"soft_stop":True,"device":"cuda"},
+        },
+        "sample_batch_size": 128,
+        "mcts_config": {
+            "num_simulations": 2
+        },
     }
-    checkpoint_freq = 5
-    return AlphaZeroTrainer, config, memory, checkpoint_freq
-
-def apex_config():
-    machine = socket.gethostname()
-    if machine == "Ikarus":
-        num_workers = 4
-        memory = 25 * 10 ** 9
-    else:
-        num_workers = 8
-        memory = 50 * 10 ** 9
-
-    config = {
-        "sample_batch_size": 20,
-        "num_envs_per_worker": 1,
-        "optimizer": {"num_replay_buffer_shards": 1},
-        "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
-        "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": num_workers,
-        "model": {"custom_model": "MolActorCritic_tfv1"},
-        "num_gpus_per_worker": 0.075,
-        "num_gpus": 0.4,
-        "hiddens": [],
-        "dueling": False,
-    }
-    checkpoint_freq = 250
-    return ApexTrainer, config, memory, checkpoint_freq
-
-
-
-# az000 = { # killed OOM
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": alphazero_config,
-#     "sample_batch_size": 128,
-#     "mcts_config": {
-#         "num_simulations": 2
-#     },
-#     "env_config":  {"obs_config":
-#                         {"mol_fp_len": 512,
-#                          "mol_fp_radiis": [2,3],
-#                          "stem_fp_len": 64,
-#                          "stem_fp_radiis": [2,3,4]
-#                          },
-#                     "max_blocks": 7,
-#                     "reward_config": {"soft_stop":True,"device":"cuda"},
-#                     },
-# }
-
+}
 
 # az001 = { # killed OOM
 #     "base_env_config": mol_blocks_v3_config,
@@ -468,98 +394,4 @@ def apex_config():
 #     "buffer_size": 2000,
 #     "env_config":{"random_steps": 5,
 #                   "allow_removal":True}
-# }
-
-#
-# apex001 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "max_steps": 7,
-#                    "allow_removal": True}
-# }
-#
-# apex002 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "random_steps": 3,
-#                    "max_steps": 7,
-#                    "allow_removal": True}
-# }
-#
-# apex003 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "random_steps": 5,
-#                    "max_steps": 7,
-#                    "allow_removal": True}
-# }
-#
-# apex004 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "max_steps": 12,
-#                    "allow_removal": True}
-# }
-#
-# apex005 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "random_steps": 3,
-#                    "max_steps": 12,
-#                    "allow_removal": True}
-# }
-#
-# apex006 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "random_steps": 5,
-#                    "max_steps": 12,
-#                    "allow_removal": True}
-# }
-#
-# apex007 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "max_steps": 7,
-#                    "allow_removal": True,
-#                    "reward_config":{"exp": 1.5}
-#                    }
-# }
-#
-# apex008 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "random_steps": 3,
-#                    "max_steps": 7,
-#                    "allow_removal": True,
-#                    "reward_config":{"exp": 2.0}
-#                    }
-# }
-#
-# apex009 = {
-#     "base_env_config": mol_blocks_v3_config,
-#     "base_trainer_config": apex_config,
-#     "buffer_size": 100000, # 16kb/sample # 100000
-#     "env_config": {"max_blocks": 9,
-#                    "random_blocks": 5,
-#                    "max_steps": 7,
-#                    "allow_removal": True,
-#                    "reward_config": {"exp": 2.5}
-#                    }
 # }
