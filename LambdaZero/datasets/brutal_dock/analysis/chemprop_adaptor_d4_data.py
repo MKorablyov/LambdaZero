@@ -5,37 +5,17 @@ conversion fails about half the time, and it appears hopeless to reconstruct qua
 without a deep understanding of how RDKit works.
 """
 
-from typing import List
 import numpy as np
 
 import pandas as pd
-from chemprop.features import MolGraph
-from rdkit.Chem.rdchem import Mol, AtomValenceException, KekulizeException
+from rdkit.Chem.rdchem import AtomValenceException, KekulizeException
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 
 from LambdaZero.chem import mol_to_graph
 from LambdaZero.datasets.brutal_dock import BRUTAL_DOCK_DATA_DIR
+from LambdaZero.datasets.brutal_dock.analysis.analysis_utils import get_all_formal_charges, \
+    are_two_mols_the_same_for_chemprop
 from LambdaZero.datasets.brutal_dock.models.chemprop_adaptor import graph_to_mol
-
-
-def get_all_formal_charges(mol: Mol) -> List[int]:
-    return [atom.GetFormalCharge() for atom in mol.GetAtoms()]
-
-
-def are_two_mols_the_same_for_chemprop(mol1: Mol, mol2: Mol) -> bool:
-
-    g1 = MolGraph(mol1)
-    g2 = MolGraph(mol2)
-
-    list_attributes = ['a2b', 'b2a', 'b2revb', 'f_atoms', 'f_bonds', 'n_atoms', 'n_bonds']
-
-    for attribute in list_attributes:
-        p1 = getattr(g1, attribute)
-        p2 = getattr(g2, attribute)
-        if p1 != p2:
-            return False
-    return True
-
 
 feather_filenames = ["dock_blocks105_walk40_clust.feather", "dock_blocks105_walk40_2_clust.feather"]
 
