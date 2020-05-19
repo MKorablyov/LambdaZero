@@ -1,3 +1,4 @@
+from LambdaZero.environments import BlockMolEnv_v3
 
 az000 = {
     "rllib_config":{
