@@ -29,9 +29,11 @@ pip install torch-scatter==latest+${CUDA} torch-sparse==latest+${CUDA} torch-clu
 pip install https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-cp36-cp36m-manylinux1_x86_64.whl
 
 # Install the pip packages
-pip install orion psutil torch-geometric ray[rllib]
+pip install wandb orion psutil torch-geometric ray[rllib]
 
-
+# Install Chemprop
+pip install git+https://github.com/chemprop/chemprop.git#egg=chemprop
+pip install typed-argument-parser
 
 pip install -e .
 

@@ -1,318 +1,268 @@
 import pandas as pd
 import numpy as np
-import torch as th
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 import random
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 import torch.nn.functional as F
+from abc import ABC, abstractmethod
 
-device = 'cuda:0' if th.cuda.is_available() else 'cpu'
+class AcquisitionFunction(ABC):
+    """
+    A base class for all acquisition functions. All subclasses should
+    override the `__call__` method.
+    """
+    # fixme
+    # def random_selection(self, set_in, b): #set_in: input set; b: how many batch size we want to take
+    #
+    #     selection = np.random.choice(len(set_in), b) #take a random choice from 0 to len(set_in), do it for b times
+    #     selected = set_in[[selection]]
+    #     rest_selection = set_in[np.delete(range(len(set_in) - 1), selection)]
+    #     set_in = TensorDataset(selected[0], selected[1])
+    #     set_rest = TensorDataset(rest_selection[0], rest_selection[1])
+    #
+    #     return set_in, set_rest
+
+    @abstractmethod
+    def __call__(self, df, b):
+        # fixme
+        raise NotImplementedError("please, implement the call function")
+
+class RandomAcquisition(AcquisitionFunction):
+
+    def __call__(self, df, batch_size):
+        # fixme (identation with 4 spaces)
+        # fixme batch_size instead of b
+      """
+
+      :param df:
+      :param b:
+      :return:
+      """
+      x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
+      y = torch.Tensor(list(df['preds'].values))
+      set_in = TensorDataset(x, y)
+      return self.random_selection(set_in, b)
+
+# class GreedyAcquisition(AcquisitionFunction):
+#
+#     def __call__(self, df, b):
+#       df = df.sort_values('preds', ascending = False)
+#       x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
+#       y = torch.Tensor(list(df['preds'].values))
+#       x_in = x[:b]
+#       x_rest = x[b:]
+#       y_in = y[:b]
+#       y_rest = y[b:]
+#       set_in = TensorDataset(x_in, y_in)
+#       set_rest = TensorDataset(x_rest, y_rest)
+#       return set_in, set_rest
+
+class EGreedyAcquisition(AcquisitionFunction):
+
+    def __call__(self, df, b, noise_std, noise_mean):
+        # fixme std, mean
+      dist = torch.randn(len(df['preds'].values)) * cfg.std + cfg.mean
+      df['preds'] = df['preds'].values + dist.detach().cpu().numpy() # fixme: use argsort(y)
+      df = df.sort_values('preds', ascending = False)
+      x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
+      y = torch.Tensor(list(df['preds'].values))
+
+      x_in = x[:b]
+      x_rest = x[b:]
+      y_in = y[:b]
+      y_rest = y[b:]
+
+      set_in = TensorDataset(x_in, y_in)
+      set_rest = TensorDataset(x_rest, y_rest)
+
+      #return set_in, set_rest
+      # return (idxs)
 
 class cfg:
-    # data could be found here: https://github.com/MKorablyov/brutal_dock/tree/master/d4/raw
-    data = 'd4_250k_clust.parquet'#"/home/maksym/Datasets/brutal_dock/d4/raw/d4_100k_clust.parquet"
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    data = 'd4_250k_clust.parquet'
     batch_size = 500
-    epochs = 6
-    std = 1.
+    epochs = 25
+    std = 0.5
     mean = 0.
+    max_len = 8000
+    #acquisition_mode = #'Greedy' #Random, Greedy, EGreedy
+    # fixme
+    acquisition_func = EGreedyAcquisition
 
-#sns.distplot(df["dockscore"])
-#plt.show()
+    #acquisition_map = {'Random':RandomAcquisition(), 'Greedy': GreedyAcquisition(), 'EGreedy': EGreedyAcquisition()}
+    #acquisition_fxn = acquisition_map[acquisition_mode]
 
-# total_budget = 3000
+class CustomBatch:
+    def __init__(self, data):
+        transposed_data = list(zip(*data)) 
+        self.x = torch.stack(transposed_data[0])
+        self.y = torch.stack(transposed_data[1])
 
-# strategies
-# S1: greedy
-# batch_size = 500, num_interations = 6
+# class utils:
+#   def collate_wrapper(batch):
+#       return CustomBatch(batch)
+#
+#   def get_top_k(df, k):
+#       df = df.sort_values('ys', ascending = True)
+#       y = df['ys'].values
+#       preds = df['preds'].values
+#       return preds[:k], y[:k]
 
-def train_epoch(x, y, model, optimizer, x_test, y_test):
-    model.train()
-    batch_size = cfg.batch_size
-    loss_all = 0
-    losses = []
-    test_mse = []
-    for i in tqdm(range(0, len(x), batch_size)):
-        x_in = x[i:i+batch_size]
-        x_in = x_in.to(device)
-        y_in = y[i:i+batch_size]
-        y_in = y_in.to(device)
-        optimizer.zero_grad()
-        preds = model(x_in)
-        loss = F.mse_loss(preds.squeeze(1), y_in)
-        loss.backward()
-        optimizer.step()
-        loss_all += loss.item()
-        losses.append(loss)
+class FingerprintDataset:
+  def __init__(self):
+      pass
+
+  def generate_fingerprint_dataset(self, filename = 'd4_250k_clust.parquet', batch_size = 500, x_name = 'fingerprint', y_name = 'dockscore'):
+      data = pd.read_parquet(filename, engine='pyarrow')
+
+      # remove the 20% of worst energy
+      data = data.sort_values(y_name)[:-int(round(len(data)*0.2))]
+      
+      # takes the value from fingerprint column, stack vertically and turn to a tensor
+      x_data = torch.from_numpy(np.vstack(data[x_name].values).astype(np.float32))
+      y_data = torch.Tensor(list(data[y_name].values)) 
+      
+      # split the data
+      self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x_data, y_data, test_size = 0.2)
+      self.x_train, self.x_val, self.y_train, self.y_val = train_test_split(self.x_train, self.y_train, test_size = 0.2)
+
+  def train_set(self):
+      train_dataset = TensorDataset(self.x_train, self.y_train)
+      train_loader = DataLoader(train_dataset, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
+      return train_dataset, train_loader
+
+  def test_set(self):
+      test_dataset = TensorDataset(self.x_test, self.y_test)
+      test_loader = DataLoader(test_dataset, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
+      return test_dataset, test_loader
+
+  def val_set(self):
+      val_dataset = TensorDataset(self.x_val, self.y_val)
+      val_loader = DataLoader(val_dataset, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
+      return val_dataset, val_loader
+
+
+
+# todo: Trainer(dataset) # train/test/stop when needed/ --- is shared for the whole repo under utils
+# todo: Aquirer (Trainer, acquisition function) # does aquisitons
+
+
+class Trainer:
+  def __init__(self, dataset, model = None, acquisition_func = None):
+      # fixme: dataset
+      # fixme: model should be passed as class
+      # model(x)
+
+    # fixme
+    def _top_k(x):
+        return k
+
+
+    if model == None:
+      self.model = torch.nn.Sequential(nn.Linear(1024, 512), nn.ReLU(), nn.Linear(512, 1))
+    #else:
+    #  self.model = model
+    #if acquisition_fxn == None:
+    #  self.acquisition_fxn = RandomAcquisition()
+    #else:
+    #  self.acquisition_fxn = acquisition_fxn
+
+  def train(self):
+    fpd = FingerprintDataset()
+    fpd.generate_fingerprint_dataset(cfg.data)
+    model = self.model
+    acquisition_fxn = self.acquisition_fxn
+    train_set, train_loader = fpd.train_set()
+    test_set, test_loader = fpd.test_set()
+    optimizer = torch.optim.Adam(model.parameters())
+    losses = [] # record loss on the train set
+    test_losses = []
+    top_mol = []
+    top_y = []
     
-        mse, _, _, _ = test_epoch(x_test, y_test, model)
-        test_mse.append(mse)
-    return loss_all / len(x), losses, test_mse
-
-def train_greedy(x, y, model, optimizer, x_test, y_test):
-    model.train()
-    batch_size = cfg.batch_size
-    loss_all = 0
-    losses = []
-    test_mse = []
-    bound = 0
-    model = model.to(device)
-
-    for i in tqdm(range(0, len(x), batch_size)):
-        if bound == 0:
-            bound = i + batch_size
-            x_in = x[0:bound]
-            x_in = x_in.to(device)
-            y_in = y[0:bound]
-            y_in = y_in.to(device)
-
-            x_rest = x[bound:]
-            x_rest = x_rest.to(device)
-            y_rest = y[bound:]
-            y_rest = y_rest.to(device)     
-
-        x_in = x_in.to(device)
-        y_in = y_in.to(device)
-        x_rest = x_rest.to(device)
-        y_rest = y_rest.to(device)
-
+    for index in tqdm(range(len(train_set) // cfg.batch_size)):
+        if index == 0:
+            set_in, set_rest = acquisition_fxn.random_selection(train_set, cfg.batch_size)
+        train_loader = DataLoader(set_in, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
+        model.train()
+        
         for _ in range(cfg.epochs):
-            optimizer.zero_grad()
-            preds = model(x_in)
-            loss = F.mse_loss(preds.squeeze(1), y_in)
-            loss.backward()
-            optimizer.step()
-        
-        loss_all += loss.item()
+            for _, batch in enumerate(train_loader):
+                optimizer.zero_grad()
+                pred = model(batch.x)
+                loss = F.mse_loss(pred.squeeze(), batch.y)
+                loss.backward()
+                optimizer.step()
+
+        test_mse, _ = self.test_epoch(test_loader, model)
+        test_losses.append(test_mse)
         losses.append(loss)
-
-        mse, _, _, _ = test_epoch(x_test, y_test, model)
-        test_mse.append(mse)
-
-        try:
-            preds = model(x_rest)
-            
-            ind = preds.argsort()
-            sorted_y = y_rest[ind].detach().cpu().numpy().squeeze()
-            sorted_x = x_rest[ind].detach().cpu().numpy().squeeze()
-
-            x_in = np.concatenate((x_in.detach().cpu().numpy(), sorted_x[-cfg.batch_size:]))
-            y_in = np.concatenate((y_in.detach().cpu().numpy(), sorted_y[-cfg.batch_size:]))
-            x_rest = sorted_x[:-cfg.batch_size]
-            y_rest = sorted_y[:-cfg.batch_size]
-
-            in_tmp = np.c_[x_in.reshape(len(x_in), -1), y_in.reshape(len(y_in), -1)]
-            rest_tmp = np.c_[x_rest.reshape(len(x_rest), -1), y_rest.reshape(len(y_rest), -1)]
-
-            np.random.shuffle(in_tmp)
-            np.random.shuffle(rest_tmp)
-            
-            x_in = in_tmp[:, :x_in.size//len(x_in)].reshape(x_in.shape)
-            y_in = in_tmp[:, x_in.size//len(x_in):].reshape(y_in.shape)
-            x_rest = rest_tmp[:, :x_rest.size//len(x_rest)].reshape(x_rest.shape)
-            y_rest = rest_tmp[:, x_rest.size//len(x_rest):].reshape(y_rest.shape)
-
-            x_in = th.from_numpy(x_in).float().to(device)
-            y_in = th.from_numpy(y_in).float().to(device)
-            x_rest = th.from_numpy(x_rest).float().to(device)
-            y_rest = th.from_numpy(y_rest).float().to(device)
+        rest_loader = DataLoader(set_rest, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
+        model.eval()
+        preds = []
+        ys = []
+        xs = []
         
-        except:
-            break
+        for b in rest_loader:
+          pred = model(b.x).detach().cpu().numpy().squeeze()
+          preds.append(pred)
+          xs.append(b.x)
+          ys.append(b.y)
 
-    return loss_all / len(x), losses, test_mse
+        xs = np.concatenate(xs, axis = 0)
+        ys = np.concatenate(ys, axis=0)
+        preds = np.concatenate(preds, axis=0)
+        df = pd.DataFrame({'xs': list(xs), 'ys':ys, 'preds':preds})
+        top_pred, top_val = utils.get_top_k(df, 1)
+        top_mol.append(top_pred) 
+        top_y.append(top_val)
 
-def train_greedy_error(x, y, model, optimizer, x_test, y_test):
-    model.train()
-    batch_size = cfg.batch_size
-    loss_all = 0
-    losses = []
-    test_mse = []
-    bound = 0
-    std = cfg.std
-    mean = cfg.mean
-    model = model.to(device)
+        new_set_in, set_rest = acquisition_fxn(df, cfg.batch_size)
+        set_in = torch.utils.data.ConcatDataset([set_in, new_set_in])
 
-    for i in tqdm(range(0, len(x), batch_size)):
-        if bound == 0:
-            bound = i + batch_size
-            x_in = x[0:bound]
-            x_in = x_in.to(device)
-            y_in = y[0:bound]
-            y_in = y_in.to(device)
+        if len(set_in) > cfg.max_len:
+          break
 
-            x_rest = x[bound:]
-            x_rest = x_rest.to(device)
-            y_rest = y[bound:]
-            y_rest = y_rest.to(device)
-            
+    self.losses = losses
+    self.test_losses = test_losses
+    self.top_mol = top_mol
+    self.top_y = top_y
+    self.model = model
 
-        x_in = x_in.to(device)
-        y_in = y_in.to(device)
-        x_rest = x_rest.to(device)
-        y_rest = y_rest.to(device)
-
-
-        for _ in range(cfg.epochs):
-            optimizer.zero_grad()
-            preds = model(x_in)
-            loss = F.mse_loss(preds.squeeze(1), y_in)
-            loss.backward()
-            optimizer.step()
-        
-        loss_all += loss.item()
-        losses.append(loss)
-
-        mse, _, _, _ = test_epoch(x_test, y_test, model)
-        test_mse.append(mse)
-
-        try:
-            preds = model(x_rest)
-            dist = th.randn(preds.size()) * std + mean
-            dist = dist.to(device)
-            preds = preds + dist
-            
-            ind = preds.argsort()
-            sorted_y = y_rest[ind].detach().cpu().numpy().squeeze()
-            sorted_x = x_rest[ind].detach().cpu().numpy().squeeze()
-
-            x_in = np.concatenate((x_in.detach().cpu().numpy(), sorted_x[-cfg.batch_size:]))
-            y_in = np.concatenate((y_in.detach().cpu().numpy(), sorted_y[-cfg.batch_size:]))
-            x_rest = sorted_x[:-cfg.batch_size]
-            y_rest = sorted_y[:-cfg.batch_size]
-
-            in_tmp = np.c_[x_in.reshape(len(x_in), -1), y_in.reshape(len(y_in), -1)]
-            rest_tmp = np.c_[x_rest.reshape(len(x_rest), -1), y_rest.reshape(len(y_rest), -1)]
-
-            np.random.shuffle(in_tmp)
-            np.random.shuffle(rest_tmp)
-            
-            x_in = in_tmp[:, :x_in.size//len(x_in)].reshape(x_in.shape)
-            y_in = in_tmp[:, x_in.size//len(x_in):].reshape(y_in.shape)
-            x_rest = rest_tmp[:, :x_rest.size//len(x_rest)].reshape(x_rest.shape)
-            y_rest = rest_tmp[:, x_rest.size//len(x_rest):].reshape(y_rest.shape)
-
-            x_in = th.from_numpy(x_in).float().to(device)
-            y_in = th.from_numpy(y_in).float().to(device)
-            x_rest = th.from_numpy(x_rest).float().to(device)
-            y_rest = th.from_numpy(y_rest).float().to(device)
-        
-        except:
-            break
-
-        
-    return loss_all / len(x), losses, test_mse
-
-def test_epoch(x, y, model):
+  def test_epoch(self, loader, model):
     model.eval()
+    xs = []
     ys = []
     preds = []
-    batch_size = cfg.batch_size
-    for i in range(0, len(x), batch_size):
-        x_in = x[i:i+batch_size]
-        x_in = x_in.to(device)
-        y_in = y[i:i+batch_size]
-        y_in = y_in.to(device)
-        ys.append(y_in.detach().cpu().numpy())
-        preds.append(model(x_in).detach().cpu().numpy())
+    
+    for data in loader:
+        xs.append(data.x.detach().cpu().numpy())
+        ys.append(data.y.detach().cpu().numpy())
+        preds.append(model(data.x).detach().cpu().numpy())
 
+    xs = np.concatenate(xs, axis = 0)
     ys = np.concatenate(ys, axis=0)
     preds = np.concatenate(preds, axis=0)
-    mse = np.mean((ys - preds) ** 2)
-    mae = np.mean(np.abs(ys - preds))
-    return mse, mae, ys, preds
+    mse = F.mse_loss(torch.from_numpy(preds.squeeze()).to(cfg.device), torch.from_numpy(ys.squeeze()).to(cfg.device))
+    test_out = pd.DataFrame({"xs":list(xs), "ys": ys.squeeze(), "preds": preds.squeeze()})
+    return mse, test_out
 
+  def generate_plot(self):
+    plt.plot(np.linspace(0, len(self.test_losses) * cfg.batch_size, len(self.test_losses)), self.test_losses, color="r", linestyle="-", marker="^", linewidth=1,label="Test")
+    plt.plot(np.linspace(0, len(self.losses) * cfg.batch_size, len(self.losses)), self.losses, color="b", linestyle="-", marker="s", linewidth=1,label="Train")
+    plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
+    plt.title(cfg.acquisition_mode)
+    plt.xlabel("Sample Size")
+    plt.ylabel("MSE")
+    plt.show()
 
-class Model(th.nn.Module):
-    def __init__(self, inp_size, output_size):
-        super(Model, self).__init__()
-        self.fc1 = th.nn.Linear(1024, 512)
-        self.relu = th.nn.ReLU()
-        self.fc2 = th.nn.Linear(512, output_size)
-
-    def forward(self, x):
-        fc = self.fc1(x)
-        rel = self.relu(fc)
-        return self.fc2(rel)
-
+  
 if __name__ == '__main__':
-    df1 = pd.read_parquet(cfg.data)
-    x = th.from_numpy(np.vstack(df1['fingerprint'].values).astype(np.float32))
-    y = th.Tensor(list(df1['dockscore'].values))
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2)
-    x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size = 0.2)
-
-    #EPSILON GREEDY
-    model = Model(1024, 1)#(x.shape[0], 1)
-    model = model.to(device)
-
-    optimizer = th.optim.Adam(model.parameters())
-        
-    tmp = list(zip(x_train, y_train))
-    random.shuffle(list(tmp))
-    x_train, y_train = zip(*tmp)
-    x_train = np.asarray([t.numpy() for t in x_train], dtype = np.float32)
-    y_train = np.asarray([t.numpy() for t in y_train], dtype = np.float32)
-    x_train = th.FloatTensor(x_train)
-    y_train = th.FloatTensor(y_train)
-
-    avg_loss, train_mse, test_mse = train_greedy_error(x_train, y_train, model, optimizer, x_test, y_test)
-    mse, mae, ys, preds = test_epoch(x_val, y_val, model)
-
-    plt.plot(np.linspace(0, len(test_mse) * cfg.batch_size, len(test_mse)), test_mse, color="r", linestyle="-", marker="^", linewidth=1,label="Test")
-    plt.plot(np.linspace(0, len(train_mse) * cfg.batch_size, len(train_mse)), train_mse, color="b", linestyle="-", marker="s", linewidth=1,label="Train")
-    plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-    plt.title('Epsilon Greedy')
-    plt.xlabel("Sample Size")
-    plt.ylabel("MSE")
-    plt.show()
-
-    #GREEDY
-    model = Model(1024, 1)#(x.shape[0], 1)
-    model = model.to(device)
-    optimizer = th.optim.Adam(model.parameters())
-        
-    tmp = list(zip(x_train, y_train))
-    random.shuffle(list(tmp))
-    x_train, y_train = zip(*tmp)
-    x_train = np.asarray([t.numpy() for t in x_train], dtype = np.float32)
-    y_train = np.asarray([t.numpy() for t in y_train], dtype = np.float32)
-    x_train = th.FloatTensor(x_train)
-    y_train = th.FloatTensor(y_train)
-
-    avg_loss, train_mse, test_mse = train_greedy(x_train, y_train, model, optimizer, x_test, y_test)
-    mse, mae, ys, preds = test_epoch(x_val, y_val, model)
-
-
-    plt.plot(np.linspace(0, len(test_mse) * cfg.batch_size, len(test_mse)), test_mse, color="r", linestyle="-", marker="^", linewidth=1,label="Test")
-    plt.plot(np.linspace(0, len(train_mse) * cfg.batch_size, len(train_mse)), train_mse, color="b", linestyle="-", marker="s", linewidth=1,label="Train")
-    plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-    plt.title('Greedy')
-    plt.xlabel("Sample Size")
-    plt.ylabel("MSE")
-    plt.show()
-
-    #STANDARD
-    model = Model(1024, 1)#(x.shape[0], 1)
-    model = model.to(device)
-
-    optimizer = th.optim.Adam(model.parameters())
-        
-    tmp = list(zip(x_train, y_train))
-    random.shuffle(list(tmp))
-    x_train, y_train = zip(*tmp)
-    x_train = np.asarray([t.numpy() for t in x_train], dtype = np.float32)
-    y_train = np.asarray([t.numpy() for t in y_train], dtype = np.float32)
-    x_train = th.FloatTensor(x_train)
-    y_train = th.FloatTensor(y_train)
-
-    avg_loss, train_mse, test_mse = train_epoch(x_train, y_train, model, optimizer, x_test, y_test)
-    mse, mae, ys, preds = test_epoch(x_val, y_val, model)
-
-    plt.plot(np.linspace(0, len(test_mse) * cfg.batch_size, len(test_mse)), test_mse, color="r", linestyle="-", marker="^", linewidth=1,label="Test")
-    plt.plot(np.linspace(0, len(train_mse) * cfg.batch_size, len(train_mse)), train_mse, color="b", linestyle="-", marker="s", linewidth=1,label="Train")
-    plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-    plt.title('Standard')
-    plt.xlabel("Sample Size")
-    plt.ylabel("MSE")
-    plt.show()
+    trainer = Trainer(acquisition_fxn = cfg.acquisition_fxn)
+    trainer.train()
+    trainer.generate_plot()

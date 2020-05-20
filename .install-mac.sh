@@ -33,9 +33,15 @@ pip install https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-
 
 
 # Install the pip packages
-pip install orion psutil torch-geometric ray[rllib]
+pip install orion wandb psutil torch-geometric ray[rllib]
+
+# Install Chemprop
+pip install git+https://github.com/chemprop/chemprop.git#egg=chemprop
+pip install typed-argument-parser
+
 
 pip install -e .
+
 
 if [ $DATASET_DEFAULT -eq 1 ]; then
     read -p "Install directory for datasets (NO to skip) [$DATASET_PATH]:" dpath

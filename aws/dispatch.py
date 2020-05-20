@@ -1,5 +1,6 @@
 import os
 import os.path as osp
+import tempfile
 
 import ray
 import pandas as pd
@@ -42,7 +43,7 @@ class cfg:
     # docking parameters
     dock6_dir = osp.join(programs_dir, "dock6")
     chimera_dir = osp.join(programs_dir, "chimera")
-    docksetup_dir = osp.join(datasets_dir, "brutal_dock/d4/docksetup")
+    docksetup_dir = osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup")
 
 
 # for 5 123 456 molecules
@@ -115,7 +116,8 @@ def find_next_batch(init_i=0, init_j=0):
             return None
         if res == 'next':
             # Create the .done file
-            open(osp.join(RESULTS_PATH, ip + ".done"), 'a').close()
+            if j == 0:
+                open(osp.join(RESULTS_PATH, ip + ".done"), 'a').close()
             i += 1
             if i == 100:
                 return None
@@ -129,7 +131,8 @@ def find_next_batch(init_i=0, init_j=0):
             return None
         if res == 'next':
             # Create the .done file
-            open(osp.join(RESULTS_PATH, ip, jp + ".done"), 'a').close()
+            if k == 0:
+                open(osp.join(RESULTS_PATH, ip, jp + ".done"), 'a').close()
             j += 1
             if j == 100:
                 i += 1
@@ -144,12 +147,14 @@ def find_next_batch(init_i=0, init_j=0):
 
 @ray.remote(num_cpus=1)
 def do_docking(i, j, k, results_dir):
+    os.environ['HOME'] = tempfile.mkdtemp()
     workpath = "/tmp/docking/{0}/{1}/{2}/".format(i, j, k)
     os.makedirs(workpath, exist_ok=True)
     dock_smi = Dock_smi(outpath=workpath,
                         chimera_dir=cfg.chimera_dir,
                         dock6_dir=cfg.dock6_dir,
                         docksetup_dir=cfg.docksetup_dir,
+                        #gas_charge=True,
                         trustme=True)
 
     results = []
@@ -160,8 +165,13 @@ def do_docking(i, j, k, results_dir):
             idx = int(zinc_id[4:])
             reactivity = tranche[2]
             features = features or None
-            name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
-            coord = coord.tolist()
+            try:
+                name, gridscore, coord = dock_smi.dock(smi, mol_name=str(n))
+                coord = coord.tolist()
+            except:
+                print("Failed to dock for: {0} in {1}/{2}/{3}".format(smi, i, j, k))
+                coord = None
+                gridscore = None
             results.append(pd.DataFrame({"smi": [smi],
                                          "gridscore": [gridscore],
                                          "coord": [coord],
@@ -174,28 +184,25 @@ def do_docking(i, j, k, results_dir):
 
     # This dance is to avoid partial files in the final output
     output_path = outpath(i, j, k)
-    output_tmp = output_path + ".tmp"
+    ofd, output_tmp = tempfile.mkstemp(dir=osp.dirname(output_path),
+                                       suffix='.tmp')
+    os.close(ofd)
     output.to_parquet(output_tmp, engine="fastparquet", compression=None)
     os.rename(output_tmp, output_path)
 
 
-@ray.remote(resources={'aws_machine': 1}, num_cpus=1)
+@ray.remote(resources={'aws-machine': 1}, num_cpus=1)
 def distribute_mols(init_i=0, init_j=0):
     os.makedirs(RESULTS_PATH, exist_ok=True)
     i = init_i
     j = init_j
-    wrapped = False
     while True:
         res = find_next_batch(i, j)
         if res is None:
-            if wrapped:
                 return 'done'
-            # Wrap around the end and try to find more work.
-            wrapped = True
-            i = 0
-            j = 0
-            continue
         i, j, k = res
+        if i != init_i:
+            return 'done'
         job_ids = [do_docking.remote(i, j, p, RESULTS_PATH)
                    for p in range(k, 100)
                    if osp.exists(molpath(i, j, p))]
@@ -209,12 +216,14 @@ def distribute_mols(init_i=0, init_j=0):
 
 if __name__ == '__main__':
     ray.init(address='auto')
-    num_dispatchers = 261  # To have 23000~ per machine
+    num_dispatchers = 176  # To have 17000~ per machine
     total_data = 5997 # Approximative, in thousands
-    parts_per_dispatch = (total_data + num_dispatchers - 1) // num_dispatchers
-    dispatchers = [distribute_mols.remote(
-        init_i=(p * parts_per_dispatch) // 100,
-        init_j=(p * parts_per_dispatch) % 100) for p in range(num_dispatchers)]
+    parts_per_dispatch = total_data // num_dispatchers
+    #dispatchers = [distribute_mols.remote(
+    #    init_i=(p * parts_per_dispatch) // 100,
+    #    init_j=(p * parts_per_dispatch) % 100) for p in range(num_dispatchers)]
 
+    dispatchers = [distribute_mols.remote(
+        init_i=i, init_j=0) for i in range(59)]
     # Wait for the jobs to finish
     ray.get(dispatchers)

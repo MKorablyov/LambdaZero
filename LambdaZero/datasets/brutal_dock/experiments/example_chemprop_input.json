@@ -1,6 +1,6 @@
 {
     "run_parameters": {
-        "experiment_name": "Message Passing Neural Network",
+        "experiment_name": "Chemprop",
         "run_name": "debugging"
     },
     "training": {
@@ -9,14 +9,12 @@
         "batch_size": 1024,
         "learning_rate": 0.001,
         "train_fraction": 0.8,
-        "validation_fraction": 0.1,
-        "patience": 5
+        "validation_fraction": 0.1
     },
     "model": {
-        "name": "MPNN",
-        "gcn_size": 16,
-        "edge_hidden": 16,
-        "gru_layers": 1,
-        "linear_hidden":16
+        "name": "chemprop",
+        "depth": 3,
+        "ffn_num_layers": 2,
+        "ffn_hidden_size": 300 
     }
 }
