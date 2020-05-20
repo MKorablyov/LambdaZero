@@ -31,6 +31,11 @@ pip install https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-
 # Install the pip packages
 pip install psutil torch-geometric ray[rllib]
 
+# Install Chemprop
+pip install -e git+https://github.com/chemprop/chemprop.git#egg=chemprop
+pip install typed-argument-parser
+
+
 pip install -e .
 
 echo "Use \"conda activate $1\" to activate the conda environement."
