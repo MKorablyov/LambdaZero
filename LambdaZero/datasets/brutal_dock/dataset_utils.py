@@ -12,10 +12,12 @@ from LambdaZero.chem import mol_to_graph, sys
 def get_molecule_graphs_from_raw_data_dataframe(raw_data_df: pd.DataFrame):
     list_graphs = []
     for _, row in tqdm(raw_data_df.iterrows(), desc="MOL_TO_GRAPH", file=sys.stdout):
-        graph = mol_to_graph(row["smiles"],
+        smiles = row["smiles"]
+        graph = mol_to_graph(smiles,
                              gridscore=row.get("gridscore", None),
                              dockscore=row.get("dockscore", None),
                              klabel=row.get("klabel", None))
+        graph.smiles = smiles
         list_graphs.append(graph)
     return list_graphs
 
