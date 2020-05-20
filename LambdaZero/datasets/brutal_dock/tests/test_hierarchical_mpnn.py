@@ -7,3 +7,8 @@ def test_get_list_of_smiles_from_batch(real_molecule_batch, realistic_smiles):
     for smiles in lst:
         assert smiles in realistic_smiles
 
+
+def test_build_vocab_from_simles_list(realistic_smiles, realistic_hgraph_vocab):
+    vocab = hmpnn.build_vocab_from_simles_list(realistic_smiles)
+    for v in vocab:
+        assert v in realistic_hgraph_vocab

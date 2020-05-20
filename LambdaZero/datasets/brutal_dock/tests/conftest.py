@@ -176,6 +176,70 @@ def realistic_smiles(easy_smiles, hard_smiles):
 
 
 @pytest.fixture
+def realistic_hgraph_vocab():
+    return {
+        ('NN', 'N[NH2:1]'),
+        ('CN', 'N[CH3:1]'),
+        ('C1=CNCN=C1', 'C1=C[NH:1]CN=C1'),
+        ('C1CCOCC1', 'C1COC[CH2:1]C1'),
+        ('CN', 'C[NH2:1]'),
+        ('C1=CN=CNC1', 'C1=NC=[CH:1]CN1'),
+        ('C1=CC=CC=C1', 'C1=CC=[CH:1]C=C1'),
+        ('SS', 'S[SH:1]'),
+        ('C[NH3+]', '[NH3+][CH3:1]'),
+        ('C1=CC=[NH+]C=C1', 'C1=CC=[NH+:1]C=C1'),
+        ('C1=CNCNC1', 'C1=CN[CH2:1]NC1'),
+        ('C1=NCCN1', 'C1=NCC[NH:1]1'),
+        ('C1=CSC=N1', 'C1=N[CH:1]=CS1'),
+        ('C=O', 'C=[O:1]'),
+        ('C1COCC[NH2+]1', 'C1C[NH2+:1]CCO1'),
+        ('C#N', 'N#[CH:1]'),
+        ('C1COCCN1', 'C1C[NH:1]CCO1'),
+        ('CP', 'P[CH3:1]'),
+        ('C1=CNCNC1', 'C1=[CH:1]CNCN1'),
+        ('CF', 'F[CH3:1]'),
+        ('O=P', 'O=[PH:1]'),
+        ('OS', 'O[SH:1]'),
+        ('NP', 'P[NH2:1]'),
+        ('C=O', 'O=[CH2:1]'),
+        ('C1CCNC1', 'C1C[CH2:1]CN1'),
+        ('C=N', 'C=[NH:1]'),
+        ('C1CNCCN1', 'C1C[NH:1]CCN1'),
+        ('C1=CN=CNC1', 'C1=N[CH:1]=CCN1'),
+        ('[O-]P', '[O-][PH2:1]'),
+        ('NI', 'I[NH2:1]'),
+        ('CBr', 'Br[CH3:1]'),
+        ('C1=CNCCN1', 'C1=CN[CH2:1]CN1'),
+        ('C1=C[NH]C=C1', 'C1=C[CH:1]=C[NH]1'),
+        ('C[SH2+]', 'C[SH2+:1]'),
+        ('S', 'S'),
+        ('C1=CCCC=C1', 'C1=C[CH2:1][CH2:1]C=C1'),
+        ('C1=CCCC=C1', 'C1=CC[CH2:1]C=C1'),
+        ('NS', 'S[NH2:1]'),
+        ('C1=C[NH]C=C1', 'C1=C[NH][CH:1]=C1'),
+        ('C=C', 'C=[CH2:1]'),
+        ('C1=CN=CN=C1', 'C1=NC=[CH:1]C=N1'),
+        ('OP', 'O[PH2:1]'),
+        ('CS', 'S[CH3:1]'),
+        ('O=S', 'O=[S:1]'),
+        ('C1=CN=CN=C1', 'C1=C[CH:1]=NC=N1'),
+        ('C1=CCCCC1', 'C1=[CH:1]CCCC1'),
+        ('C1=CN=CNC1', 'C1=N[CH:1]=[CH:1]CN1'),
+        ('O=S', 'S=[O:1]'),
+        ('C1=CN=CN=C1', 'C1=NC=[CH:1][CH:1]=N1'),
+        ('P', 'P'),
+        ('C', 'C'),
+        ('CC', 'C[CH3:1]'),
+        ('C1=CNCN=C1', 'C1=C[CH:1]=NCN1'),
+        ('C1=CNC=CC1', 'C1=CNC=[CH:1]C1'),
+        ('C[SH2+]', '[SH2+][CH3:1]'),
+        ('C1=CNC=CC1', 'C1=C[NH:1]C=CC1'),
+        ('CO', 'O[CH3:1]'),
+        ('CCl', 'Cl[CH3:1]')
+    }
+
+
+@pytest.fixture
 def smiles_and_scores_dataframe(realistic_smiles):
 
     np.random.seed(213421)
