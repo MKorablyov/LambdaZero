@@ -1,7 +1,20 @@
 import logging
 
+import numpy as np
 import torch
+from torch_geometric.data import Batch
 
+def get_list_of_smiles_from_batch(batch: Batch):
+        """
+        This method takes a batch and extracts the list of smiles.
+        It is a bit dirty, as the batch.smiles may return a list of list or a list...
+        TODO: It would be better to make sure pytorch_geometric collates the smiles
+           correctly as a list instead of going around its default behavior here.
+        """
+        smiles_array = np.array(batch.smiles).flatten()
+        # numpy casts things to its own types, which breaks everything else. Bring it back to vanilla strings.
+        list_smiles = [str(smiles) for smiles in smiles_array]
+        return list_smiles
 
 class ModelBase(torch.nn.Module):
     """

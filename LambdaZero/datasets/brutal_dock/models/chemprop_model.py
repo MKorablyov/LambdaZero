@@ -1,8 +1,7 @@
 from chemprop.args import TrainArgs
 from torch_geometric.data import Batch
-import numpy as np
 
-from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase
+from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase, get_list_of_smiles_from_batch
 from chemprop.models import MoleculeModel
 
 
@@ -46,16 +45,7 @@ class ChempropNet(ModelBase):
 
     @staticmethod
     def _get_list_of_smiles_from_batch(batch: Batch):
-        """
-        This method takes a batch and extracts the list of smiles.
-        It is a bit dirty, as the batch.smiles may return a list of list or a list...
-        TODO: It would be better to make sure pytorch_geometric collates the smiles
-           correctly as a list instead of going around its default behavior here.
-        """
-        smiles_array = np.array(batch.smiles).flatten()
-        # numpy casts things to its own types, which breaks everything else. Bring it back to vanilla strings.
-        list_smiles = [str(smiles) for smiles in smiles_array]
-        return list_smiles
+        return get_list_of_smiles_from_batch(batch)
 
     def forward(self, batch: Batch):
         list_smiles = self._get_list_of_smiles_from_batch(batch)
