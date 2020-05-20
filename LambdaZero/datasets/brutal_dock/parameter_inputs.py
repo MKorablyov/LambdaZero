@@ -58,7 +58,7 @@ def get_git_hash():
     repo = git.Repo(ROOT_DIR)
     git_hash = repo.head.object.hexsha
     if git_hash is None:
-        return 'none'
+        git_hash = 'none'
     return git_hash
 
 
