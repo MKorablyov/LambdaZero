@@ -6,11 +6,13 @@ import logging
 import tempfile
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 import pytest
 import torch
 from torch_geometric.data import Batch
 
+from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_random_molecule_data
@@ -270,3 +272,42 @@ def real_molecule_batch(list_real_molecules):
 @pytest.fixture
 def real_molecule_dataset(list_real_molecules):
     return FakeMoleculeDataset(list_real_molecules)
+
+
+@pytest.fixture
+def fake_raw_molecule_data_dataframe(realistic_smiles):
+    np.random.seed(12312)
+    size = len(realistic_smiles)
+    list_gridscores = np.random.random(size)
+    list_klabels = np.random.choice(range(10), size)
+
+    df = pd.DataFrame(data={'smiles': realistic_smiles, 'gridscore': list_gridscores, 'klabel': list_klabels})
+
+    return df
+
+
+@pytest.fixture
+def original_raw_data_dir(fake_raw_molecule_data_dataframe):
+    with tempfile.TemporaryDirectory() as tmp_dir_str:
+        logging.info("creating a fake directory")
+        raw_dir = Path(tmp_dir_str).joinpath("raw")
+        raw_dir.mkdir()
+
+        number_of_files = len(D4MoleculesDataset.feather_filenames)
+        list_index_groups = np.array_split(fake_raw_molecule_data_dataframe.index, number_of_files)
+
+        for filename, indices in zip(D4MoleculesDataset.feather_filenames, list_index_groups):
+            file_path = raw_dir.joinpath(filename)
+            sub_df = fake_raw_molecule_data_dataframe.iloc[indices].reset_index(drop=True)
+            sub_df.to_feather(file_path)
+        yield str(raw_dir)
+
+    logging.info("deleting test folder")
+
+
+@pytest.fixture
+def root_dir():
+    with tempfile.TemporaryDirectory() as tmp_dir_str:
+        yield tmp_dir_str
+
+    logging.info("deleting test folder")
