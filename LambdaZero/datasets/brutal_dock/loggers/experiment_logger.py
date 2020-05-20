@@ -19,7 +19,7 @@ class ExperimentLogger:
         """
         super().__init__()
         self._experiment_name = run_parameters.get("experiment_name", 'none')
-        self._run_name = run_parameters.pop("run_name", 'none')
+        self._run_name = run_parameters.get("run_name", 'none')
         self._execution_filename = execution_filename
         self._tracking_uri = tracking_uri
 
