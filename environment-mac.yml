@@ -9,6 +9,7 @@ dependencies:
   - python=3.6.*
   - pip
   - tensorflow
+  - tensorboardX
   - pytorch==1.4.0
   - torchvision
   - rdkit
@@ -18,7 +19,7 @@ dependencies:
   - numba
   - isodate
   - jsonschema
-  - redis-py
+  - redis-py=3.4.*
   - pyyaml
   - colorama
   - filelock
@@ -34,6 +35,16 @@ dependencies:
   - pyarrow
   - mlflow
   - tqdm
+  - cloudpickle=1.3.*
+  - py-opencv
+  - joblib
+  - msgpack-python=0.6.*
+  - plyfile
+  - psutil
+  - pymongo
+  - rdflib
+  - scikit-learn
+  - threadpoolctl
   - pip:
     - -f https://pytorch-geometric.com/whl/torch-1.4.0.html
     - torch-scatter==latest+cpu
@@ -43,8 +54,9 @@ dependencies:
     - https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-0.9.0.dev0-cp36-cp36m-macosx_10_13_intel.whl
     - orion
     - wandb
-    - psutil
     - torch-geometric
     - ray[rllib]
     - git+https://github.com/chemprop/chemprop.git#egg=chemprop
     - typed-argument-parser
+    - gym
+    - dm-tree
