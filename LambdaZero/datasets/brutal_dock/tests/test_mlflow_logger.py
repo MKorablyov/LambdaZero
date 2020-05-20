@@ -13,8 +13,8 @@ def run_parameters(experiment_name):
 
 
 @pytest.fixture
-def tags():
-    return {"id": "abcdef", "other-test-thing": '123'}
+def execution_filename():
+    return "some_test_file_name.py"
 
 
 @pytest.fixture
@@ -31,9 +31,9 @@ def key():
 
 
 @pytest.fixture
-def mlflow_logger_with_logging(run_parameters, tracking_uri, tags, key, metrics):
+def mlflow_logger_with_logging(run_parameters, tracking_uri, execution_filename, key, metrics):
 
-    mlflow_logger = MLFlowLogger(run_parameters, tracking_uri, tags)
+    mlflow_logger = MLFlowLogger(run_parameters, tracking_uri, execution_filename)
 
     for step, value in enumerate(metrics):
         mlflow_logger.increment_step_and_log_metrics(key, value)
@@ -47,10 +47,10 @@ def test_mlflow_logger_name(mlflow_logger_with_logging, experiment_name, trackin
     assert experiment.name == experiment_name
 
 
-def test_mlflow_logger_tags(mlflow_logger_with_logging, tags, tracking_uri):
+def test_mlflow_logger_tags(mlflow_logger_with_logging, tracking_uri):
     mlflow_client = mlflow.tracking.MlflowClient(tracking_uri)
     run = mlflow_client.get_run(mlflow_logger_with_logging.run_id)
-    tags_with_reserved_names = MLFlowLogger._create_tags_using_reserved_names(tags)
+    tags_with_reserved_names = mlflow_logger_with_logging._create_tags_using_reserved_names()
     assert run.data.tags == tags_with_reserved_names
 
 

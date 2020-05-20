@@ -14,7 +14,7 @@ from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
-    MODEL_PARAMETERS_KEY, TAGS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY
+    MODEL_PARAMETERS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY
 
 
 @pytest.fixture
@@ -119,11 +119,6 @@ def model_parameters(model_name, number_of_node_features):
 @pytest.fixture
 def input_and_run_config(paths, model_parameters):
 
-    tags = dict(git_hash="SOMETESTHASH",
-                user="test-user",
-                execution_file_name="test_file_name.py",
-                run_name="exp-driver-smoke-test")
-
     run_parameters = dict(experiment_name="TEST",
                           run_name="exp-driver-smoke-test")
 
@@ -140,7 +135,7 @@ def input_and_run_config(paths, model_parameters):
               MODEL_PARAMETERS_KEY: model_parameters}
 
     non_config = {PATHS_KEY: paths,
-                  TAGS_KEY: tags}
+                  EXECUTION_FILENAME_KEY: "test_file_name.py"}
 
     config_and_augmented = {CONFIG_KEY: config,
                             NON_CONFIG_KEY: non_config}
