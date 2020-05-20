@@ -14,7 +14,7 @@ class ExperimentLogger:
         Args:
             run_parameters (Dict): dictionary containing the name of the experiment and the run name
             tracking_uri (str): path where the logger will write.
-            tags (Dict): other tags
+            execution_filename (str): name of the experiment file executed to start the experiment
             kwargs : dictionary of parameters for specific logger.
         """
         super().__init__()
