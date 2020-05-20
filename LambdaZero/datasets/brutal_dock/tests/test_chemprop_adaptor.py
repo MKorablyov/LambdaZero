@@ -1,9 +1,31 @@
 import pytest
 from chemprop.features import MolGraph
 from rdkit.Chem.rdmolfiles import MolFromSmiles
+import numpy as np
 
-from LambdaZero.chem import mol_to_graph
+from LambdaZero.chem import mol_to_graph, Chem
 from LambdaZero.datasets.brutal_dock.models.chemprop_adaptor import graph_to_mol
+
+
+@pytest.mark.xfail
+def test_rdkit_api():
+    """
+    This purposefully failing test shows how the chemprop API raises an ArgumentError if the
+    Atom constructor is passed a np.int64 integer instead of a standard python integer.
+
+    The error raised is of the form
+
+    >       _ = Chem.Atom(numpy_atomic_number)
+E       Boost.Python.ArgumentError: Python argument types in
+E           Atom.__init__(Atom, numpy.int64)
+E       did not match C++ signature:
+E           __init__(_object*, unsigned int)
+E           __init__(_object*, RDKit::Atom)
+E           __init__(_object*, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> >)
+    """
+
+    numpy_atomic_number = np.int64(1)
+    _ = Chem.Atom(numpy_atomic_number)
 
 
 def test_graph_to_mol_easy(easy_smiles):

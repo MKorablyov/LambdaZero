@@ -1,9 +1,8 @@
 import os
-from typing import Dict
-
-from torch import nn
+from typing import Dict, List
 
 import wandb
+from torch import nn
 
 from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
 
@@ -15,26 +14,19 @@ def set_wandb_to_dryrun():
 
 
 class WandbLogger(ExperimentLogger):
-    def __init__(self, run_parameters: Dict[str, str], tracking_uri: str, tags: Dict[str, str], notes: str = None):
-        """
-        Class to manage the Weights-and-Biases logger.
+    """
+    Class to manage the Weights-and-Biases logger.
+    """
+    def __init__(self, run_parameters: Dict[str, str], tracking_uri: str,  execution_filename: str,
+                 notes: str = None, tags: List[str] = None):
+        super().__init__(run_parameters, tracking_uri, execution_filename)
 
-        Ignore the tags.
-        """
-        super().__init__(run_parameters, tracking_uri, tags)
-
-        # copy to avoid changing input
-        parameters = dict(run_parameters)
-
-        experiment_name = parameters.pop("experiment_name", 'none')
-        run_name = parameters.pop("run_name", 'none')
-
-        wandb.init(project=experiment_name,
+        wandb.init(project=self.experiment_name,
                    entity=ENTITY,
-                   name=run_name,
-                   dir=tracking_uri,
+                   name=self.run_name,
+                   dir=self.tracking_uri,
                    notes=notes,
-                   tags=parameters
+                   tags=tags
                    )
 
     def watch_model(self, model: nn.Module):

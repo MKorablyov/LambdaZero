@@ -15,59 +15,72 @@ class AcquisitionFunction(ABC):
     A base class for all acquisition functions. All subclasses should
     override the `__call__` method.
     """
-
-    def random_selection(self, set_in, b): #set_in: input set; b: how many batch size we want to take
-
-        selection = np.random.choice(len(set_in), b) #take a random choice from 0 to len(set_in), do it for b times
-        selected = set_in[[selection]]
-        rest_selection = set_in[np.delete(range(len(set_in) - 1), selection)]
-        set_in = TensorDataset(selected[0], selected[1])
-        set_rest = TensorDataset(rest_selection[0], rest_selection[1])
-
-        return set_in, set_rest
+    # fixme
+    # def random_selection(self, set_in, b): #set_in: input set; b: how many batch size we want to take
+    #
+    #     selection = np.random.choice(len(set_in), b) #take a random choice from 0 to len(set_in), do it for b times
+    #     selected = set_in[[selection]]
+    #     rest_selection = set_in[np.delete(range(len(set_in) - 1), selection)]
+    #     set_in = TensorDataset(selected[0], selected[1])
+    #     set_rest = TensorDataset(rest_selection[0], rest_selection[1])
+    #
+    #     return set_in, set_rest
 
     @abstractmethod
     def __call__(self, df, b):
-        pass
+        # fixme
+        raise NotImplementedError("please, implement the call function")
 
 class RandomAcquisition(AcquisitionFunction):
 
-    def __call__(self, df, b):
+    def __call__(self, df, batch_size):
+        # fixme (identation with 4 spaces)
+        # fixme batch_size instead of b
+      """
+
+      :param df:
+      :param b:
+      :return:
+      """
       x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
       y = torch.Tensor(list(df['preds'].values))
       set_in = TensorDataset(x, y)
       return self.random_selection(set_in, b)
 
-class GreedyAcquisition(AcquisitionFunction):
-
-    def __call__(self, df, b):
-      df = df.sort_values('preds', ascending = False)
-      x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
-      y = torch.Tensor(list(df['preds'].values))
-      x_in = x[:b]
-      x_rest = x[b:]
-      y_in = y[:b]
-      y_rest = y[b:]
-      set_in = TensorDataset(x_in, y_in)
-      set_rest = TensorDataset(x_rest, y_rest)
-      return set_in, set_rest
+# class GreedyAcquisition(AcquisitionFunction):
+#
+#     def __call__(self, df, b):
+#       df = df.sort_values('preds', ascending = False)
+#       x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
+#       y = torch.Tensor(list(df['preds'].values))
+#       x_in = x[:b]
+#       x_rest = x[b:]
+#       y_in = y[:b]
+#       y_rest = y[b:]
+#       set_in = TensorDataset(x_in, y_in)
+#       set_rest = TensorDataset(x_rest, y_rest)
+#       return set_in, set_rest
 
 class EGreedyAcquisition(AcquisitionFunction):
 
-    def __call__(self, df, b):
+    def __call__(self, df, b, noise_std, noise_mean):
+        # fixme std, mean
       dist = torch.randn(len(df['preds'].values)) * cfg.std + cfg.mean
-      df['preds'] = df['preds'].values + dist.detach().cpu().numpy()
+      df['preds'] = df['preds'].values + dist.detach().cpu().numpy() # fixme: use argsort(y)
       df = df.sort_values('preds', ascending = False)
       x = torch.from_numpy(np.vstack(df['xs'].values).astype(np.float32))
       y = torch.Tensor(list(df['preds'].values))
+
       x_in = x[:b]
       x_rest = x[b:]
       y_in = y[:b]
       y_rest = y[b:]
+
       set_in = TensorDataset(x_in, y_in)
       set_rest = TensorDataset(x_rest, y_rest)
 
-      return set_in, set_rest
+      #return set_in, set_rest
+      # return (idxs)
 
 class cfg:
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -77,9 +90,12 @@ class cfg:
     std = 0.5
     mean = 0.
     max_len = 8000
-    acquisition_mode = 'Greedy' #Random, Greedy, EGreedy
-    acquisition_map = {'Random':RandomAcquisition(), 'Greedy': GreedyAcquisition(), 'EGreedy': EGreedyAcquisition()}
-    acquisition_fxn = acquisition_map[acquisition_mode]
+    #acquisition_mode = #'Greedy' #Random, Greedy, EGreedy
+    # fixme
+    acquisition_func = EGreedyAcquisition
+
+    #acquisition_map = {'Random':RandomAcquisition(), 'Greedy': GreedyAcquisition(), 'EGreedy': EGreedyAcquisition()}
+    #acquisition_fxn = acquisition_map[acquisition_mode]
 
 class CustomBatch:
     def __init__(self, data):
@@ -87,15 +103,15 @@ class CustomBatch:
         self.x = torch.stack(transposed_data[0])
         self.y = torch.stack(transposed_data[1])
 
-class utils:
-  def collate_wrapper(batch):
-      return CustomBatch(batch)
-
-  def get_top_k(df, k):
-      df = df.sort_values('ys', ascending = True)
-      y = df['ys'].values
-      preds = df['preds'].values
-      return preds[:k], y[:k]
+# class utils:
+#   def collate_wrapper(batch):
+#       return CustomBatch(batch)
+#
+#   def get_top_k(df, k):
+#       df = df.sort_values('ys', ascending = True)
+#       y = df['ys'].values
+#       preds = df['preds'].values
+#       return preds[:k], y[:k]
 
 class FingerprintDataset:
   def __init__(self):
@@ -130,16 +146,31 @@ class FingerprintDataset:
       val_loader = DataLoader(val_dataset, batch_size = cfg.batch_size, collate_fn = utils.collate_wrapper)
       return val_dataset, val_loader
 
+
+
+# todo: Trainer(dataset) # train/test/stop when needed/ --- is shared for the whole repo under utils
+# todo: Aquirer (Trainer, acquisition function) # does aquisitons
+
+
 class Trainer:
-  def __init__(self, model = None, acquisition_fxn = None):
+  def __init__(self, dataset, model = None, acquisition_func = None):
+      # fixme: dataset
+      # fixme: model should be passed as class
+      # model(x)
+
+    # fixme
+    def _top_k(x):
+        return k
+
+
     if model == None:
       self.model = torch.nn.Sequential(nn.Linear(1024, 512), nn.ReLU(), nn.Linear(512, 1))
-    else:
-      self.model = model
-    if acquisition_fxn == None:
-      self.acquisition_fxn = RandomAcquisition()
-    else:
-      self.acquisition_fxn = acquisition_fxn
+    #else:
+    #  self.model = model
+    #if acquisition_fxn == None:
+    #  self.acquisition_fxn = RandomAcquisition()
+    #else:
+    #  self.acquisition_fxn = acquisition_fxn
 
   def train(self):
     fpd = FingerprintDataset()

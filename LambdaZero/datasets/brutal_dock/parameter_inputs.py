@@ -3,7 +3,6 @@ import json
 import sys
 from pathlib import Path
 import getpass
-from typing import Dict
 
 import git
 
@@ -15,9 +14,8 @@ TRAINING_PARAMETERS_KEY = "training"
 RUN_PARAMETERS_KEY = "run_parameters"
 
 NON_CONFIG_KEY = "non_config"
-TAGS_KEY = "tags"
 PATHS_KEY = "paths"
-
+EXECUTION_FILENAME_KEY = "execution_filename"
 
 
 def get_input_arguments():
@@ -59,6 +57,8 @@ def read_configuration_file(json_config_path: str):
 def get_git_hash():
     repo = git.Repo(ROOT_DIR)
     git_hash = repo.head.object.hexsha
+    if git_hash is None:
+        git_hash = 'none'
     return git_hash
 
 
@@ -76,9 +76,8 @@ def write_configuration_file(json_config_path: str, config_dict: dict):
 
 
 def get_non_configuration_parameters(
-    config: Dict[str, str],
     executable_file_path: Path,
-    args: argparse.ArgumentParser,
+    args: argparse.Namespace,
 ):
     paths = {"tracking_uri": args.tracking_uri,
              "working_directory": args.working_directory,
@@ -86,14 +85,8 @@ def get_non_configuration_parameters(
              "data_directory":  args.data_directory,
              }
 
-    tags = {"git_hash":  get_git_hash(),
-            "user": get_user(),
-            "execution_file_name": str(executable_file_path.relative_to(ROOT_DIR)),
-            "run_name": config[RUN_PARAMETERS_KEY]["run_name"]
-            }
-
     non_config_dict = {PATHS_KEY: paths,
-                       TAGS_KEY: tags}
+                       EXECUTION_FILENAME_KEY: str(executable_file_path.relative_to(ROOT_DIR))}
 
     return non_config_dict
 
@@ -102,7 +95,7 @@ def get_input_and_run_configuration(executable_file_path: Path):
     args = get_input_arguments()
 
     config = read_configuration_file(args.config)
-    non_config = get_non_configuration_parameters(config, executable_file_path, args)
+    non_config = get_non_configuration_parameters(executable_file_path, args)
 
     config_and_augmented = {CONFIG_KEY: config,
                             NON_CONFIG_KEY: non_config}

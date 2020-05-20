@@ -1,33 +1,11 @@
-from typing import List
-
 import pandas as pd
-from rdkit.Chem import Draw, Mol
-from rdkit.Chem.rdchem import Atom
+from rdkit.Chem import Draw
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 
 from LambdaZero.chem import mol_to_graph, build_mol, mpnn_feat
 from LambdaZero.datasets.brutal_dock import RESULTS_DIR
+from LambdaZero.datasets.brutal_dock.analysis.analysis_utils import get_number_of_hydrogens, get_atom_series
 from LambdaZero.datasets.brutal_dock.models.chemprop_adaptor import graph_to_mol
-
-
-def get_number_of_hydrogens(mol: Mol) -> List[int]:
-    return [atom.GetTotalNumHs() for atom in mol.GetAtoms()]
-
-
-def get_atom_series(atom: Atom):
-
-    series = pd.Series({'atomic number': atom.GetAtomicNum(),
-                        'total degree': atom.GetTotalDegree(),
-                        'formal charge': atom.GetFormalCharge(),
-                        'chiral tag': atom.GetChiralTag(),
-                        'total number of hydrogens': atom.GetTotalNumHs(),
-                        'hybridation': atom.GetHybridization(),
-                        'is aromatic': atom.GetIsAromatic(),
-                        'mass': atom.GetMass()
-                        })
-
-    return series
-
 
 smiles = "Nn1cnc2c([PH](=O)[O-])ncnc21"
 problematic_atom_index = 8  # I know this by inspection

@@ -17,7 +17,7 @@ from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statist
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \
-    TRAINING_PARAMETERS_KEY, write_configuration_file, CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, TAGS_KEY
+    TRAINING_PARAMETERS_KEY, write_configuration_file, CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, EXECUTION_FILENAME_KEY
 
 loss_function = F.mse_loss
 
@@ -47,7 +47,7 @@ def experiment_driver(
     non_config_parameters = input_and_run_config[NON_CONFIG_KEY]
 
     paths_dict = non_config_parameters[PATHS_KEY]
-    tags_dict = non_config_parameters[TAGS_KEY]
+    execution_filename = non_config_parameters[EXECUTION_FILENAME_KEY]
 
     run_parameters = config[RUN_PARAMETERS_KEY]
     training_parameters = config[TRAINING_PARAMETERS_KEY]
@@ -68,7 +68,7 @@ def experiment_driver(
 
     experiment_logger = logger_class(run_parameters,
                                      str(tracking_uri),
-                                     tags_dict)
+                                     execution_filename)
 
     experiment_logger.log_configuration(config)
 

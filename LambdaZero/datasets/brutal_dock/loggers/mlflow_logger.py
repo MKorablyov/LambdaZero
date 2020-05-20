@@ -4,18 +4,17 @@ import mlflow
 import logging
 
 from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
+from LambdaZero.datasets.brutal_dock.parameter_inputs import get_git_hash, get_user
 
 
 class MLFlowLogger(ExperimentLogger):
-    def __init__(self, run_parameters: Dict[str, str], tracking_uri: str, tags: Dict[str, str]):
+    def __init__(self, run_parameters: Dict[str, str], tracking_uri: str, execution_filename: str):
         """
         Class to manage the internals of mlflow, for easy experiment logging.
         """
-        super().__init__(run_parameters, tracking_uri, tags)
+        super().__init__(run_parameters, tracking_uri, execution_filename)
 
-        self.mlflow_client = mlflow.tracking.MlflowClient(tracking_uri)
-        self.experiment_name = run_parameters.pop("experiment_name", 'none')
-        self.tags = tags
+        self.mlflow_client = mlflow.tracking.MlflowClient(self.tracking_uri)
         self._run_id = None
 
     @property
@@ -33,7 +32,7 @@ class MLFlowLogger(ExperimentLogger):
         if self._run_id is not None:
             return self._run_id
 
-        tags_with_reserved_names = self._create_tags_using_reserved_names(self.tags)
+        tags_with_reserved_names = self._create_tags_using_reserved_names()
         run = self.mlflow_client.create_run(experiment_id=self.experiment_id, tags=tags_with_reserved_names)
         self._run_id = run.info.run_id
         return self._run_id
@@ -59,24 +58,15 @@ class MLFlowLogger(ExperimentLogger):
     def finalize(self):
         self.mlflow_client.set_terminated(self.run_id, status='FINISHED')
 
-    @classmethod
-    def _create_tags_using_reserved_names(cls, input_tags: Dict[str, str]):
+    def _create_tags_using_reserved_names(self):
         """
-        Use MLFlow specific reserved names so tags are presented in the correct place in the gui.
-        For reserved names, see https: // www.mlflow.org / docs / latest / tracking.html  # tracking
+        Use MLFlow specific reserved names so mlflow tags are presented in the correct place in the gui.
+        For reserved names, see https://www.mlflow.org/docs/latest/tracking.html#tracking
         """
 
-        # make a local copy to not modify the input parameter
-        tags = dict(input_tags)
-        git_hash = tags.pop("git_hash", 'none')
-        execution_file_name = tags.pop("execution_file_name", 'none')
-        user = tags.pop("user", 'none')
-        run_name = tags.pop("run_name", 'none')
+        tags_with_correct_names = {"mlflow.source.git.commit": get_git_hash(),
+                                   "mlflow.source.name": self.execution_filename,
+                                   "mlflow.user": get_user(),
+                                   "mlflow.runName": self.run_name}
 
-        tags_with_correct_names = dict(tags)
-        tags_with_correct_names["mlflow.source.git.commit"] = git_hash
-        tags_with_correct_names["mlflow.source.name"] = execution_file_name
-        tags_with_correct_names["mlflow.user"] = user
-        tags_with_correct_names["mlflow.runName"] = run_name
         return tags_with_correct_names
-
