@@ -10,10 +10,11 @@ from torch_geometric.data import InMemoryDataset
 from LambdaZero.core.alpha_zero_policy import torch
 from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
+from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
-    MODEL_PARAMETERS_KEY, TAGS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY
+    MODEL_PARAMETERS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY
 
 
 @pytest.fixture
@@ -118,11 +119,6 @@ def model_parameters(model_name, number_of_node_features):
 @pytest.fixture
 def input_and_run_config(paths, model_parameters):
 
-    tags = dict(git_hash="SOMETESTHASH",
-                user="test-user",
-                execution_file_name="test_file_name.py",
-                run_name="exp-driver-smoke-test")
-
     run_parameters = dict(experiment_name="TEST",
                           run_name="exp-driver-smoke-test")
 
@@ -139,7 +135,7 @@ def input_and_run_config(paths, model_parameters):
               MODEL_PARAMETERS_KEY: model_parameters}
 
     non_config = {PATHS_KEY: paths,
-                  TAGS_KEY: tags}
+                  EXECUTION_FILENAME_KEY: "test_file_name.py"}
 
     config_and_augmented = {CONFIG_KEY: config,
                             NON_CONFIG_KEY: non_config}
@@ -150,10 +146,11 @@ def input_and_run_config(paths, model_parameters):
 @pytest.mark.parametrize("model_name", ["chemprop", "MPNN"])
 def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_config):
     dataset_class = D4MoleculesDataset
+    logger_class = MLFlowLogger
 
     # Passing None to warns records the warnings; see https://docs.pytest.org/en/3.0.2/recwarn.html
     with pytest.warns(None) as record:
-        _ = experiment_driver(input_and_run_config, dataset_class, model_class)
+        _ = experiment_driver(input_and_run_config, dataset_class, model_class, logger_class)
 
     for warning in record.list:
         assert warning.category != UserWarning, "A user warning was raised"
