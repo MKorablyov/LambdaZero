@@ -74,7 +74,7 @@ In no particular order:
 ##### Tune the setup, use more representative values for batch size etc
 Also should decide on how we want to evaluate.
 
-##### Add in the previous (more noisy oracles) output in as features to ML models
+##### ✅ Add in the previous (more noisy oracles) output in as features to ML models
 
 ##### Decide on how best to benchmark how well an acquisition scheme works
 Ie are we going to look at final best molecule found or choose some measure of regret
@@ -83,12 +83,14 @@ Ie are we going to look at final best molecule found or choose some measure of r
 The dataset we are using is a subset of Dopamine, sampled so that we have a uniform distribution over Dock6 scores.
 This means that randomly we may find a good point with more chance than the original dataset which had a longer tail.
 
-##### Explore prior tuning/hyperpriors for Bayes Regression
+##### 🩹 Explore prior tuning/hyperpriors for Bayes Regression
 On Bayes Learning call 13.May we discussed tuning the parameters over the noise and weights distribution to learn them
 or potentially using hyperpriors.
 This is important as in low data regimes the model is not performing well.
 The notebooks `JupyterNotebooks/BayesModelFP.ipynb` and `JupyterNotebooks/BayesianModel1dDemo.ipynb` may be useful 
-for this task. Would be good to add log likelihood to the first notebook.
+for this task. Would be good to add log likelihood to the first notebook.  
+**Update 19 May** _put in a hack to use Sklearn precisions for now but should fix at some point!_
+
 
 ##### Change the Bayesian Regression sampling so that can sample first from weights then batch.
 At the moment the Gaussian posterior uncertainty over weights is propagated through predictions which return a MVN distribution

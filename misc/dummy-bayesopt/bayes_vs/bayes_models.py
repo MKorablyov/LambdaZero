@@ -2,7 +2,10 @@
 import torch
 from torch import nn
 from torch import distributions
+from sklearn import linear_model
+
 from . import chem_ops
+
 
 
 class BayesianRegression(nn.Module):
@@ -30,6 +33,15 @@ class BayesianRegression(nn.Module):
             self.mean_ = y_train.mean(dim=0)
             y_train = y_train - self.mean_
 
+        #todo: this is a bit of a hack to tune hyperparameters, ideally we should do this ourselves
+        # as we potentially want to do it quickly/backprop so would be useful to have it all in pytorch, anyway for now
+        # we will cheat by setting the hyperparamters to those suggested by sklearn.
+        clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
+        clf.fit(x_train.detach().numpy(), y_train.detach().squeeze().numpy())
+        self.alpha = clf.lambda_
+        self.beta = clf.alpha_
+        print(f"Setting hyperparameters to {self.alpha} and {self.beta}")
+
         assert len(y_train.shape) == 2
         self.K = self.beta * x_train.T @ x_train + self.alpha * torch.eye(self.feature_dim)   # [M, M]
         self.chol_K = torch.cholesky(self.K)
@@ -53,6 +65,8 @@ class BayesianRegression(nn.Module):
         variance = chol_inv_x_tran.T @ chol_inv_x_tran + 1./self.beta  # [N_test, N_test]
         variance += 1e-3 * torch.eye(n_test)  # <- this is for numerical stability.
         out = distributions.MultivariateNormal(mean.squeeze(1), variance)
+        #todo: this should be changed to predict mean and covariance.
+
         return out
 
     def predict_on_smiles(self, x_test_smiles):

@@ -79,6 +79,7 @@ def main(params: Params):
         oracle.load_state_dict(state_dict)
         oracles[model_name] = oracle
     all_molecules = list(chkpt['ground-truth'].keys())
+    # all_molecules = list(chkpt['ground-truth'].keys())[:50000]
 
     experiments = {}
 

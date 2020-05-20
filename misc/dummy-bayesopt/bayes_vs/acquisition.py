@@ -104,16 +104,26 @@ class ThompsonSamplingAcq(AcquisitionFunc):
         if "feature_dim" not in params:
             params["feature_dim"] = 100
 
+        previous_molecule_to_result_dicts = [q.smi_to_value_dict for q in queried_results_so_far[:-1]]
+
         #todo: probably should make the embedding func a seperate class elsewhere
         def embedding_func(list_of_smiles):
+
+            previous_oracle_results = [[d[smi] for d in previous_molecule_to_result_dicts] for smi in list_of_smiles]
+            previous_oracle_results = torch.tensor(previous_oracle_results, dtype=torch.float32)
+
             fingerprints = [torch.tensor(chem_ops.morgan_fp_from_smiles(smi, radius=2, number_bits=params["feature_dim"]),
                                          dtype=torch.float32)
                             for smi in list_of_smiles]
+            #todo: representations.
             fingerprints = torch.stack(fingerprints)
-            # todo: add the previous oracle results to this vector.
-            return fingerprints
 
-        embedding_func.fp_dim = params["feature_dim"]
+            feats = torch.cat([previous_oracle_results, fingerprints], dim=1)
+            #todo: maybe NN on top
+
+            return feats
+
+        embedding_func.fp_dim = params["feature_dim"] + len(previous_molecule_to_result_dicts)
 
         bayes_regress = bayes_models.BayesianRegression(embedding_func)
         return cls(bayes_regress, available_molecules, seen_molecule2value)
