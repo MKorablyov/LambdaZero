@@ -1,4 +1,6 @@
 import os, sys, logging,time,string, random, time, subprocess
+import contextlib
+
 from collections import Counter
 import numpy as np
 from rdkit import Chem
@@ -340,18 +342,30 @@ class Dock_smi:
             assert os.path.exists(self.dock_in_template), "can't find rec site file " + self.dock_in_template
 
     def dock(self, smi, mol_name=None, molgen_conf=20):
-        # generate random molecule name if needed
-        if mol_name is None: mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
-        # do smiles conversion and docking
-        mol2_file = _gen_mol2(smi, mol_name, self.outpath, self.chimera_bin, self.charge_method, num_conf=molgen_conf)
-        gridscore, coord = self._dock_dock6(smi, mol2_file, mol_name,
-                                            self.outpath, self.dock_in_template, self.dock6_bin)
-        if self.cleanup:
-            os.remove(os.path.join(self.outpath, mol_name + ".mol"))
-            os.remove(os.path.join(self.outpath, mol_name + ".mol2"))
-            os.remove(os.path.join(self.outpath, mol_name + "_dockin"))
-            os.remove(os.path.join(self.outpath, mol_name + "_dockout"))
-            os.remove(os.path.join(self.outpath, mol_name + "_scored.mol2"))
+        try:
+            # generate random molecule name if needed
+            if mol_name is None: mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+            # do smiles conversion and docking
+            mol2_file = _gen_mol2(smi, mol_name, self.outpath, self.chimera_bin, self.charge_method, num_conf=molgen_conf)
+            gridscore, coord = self._dock_dock6(smi, mol2_file, mol_name,
+                                                self.outpath, self.dock_in_template, self.dock6_bin)
+        finally:
+            if self.cleanup:
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + ".mol"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + ".mol2"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + "_dockin"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + "_dockout"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + "_scored.mol2"))
+
         return mol_name, gridscore, coord
 
     def _dock_dock6(self, smi, mol2file, mol_name, outpath, dock_pars_file, dock_bin):
