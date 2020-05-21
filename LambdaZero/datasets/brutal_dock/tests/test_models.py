@@ -19,7 +19,8 @@ def mpnn_model(number_of_node_features, number_of_edge_features, gcn_size, edge_
     return mpnn
 
 
-@pytest.mark.parametrize("number_of_molecules, gcn_size, edge_hidden, linear_hidden", [(10, 8, 8, 8)])
+@pytest.mark.parametrize("number_of_molecules, gcn_size, edge_hidden, linear_hidden",
+                         [(10, 8, 8, 8), (10, 2, 3, 4), (10, 11, 7, 5)])
 def test_message_passing_net(mpnn_model, random_molecule_batch):
     """
     A smoke test showing that the model runs on data of the expected shape.
