@@ -12,7 +12,6 @@ class MessagePassingNet(ModelBase):
                  edge_feat: int = 4,
                  gcn_size: int = 128,
                  edge_hidden: int = 128,
-                 gru_layers: int = 1,
                  linear_hidden: int = 128,
                  out_size: int = 1
                  ):
@@ -25,7 +24,6 @@ class MessagePassingNet(ModelBase):
             edge_feat (int, optional): number of edge features. Defaults to 3.
             gcn_size (int, optional): size of GCN embedding size. Defaults to 128.
             edge_hidden (int, optional): edge hidden embedding size. Defaults to 128.
-            gru_layers (int, optional): number of layers in GRU. Defaults to 1.
             linear_hidden (int, optional): hidden size in fully-connected network. Defaults to 128.
             out_size (int, optional): output size. Defaults to 1.
         """
@@ -41,7 +39,7 @@ class MessagePassingNet(ModelBase):
         )
 
         self.conv = NNConv(gcn_size, gcn_size, edge_network, aggr='mean')
-        self.gru = nn.GRU(gcn_size, gcn_size, num_layers=gru_layers)
+        self.gru = nn.GRU(input_size=gcn_size, hidden_size=gcn_size, num_layers=1)
 
         self.set2set = Set2Set(gcn_size, processing_steps=3)
         self.fully_connected = nn.Sequential(
@@ -57,6 +55,10 @@ class MessagePassingNet(ModelBase):
         for i in range(3):
             # blocks are reused here - this is subcase, generally in MPNN different instances would be used for each layer
             m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+
+            # GRU expects
+            #    input: (seq_len, batch, input_size)
+            #    h0: (num_layers, batch, hidden_size)
             out, h = self.gru(m.unsqueeze(0), h)
             out = out.squeeze(0)
 

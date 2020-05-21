@@ -24,6 +24,14 @@ def number_of_node_features(real_molecule_dataset):
 
 
 @pytest.fixture
+def number_of_edge_features(real_molecule_dataset):
+    molecule_graph = real_molecule_dataset[0]
+    edge_features = molecule_graph.edge_attr
+    number_features = edge_features.shape[1]
+    return number_features
+
+
+@pytest.fixture
 def expected_raw_files():
     return ['dock_blocks105_walk40_clust.feather', 'dock_blocks105_walk40_2_clust.feather']
 
@@ -94,15 +102,14 @@ def model_class(model_name):
 
 
 @pytest.fixture
-def model_parameters(model_name, number_of_node_features):
+def model_parameters(model_name, number_of_node_features, number_of_edge_features):
     parameters = None
     if model_name == "MPNN":
         parameters = dict(name="MPNN",
                           node_feat=number_of_node_features,
-                          edge_feat=4,
+                          edge_feat=number_of_edge_features,
                           gcn_size=8,
                           edge_hidden=8,
-                          gru_layers=1,
                           linear_hidden=8)
 
     elif model_name == "chemprop":
