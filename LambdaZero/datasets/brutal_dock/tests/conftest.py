@@ -111,11 +111,15 @@ def random_molecule_dataset(list_random_molecules):
 
 
 @pytest.fixture
-def mpnn_model(number_of_node_features):
+def mpnn_model(number_of_node_features, gru_layers):
 
     model_instantiation_parameters = dict(node_feat=number_of_node_features,
-                                          edge_feat=4, gcn_size=8, edge_hidden=8,
-                                          gru_layers=1, linear_hidden=8, out_size=1)
+                                          edge_feat=4,
+                                          gcn_size=8,
+                                          edge_hidden=8,
+                                          gru_layers=gru_layers,
+                                          linear_hidden=8,
+                                          out_size=1)
 
     mpnn = MessagePassingNet.create_model_for_training(model_instantiation_parameters)
 
