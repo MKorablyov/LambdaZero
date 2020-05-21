@@ -1,5 +1,6 @@
 import copy
 import functools
+import multiprocessing
 from os import path
 import time
 
@@ -36,8 +37,8 @@ def step_env(rng, env, state, action_mask, temperature, evaluate_molecules):
     return values[a], next_states[a], observations[a]
 
 
-def boltzmann_search(max_steps, mol_eval, temperature=1., stop_condition=None,
-                     top_k=1):
+def boltzmann_search(max_steps, mol_eval, total_evals, temperature=1.,
+                     stop_condition=None, top_k=1):
     config = cfg.mol_blocks_v4_config()
     config["env_config"]["reward_config"]["device"] = "cpu"
     env = config["env"](config["env_config"])
@@ -50,12 +51,15 @@ def boltzmann_search(max_steps, mol_eval, temperature=1., stop_condition=None,
     rng = np.random.default_rng()
 
     for i in range(max_steps):
-        print(i)
         action_mask = obs["action_mask"]
         val, state, obs = step_env(rng, env, state, action_mask, temperature,
                                    mol_eval)
         values.append(val)
         states.append(state)
+
+        print((
+            "Finished iteration {}, current max: {:.3f}, total evals: {}"
+        ).format(i, np.max(values), total_evals()))
 
         if stop_condition is not None:
             stop_condition.update(val, state, obs)
@@ -84,40 +88,34 @@ class DockActor:
                                        chimera_dir=CHIMERA_DIR,
                                        dock6_dir=DOCK6_DIR,
                                        docksetup_dir=DOCKSETUP_DIR)
+        self._num_evals = 0
 
     def evaluate_molecule(self, molecule):
-        _, energy, _ = self._dock_smi.dock(Chem.MolToSmiles(molecule))
-        return energy
+        try:
+            self._num_evals += 1
+            _, energy, _ = self._dock_smi.dock(Chem.MolToSmiles(molecule))
+        except AssertionError:
+            energy = np.inf
+        return -energy
+
+    def evaluation_count(self):
+        return self._num_evals
 
 
 if __name__ == "__main__":
 
-    # rew_eval = molecule.PredDockReward(
-    #     load_model=path.join(DATASET_DIR, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
-    #     natm_cutoff=[45, 50],
-    #     qed_cutoff=[0.2, 0.7],
-    #     soft_stop=False,
-    #     exp=None,
-    #     delta=False,
-    #     simulation_cost=0.0,
-    #     device="cpu",
-    # )
-    #
-    # def eval_molecule(mol):
-    #     rew_eval.reset()
-    #     return rew_eval(mol,
-    #                     env_stop=False,
-    #                     simulate=True,
-    #                     num_steps=1)[0]
-    # evaluate random molecules with docking
-
-    ray.init(local_mode=False)
-    pool = util.ActorPool([DockActor.remote() for _ in range(24)])
+    ray.init()
+    dockactors = [DockActor.remote() for _ in range(multiprocessing.cpu_count())]
+    pool = util.ActorPool(dockactors)
 
     def evaluate_molecules(molecules):
         return list(
             pool.map(lambda a, m: a.evaluate_molecule.remote(m), molecules))
 
-    values, states = boltzmann_search(100, evaluate_molecules, 1.0, None, 3)
+    def total_evaluations():
+        return np.sum(ray.get([a.evaluation_count.remote() for a in dockactors]))
+
+    values, states = boltzmann_search(100, evaluate_molecules, total_evaluations,
+                                      1.0, None, 3)
     print(states)
     print(values)
