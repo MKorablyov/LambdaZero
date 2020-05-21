@@ -1,0 +1,63 @@
+name: lz
+
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.6.*
+  - pip
+  - cudatoolkit=10.1.*
+  - tensorflow-gpu
+  - tensorboardX
+  - pytorch==1.4.0
+  - torchvision
+  - rdkit
+  - pandas
+  - networkx
+  - scikit-image
+  - numba
+  - isodate
+  - jsonschema
+  - redis-py=3.4.*
+  - pyyaml
+  - colorama
+  - filelock
+  - aiohttp
+  - beautifulsoup4
+  - future
+  - lz4
+  - tabulate
+  - fastparquet
+  - boto3
+  - pytest
+  - pytest-cov
+  - pyarrow
+  - mlflow
+  - tqdm
+  - cloudpickle=1.3.*
+  - py-opencv
+  - joblib
+  - msgpack-python=0.6.*
+  - plyfile
+  - psutil
+  - pymongo
+  - rdflib
+  - scikit-learn
+  - threadpoolctl
+  - pip:
+    - -f https://pytorch-geometric.com/whl/torch-1.4.0.html
+    - torch-scatter==latest+cu101
+    - torch-sparse==latest+cu101
+    - torch-cluster==latest+cu101
+    - torch-spline-conv==latest+cu101
+    - https://ray-wheels.s3-us-west-2.amazonaws.com/master/11c2b500b86e1a02a97f65708796e1605eb91808/ray-0.9.0.dev0-cp36-cp36m-manylinux1_x86_64.whl
+    - orion
+    - wandb
+    - torch-geometric
+    - ray[rllib]
+    - git+https://github.com/chemprop/chemprop.git#egg=chemprop
+    - typed-argument-parser
+    - gym
+    - dm-tree

@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
-from LambdaZero.datasets.brutal_dock.mlflow_logger import MLFlowLogger
+from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import XYModelTrainer
 from LambdaZero.datasets.brutal_dock.tests.fake_linear_dataset import FakeLinearDataset
 from LambdaZero.datasets.brutal_dock.tests.linear_regression import LinearRegression
@@ -90,7 +90,8 @@ def dataloaders(linear_dataset, number_of_points, batch_size):
 @pytest.fixture
 def mlflow_logger(experiment_name, tracking_uri):
     tags = {'model_type': 'trivial_linear_regresssion'}
-    mlflow_logger = MLFlowLogger(experiment_name, tracking_uri, tags)
+    run_parameters = {'experiment_name': experiment_name, 'run_name': 'TEST'}
+    mlflow_logger = MLFlowLogger(run_parameters, tracking_uri, tags)
     return mlflow_logger
 
 

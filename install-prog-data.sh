@@ -3,7 +3,6 @@ DATASET_PATH=Datasets
 PROGRAMS_PATH=Programs
 DATASET_DEFAULT=1
 PROGRAMS_DEFAULT=1
-CONDA_ENV_NAME=""
 
 function help() {
 cat <<EOF
@@ -11,7 +10,6 @@ Usage:
 
     $script_name [ -d <path> | --dataset_path=<path> ]
         [ -p <path> | --programs_path=<path> ]
-        -e <name> | --env_name=<name>
 
     -d NO will skip installing the datasets
     -p NO will skip installing the programs
@@ -20,7 +18,6 @@ Usage:
     you will have to adjust the paths in the code to match.
 
 EOF
-
 }
 
 while [[ $# -gt 0 ]]; do
@@ -61,21 +58,6 @@ while [[ $# -gt 0 ]]; do
 	    DATASET_DEFAULT=0
 	    shift
 	    ;;
-	-e)
-            if [ -z "${2+x}" ]; then
-                echo "-e requires an argument"
-                echo ""
-                help
-                exit 1
-            fi
-	    CONDA_ENV_NAME="$2"
-	    shift
-	    shift
-	    ;;
-	--env_name=*)
-	    CONDA_ENV_NAME="${key#*=}"
-	    shift
-	    ;;
         -h|--help)
             help
             exit 0
@@ -89,9 +71,39 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ -z "$CONDA_ENV_NAME" ]; then
-    echo "Missing environement name"
-    echo ""
-    help
-    exit 1
+if [ $DATASET_DEFAULT -eq 1 ]; then
+    read -p "Install directory for datasets (NO to skip) [$DATASET_PATH]:" dpath
+    if [ ! -z "$dpath" ]; then
+        DATASET_PATH="$dpath"
+    fi
+fi
+
+if [ "$DATASET_PATH" != "NO" ]; then
+    mkdir -p "$DATASET_PATH"
+    cd $DATASET_PATH
+    git clone --depth 1 https://github.com/MKorablyov/fragdb
+    git clone --depth 1 https://github.com/MKorablyov/brutal_dock
+    cd ..
+fi
+
+
+if [ $PROGRAMS_DEFAULT -eq 1 ]; then
+    read -p "Install directory for programs (NO to skip) [$PROGRAMS_PATH]:" ppath
+    if [ ! -z "$ppath" ]; then
+        PROGRAMS_PATH="$ppath"
+    fi
+fi
+
+if [ "$PROGRAMS_PATH" != "NO" ]; then
+    mkdir -p "$PROGRAMS_PATH"
+    cd $PROGRAMS_PATH
+    git clone --depth 1 https://github.com/MKorablyov/dock6
+    git clone --depth 1 https://github.com/MKorablyov/chimera tmp
+    cd tmp
+    cat xaa xab > chimera.bin
+    chmod 755 chimera.bin
+    echo '../chimera' | ./chimera.bin
+    cd ..
+    rm -rf tmp
+    cd ..
 fi
