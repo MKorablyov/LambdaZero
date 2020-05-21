@@ -12,7 +12,6 @@ import torch
 from torch_geometric.data import Batch
 
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
-from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_random_molecule_data
 from LambdaZero.datasets.brutal_dock.tests.fake_molecule_dataset import FakeMoleculeDataset
 from LambdaZero.datasets.brutal_dock.tests.testing_utils import generate_random_string
@@ -108,21 +107,6 @@ def random_molecule_batch(list_random_molecules):
 @pytest.fixture
 def random_molecule_dataset(list_random_molecules):
     return FakeMoleculeDataset(list_random_molecules)
-
-
-@pytest.fixture
-def mpnn_model(number_of_node_features):
-
-    model_instantiation_parameters = dict(node_feat=number_of_node_features,
-                                          edge_feat=4,
-                                          gcn_size=8,
-                                          edge_hidden=8,
-                                          linear_hidden=8,
-                                          out_size=1)
-
-    mpnn = MessagePassingNet.create_model_for_training(model_instantiation_parameters)
-
-    return mpnn
 
 
 @pytest.fixture
