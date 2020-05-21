@@ -29,12 +29,14 @@ atomic_numbers = {"H":1,"He":2,"Li":3,"Be":4,"B":5,"C":6,"N":7,"O":8,"F":9,"Ne":
                   "Zr":40, "Nb":41,"Mo":42,"Tc":43,"Ru":44,"Rh":45,"Pd":46,"Ag":47,"Cd":48,"In":49,"Sn":50,"Sb":51,
                   "Te":52, "I":53,"Xe":54,"Cs":55,"Ba":56}
 
+
 def compute_isometry(mol):
     ":return [num_atoms] isometric group "
     isom_groups = list(Chem.rdmolfiles.CanonicalRankAtoms(mol, breakTies=False))
     return np.asarray(isom_groups,dtype=np.int32)
 
-def find_rota_murcko_bonds(mol,sanitize=False):
+
+def find_rota_murcko_bonds(mol, sanitize=False):
     """ Finds rotatable bonds (first) and Murcko bonds (second)
     :param mol:
     :return:
@@ -79,6 +81,7 @@ def find_rota_murcko_bonds(mol,sanitize=False):
     rota_bonds = np.reshape(np.asarray(rota_bonds, dtype=np.int64), [-1, 2])
     murcko_bonds = np.reshape(np.asarray(murcko_bonds, dtype=np.int64), [-1, 2])
     return rota_bonds,murcko_bonds
+
 
 def break_on_bonds(mol, jun_bonds, frags_generic):
     """ Breaks molecule into fragments
@@ -161,6 +164,7 @@ def mol_from_frag(jun_bonds, frags=None, frag_smis=None, coord=None, optimize=Fa
     [emol.AddBond(int(bond[0]),int(bond[1]), Chem.BondType.SINGLE) for bond in mol_bonds]
     mol = emol.GetMol()
     atoms = list(mol.GetAtoms())
+
     def _pop_H(atom):
         nh = atom.GetNumExplicitHs()
         if nh > 0: atom.SetNumExplicitHs(nh-1)
@@ -176,6 +180,7 @@ def mol_from_frag(jun_bonds, frags=None, frag_smis=None, coord=None, optimize=Fa
         AllChem.MMFFOptimizeMolecule(mol)
         Chem.RemoveHs(mol)
     return mol,mol_bonds
+
 
 def fragment_molecule(mol, frags_generic, decomposition):
     """ Fragments a whole molecule and adds to the database.
@@ -237,6 +242,7 @@ def draw_frag(frag_name,r_idx,out_path,out_file=None):
     svg_file.close()
     logging.info("saved image", os.path.join(out_path, fragsp_name + ".svg"))
     return
+
 
 def build_mol(smiles=None,num_conf=1, minimize=False, noh=True,charges=True):
     # todo: things other than SMILES
@@ -344,7 +350,9 @@ class Dock_smi:
     def dock(self, smi, mol_name=None, molgen_conf=20):
         try:
             # generate random molecule name if needed
-            if mol_name is None: mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+            if mol_name is None:
+                mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+
             # do smiles conversion and docking
             mol2_file = _gen_mol2(smi, mol_name, self.outpath, self.chimera_bin, self.charge_method, num_conf=molgen_conf)
             gridscore, coord = self._dock_dock6(smi, mol2_file, mol_name,
@@ -403,7 +411,6 @@ class Dock_smi:
         return gridscore, coord
 
 
-
 class ScaffoldSplit:
     def __init__(self, mols_smiles, incude_chirality=False):
         scaffolds = []
@@ -443,6 +450,7 @@ def get_fp(mol, fp_length, fp_radiis, from_atoms=None):
     fps = np.asarray(np.concatenate(fps_, axis=0),dtype=np.float32)
     return fps
 
+
 def get_fingerprint(smiles, radius=2,length=1024):
   """Get Morgan Fingerprint of a specific SMILES string.
   Args:
@@ -468,6 +476,7 @@ def onehot(arr,num_classes,dtype=np.int):
     onehot_arr = np.zeros(arr.shape + (num_classes,),dtype=dtype)
     onehot_arr[np.arange(arr.shape[0]), arr] = 1
     return onehot_arr
+
 
 def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     atomtypes = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
@@ -522,6 +531,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
         atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
     return atmfeat, coord, bond, bondfeat
 
+
 def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
@@ -537,6 +547,7 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
+
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
     "mol to graph convertor"
