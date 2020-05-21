@@ -34,3 +34,19 @@ def test_vocab_to_txt_file(root_dir, realistic_hgraph_vocab):
     for v in realistic_hgraph_vocab:
         assert v in loaded_vocab
 
+@pytest.mark.skip(reason="the hmpnn module uses `.cuda()` which cannot work on cpu only machines so we cannot test it")
+def test_HMPNN_forward(real_molecule_batch, one_tmp_feather_file):
+    """
+    Smoke test that HMPNN runs on expected input shape.
+    """
+    parameters = {
+        'vocab_file': one_tmp_feather_file,
+        'rnn_type': "LSTM",
+        'embed_size': 12,
+        'hidden_size': 12,
+        'depthT': 20,
+        'depthG': 20,
+        'dropout': 0.0,
+    }
+    net = hmpnn.HierarchMPNN(**parameters)
+    _ = net.forward(real_molecule_batch)
