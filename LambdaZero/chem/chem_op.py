@@ -372,7 +372,7 @@ class Dock_smi:
         # parse dock energy
         with open(dock_out_file) as f: lines = f.read().splitlines()
         gridscores = [float(line[38:]) for line in lines if line.startswith("                          Grid_Score")]
-        assert len(gridscores) == 1, "parsing error - multiple gridscores"
+        assert len(gridscores) == 1, "parsing error - multiple gridscores in {}".format(dock_out_file)
         gridscore = gridscores[0]
 
         # parse dock coords
