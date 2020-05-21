@@ -17,7 +17,6 @@
         "name": "MPNN",
         "gcn_size": "orion~choices([32, 64, 128, 256])",
         "edge_hidden": "orion~choices([32, 64, 128, 256])",
-        "gru_layers": 1,
         "linear_hidden": "orion~choices([128, 256, 512])"
     }
 }

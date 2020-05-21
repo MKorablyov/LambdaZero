@@ -16,7 +16,6 @@
         "name": "MPNN",
         "gcn_size": 64,
         "edge_hidden": 64,
-        "gru_layers": 1,
         "linear_hidden": 64
     }
 }
