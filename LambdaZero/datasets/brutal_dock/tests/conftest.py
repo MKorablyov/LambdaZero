@@ -311,3 +311,38 @@ def root_dir():
         yield tmp_dir_str
 
     logging.info("deleting test folder")
+
+
+@pytest.fixture
+def one_tmp_feather_file(fake_raw_molecule_data_dataframe):
+    with tempfile.TemporaryDirectory() as tmp_dir_str:
+        logging.info("creating a fake directory with one file")
+        raw_dir = Path(tmp_dir_str)
+        file_path = raw_dir.joinpath('tmp_file.feather')
+        fake_raw_molecule_data_dataframe.to_feather(file_path)
+        yield str(file_path)
+    logging.info("deleting test folder")
+
+
+@pytest.fixture
+def list_of_tmp_feather_files(fake_raw_molecule_data_dataframe):
+    df = fake_raw_molecule_data_dataframe
+    list_filename = ["tmp1.feather", "tmp2.feather", "tmp3.feather"]
+    number_of_files = len(list_filename)
+    
+    with tempfile.TemporaryDirectory() as tmp_dir_str:
+        logging.info(f"creating a fake directory with {number_of_files} files")
+        raw_dir = Path(tmp_dir_str)
+        
+        list_index_groups = np.array_split(df.index, number_of_files)
+        
+        list_file_path = []
+        for filename, indices in zip(list_filename, list_index_groups):
+            file_path = raw_dir.joinpath(filename)
+            sub_df = df.iloc[indices].reset_index(drop=True)
+            sub_df.to_feather(file_path)
+            list_file_path.append(str(file_path))
+        yield list_file_path
+    
+    logging.info("deleting test folder")
+
