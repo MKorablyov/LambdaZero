@@ -57,6 +57,7 @@ dependencies:
     - torch-geometric
     - ray[rllib]
     - git+https://github.com/chemprop/chemprop.git#egg=chemprop
+    - -e git+https://github.com/wengong-jin/hgraph2graph.git#egg=hgraph2graph
     - typed-argument-parser
     - gym
     - dm-tree
