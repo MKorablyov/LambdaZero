@@ -7,31 +7,37 @@ Library Includes:
 - Tools to design action space
 
 ## Install
+
+### Dependecies
+
 ```
-# the installation process is a bit tricky because of the rdkit package which only works properly with anaconda env
-# create a new conda environment
-conda create -n lz python=3.6
-conda activate lz
+conda env create -f environment-linux.yml [-n env_name]
+```
 
-# install ray nightly and ray[rllib]
-pip install -U ray-0.9.0.dev0-cp36-cp36m-manylinux1_x86_64.whl
-pip install ray[rllib]
+This will create an environment named `lz` by default with all the
+packages you need to use LambdaZero. You need to have conda installed
+first. If you don't have it yet,
+[miniconda](https://docs.conda.io/en/latest/miniconda.html) is
+strongly recommended over anaconda.
 
-# install pytorch and tensorflow
-conda install pytorch torchvision cudatoolkit=10.1 -c pytorch
-pip install tensorflow
+### Datasets and Programs
 
-# install torch geometric package for graph processing
-install torch geometric https://github.com/rusty1s/pytorch_geometric
+There is a script to install the required programs and datasets:
 
-# install rdkit
-conda install -c conda-forge rdkit
+```
+bash install-prog-datasets.sh [-d dataset_path] [-p programs_path]
+```
 
-# install misc
-conda install -c anaconda pandas
-pip install psutil
+You can specify either paths as `NO` to skip installing that
+particular item. By default these install in the root of the
+checkout.
 
-# install datasets
+#### Optional Manual Instructions
+
+If you prefer to install the datasets and programs manually you can
+follow these instructions.
+
+```
 cd ~/Datasets
 git clone https://github.com/MKorablyov/fragdb 	        # fragments to use in the scoring function
 git clone https://github.com/MKorablyov/brutal_dock     # pretrained message passing NN to predict docking energy
@@ -46,7 +52,6 @@ git clone https://github.com/MKorablyov/chimera
 git clone https://github.com/MKorablyov/dock6
 
 # perform postclone instructions described at git clone https://github.com/MKorablyov/chimera
-
 ```
 
 ## Getting started
