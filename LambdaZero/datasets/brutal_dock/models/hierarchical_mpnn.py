@@ -14,12 +14,12 @@ def build_vocab_from_simles_list(list_of_smiles):
     """
     vocab = set() # turned to a list
     ## TODO: this could be parallelized
-    for s in list_of_smiles:
-        hmol = MolGraph(s)
-        for node, attr in hmol.mol_tree.nodes(data=True):
+    for smi in list_of_smiles:
+        hmol = MolGraph(smi)
+        for _, attr in hmol.mol_tree.nodes(data=True):
             smiles = attr['smiles']
             vocab.add( attr['label'] )
-            for i,s in attr['inter_label']:
+            for _, s in attr['inter_label']:
                 vocab.add( (smiles, s) )
     vocab = list(vocab)
     return vocab
@@ -54,26 +54,45 @@ def load_vocab_from_txt_file(vocab_file):
 
 class HierarchMPNN(ModelBase):
     """
-    This model class adapts the hierarchical mpnn model to LambdaZero.
+    This model class adapts the hierarchical mpnn model from hmpnn.
     The Forward method assumes that the batch of molecules contains
-    a field "smiles" to extract features, as we did for chemprop.
+    a field "smiles" to extract features, as for chemprop.
+
+    there is a fundamental problem with the way this model works.
+    a vocabulary constructed from the dataset needs to be passed to the model.
+    In effect, this corresponds to a dependency on the dataset, which is not
+    allowed by how an experiment usually work.
+
+    To circumvent the problem, the name of the dataset, by default 
+    "D4MoleculesDataset", is passed to the model. A corresponding vocab file 
+    `D4MoleculesDataset_vocab.txt` is loaded. That file should be considered
+    part of the model. To extend thi model to other datasets, new vocab.txt 
+    file will be required.
     """
 
-    def __init__(self, vocab_file, rnn_type='LSTM', embed_size=270, hidden_size=270, depthT=20, depthG=20, dropout=0.0):
+    def __init__(self, dataset_name="D4MoleculesDataset", rnn_type='LSTM', embed_size=270, hidden_size=270, depthT=20, depthG=20, dropout=0.0):
         super().__init__()
-        file_path = Path(vocab_file)
+        
+        model_dir = Path(__file__).resolve().parent
+        vocab_file_path = model_dir.joinpath(f"{dataset_name}_vocab.txt")
 
-        if file_path.suffix == ".feather":
-            txt_file = Path(str(file_path).replace(".feather","_vocab.txt"))
-            if not txt_file.exists():
-                smiles_list = feather_to_smiles_list(str(file_path))
-                vocab = build_vocab_from_simles_list(smiles_list)
-                vocab_to_txt_file(vocab, str(txt_file))
-            file_path = txt_file
-        vocab = load_vocab_from_txt_file(str(file_path))
-        vocab = PairVocab(vocab)
-        avocab = common_atom_vocab
-        self.hgraph_encoder = HierMPNEncoder(vocab, avocab, rnn_type, embed_size, hidden_size, depthT, depthG, dropout)
+        if not vocab_file_path.exists():
+            raise NotImplementedError("using HierarchMPNN with a new dataset requires to make the corresponding _vocab.txt first")
+        
+        vocab = load_vocab_from_txt_file(str(vocab_file_path))
+        self.vocab = PairVocab(vocab, cuda=False)
+        self.avocab = common_atom_vocab
+        self.hgraph_encoder = HierMPNEncoder(self.vocab, self.avocab, rnn_type, embed_size, hidden_size, depthT, depthG, dropout)
+
+        # self.set2set_1 = Set2Set(gcn_size, processing_steps=3)
+        # self.set2set_1 = Set2Set(gcn_size, processing_steps=3)
+        # self.set2set_1 = Set2Set(gcn_size, processing_steps=3)
+        
+        # self.fully_connected = nn.Sequential(
+        #     nn.Linear(2*gcn_size, linear_hidden),
+        #     nn.ReLU(),
+        #     nn.Linear(linear_hidden, out_size)
+        # )
 
     def forward(self, batch: Batch):
         smiles_list = get_list_of_smiles_from_batch(batch)
@@ -83,9 +102,10 @@ class HierarchMPNN(ModelBase):
         tree_tensors, graph_tensors = tensors_tuple
         
         # wasted inter_vecs computation from HierMPNEncoder.forward
-        root_vecs, node_vecs, inter_vecs, atom_vecs = self.encoder((tree_tensors, graph_tensors))
+        root_vecs, node_vecs, inter_vecs, atom_vecs = self.hgraph_encoder(tree_tensors, graph_tensors)
         
         # TODO:
+        
         # root_vecs = aggregate(root_vecs)
         # node_vecs = aggregate(node_vecs)
         # atom_vecs = aggregate(atom_vecs)
@@ -98,9 +118,39 @@ class HierarchMPNN(ModelBase):
         return 0
 
 
-if __name__=="__main__":
-    path_to_feather_files = [
-        ""
-    ]
+if __name__=="__main__": ## for debugging
+    """
+    making the original "_vocab.txt" file and example batch
+    """
+    from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
+
+    dataset_name="D4MoleculesDataset"
+    root_dir = "/Users/Simon/codes/LambdaZero/LambdaZero/datasets/brutal_dock/experiments/data/"
+    raw_dir = "/Users/Simon/codes/LambdaZero/Datasets/brutal_dock/d4/raw/"
+    raw_files = ['dock_blocks105_walk40_clust.feather', 'dock_blocks105_walk40_2_clust.feather']
+    raw_paths = [raw_dir + name for name in raw_files]
     
-    pass
+    model_dir = Path(__file__).resolve().parent
+    vocab_file_path = model_dir.joinpath(f"{dataset_name}_vocab.txt")
+
+    if not vocab_file_path.exists():
+        smiles_list = feather_to_smiles_list(raw_paths)
+        vocab = build_vocab_from_simles_list(smiles_list)
+        vocab_to_txt_file(vocab, str(vocab_file_path))
+
+    dataset = D4MoleculesDataset(root_dir, raw_dir)
+    
+    parameters = {
+        'dataset_name': 'D4MoleculesDataset',
+        'rnn_type': "LSTM",
+        'embed_size': 12,
+        'hidden_size': 12,
+        'depthT': 20,
+        'depthG': 20,
+        'dropout': 0.0,
+    }
+
+    batch = dataset[:16]
+    net = HierarchMPNN(**parameters)
+    out = net(batch)
+    print(out)
