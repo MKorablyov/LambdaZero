@@ -3,6 +3,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 from torch_geometric.data import Batch
+from torch_geometric.data import DataLoader
 from hgraph import HierMPNEncoder, MolGraph, PairVocab, common_atom_vocab
 from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase, get_list_of_smiles_from_batch
 
@@ -84,15 +85,31 @@ class HierarchMPNN(ModelBase):
         self.avocab = common_atom_vocab
         self.hgraph_encoder = HierMPNEncoder(self.vocab, self.avocab, rnn_type, embed_size, hidden_size, depthT, depthG, dropout)
 
-        # self.set2set_1 = Set2Set(gcn_size, processing_steps=3)
-        # self.set2set_1 = Set2Set(gcn_size, processing_steps=3)
-        # self.set2set_1 = Set2Set(gcn_size, processing_steps=3)
-        
-        # self.fully_connected = nn.Sequential(
-        #     nn.Linear(2*gcn_size, linear_hidden),
+        ## TODO: aggregate and linear out
+        # self.aggregate1 = Set2Set(hidden_size, processing_steps=3)
+        # self.aggregate2 = Set2Set(hidden_size, processing_steps=3)
+        # self.aggregate3 = Set2Set(hidden_size, processing_steps=3)
+        # self.mlp1 = nn.Sequential(
+        #     nn.Linear(hidden_size, linear_hidden),
+        #     nn.ReLU(),
+        #     nn.Linear(linear_hidden, linear_out_size)
+        # )
+        # self.mlp2 = nn.Sequential(
+        #     nn.Linear(hidden_size, linear_hidden),
+        #     nn.ReLU(),
+        #     nn.Linear(linear_hidden, linear_out_size)
+        # )
+        # self.mlp3 = nn.Sequential(
+        #     nn.Linear(hidden_size, linear_hidden),
+        #     nn.ReLU(),
+        #     nn.Linear(linear_hidden, linear_out_size)
+        # )
+        # self.mlp_out = nn.Sequential(
+        #     nn.Linear(3*linear_out_size, linear_hidden),
         #     nn.ReLU(),
         #     nn.Linear(linear_hidden, out_size)
         # )
+
 
     def forward(self, batch: Batch):
         smiles_list = get_list_of_smiles_from_batch(batch)
@@ -104,11 +121,10 @@ class HierarchMPNN(ModelBase):
         # wasted inter_vecs computation from HierMPNEncoder.forward
         root_vecs, node_vecs, inter_vecs, atom_vecs = self.hgraph_encoder(tree_tensors, graph_tensors)
         
-        # TODO:
-        
-        # root_vecs = aggregate(root_vecs)
-        # node_vecs = aggregate(node_vecs)
-        # atom_vecs = aggregate(atom_vecs)
+        ## TODO: aggregate and linear out
+        # root_vecs = aggregate1(root_vecs)
+        # node_vecs = aggregate2(node_vecs)
+        # atom_vecs = aggregate3(atom_vecs)
         # r = self.mlp1(root_vecs)
         # n = self.mlp2(node_vecs)
         # a = self.mlp3(atom_vecs)
@@ -120,7 +136,9 @@ class HierarchMPNN(ModelBase):
 
 if __name__=="__main__": ## for debugging
     """
-    making the original "_vocab.txt" file and example batch
+    making the original "_vocab.txt" file
+    +
+    debugging with an example batch
     """
     from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
 
@@ -151,6 +169,13 @@ if __name__=="__main__": ## for debugging
     }
 
     batch = dataset[:16]
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+    
     net = HierarchMPNN(**parameters)
-    out = net(batch)
-    print(out)
+    
+    for batch in dataloader:
+        out = net(batch)
+        break
+
+    print(batch)
+    
