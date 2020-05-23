@@ -9,6 +9,7 @@ class GraphScoreNormalizer:
         self.std = std
 
     def normalize_score(self, graph: Data):
+
         normalized_graph = deepcopy(graph)
         normalized_graph.gridscore = (graph.gridscore-self.mean)/self.std
         return normalized_graph

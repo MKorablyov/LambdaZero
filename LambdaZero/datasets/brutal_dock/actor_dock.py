@@ -1,9 +1,10 @@
-import time, os.path as osp
+import os, time, socket, os.path as osp
 import numpy as np
-from LambdaZero.environments.molecule import BlockMolEnv_v3
+from LambdaZero.environments.molecule import BlockMolEnv_v3, MolMDP, QEDReward, PredDockReward
+from copy import deepcopy
 import ray
-import os
-from LambdaZero.examples.AlphaZero.config import mol_blocks_v4_config
+import os, sys
+from LambdaZero.examples.config import mol_blocks_v4_config
 from rdkit import Chem
 from LambdaZero.chem import Dock_smi
 import pandas as pd
