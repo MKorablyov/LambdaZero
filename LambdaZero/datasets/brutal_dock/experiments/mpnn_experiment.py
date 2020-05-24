@@ -36,5 +36,5 @@ if __name__ == "__main__":
     input_and_run_config = get_input_and_run_configuration(path_of_this_file)
     best_validation_loss = experiment_driver(input_and_run_config, dataset_class, model_class)
 
-    report_results([dict( name="best_validation_loss", type="objective", value=best_validation_loss)])
+    report_results([dict(name="best_validation_loss", type="objective", value=best_validation_loss)])
 
