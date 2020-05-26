@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, Any, Type
+from typing import Dict, Any, Type, Callable
 
 import numpy as np
 import torch
@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock import set_logging_directory
+from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
 from LambdaZero.datasets.brutal_dock.dataset_splitting import KnnDatasetSplitter
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
@@ -28,6 +29,7 @@ def experiment_driver(
     model_class: Type[ModelBase],
     logger_class: Type[ExperimentLogger] = WandbLogger,
     random_seed: int = 0,
+    get_dataloaders: Callable = get_geometric_dataloaders
 ) -> float:
     """
     This method drives the execution of an experiment. It is responsible for
@@ -81,27 +83,8 @@ def experiment_driver(
     dataset = dataset_class.create_dataset(root_dir=work_dir,
                                            original_raw_data_dir=data_dir)
 
-    splitter = KnnDatasetSplitter(training_parameters["train_fraction"],
-                                  training_parameters["validation_fraction"],
-                                  random_seed=random_seed)
-    training_dataset, validation_dataset, test_dataset = splitter.get_split_datasets(dataset)
-
-    logging.info(f"size of training set {len(training_dataset)}")
-    logging.info(f"size of validation set {len(validation_dataset)}")
-    logging.info(f"size of test set {len(test_dataset)}")
-
-    training_dataloader = DataLoader(training_dataset,
-                                     batch_size=training_parameters['batch_size'],
-                                     num_workers=training_parameters['num_workers'],
-                                     shuffle=True)
-    validation_dataloader = DataLoader(validation_dataset,
-                                       batch_size=training_parameters['batch_size'],
-                                       num_workers=training_parameters['num_workers'],
-                                       shuffle=True)
-    test_dataloader = DataLoader(test_dataset,
-                                 batch_size=training_parameters['batch_size'],
-                                 num_workers=training_parameters['num_workers'],
-                                 shuffle=False)
+    training_dataloader, validation_dataloader, test_dataloader = \
+        get_dataloaders(dataset, training_parameters, random_seed)
 
     logging.info(f"Extracting mean and standard deviation from training data")
     training_mean, training_std = get_scores_statistics(training_dataloader)
