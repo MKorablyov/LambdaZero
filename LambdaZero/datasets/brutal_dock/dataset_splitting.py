@@ -74,7 +74,14 @@ class RandomDatasetSplitter(AbstractDatasetSplitter):
         return train_indices, valid_indices, test_indices
 
 
-class KnnDatasetSplitter(AbstractDatasetSplitter):
+class AbstactKnnDatasetSplitter(AbstractDatasetSplitter):
+
+    @abstractmethod
+    def _get_list_klabels(self, full_dataset: Dataset) -> List[int]:
+        """
+        This method extracts the klabel indices based on the form of the full dataset.
+        """
+        pass
 
     @classmethod
     def _split_labels_in_groups(cls, random_generator: RandomState,
@@ -120,7 +127,7 @@ class KnnDatasetSplitter(AbstractDatasetSplitter):
                                                train_size: int, valid_size: int,
                                                test_size: int) -> Tuple[List[int], List[int], List[int]]:
 
-        list_klabels = full_dataset.data["klabel"].numpy()
+        list_klabels = self._get_list_klabels(full_dataset)
 
         total_size = len(full_dataset)
 
@@ -135,3 +142,11 @@ class KnnDatasetSplitter(AbstractDatasetSplitter):
 
         return train_indices, validation_indices, test_indices
 
+
+class KnnDatasetSplitter(AbstactKnnDatasetSplitter):
+    """
+    This splitter is for pytorch_geometric datasets.
+    """
+
+    def _get_list_klabels(self, full_dataset):
+        return full_dataset.data["klabel"].numpy()
