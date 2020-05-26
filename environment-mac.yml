@@ -45,6 +45,7 @@ dependencies:
   - rdflib
   - scikit-learn
   - threadpoolctl
+  - pyinstrument
   - pip:
     - -f https://pytorch-geometric.com/whl/torch-1.4.0.html
     - torch-scatter==latest+cpu
