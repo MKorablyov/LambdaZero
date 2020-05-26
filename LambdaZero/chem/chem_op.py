@@ -550,8 +550,8 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
 
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
-    "mol to graph convertor"
-    mol = build_mol(smiles, num_conf=num_conf, noh=noh)["mol"].to_list()[0]
+    " mol to graph convertor "
+    mol, _, _ = build_mol(smiles, num_conf=num_conf, noh=noh)
     if feat == "mpnn":
         atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
     else:
