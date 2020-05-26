@@ -5,17 +5,15 @@ from typing import Dict, Any, Type, Callable
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.brutal_dock import set_logging_directory
 from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
-from LambdaZero.datasets.brutal_dock.dataset_splitting import KnnDatasetSplitter
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
 from LambdaZero.datasets.brutal_dock.loggers.wandb_logger import WandbLogger
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
-from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
+from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer, AbstractModelTrainer
 from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, \
     TRAINING_PARAMETERS_KEY, write_configuration_file, CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, EXECUTION_FILENAME_KEY
@@ -29,7 +27,8 @@ def experiment_driver(
     model_class: Type[ModelBase],
     logger_class: Type[ExperimentLogger] = WandbLogger,
     random_seed: int = 0,
-    get_dataloaders: Callable = get_geometric_dataloaders
+    get_dataloaders: Callable = get_geometric_dataloaders,
+    model_trainer_class: Type[AbstractModelTrainer] = MoleculeModelTrainer
 ) -> float:
     """
     This method drives the execution of an experiment. It is responsible for
@@ -96,11 +95,11 @@ def experiment_driver(
     logging.info(f"Instantiating model trainer")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model_trainer = MoleculeModelTrainer(loss_function,
-                                         device,
-                                         experiment_logger,
-                                         score_mean=training_mean,
-                                         score_std=training_std)
+    model_trainer = model_trainer_class(loss_function,
+                                        device,
+                                        experiment_logger,
+                                        score_mean=training_mean,
+                                        score_std=training_std)
 
     logging.info(f"Starting Model Training...")
     best_model_path = out_dir.joinpath("best_model.ckpt")
