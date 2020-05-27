@@ -1,11 +1,12 @@
 import sys
+from typing import List, Dict
 
 from chemprop.features import MolGraph
 import pandas as pd
 from tqdm import tqdm
 
 
-def get_chemprop_graphs_from_raw_data_dataframe(raw_data_df: pd.DataFrame):
+def get_chemprop_graphs_from_raw_data_dataframe(raw_data_df: pd.DataFrame) -> List[Dict]:
     list_data = []
 
     for _, row in tqdm(raw_data_df.iterrows(), total=len(raw_data_df), desc="CHEMPROP_GRAPH", file=sys.stdout):
