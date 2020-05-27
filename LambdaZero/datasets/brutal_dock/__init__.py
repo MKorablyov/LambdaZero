@@ -23,7 +23,7 @@ def set_logging_directory(logging_directory: Path):
     with open(logging_path, "rt") as f:
         config = yaml.safe_load(f.read())
 
-    for log_type in ["info", "error", "debug"]:
+    for log_type in ["info", "error"]:
         config["handlers"][f"{log_type}_file_handler"]["filename"] = str(
             logging_directory.joinpath(f"{log_type}.log")
         )
