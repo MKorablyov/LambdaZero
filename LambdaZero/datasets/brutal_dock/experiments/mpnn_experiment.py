@@ -17,7 +17,7 @@ from pathlib import Path
 from orion.client import report_results
 
 
-from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
+from LambdaZero.datasets.brutal_dock.datasets import D4GeometricMoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import get_input_and_run_configuration
@@ -26,7 +26,7 @@ from LambdaZero.datasets.brutal_dock.parameter_inputs import get_input_and_run_c
 model_class = MessagePassingNet
 
 # Specify which dataset class we want to use
-dataset_class = D4MoleculesDataset
+dataset_class = D4GeometricMoleculesDataset
 
 path_of_this_file = Path(__file__).resolve()
 

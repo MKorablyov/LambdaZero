@@ -6,7 +6,7 @@ import pytest
 from torch_geometric.data import InMemoryDataset
 
 from LambdaZero.core.alpha_zero_policy import torch
-from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
+from LambdaZero.datasets.brutal_dock.datasets import D4GeometricMoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
@@ -150,7 +150,7 @@ def input_and_run_config(paths, model_parameters):
 
 @pytest.mark.parametrize("model_name", ["chemprop", "MPNN"])
 def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_config):
-    dataset_class = D4MoleculesDataset
+    dataset_class = D4GeometricMoleculesDataset
     logger_class = MLFlowLogger
 
     with pytest.warns(None) as record:

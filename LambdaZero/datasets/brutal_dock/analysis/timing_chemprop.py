@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 from LambdaZero.datasets.brutal_dock import RESULTS_DIR, BRUTAL_DOCK_DATA_DIR
-from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
+from LambdaZero.datasets.brutal_dock.datasets import D4GeometricMoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR
 from LambdaZero.datasets.brutal_dock.loggers.null_logger import NullLogger
@@ -48,7 +48,7 @@ non_config_dict = {PATHS_KEY: paths,
 input_and_run_config = {CONFIG_KEY: config,
                         NON_CONFIG_KEY: non_config_dict}
 
-dataset_class = D4MoleculesDataset
+dataset_class = D4GeometricMoleculesDataset
 model_class = ChempropNet
 
 if __name__ == '__main__':

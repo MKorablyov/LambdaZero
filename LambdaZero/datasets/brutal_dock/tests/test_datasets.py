@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
+from LambdaZero.datasets.brutal_dock.datasets import D4GeometricMoleculesDataset
 
 
 @pytest.fixture
@@ -28,10 +28,10 @@ def original_raw_data_dir(fake_raw_molecule_data_dataframe):
         raw_dir = Path(tmp_dir_str).joinpath("raw")
         raw_dir.mkdir()
 
-        number_of_files = len(D4MoleculesDataset.feather_filenames)
+        number_of_files = len(D4GeometricMoleculesDataset.feather_filenames)
         list_index_groups = np.array_split(fake_raw_molecule_data_dataframe.index, number_of_files)
 
-        for filename, indices in zip(D4MoleculesDataset.feather_filenames, list_index_groups):
+        for filename, indices in zip(D4GeometricMoleculesDataset.feather_filenames, list_index_groups):
             file_path = raw_dir.joinpath(filename)
             sub_df = fake_raw_molecule_data_dataframe.iloc[indices].reset_index(drop=True)
             sub_df.to_feather(file_path)
@@ -50,7 +50,7 @@ def root_dir():
 
 def test_d4_molecules_dataset(root_dir, original_raw_data_dir, fake_raw_molecule_data_dataframe):
 
-    dataset = D4MoleculesDataset.create_dataset(root_dir, original_raw_data_dir)
+    dataset = D4GeometricMoleculesDataset.create_dataset(root_dir, original_raw_data_dir)
 
     assert dataset.processed_dir == str(Path(root_dir).joinpath('processed/'))
 
