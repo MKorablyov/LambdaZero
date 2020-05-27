@@ -39,6 +39,10 @@ def experiment_driver(
         dataset: the full instantiated dataset, which will be split within this driver
         model_class: class for the model, which should derive from ModelBase.
         logger_class: class responsible for keeping track of model metrics
+        random_seed: integer seed for dataset splitting randomness.
+        get_dataloaders: function which returns the train,valid,test dataloaders
+                         given the full dataset, the seed and parameters
+        model_trainer_class: class which trains the instantiated model
     """
 
     torch.manual_seed(random_seed)
