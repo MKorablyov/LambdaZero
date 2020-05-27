@@ -5,16 +5,20 @@ class ChempropModelTrainer(AbstractModelTrainer):
     """
     Trainer tailored to the chemprop model. Note that
     chemprop handles its own device, so this class won't
-    use .to(device).
+    use .to(device) on the features.
     """
     target_name = 'gridscore'
     features_name = 'mol_graph'
 
     def _get_target_from_batch(self, batch):
-        return batch[self.target_name]
+        target = batch[self.target_name]
+        target = target.to(self.device)
+        return target
 
     def _apply_model_to_batch(self, batch, model):
-        y_hat = model.forward(batch[self.features_name])
+        # features is a complex chemprop-specific object; don't put on device
+        features = batch[self.features_name]
+        y_hat = model.forward(features)
         return y_hat
 
     def _get_size_of_batch(self, batch):
