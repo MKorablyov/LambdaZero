@@ -150,3 +150,9 @@ class KnnDatasetSplitter(AbstactKnnDatasetSplitter):
 
     def _get_list_klabels(self, full_dataset):
         return full_dataset.data["klabel"].numpy()
+
+
+class DictKnnDatasetSplitter(AbstactKnnDatasetSplitter):
+    def _get_list_klabels(self, full_dataset):
+        list_klabels = [d['klabel'] for d in full_dataset]
+        return list_klabels

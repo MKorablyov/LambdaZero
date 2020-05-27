@@ -62,3 +62,27 @@ class ChempropNet(ModelBase):
         chemprop_output = self.chemprop_model.forward(list_smiles)
         return chemprop_output.flatten()
 
+
+class OptimizedChempropNet(ChempropNet):
+
+    def __init__(self, name: str,
+                 depth: int,
+                 ffn_num_layers: int,
+                 ffn_hidden_size: int,
+                 ):
+        """
+        Adaptor to the chemprop model.
+
+        Args:
+            name (str): name of this model
+            depth (int):  Number of message passing steps
+            ffn_num_layers (int): Number of layers in FFN after MPN encoding
+            ffn_hidden_size (int): Hidden dim for higher-capacity FFN (defaults to hidden_size)
+        """
+
+        super(OptimizedChempropNet, self).__init__(name, depth, ffn_num_layers, ffn_hidden_size)
+
+    def forward(self, batch):
+            chemprop_output = self.chemprop_model.forward(batch)
+            return chemprop_output.flatten()
+
