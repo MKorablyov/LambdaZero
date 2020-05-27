@@ -33,7 +33,7 @@ from sklearn.decomposition import PCA as sk_PCA
 #from ..py_tools import chem
 #from ..py_tools import multithread as mtr
 
-from LambdaZero import chem
+import LambdaZero.chem
 
 # def mtable_featurizer(elem, charge=None,organic=False):
 #     """
@@ -649,7 +649,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
         atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
     return atmfeat, coord, bond, bondfeat
 
-def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
+def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
@@ -665,126 +665,33 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
-@ray.remote
-def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
+def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     "mol to graph convertor"
-    mol = chem.build_mol(smiles, num_conf=num_conf, noh=noh)["mol"].to_list()[0]
+    mol,_,_ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
     if feat == "mpnn":
         atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
     else:
         raise NotImplementedError(feat)
-    props = {}
-    if dockscore is not None:
-        props["dockscore"] = dockscore
-    if gridscore is not None:
-        props["gridscore"] = gridscore
-    if klabel is not None:
-        props["klabel"] = klabel
-    graph = mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props)
+    graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
     return graph
 
 
-class QM9(InMemoryDataset):
-    r"""The QM9 dataset from the `"MoleculeNet: A Benchmark for Molecular
-    Machine Learning" <https://arxiv.org/abs/1703.00564>`_ paper, consisting of
-    about 130,000 molecules with 16 regression targets.
-    Each molecule includes complete spatial information for the single low
-    energy conformation of the atoms in the molecule.
-    In addition, we provide the atom features from the `"Neural Message
-    Passing for Quantum Chemistry" <https://arxiv.org/abs/1704.01212>`_ paper.
-
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | Target | Property                         | Description                                                                       | Unit                                        |
-    +========+==================================+===================================================================================+=============================================+
-    | 0      | :math:`\mu`                      | Dipole moment                                                                     | :math:`\textrm{D}`                          |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 1      | :math:`\alpha`                   | Isotropic polarizability                                                          | :math:`{a_0}^3`                             |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 2      | :math:`\epsilon_{\textrm{HOMO}}` | Highest occupied molecular orbital energy                                         | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 3      | :math:`\epsilon_{\textrm{LUMO}}` | Lowest unoccupied molecular orbital energy                                        | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 4      | :math:`\Delta \epsilon`          | Gap between :math:`\epsilon_{\textrm{HOMO}}` and :math:`\epsilon_{\textrm{LUMO}}` | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 5      | :math:`\langle R^2 \rangle`      | Electronic spatial extent                                                         | :math:`{a_0}^2`                             |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 6      | :math:`\textrm{ZPVE}`            | Zero point vibrational energy                                                     | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 7      | :math:`U_0`                      | Internal energy at 0K                                                             | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 8      | :math:`U`                        | Internal energy at 298.15K                                                        | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 9      | :math:`H`                        | Enthalpy at 298.15K                                                               | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 10     | :math:`G`                        | Free energy at 298.15K                                                            | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 11     | :math:`c_{\textrm{v}}`           | Heat capavity at 298.15K                                                          | :math:`\frac{\textrm{cal}}{\textrm{mol K}}` |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 12     | :math:`U_0^{\textrm{ATOM}}`      | Atomization energy at 0K                                                          | :math:`\frac{\textrm{kcal}}{\textrm{mol}}`  |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 13     | :math:`U^{\textrm{ATOM}}`        | Atomization energy at 298.15K                                                     | :math:`\frac{\textrm{kcal}}{\textrm{mol}}`  |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 14     | :math:`H^{\textrm{ATOM}}`        | Atomization enthalpy at 298.15K                                                   | :math:`\frac{\textrm{kcal}}{\textrm{mol}}`  |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 15     | :math:`G^{\textrm{ATOM}}`        | Atomization free energy at 298.15K                                                | :math:`\frac{\textrm{kcal}}{\textrm{mol}}`  |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-
-    Args:
-        root (string): Root directory where the dataset should be saved.
-        transform (callable, optional): A function/transform that takes in an
-            :obj:`torch_geometric.data.Data` object and returns a transformed
-            version. The data object will be transformed before every access.
-            (default: :obj:`None`)
-        pre_transform (callable, optional): A function/transform that takes in
-            an :obj:`torch_geometric.data.Data` object and returns a
-            transformed version. The data object will be transformed before
-            being saved to disk. (default: :obj:`None`)
-        pre_filter (callable, optional): A function that takes in an
-            :obj:`torch_geometric.data.Data` object and returns a boolean
-            value, indicating whether the data object should be included in the
-            final dataset. (default: :obj:`None`)
-    """
-    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
-        super(QM9, self).__init__(root, transform, pre_transform, pre_filter)
-        self.data, self.slices = th.load(self.processed_paths[0])
-
-
-    @property
-    def raw_file_names(self):
-        return ['gdb9.sdf', 'gdb9.sdf.csv']
-
-    @property
-    def processed_file_names(self):
-        return 'qm9.pt'
-
-    def download(self):
-        pass
-
-    def process(self):
-        # read energies in QM9
-        with open(self.raw_paths[1], 'r') as f:
-            target = f.read().split('\n')[1:-1]
-            target = th.tensor([[float(x) for x in line.split(',')[4:20]] for line in target],dtype=th.float)
-
-        # read/embed molecule into graph format
-        suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=False)
-        graphs = []
-        for i,mol in enumerate(suppl):
-            if mol is None: continue
-            atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
-            graph = mol_to_graph(atmfeat, coord, bond, bondfeat, args={"y":target[i].unsqueeze(0)})
-            if self.pre_filter is not None and not self.pre_filter(graph): continue
-            if self.pre_transform is not None: graph = self.pre_transform(graph)
-            graphs.append(graph)
-
-        # save to the disk
-        th.save(self.collate(graphs), self.processed_paths[0])
-
+@ray.remote
+def _brutal_dock_preproc(smi, props, pre_filter, pre_transform):
+    try:
+        graph = mol_to_graph(smi, props)
+    except Exception as e:
+        return None
+    if pre_filter is not None and not pre_filter(graph):
+        return None
+    if pre_transform is not None:
+        graph = pre_transform(graph)
+    return graph
 
 class BrutalDock(InMemoryDataset):
     # own internal dataset
     def __init__(self, root, transform=None, pre_transform=None, pre_filter=None,
-                 props="gridscore", file_names=['ampc_100k'], chunksize=550):
+                 props=["gridscore"], file_names=['ampc_100k'], chunksize=550):
         self._props = props
         self.file_names = file_names
         self._chunksize = chunksize
@@ -811,29 +718,26 @@ class BrutalDock(InMemoryDataset):
 
     def process(self):       
         print("processing", self.raw_paths)
-        ray.init()
         for i in range(len(self.raw_file_names)):
             if not os.path.exists(self.processed_file_names[i]):
                 docked_index = pd.read_feather(self.raw_paths[i])
-                smiles = docked_index["smiles"].tolist()
+                smis = docked_index["smiles"].tolist()
                 props = {pr:docked_index[pr].tolist() for pr in self._props}
-                graph_ray_funs = []
-                for j in range(len(smiles)):
-                    graph_ray_funs.append(
-                        mol_to_graph.remote(smiles[j], **{pr:props[pr][j] for pr in props})
-                    )
-                
-                graphs = []
-                for graph_ray_function in graph_ray_funs:
-                    graph = ray.get(graph_ray_function)
-                    if self.pre_filter is not None and not self.pre_filter(graph): continue
-                    if self.pre_transform is not None: graph = self.pre_transform(graph)
-                    graphs.append(graph)
+                tasks = [_brutal_dock_preproc.remote(smis[j], {pr: props[pr][j] for pr in props},
+                                                     self.pre_filter, self.pre_transform)
+                         for j in range(len(smis))][:1000] # fixme !!!!!!!!!!!!!!!!1
+
+                graphs = ray.get(tasks)
+                graphs = [g for g in graphs if g is not None]
+
                 # save to the disk
                 th.save(self.collate(graphs), self.processed_paths[i])
-        ray.shutdown()
 
 
-if __name__ == "__main__":
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../..', 'data', 'QM9')
-    dataset = QM9(path).shuffle()
+
+
+
+
+
+#if __name__ == "__main__":
+#    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../..', 'data', 'QM9')

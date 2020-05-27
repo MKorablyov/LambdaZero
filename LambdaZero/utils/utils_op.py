@@ -1,6 +1,9 @@
 import time
 import os.path as osp
 import configparser
+import torch as th
+from torch_geometric.utils import remove_self_loops
+
 
 def get_external_dirs():
     """Locate in the filesystem external programs/folders essensial for LambdaZero execution
@@ -40,3 +43,40 @@ def dock_metrics(info):
     episode.custom_metrics["reward"] = env_info["reward"]
     episode.custom_metrics["QED"] = env_info["QED"]
     episode.custom_metrics["discounted_reward"] = env_info["discounted_reward"]
+
+
+
+# class Normalize(object):
+#     def __init__(self, target, target_norm):
+#         self.target = target
+#         self.target_norm = target_norm
+#
+#     def __call__(self, data):
+#         # Specify target.
+#         y = getattr(data, self.target)
+#         y = (y - self.target_norm[0]) / self.target_norm[1]
+#         data.y = y
+#         return data
+
+
+class Complete(object):
+    def __call__(self, data):
+        device = data.edge_index.device
+        row = th.arange(data.num_nodes, dtype=th.long, device=device)
+        col = th.arange(data.num_nodes, dtype=th.long, device=device)
+        row = row.view(-1, 1).repeat(1, data.num_nodes).view(-1)
+        col = col.repeat(data.num_nodes)
+        edge_index = th.stack([row, col], dim=0)
+
+        edge_attr = None
+        if data.edge_attr is not None:
+            idx = data.edge_index[0] * data.num_nodes + data.edge_index[1]
+            size = list(data.edge_attr.size())
+            size[0] = data.num_nodes * data.num_nodes
+            edge_attr = data.edge_attr.new_zeros(size)
+            edge_attr[idx] = data.edge_attr
+
+        edge_index, edge_attr = remove_self_loops(edge_index, edge_attr)
+        data.edge_attr = edge_attr
+        data.edge_index = edge_index
+        return data

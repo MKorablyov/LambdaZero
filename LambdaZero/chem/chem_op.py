@@ -258,7 +258,7 @@ def build_mol(smiles=None,num_conf=1, minimize=False, noh=True,charges=True):
     elem = [int(atom.GetAtomicNum()) for atom in mol.GetAtoms()]
     coord = [np.asarray([mol.GetConformer(j).GetAtomPosition(i) for i in range(len(elem))]) for j in range(num_conf)]
     coord = np.asarray(np.stack(coord,axis=0),dtype=np.float32).tolist()
-    return pd.DataFrame({"mol":[mol], "elem":[elem], "coord":[coord]})
+    return mol, elem, coord
 
 
 def _gen_mol2(smi, mol_name, outpath, chimera_bin, charge_method, num_conf):
