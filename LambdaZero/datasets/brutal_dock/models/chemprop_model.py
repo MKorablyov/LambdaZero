@@ -1,4 +1,5 @@
 from chemprop.args import TrainArgs
+from chemprop.features import BatchMolGraph
 from torch_geometric.data import Batch
 import numpy as np
 
@@ -82,7 +83,7 @@ class OptimizedChempropNet(ChempropNet):
 
         super(OptimizedChempropNet, self).__init__(name, depth, ffn_num_layers, ffn_hidden_size)
 
-    def forward(self, batch):
+    def forward(self, batch: BatchMolGraph):
             chemprop_output = self.chemprop_model.forward(batch)
             return chemprop_output.flatten()
 
