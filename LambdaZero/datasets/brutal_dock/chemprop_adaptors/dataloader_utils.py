@@ -45,6 +45,8 @@ def get_chemprop_dataloaders(dataset: Dataset,
 
 def chemprop_collate_fn(list_dict: List[Dict]):
 
+        logging.debug(f"Collating {len(list_dict)} dictionaries")
+
         collated_dict = dict()
         for key in list_dict[0].keys():
             if key == 'mol_graph':
