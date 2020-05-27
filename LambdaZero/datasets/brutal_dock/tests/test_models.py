@@ -1,4 +1,5 @@
 import pytest
+import torch
 
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
@@ -32,10 +33,16 @@ def test_chemprop_net(real_molecule_batch):
     """
     A smoke test showing that the chemprop model runs on data of the expected shape.
     """
+
     parameters = {'name': 'chemprop', 'depth': 2, 'ffn_num_layers': 2, 'ffn_hidden_size': 8}
 
-    net = ChempropNet(**parameters)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    _ = net.forward(real_molecule_batch)
+    batch = real_molecule_batch.to(device)
+
+    net = ChempropNet(**parameters)
+    net.to(device)
+
+    _ = net.forward(batch)
 
 
