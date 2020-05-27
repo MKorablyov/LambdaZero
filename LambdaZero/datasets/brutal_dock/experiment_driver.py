@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from LambdaZero.datasets.brutal_dock import set_logging_directory
 from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
 from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
-from LambdaZero.datasets.brutal_dock.datasets import GeometricMoleculesDatasetBase
+from LambdaZero.datasets.brutal_dock.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
 from LambdaZero.datasets.brutal_dock.loggers.wandb_logger import WandbLogger
 from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
@@ -23,7 +23,7 @@ loss_function = F.mse_loss
 
 def experiment_driver(
     input_and_run_config: Dict[str, Any],
-    dataset_class: Type[GeometricMoleculesDatasetBase],
+    dataset_class: Type[MoleculesDatasetBase],
     model_class: Type[ModelBase],
     logger_class: Type[ExperimentLogger] = WandbLogger,
     random_seed: int = 0,
