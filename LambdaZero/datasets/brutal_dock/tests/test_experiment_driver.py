@@ -6,9 +6,11 @@ import pytest
 from torch_geometric.data import InMemoryDataset
 
 from LambdaZero.core.alpha_zero_policy import torch
+from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
 from LambdaZero.datasets.brutal_dock.datasets import D4GeometricMoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
+from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
@@ -94,11 +96,21 @@ def paths(data_dir, work_dir, output_dir):
 
 
 @pytest.fixture
-def model_class(model_name):
+def driver_inputs(model_name):
     if model_name == "MPNN":
-        return MessagePassingNet
+        inputs = dict(model_class=MessagePassingNet,
+                      dataset_class=D4GeometricMoleculesDataset,
+                      model_trainer_class=MoleculeModelTrainer,
+                      get_dataloaders=get_geometric_dataloaders)
     elif model_name == "chemprop":
-        return ChempropNet
+        inputs = dict(model_class=ChempropNet,
+                      dataset_class=D4GeometricMoleculesDataset,
+                      model_trainer_class=MoleculeModelTrainer,
+                      get_dataloaders=get_geometric_dataloaders)
+    else:
+        inputs = None
+
+    return inputs
 
 
 @pytest.fixture
@@ -149,12 +161,10 @@ def input_and_run_config(paths, model_parameters):
 
 
 @pytest.mark.parametrize("model_name", ["chemprop", "MPNN"])
-def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_config):
-    dataset_class = D4GeometricMoleculesDataset
+def test_smoke_test_experiment_driver(input_and_run_config, driver_inputs):
     logger_class = MLFlowLogger
-
     with pytest.warns(None) as record:
-        _ = experiment_driver(input_and_run_config, dataset_class, model_class, logger_class)
+        _ = experiment_driver(input_and_run_config, logger_class=logger_class, **driver_inputs)
 
     for warning in record.list:
         assert warning.category != UserWarning, "A user warning was raised"
