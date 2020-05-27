@@ -57,7 +57,7 @@ class D4ChempropMoleculesDataset(MoleculesDatasetBase):
             list_df.append(df)
 
         raw_data_df = pd.concat(list_df).reset_index(drop=True)
-        list_data = get_chemprop_graphs_from_raw_data_dataframe(raw_data_df[:1000])
+        list_data = get_chemprop_graphs_from_raw_data_dataframe(raw_data_df)
         return list_data
 
     def __getitem__(self, index):
