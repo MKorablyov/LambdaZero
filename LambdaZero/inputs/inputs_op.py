@@ -677,7 +677,7 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
 
 
 @ray.remote
-def _brutal_dock_preproc(smi, props, pre_filter, pre_transform):
+def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
     try:
         graph = mol_to_graph(smi, props)
     except Exception as e:
@@ -723,18 +723,12 @@ class BrutalDock(InMemoryDataset):
                 docked_index = pd.read_feather(self.raw_paths[i])
                 smis = docked_index["smiles"].tolist()
                 props = {pr:docked_index[pr].tolist() for pr in self._props}
-                tasks = [_brutal_dock_preproc.remote(smis[j], {pr: props[pr][j] for pr in props},
-                                                     self.pre_filter, self.pre_transform)
-                         for j in range(len(smis))][:1000] # fixme !!!!!!!!!!!!!!!!1
-
+                tasks = [_brutal_dock_proc.remote(smis[j], {pr: props[pr][j] for pr in props},
+                                                  self.pre_filter, self.pre_transform) for j in range(len(smis))]
                 graphs = ray.get(tasks)
                 graphs = [g for g in graphs if g is not None]
-
                 # save to the disk
                 th.save(self.collate(graphs), self.processed_paths[i])
-
-
-
 
 
 

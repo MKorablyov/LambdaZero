@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch_geometric.utils import remove_self_loops
 import torch_geometric.transforms as T
 from torch_geometric.data import DataLoader
-
+import ray
 from ray.rllib.models.catalog import ModelCatalog
 from ray import tune
 
@@ -26,7 +26,7 @@ def train_epoch(loader, model, optimizer, device, config):
     target_norm = config["target_norms"][0]
     model.train()
     sum_loss, sum_mse = 0,0
-    for data in loader:
+    for bidx,data in enumerate(loader):
         # compute y_hat and y
         data = data.to(device)
         optimizer.zero_grad()
@@ -36,7 +36,7 @@ def train_epoch(loader, model, optimizer, device, config):
         loss = F.mse_loss(y_hat, (y - target_norm[0]) / target_norm[1])
         loss.backward()
         optimizer.step()
-        mse = ((y_hat * target_norm[1]) + target_norm[0] - y)**2
+        mse = (((y_hat * target_norm[1]) + target_norm[0] - y)**2).mean()
 
         sum_loss += loss.item() * data.num_graphs
         sum_mse += mse.item() * data.num_graphs
@@ -58,7 +58,7 @@ def eval_epoch(loader, model, device, config):
         y = getattr(data, target)
 
         loss = F.mse_loss(y_hat, (y - target_norm[0]) / target_norm[1])
-        mse = ((y_hat * target_norm[1]) + target_norm[0] - y) ** 2
+        mse = (((y_hat * target_norm[1]) + target_norm[0] - y) ** 2).mean()
 
         sum_loss += loss.item() * data.num_graphs
         sum_mse += mse.item() * data.num_graphs
@@ -80,9 +80,9 @@ class BasicRegressor(tune.Trainable):
                                                file_names=config["file_names"])
 
         # split dataset
-        self.train_set = DataLoader(dataset[:800], shuffle=True)
-        self.val_set = DataLoader(dataset[800:900])
-        self.test_set = DataLoader(dataset[900:])
+        self.train_set = DataLoader(dataset[:8000], shuffle=True, batch_size=config["b_size"])
+        self.val_set = DataLoader(dataset[8000:9000], batch_size=config["b_size"])
+        self.test_set = DataLoader(dataset[9000:], batch_size=config["b_size"])
 
         # make model
         self.model = LambdaZero.models.MPNNet()
@@ -95,7 +95,7 @@ class BasicRegressor(tune.Trainable):
 
     def _train(self):
         train_scores = self.train_epoch(self.train_set, self.model, self.optim, self.device, self.config)
-        eval_scores = self.eval_epoch(self.train_set, self.model,  self.device, self.config) # fixme !!!!!!!!!!!!!!
+        eval_scores = self.eval_epoch(self.train_set, self.model,  self.device, self.config)
 
         return eval_scores
 
@@ -109,8 +109,6 @@ class BasicRegressor(tune.Trainable):
 
 
 transform = LambdaZero.utils.Complete()
-
-
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 
@@ -125,7 +123,7 @@ DEFAULT_CONFIG = {
         "transform": transform,
 
         "lr": 0.001,
-        "b_size": 16,
+        "b_size": 128,
         "dim": 64,
         "num_epochs": 120,
 
@@ -137,7 +135,7 @@ DEFAULT_CONFIG = {
         # todo: test epoch
         },
     "summaries_dir": summaries_dir,
-    "memory": 60 * 10 ** 9,
+    "memory": 20 * 10 ** 9,
     "checkpoint_freq": 250000000,
     "stop": {"training_iteration": 2},
 }
@@ -145,14 +143,15 @@ DEFAULT_CONFIG = {
 config = DEFAULT_CONFIG
 
 
-
 if __name__ == "__main__":
+    ray.init()
+
     analysis = tune.run(config["trainer"],
                         config=config["trainer_config"],
                         stop={"training_iteration":100}, #EarlyStop(),
                         resources_per_trial={
-                            "cpu": 8,
-                            "gpu": 1.0
+                           "cpu": 4, # fixme cpu allocation could block inputs ....
+                           "gpu": 1.0
                         },
                         num_samples=1,
                         checkpoint_at_end=False,

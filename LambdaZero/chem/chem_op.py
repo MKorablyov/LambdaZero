@@ -257,7 +257,7 @@ def build_mol(smiles=None,num_conf=1, minimize=False, noh=True,charges=True):
     # get elem, get coord
     elem = [int(atom.GetAtomicNum()) for atom in mol.GetAtoms()]
     coord = [np.asarray([mol.GetConformer(j).GetAtomPosition(i) for i in range(len(elem))]) for j in range(num_conf)]
-    coord = np.asarray(np.stack(coord,axis=0),dtype=np.float32).tolist()
+    coord = np.asarray(np.stack(coord, axis=0), dtype=np.float32).tolist()
     return mol, elem, coord
 
 

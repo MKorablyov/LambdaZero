@@ -7,11 +7,12 @@ from rdkit import Chem
 from rdkit.Chem import QED, AllChem
 from rdkit import DataStructs
 import torch_geometric.transforms as T
-import LambdaZero.nn
+import LambdaZero.utils
+#import LambdaZero.nn
 
 class PredDockReward:
     def __init__(self, load_model, natm_cutoff, qed_cutoff, soft_stop, exp, delta, simulation_cost, device,
-                 transform=T.Compose([LambdaZero.nn.Complete()])):
+                 transform=T.Compose([LambdaZero.utils.Complete()])):
 
         self.natm_cutoff = natm_cutoff
         self.qed_cutoff = qed_cutoff
