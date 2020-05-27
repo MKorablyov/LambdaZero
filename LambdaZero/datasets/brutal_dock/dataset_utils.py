@@ -30,7 +30,7 @@ def get_scores_statistics(training_dataloader: DataLoader):
         score_sum = torch.zeros(1)
         score_square_sum = torch.zeros(1)
 
-        for batch in training_dataloader:
+        for batch in tqdm(training_dataloader, desc="STATS", file=sys.stdout):
             gridscores = batch['gridscore']
             score_sum += torch.sum(gridscores)
             score_square_sum += torch.sum(gridscores ** 2)
