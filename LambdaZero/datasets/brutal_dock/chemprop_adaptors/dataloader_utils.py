@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, Union, List
 
 import torch
@@ -16,6 +17,10 @@ def get_chemprop_dataloaders(dataset: Dataset,
                                       random_seed=random_seed)
 
     training_dataset, validation_dataset, test_dataset = splitter.get_split_datasets(dataset)
+
+    logging.info(f"size of training set {len(training_dataset)}")
+    logging.info(f"size of validation set {len(validation_dataset)}")
+    logging.info(f"size of test set {len(test_dataset)}")
 
     training_dataloader = DataLoader(training_dataset,
                                      batch_size=training_parameters["batch_size"],
