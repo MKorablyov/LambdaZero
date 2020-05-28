@@ -105,3 +105,23 @@
         # files = os.listdir(cfg.results_dir)
         # for f in files:
         #     print(pd.read_parquet(os.path.join(cfg.results_dir, f), engine="fastparquet")["gridscore"])
+
+import pandas as pd
+path = "/home/maksym/Datasets/actor_dock/results/c1cncnc1.parquet"
+df = pd.read_parquet(path)
+print(df.columns.values)
+print(df["smi"])
+
+
+# molecular environment
+
+# molMDP().random_walk() -> mol_graph, r-groups
+# choose r-group randomly
+# molMDP().make_subs(r-group) -> mol_graph * 105
+# MPNN(mol_graph, r_group) -> logit * 105           # actor
+# MPNN(mol_graphs) -> label * 105                   # critic
+
+
+
+
+

@@ -26,7 +26,8 @@ def train_epoch(loader, model, optimizer, device, config):
     for bidx,data in enumerate(loader):
         # compute y_hat and y
         data = data.to(device)
-        print(data)
+        print(data.edge_attr.shape[0])
+        #print(data.edges.shape[0])
 
         optimizer.zero_grad()
         logit = model(data)
@@ -68,25 +69,12 @@ def eval_epoch(loader, model, device, config):
         metrics["mse"] += ((y - pred) ** 2).sum().item()
         metrics["mae"] += ((y - pred).abs()).sum().item()
 
-        print(metrics)
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
     print("done test")
     return metrics
-#
-# class NumAtoms:
-#     def __init__(self):
-#         self.max = 0
-#         print("!!!!!!!!!!!!!!!!!! setup ")
-#
-#
-#     def __call__(self, data):
-#         if data.pos.shape[0] > self.max:
-#             self.max = data.pos.shape[0]
-#         print("max", self.max)
-#
-#         pass
+
 
 class BasicRegressor(tune.Trainable):
     def _setup(self, config):
@@ -97,10 +85,8 @@ class BasicRegressor(tune.Trainable):
         # load dataset
         dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
                                                props=config["molprops"],
-                                               #pre_filter=NumAtoms(),
                                                transform=config["transform"],
                                                file_names=config["file_names"])
-
 
         # split dataset
         split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
@@ -151,7 +137,7 @@ DEFAULT_CONFIG = {
         "transform": transform,
         "split_name": "randsplit_dock_blocks105_walk40_clust",
         "lr": 0.001,
-        "b_size": 16,
+        "b_size": 64,
         "dim": 64,
         "num_epochs": 120,
 
