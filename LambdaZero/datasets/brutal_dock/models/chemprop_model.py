@@ -35,6 +35,14 @@ class ChempropNet(ModelBase):
     a field "smiles". This is used internally by chemprop to extract features.
     """
 
+    @classmethod
+    def _buggy_input(cls, atom_messages: bool, undirected: bool, depth: int) -> bool:
+        """
+        There is a bug in chemprop. The model crashes because of mismatched dimensions if
+        atom_messages = True, undirected = True and depth > 1.
+        """
+        return atom_messages and undirected and depth > 1
+
     def __init__(self,
                  name: str,
                  bias: bool = False,
@@ -53,6 +61,10 @@ class ChempropNet(ModelBase):
             name (str): name of this model
             [others] : see description above
         """
+
+        if self._buggy_input(atom_messages, undirected, depth):
+            raise NotImplementedError("There is a bug in Chemprop, which crashes for "
+                                      "atom_messages = True, and undirected = True and depth > 1. Review input")
 
         super(ChempropNet, self).__init__()
 
