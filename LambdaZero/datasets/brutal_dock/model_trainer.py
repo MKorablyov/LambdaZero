@@ -172,6 +172,7 @@ class XYModelTrainer(AbstractModelTrainer):
         return y
 
     def _apply_model_to_batch(self, batch, model):
+        model.to(self.device)
         x, _ = self._get_xy_from_batch(batch)
         y_hat = model.forward(x)
         return y_hat
