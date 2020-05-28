@@ -1,19 +1,38 @@
+from contextlib import contextmanager
+
 import pytest
 import torch
 from chemprop.features import BatchMolGraph
+import itertools
 
 from LambdaZero.datasets.brutal_dock.chemprop_adaptors.utils import get_chemprop_graphs_from_raw_data_dataframe
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet, OptimizedChempropNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 
+# There is a tradeoff between how many combinations we consider and how long the tests take to run.
+biases = [True, False]
+hidden_sizes = [5]
+depths = [1, 2]
+dropouts = [0.1]
+atom_messages = [True, False]
+undirected = [True, False]
+list_ffn_hidden_sizes = [7]
+list_ffn_num_layers = [3]
+
+all_chemprop_parameters = list(itertools.product(biases, hidden_sizes, depths, dropouts, atom_messages,
+                                            undirected, list_ffn_hidden_sizes , list_ffn_num_layers))
 
 @pytest.fixture
-def chemprop_parameters():
-    parameters = {'name': 'chemprop', 'depth': 2, 'ffn_num_layers': 2, 'ffn_hidden_size': 8}
+def chemprop_parameters(bias, hidden_size, depth, dropout, atom_messages, undirected, ffn_hidden_size, ffn_num_layers):
+
+    parameters = {'name': 'chemprop', "bias": bias, "hidden_size": hidden_size, "depth": depth,
+                  "dropout": dropout, "atom_messages": atom_messages, "undirected": undirected,
+                  "ffn_hidden_size": ffn_hidden_size, "ffn_num_layers": ffn_num_layers}
+
     return parameters
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def batch_mol_graph(smiles_and_scores_dataframe):
     list_data_dict = get_chemprop_graphs_from_raw_data_dataframe(smiles_and_scores_dataframe)
     return BatchMolGraph([d['mol_graph'] for d in list_data_dict])
@@ -44,7 +63,25 @@ def test_message_passing_net(mpnn_model, random_molecule_batch):
     _ = mpnn_model.forward(random_molecule_batch)
 
 
-def test_chemprop_net(real_molecule_batch, chemprop_parameters):
+@contextmanager
+def does_not_raise():
+    yield
+
+
+@pytest.fixture
+def input_parameter_context(chemprop_parameters):
+    buggy = OptimizedChempropNet._buggy_input(chemprop_parameters["atom_messages"],
+                                              chemprop_parameters["undirected"],
+                                              chemprop_parameters["depth"])
+
+    if buggy:
+        return pytest.raises(NotImplementedError)
+    else:
+        return does_not_raise()
+
+
+@pytest.mark.parametrize("bias, hidden_size, depth, dropout, atom_messages, undirected, ffn_hidden_size, ffn_num_layers", all_chemprop_parameters)
+def test_chemprop_net(real_molecule_batch, chemprop_parameters, input_parameter_context):
     """
     A smoke test showing that the chemprop model runs on data of the expected shape.
     """
@@ -52,21 +89,24 @@ def test_chemprop_net(real_molecule_batch, chemprop_parameters):
 
     batch = real_molecule_batch.to(device)
 
-    # chemprop is a bit nasty and half puts itself on cuda on its own. Let's make it right.
-    net = ChempropNet(**chemprop_parameters)
-    net.to(device)
+    with input_parameter_context:
+        # chemprop is a bit nasty and half puts itself on cuda on its own. Let's make it right.
+        net = ChempropNet(**chemprop_parameters)
+        net.to(device)
 
-    _ = net.forward(batch)
+        _ = net.forward(batch)
 
 
-def test_optimized_chemprop_net(batch_mol_graph, chemprop_parameters):
+@pytest.mark.parametrize("bias, hidden_size, depth, dropout, atom_messages, undirected, ffn_hidden_size, ffn_num_layers", all_chemprop_parameters)
+def test_optimized_chemprop_net(batch_mol_graph, chemprop_parameters, input_parameter_context):
     """
     A smoke test showing that the chemprop model runs on data of the expected shape.
     """
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # chemprop is a bit nasty and half puts itself on cuda on its own. Let's make it right.
-    net = OptimizedChempropNet(**chemprop_parameters)
-    net.to(device)
+    with input_parameter_context:
+        # chemprop is a bit nasty and half puts itself on cuda on its own. Let's make it right.
+        net = OptimizedChempropNet(**chemprop_parameters)
+        net.to(device)
 
-    _ = net.forward(batch_mol_graph)
+        _ = net.forward(batch_mol_graph)
