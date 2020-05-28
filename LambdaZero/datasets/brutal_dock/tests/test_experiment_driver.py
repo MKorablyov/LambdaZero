@@ -2,16 +2,17 @@ import logging
 import tempfile
 from pathlib import Path
 
+import numpy as np
 import pytest
-from torch_geometric.data import InMemoryDataset
 
-from LambdaZero.core.alpha_zero_policy import torch
+from LambdaZero.datasets.brutal_dock.chemprop_adaptors.dataloader_utils import get_chemprop_dataloaders
+from LambdaZero.datasets.brutal_dock.chemprop_adaptors.model_trainer import ChempropModelTrainer
 from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
-from LambdaZero.datasets.brutal_dock.datasets import D4GeometricMoleculesDataset
+from LambdaZero.datasets.brutal_dock.datasets import D4GeometricMoleculesDataset, D4ChempropMoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.brutal_dock.model_trainer import MoleculeModelTrainer
-from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
+from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet, OptimizedChempropNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
     MODEL_PARAMETERS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY
@@ -44,13 +45,18 @@ def expected_processed_file():
 
 
 @pytest.fixture
-def data_dir(expected_raw_files):
+def data_dir(expected_raw_files, smiles_and_scores_dataframe):
+
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
-        data_dir_path = Path(tmp_dir_str).joinpath('raw/')
-        data_dir_path.mkdir(exist_ok=True)
-        for expected_raw_file in expected_raw_files:
-            data_dir_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
+        data_dir_path = Path(tmp_dir_str)
+
+        logging.info("creating fake raw data files")
+        index_splits = np.array_split(smiles_and_scores_dataframe.index, len(expected_raw_files))
+        for filename, indices in zip(expected_raw_files, index_splits):
+            sub_df = smiles_and_scores_dataframe.loc[indices].reset_index(drop=True)
+            file_path = data_dir_path.joinpath(filename)
+            sub_df.to_feather(file_path)
         yield data_dir_path
     logging.info("deleting test folder")
 
@@ -59,21 +65,6 @@ def data_dir(expected_raw_files):
 def work_dir(expected_raw_files, expected_processed_file, real_molecule_dataset):
     with tempfile.TemporaryDirectory() as tmp_dir_str:
         logging.info("creating a fake directory")
-        raw_path = Path(tmp_dir_str).joinpath('raw/')
-        raw_path.mkdir(exist_ok=True)
-        for expected_raw_file in expected_raw_files:
-            raw_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
-
-        processed_path = Path(tmp_dir_str).joinpath('processed/')
-        processed_path.mkdir(exist_ok=True)
-        processed_file_path = processed_path.joinpath(expected_processed_file)
-
-        # This is a bit dirty. The collate method should really be a class method;
-        # looking at that code, there is no reference to "self" internally. Here
-        # we just want to spoof what this method does so we can shove our dataset
-        # in the right place.
-        torch.save(InMemoryDataset.collate(InMemoryDataset, real_molecule_dataset), str(processed_file_path))
-
         yield Path(tmp_dir_str)
     logging.info("deleting test folder")
 
@@ -97,6 +88,7 @@ def paths(data_dir, work_dir, output_dir):
 
 @pytest.fixture
 def driver_inputs(model_name):
+    inputs = None
     if model_name == "MPNN":
         inputs = dict(model_class=MessagePassingNet,
                       dataset_class=D4GeometricMoleculesDataset,
@@ -107,8 +99,12 @@ def driver_inputs(model_name):
                       dataset_class=D4GeometricMoleculesDataset,
                       model_trainer_class=MoleculeModelTrainer,
                       get_dataloaders=get_geometric_dataloaders)
-    else:
-        inputs = None
+
+    elif model_name == "optimized-chemprop":
+        inputs = dict(model_class=OptimizedChempropNet,
+                      dataset_class=D4ChempropMoleculesDataset,
+                      model_trainer_class=ChempropModelTrainer,
+                      get_dataloaders=get_chemprop_dataloaders)
 
     return inputs
 
@@ -124,8 +120,8 @@ def model_parameters(model_name, number_of_node_features, number_of_edge_feature
                           edge_hidden=8,
                           linear_hidden=8)
 
-    elif model_name == "chemprop":
-        parameters = dict(name="chemprop",
+    elif model_name == "chemprop" or model_name == "optimized-chemprop":
+        parameters = dict(name=model_name,
                           depth=2,
                           ffn_num_layers=2,
                           ffn_hidden_size=8
@@ -160,7 +156,7 @@ def input_and_run_config(paths, model_parameters):
     return config_and_augmented
 
 
-@pytest.mark.parametrize("model_name", ["chemprop", "MPNN"])
+@pytest.mark.parametrize("model_name", ["chemprop", "MPNN", "optimized-chemprop"])
 def test_smoke_test_experiment_driver(input_and_run_config, driver_inputs):
     logger_class = MLFlowLogger
     with pytest.warns(None) as record:
