@@ -1,9 +1,6 @@
 import socket, os, time
 import numpy as np
 import os.path as osp
-
-from tqdm import tqdm
-
 import torch as th
 import torch.nn.functional as F
 
@@ -11,7 +8,6 @@ from torch_geometric.utils import remove_self_loops
 import torch_geometric.transforms as T
 from torch_geometric.data import DataLoader
 import ray
-from ray.rllib.models.catalog import ModelCatalog
 from ray import tune
 
 from LambdaZero.utils import get_external_dirs
@@ -25,47 +21,72 @@ def train_epoch(loader, model, optimizer, device, config):
     target = config["targets"][0]
     target_norm = config["target_norms"][0]
     model.train()
-    sum_loss, sum_mse = 0,0
+
+    metrics = {"loss":0, "mse": 0, "mae":0}
     for bidx,data in enumerate(loader):
         # compute y_hat and y
         data = data.to(device)
+        print(data)
+
         optimizer.zero_grad()
-        y_hat = model(data)
+        logit = model(data)
+        pred = (logit * target_norm[1]) + target_norm[0]
         y = getattr(data, target)
 
-        loss = F.mse_loss(y_hat, (y - target_norm[0]) / target_norm[1])
+        loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
         loss.backward()
         optimizer.step()
-        mse = (((y_hat * target_norm[1]) + target_norm[0] - y)**2).mean()
 
-        sum_loss += loss.item() * data.num_graphs
-        sum_mse += mse.item() * data.num_graphs
+        metrics["loss"] += loss.item() * data.num_graphs
+        metrics["mse"] += ((y - pred) ** 2).sum().item()
+        metrics["mae"] += ((y - pred).abs()).sum().item()
 
-    mean_loss, mean_mse = sum_loss / len(loader.dataset), sum_mse / len(loader.dataset)
+        print(metrics)
 
-    return {"mse" : mean_mse, "loss": mean_loss}
+    metrics["loss"] = metrics["loss"] / len(loader.dataset)
+    metrics["mse"] = metrics["mse"] / len(loader.dataset)
+    metrics["mae"] = metrics["mae"] / len(loader.dataset)
+    print("DONE train")
+    return metrics
 
 
 def eval_epoch(loader, model, device, config):
     target = config["targets"][0]
     target_norm = config["target_norms"][0]
     model.eval()
-    sum_loss, sum_mse = 0, 0
-    for data in loader:
+
+    metrics = {"loss": 0, "mse": 0, "mae": 0}
+    for bidx, data in enumerate(loader):
         # compute y_hat and y
         data = data.to(device)
-        y_hat = model(data)
+        logit = model(data)
+        pred = (logit * target_norm[1]) + target_norm[0]
         y = getattr(data, target)
 
-        loss = F.mse_loss(y_hat, (y - target_norm[0]) / target_norm[1])
-        mse = (((y_hat * target_norm[1]) + target_norm[0] - y) ** 2).mean()
+        loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
+        metrics["loss"] += loss.item() * data.num_graphs
+        metrics["mse"] += ((y - pred) ** 2).sum().item()
+        metrics["mae"] += ((y - pred).abs()).sum().item()
 
-        sum_loss += loss.item() * data.num_graphs
-        sum_mse += mse.item() * data.num_graphs
-
-    mean_loss, mean_mse = sum_loss / len(loader.dataset), sum_mse / len(loader.dataset)
-    return {"mse": mean_mse, "loss": mean_loss}
-
+        print(metrics)
+    metrics["loss"] = metrics["loss"] / len(loader.dataset)
+    metrics["mse"] = metrics["mse"] / len(loader.dataset)
+    metrics["mae"] = metrics["mae"] / len(loader.dataset)
+    print("done test")
+    return metrics
+#
+# class NumAtoms:
+#     def __init__(self):
+#         self.max = 0
+#         print("!!!!!!!!!!!!!!!!!! setup ")
+#
+#
+#     def __call__(self, data):
+#         if data.pos.shape[0] > self.max:
+#             self.max = data.pos.shape[0]
+#         print("max", self.max)
+#
+#         pass
 
 class BasicRegressor(tune.Trainable):
     def _setup(self, config):
@@ -76,13 +97,17 @@ class BasicRegressor(tune.Trainable):
         # load dataset
         dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
                                                props=config["molprops"],
+                                               #pre_filter=NumAtoms(),
                                                transform=config["transform"],
                                                file_names=config["file_names"])
 
+
         # split dataset
-        self.train_set = DataLoader(dataset[:8000], shuffle=True, batch_size=config["b_size"])
-        self.val_set = DataLoader(dataset[8000:9000], batch_size=config["b_size"])
-        self.test_set = DataLoader(dataset[9000:], batch_size=config["b_size"])
+        split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
+        train_idxs, val_idxs, test_idxs = np.load(split_path, allow_pickle=True)
+        self.train_set = DataLoader(dataset[th.tensor(train_idxs)], shuffle=True, batch_size=config["b_size"])
+        self.val_set = DataLoader(dataset[th.tensor(val_idxs)], batch_size=config["b_size"])
+        self.test_set = DataLoader(dataset[th.tensor(test_idxs)], batch_size=config["b_size"])
 
         # make model
         self.model = LambdaZero.models.MPNNet()
@@ -96,8 +121,11 @@ class BasicRegressor(tune.Trainable):
     def _train(self):
         train_scores = self.train_epoch(self.train_set, self.model, self.optim, self.device, self.config)
         eval_scores = self.eval_epoch(self.train_set, self.model,  self.device, self.config)
-
-        return eval_scores
+        # rename to make scope
+        train_scores = [("train_" + k, v) for k,v in train_scores.items()]
+        eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
+        scores = dict(train_scores + eval_scores)
+        return scores
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
@@ -121,9 +149,9 @@ DEFAULT_CONFIG = {
         "target_norms": [[-26.3, 12.3]],
         "file_names": ["dock_blocks105_walk40_clust"],
         "transform": transform,
-
+        "split_name": "randsplit_dock_blocks105_walk40_clust",
         "lr": 0.001,
-        "b_size": 128,
+        "b_size": 16,
         "dim": 64,
         "num_epochs": 120,
 
