@@ -122,7 +122,7 @@ def experiment_name():
     return 'some-fake-experiment-name'
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def easy_smiles():
     list_smiles = ['CC(C)=CC(C)(C)O',
                    'CC(C)=CC(=O)NC(C#N)P(=O)(O)O',
@@ -141,7 +141,7 @@ def easy_smiles():
     return list_smiles
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def hard_smiles():
     list_smiles = ['Nn1cnc2c([PH](=O)[O-])ncnc21',
                    'N=C[n+]1cccc(-[n+]2cccc(C(NC(=O)c3csc(N4C=CCC(S)=C4)n3)[NH+]3CCOCC3)c2)c1',
@@ -154,7 +154,7 @@ def hard_smiles():
     return list_smiles
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def realistic_smiles(easy_smiles, hard_smiles):
     list_smiles = []
     list_smiles.extend(easy_smiles)
@@ -162,7 +162,7 @@ def realistic_smiles(easy_smiles, hard_smiles):
     return list_smiles
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def smiles_and_scores_dataframe(realistic_smiles):
 
     np.random.seed(213421)
@@ -179,13 +179,13 @@ def smiles_and_scores_dataframe(realistic_smiles):
     return df
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def list_real_molecules(smiles_and_scores_dataframe):
     list_graphs = get_molecule_graphs_from_raw_data_dataframe(smiles_and_scores_dataframe)
     return list_graphs
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def real_molecule_batch(list_real_molecules):
     return Batch.from_data_list(list_real_molecules)
 
