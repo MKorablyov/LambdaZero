@@ -1,0 +1,26 @@
+{
+    "run_parameters": {
+        "experiment_name": "Chemprop",
+        "run_name": "orion"
+    },
+    "training": {
+        "num_epochs": 100,
+        "num_workers": 4,
+        "batch_size": 1024,
+        "learning_rate": "orion~loguniform(1e-5, 1e-3)",
+        "train_fraction": 0.8,
+        "validation_fraction": 0.1,
+        "patience": 5
+    },
+    "model": {
+        "name": "optimized-chemprop",
+        "bias": "orion~choices([True, False])",
+        "hidden_size": "orion~choices([32, 64, 128, 256, 300, 512])",
+        "depth": "orion~choices([1, 2, 3, 4, 5, 6, 7, 8])",
+        "dropout": "orion~uniform(0., 0.5)",
+        "atom_messages": "orion~choices([True, False])",
+        "undirected": "orion~choices([True, False])",
+        "ffn_hidden_size": "orion~choices([32, 64, 128, 256, 300, 512])",
+        "ffn_num_layers": "orion~choices([1, 2, 3, 4, 5, 6, 7, 8])"
+    }
+}
