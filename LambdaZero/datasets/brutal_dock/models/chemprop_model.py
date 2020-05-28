@@ -45,7 +45,6 @@ class ChempropNet(ModelBase):
                  undirected: bool = False,
                  ffn_hidden_size: int = None,
                  ffn_num_layers: int = 2,
-                 features_only: bool = False
                  ):
         """
         Adaptor to the chemprop model.
@@ -67,7 +66,6 @@ class ChempropNet(ModelBase):
                                undirected=undirected,
                                ffn_hidden_size=ffn_hidden_size,
                                ffn_num_layers=ffn_num_layers,
-                               features_only=features_only,
                                num_tasks=1)
 
         parameters_dict.update(required_parameter_dict)
@@ -108,14 +106,13 @@ class OptimizedChempropNet(ChempropNet):
                  undirected: bool = False,
                  ffn_hidden_size: int = None,
                  ffn_num_layers: int = 2,
-                 features_only: bool = False
                  ):
         """
         Adaptor to the chemprop model.
         """
 
         super(OptimizedChempropNet, self).__init__(name, bias, hidden_size, depth, dropout, atom_messages,
-                                                   undirected, ffn_hidden_size, ffn_num_layers, features_only)
+                                                   undirected, ffn_hidden_size, ffn_num_layers)
 
     def forward(self, batch: BatchMolGraph):
             chemprop_output = self.chemprop_model.forward(batch)
