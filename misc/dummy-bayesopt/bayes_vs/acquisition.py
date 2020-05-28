@@ -5,9 +5,11 @@ import typing
 import torch
 from torch import distributions
 
+from . import greedy_models
 from . import bayes_models
 from . import querier
 from . import chem_ops
+
 
 
 class AcquisitionFunc(metaclass=abc.ABCMeta):
@@ -130,3 +132,67 @@ class ThompsonSamplingAcq(AcquisitionFunc):
 
 
 
+class GreedySamplingAcq(AcquisitionFunc):
+    def __init__(self, trainer, available_molecules: typing.Set[str], seen_molecule2value: dict, noise_std = 0., noise_mean = 0.):
+        self.available_molecules = available_molecules
+        self.seen_molecule2value = seen_molecule2value
+        self.noise_mean = noise_mean
+        self.noise_std = noise_std
+        self.trainer = trainer
+        self._train_model()
+
+    def update_with_seen(self, seen_molecules_smiles, seen_molecules_values):
+        self.seen_molecule2value.update(dict(zip(seen_molecules_smiles, seen_molecules_values)))
+        self.available_molecules.difference_update(set(seen_molecules_smiles))
+        self._train_model()
+
+    def get_batch(self, batch_size=500):
+        fingerprints = [torch.tensor(chem_ops.morgan_fp_from_smiles(smi, radius=2, number_bits=1024),
+                                         dtype=torch.float32)
+                            for smi in self.available_molecules]
+        fingerprints = torch.stack(fingerprints)
+        predicted_scores = self.trainer.predict(fingerprints)
+        predicted_scores = predicted_scores * self.noise_std + self.noise_mean
+
+        sorted_scores = sorted(predicted_scores)
+        sorted_score_index = [index for index, num in sorted(enumerate(predicted_scores), key=lambda x: x[-1])]
+        sorted_available_molecules = list(self.available_molecules)
+        sorted_available_molecules = set([sorted_available_molecules[i] for i in sorted_score_index])
+
+        sorted_available_molecules = iter(sorted_available_molecules)
+        seen_smiles, seen_values = zip(*self.seen_molecule2value.items())
+        batch_results = []
+
+        while len(batch_results) < batch_size:
+            new_molecule = next(sorted_available_molecules)
+            if new_molecule not in list(seen_smiles):
+                batch_results.append(new_molecule)
+
+        return batch_results
+
+    def _train_model(self):
+        seen_smiles, seen_values = zip(*self.seen_molecule2value.items())
+        seen_smiles = list(seen_smiles)
+        seen_values = list(seen_values)
+        fingerprints = [torch.tensor(chem_ops.morgan_fp_from_smiles(smi, radius=2, number_bits=1024),
+                                         dtype=torch.float32)
+                            for smi in seen_smiles]
+        seen_values_tensor = torch.tensor(seen_values)[:, None]
+        fingerprints = torch.stack(fingerprints)
+        self.trainer.train(fingerprints, seen_values_tensor, batch_size = 500)
+
+    @classmethod
+    def create_acquisition_function(cls, queried_results_so_far: typing.List[querier.QueriedHeap], **params):
+
+        available_molecules = queried_results_so_far[-2].all_smiles_set
+        # ^ the available molecules are given by all the molecules seen by the previous oracle
+
+        seen_molecule2value = queried_results_so_far[-1].smi_to_value_dict
+        # ^ the values seen so far are those given by the querier that this acquisition function will suggest molecules
+        # tp
+
+        # bayes_regress = bayes_models.BayesianRegression(embedding_func)
+        #TODO: implement proper init for model
+        model = greedy_models.Model()
+        trainer = greedy_models.Trainer(model)
+        return cls(trainer, available_molecules, seen_molecule2value)
