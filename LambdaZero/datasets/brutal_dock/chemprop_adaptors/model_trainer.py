@@ -2,11 +2,6 @@ from LambdaZero.datasets.brutal_dock.model_trainer import AbstractModelTrainer
 
 
 class ChempropModelTrainer(AbstractModelTrainer):
-    """
-    Trainer tailored to the chemprop model. Note that
-    chemprop handles its own device, so this class won't
-    use .to(device) on the features.
-    """
     target_name = 'gridscore'
     features_name = 'mol_graph'
 
@@ -16,7 +11,7 @@ class ChempropModelTrainer(AbstractModelTrainer):
         return target
 
     def _apply_model_to_batch(self, batch, model):
-        # features is a complex chemprop-specific object; don't put on device
+        model.to(self.device)
         features = batch[self.features_name]
         y_hat = model.forward(features)
         return y_hat
