@@ -52,6 +52,7 @@ def test_chemprop_net(real_molecule_batch, chemprop_parameters):
 
     batch = real_molecule_batch.to(device)
 
+    # chemprop is a bit nasty and half puts itself on cuda on its own. Let's make it right.
     net = ChempropNet(**chemprop_parameters)
     net.to(device)
 
@@ -63,6 +64,9 @@ def test_optimized_chemprop_net(batch_mol_graph, chemprop_parameters):
     A smoke test showing that the chemprop model runs on data of the expected shape.
     """
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # chemprop is a bit nasty and half puts itself on cuda on its own. Let's make it right.
     net = OptimizedChempropNet(**chemprop_parameters)
+    net.to(device)
 
     _ = net.forward(batch_mol_graph)
