@@ -56,7 +56,5 @@ python oracle_examples.py
 
 ## Getting Involved
 [Calendar](https://calendar.google.com/calendar?cid=bnNncTk1NjVobWozY3Z2czUyZHI5anNuZThAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ)  
-[Slack](https://lambdazerogroupe.slack.com/)
-[Asana](https://app.asana.com/0/1176844015060872/list)
-
-
+[Slack](https://lambdazerogroupe.slack.com/)  
+[Asana](https://app.asana.com/0/1176844015060872/list)  
