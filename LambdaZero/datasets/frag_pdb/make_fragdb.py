@@ -5,7 +5,7 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from matplotlib import pyplot as plt
 import pandas as pd
-sys.path.append("../../")
+#sys.path.append("../../")
 from LambdaZero import chem
 
 class cfg:

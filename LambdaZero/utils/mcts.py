@@ -146,6 +146,5 @@ class MCTS:
             action = np.argmax(tree_policy)
         else:
             # otherwise sample an action according to tree policy probabilities
-
             action = np.random.choice(np.arange(node.action_space_size), p=tree_policy)
         return tree_policy, action, node.children[action]
