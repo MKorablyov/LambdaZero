@@ -2,8 +2,6 @@ import logging
 import tempfile
 from pathlib import Path
 
-import warnings
-
 import pytest
 from torch_geometric.data import InMemoryDataset
 
@@ -22,6 +20,14 @@ def number_of_node_features(real_molecule_dataset):
     molecule_graph = real_molecule_dataset[0]
     node_features = molecule_graph.x
     number_features = node_features.shape[1]
+    return number_features
+
+
+@pytest.fixture
+def number_of_edge_features(real_molecule_dataset):
+    molecule_graph = real_molecule_dataset[0]
+    edge_features = molecule_graph.edge_attr
+    number_features = edge_features.shape[1]
     return number_features
 
 
@@ -96,15 +102,14 @@ def model_class(model_name):
 
 
 @pytest.fixture
-def model_parameters(model_name, number_of_node_features):
+def model_parameters(model_name, number_of_node_features, number_of_edge_features):
     parameters = None
     if model_name == "MPNN":
         parameters = dict(name="MPNN",
                           node_feat=number_of_node_features,
-                          edge_feat=4,
+                          edge_feat=number_of_edge_features,
                           gcn_size=8,
                           edge_hidden=8,
-                          gru_layers=1,
                           linear_hidden=8)
 
     elif model_name == "chemprop":
@@ -148,7 +153,6 @@ def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_con
     dataset_class = D4MoleculesDataset
     logger_class = MLFlowLogger
 
-    # Passing None to warns records the warnings; see https://docs.pytest.org/en/3.0.2/recwarn.html
     with pytest.warns(None) as record:
         _ = experiment_driver(input_and_run_config, dataset_class, model_class, logger_class)
 

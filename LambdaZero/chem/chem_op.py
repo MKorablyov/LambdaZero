@@ -266,7 +266,7 @@ def build_mol(smiles=None,num_conf=1, minimize=False, noh=True,charges=True):
     elem = [int(atom.GetAtomicNum()) for atom in mol.GetAtoms()]
     coord = [np.asarray([mol.GetConformer(j).GetAtomPosition(i) for i in range(len(elem))]) for j in range(num_conf)]
     coord = np.asarray(np.stack(coord,axis=0),dtype=np.float32).tolist()
-    return pd.DataFrame({"mol":[mol], "elem":[elem], "coord":[coord]})
+    return mol, elem, coord
 
 
 def _gen_mol2(smi, mol_name, outpath, chimera_bin, charge_method, num_conf):
@@ -550,8 +550,8 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
 
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
-    "mol to graph convertor"
-    mol = build_mol(smiles, num_conf=num_conf, noh=noh)["mol"].to_list()[0]
+    " mol to graph convertor "
+    mol, _, _ = build_mol(smiles, num_conf=num_conf, noh=noh)
     if feat == "mpnn":
         atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
     else:

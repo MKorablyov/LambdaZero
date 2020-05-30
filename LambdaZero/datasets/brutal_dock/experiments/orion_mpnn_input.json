@@ -1,8 +1,8 @@
 {
 
     "run_parameters": {
-        "experiment_name": "Message Passing Neural Network",
-        "run_name": "testrun1"
+        "experiment_name": "Orion-MPNN",
+        "run_name": "orion"
     },
     "training": {
         "num_epochs": 100,
@@ -17,7 +17,6 @@
         "name": "MPNN",
         "gcn_size": "orion~choices([32, 64, 128, 256])",
         "edge_hidden": "orion~choices([32, 64, 128, 256])",
-        "gru_layers": 1,
         "linear_hidden": "orion~choices([128, 256, 512])"
     }
 }
