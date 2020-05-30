@@ -1,5 +1,3 @@
-![alt tag](doc/molMCTS.png)
-
 # LambdaZero: search in the space of small molecules
 
 ## Install
@@ -15,13 +13,11 @@ bash install-prog-datasets.sh [-d dataset_path] [-p programs_path] [-s summaries
 ```
 this script would create a locator file called `external_dirs.cfg` that is machine specific and is used by the LambdaZero core to be able to call external dependencies. 
 
-
 ## Getting started
-Run a few RL algorithms
-`cd examples`
-run ppo
+Run PPO
 ```
-python train_molecule.py ppo001
+cd ~/LambdaZero/LambdaZero/examples/PPO  
+python train_ppo.py ppo001
 # you should see something like this
 
 #+-----------------------------+----------+--------------------+-----------+------------------+------+--------+
@@ -31,27 +27,32 @@ python train_molecule.py ppo001
 #+-----------------------------+----------+--------------------+-----------+------------------+------+--------+
 
 ...
-
-
 ```
-
 Run Ape-X
 ```
-python train_molecule.py apex001
+cd ~/LambdaZero/LambdaZero/examples/PPO  
+python train_apex.py apex001
 ```
-
 Run AlphaZero
 ```
-# az000 ending by three zeros means it is a debug configuration
-# in case of AlphaZero, it means expanding MCTS only a few times to see the outpus
-python train_molecule.py az000
+cd ~/LambdaZero/LambdaZero/examples/AlphaZero
+# az000 ending by three zeros means it is a debug configuration in this case it means expanding MCTS only a few times instead of 800 or 1600 times as in the original implementation to make sure the algorithm runs.
+python train_az.py az000
+```
+Train vanilla MPNN on biophysics simulation data
+```
+cd ~/LambdaZero/LambdaZero/datasets/brutal_dock 
+python split_random.py
+cd ~/LambdaZero/LambdaZero/examples/mpnn
+python train_mpnn.py
 ```
 
-Run Docking simulation in parallel
+Use environment, make random walks, call oracles:
 
-Train MPNN on simulation data
-
-For more information see tutorials, and docs
+```
+cd ~/LambdaZero/LambdaZero/examples/oracles
+python oracle_examples.py
+```
 
 ## Getting Involved
  Google group
