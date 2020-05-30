@@ -15,7 +15,15 @@ def get_external_dirs():
     """
     ROOT = osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))
     config = configparser.ConfigParser()
-    config.read(osp.join(ROOT, 'setup.cfg'))
+
+    if not osp.exists(osp.join(ROOT, 'external_dirs.cfg')):
+        raise ImportError("Locator file is missing. Can't locate third party dependencies. "
+                          "Please, run install_prog_data.sh which will install datasets and third party dependencies "
+                          "and also create external_dirs.cfg  in process needed to locate to these softwares."
+                          "In case you already have datasets and programs installed, you could create "
+                          "external_dirs.cfg manually to point to installations.")
+
+    config.read(osp.join(ROOT, 'external_dirs.cfg'))
 
     if config["dir"]["datasets"].startswith("/"):
         datasets_dir = config["dir"]["datasets"]
