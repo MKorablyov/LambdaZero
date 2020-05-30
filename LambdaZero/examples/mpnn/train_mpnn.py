@@ -26,8 +26,6 @@ def train_epoch(loader, model, optimizer, device, config):
     for bidx,data in enumerate(loader):
         # compute y_hat and y
         data = data.to(device)
-        print(data.edge_attr.shape[0])
-        #print(data.edges.shape[0])
 
         optimizer.zero_grad()
         logit = model(data)
@@ -42,12 +40,9 @@ def train_epoch(loader, model, optimizer, device, config):
         metrics["mse"] += ((y - pred) ** 2).sum().item()
         metrics["mae"] += ((y - pred).abs()).sum().item()
 
-        print(metrics)
-
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
-    print("DONE train")
     return metrics
 
 
@@ -72,7 +67,6 @@ def eval_epoch(loader, model, device, config):
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
-    print("done test")
     return metrics
 
 
@@ -164,7 +158,7 @@ if __name__ == "__main__":
                         config=config["trainer_config"],
                         stop={"training_iteration":100}, #EarlyStop(),
                         resources_per_trial={
-                           "cpu": 4, # fixme cpu allocation could block inputs ....
+                           "cpu": 4, # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
                            "gpu": 1.0
                         },
                         num_samples=1,
