@@ -42,6 +42,7 @@ class PredictArgs(Tap):
             return torch.device('cpu')
 
         return torch.device('cuda', self.gpu)
+
     @device.setter
     def device(self, device: torch.device) -> None:
         self.cuda = device.type == 'cuda'
@@ -114,3 +115,32 @@ def predict_synthesizability(checkpoint_path, smiles, type):
     args = PredictArgs()
     args.checkpoint_paths = [checkpoint_path]
     return make_predictions(args, [smiles], type)
+
+
+
+
+# DEFAULT_CONFIG({cuda=True, chemprop_pars={num_layer=2, num_ensembles=4}})
+
+# class ChemPropPredictor()
+#   def __init__(dataset=None, load_weights=None):
+#   self.model = init_model()
+
+#   def train_epoch(dataset)
+#       return {"loss":loss}
+
+#   def eval_epoch():
+        # return
+
+#   def predict(mol=None, smi=None)
+        # if mol is None: mol = Chem.MolFromSmiles(smi)
+        # precition = self.model(mol)
+        # return prdiciton
+
+
+# if __name__ == "__main__":
+    # pass
+
+
+
+
+# train_chemprop_.py
