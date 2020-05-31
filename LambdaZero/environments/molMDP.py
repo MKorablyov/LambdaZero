@@ -17,6 +17,15 @@ class BlockMoleculeData:
         self._mol = None
 
     def add_block(self, block_idx, block, block_r, stem_idx, atmidx):
+        """
+
+        :param block_idx:
+        :param block:
+        :param block_r:
+        :param stem_idx:
+        :param atmidx:
+        :return:
+        """
         self.blockidxs.append(block_idx)
         self.blocks.append(block)
         self.slices.append(self.slices[-1] + block.GetNumAtoms())
@@ -41,6 +50,12 @@ class BlockMoleculeData:
         return None
 
     def delete_blocks(self, block_mask):
+        """
+
+        :param block_mask:
+        :return:
+        """
+
         # update number of blocks
         self.numblocks = np.sum(np.asarray(block_mask, dtype=np.int32))
         self.blocks = list(np.asarray(self.blocks)[block_mask])
@@ -132,8 +147,13 @@ class MolMDP:
         self.block_nrs = np.asarray([len(r) for r in self.block_rs])
         self.block_mols = [Chem.MolFromSmiles(smi) for smi in blocks["block_smi"]]
         self.block_natm = np.asarray([b.GetNumAtoms() for b in self.block_mols])
-        self.num_blocks = len(self.block_smi)
+        #self.num_blocks = len(self.block_smi)
         self.reset()
+
+    @property
+    def num_blocks(self):
+        "number of possible buildoing blocks in molMDP"
+        return len(self.block_smi)
 
     def reset(self):
         self.molecule = BlockMoleculeData()
