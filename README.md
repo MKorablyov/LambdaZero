@@ -55,13 +55,6 @@ python oracle_examples.py
 ```
 
 ## Getting Involved
- Google group
- Slack community
- Meetings schedule
-
-
-## References
-- AlphaZero: https://arxiv.org/abs/1712.01815
-- Ranked rewards: https://arxiv.org/abs/1807.01672
-
-
+[Calendar](https://calendar.google.com/calendar?cid=bnNncTk1NjVobWozY3Z2czUyZHI5anNuZThAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ)  
+[Slack](https://lambdazerogroupe.slack.com/)  
+[Asana](https://app.asana.com/0/1176844015060872/list)  
