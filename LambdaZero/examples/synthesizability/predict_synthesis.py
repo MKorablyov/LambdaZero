@@ -113,4 +113,4 @@ def make_predictions(args: PredictArgs, smiles: List[str] = None, type: str = "B
 def predict_synthesizability(checkpoint_path, smiles, type):
     args = PredictArgs()
     args.checkpoint_paths = [checkpoint_path]
-    make_predictions(args, [smiles], type)
+    return make_predictions(args, [smiles], type)
