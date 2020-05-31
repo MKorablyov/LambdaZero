@@ -114,6 +114,3 @@ def predict_synthesizability(checkpoint_path, smiles, type):
     args = PredictArgs()
     args.checkpoint_paths = [checkpoint_path]
     make_predictions(args, [smiles], type)
-
-if __name__ == '__main__':
-    predict_synthesizability('/Users/chenghaoliu/ML/Synthesizability/MPNN_model/Binary_corrected/model_0/model.pt', "CNCl", "binary")
