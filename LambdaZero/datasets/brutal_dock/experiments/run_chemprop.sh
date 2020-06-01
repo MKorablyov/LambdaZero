@@ -3,12 +3,13 @@
 
 LAMBDA_ZERO_BASE_PATH="/Users/bruno/PycharmProjects/LambdaZero/"
 CONFIG=./example_chemprop_input.json
-SCRIPT=chemprop_experiment.py
+#SCRIPT=chemprop_experiment.py
+SCRIPT=optimized_chemprop_experiment.py
 
 DATA_DIRECTORY=$LAMBDA_ZERO_BASE_PATH/Datasets/brutal_dock/d4/raw/
 OUTPUT_DIRECTORY=$LAMBDA_ZERO_BASE_PATH/results/
 WORKING_DIRECTORY=$LAMBDA_ZERO_BASE_PATH/LambdaZero/datasets/brutal_dock/experiments/data/
-TRACKING_URI=$LAMBDA_ZERO_BASE_PATH/mlruns/
+TRACKING_URI=$LAMBDA_ZERO_BASE_PATH/wandb/
 
 python $SCRIPT --config=$CONFIG \
                --working_directory=$WORKING_DIRECTORY \
