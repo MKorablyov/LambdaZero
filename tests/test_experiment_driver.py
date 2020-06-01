@@ -93,15 +93,6 @@ def paths(data_dir, work_dir, output_dir):
     return paths
 
 
-
-@pytest.fixture
-def model_class(model_name):
-    if model_name == "MPNN":
-        return MessagePassingNet
-    elif model_name == "chemprop":
-        return ChempropNet
-
-
 @pytest.fixture
 def model_class(model_name):
     if model_name == "MPNN":
@@ -167,3 +158,4 @@ def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_con
 
     for warning in record.list:
         assert warning.category != UserWarning, "A user warning was raised"
+
