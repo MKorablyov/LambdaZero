@@ -1,13 +1,11 @@
-import os,sys, time
+import os
+import time
+
 import numpy as np
 import pandas as pd
-from rdkit import Chem
-from rdkit.Chem import AllChem
-from rdkit.Chem import Descriptors
-from scipy.cluster.vq import kmeans2
 from affinity_torch.py_tools import chem
 from affinity_torch.py_tools import multithread as mtr
-from affinity_torch.py_tools import chem
+from scipy.cluster.vq import kmeans2
 
 
 # read smiles
