@@ -2,19 +2,17 @@ import logging
 import tempfile
 from pathlib import Path
 
-import warnings
-
 import pytest
+import torch
 from torch_geometric.data import InMemoryDataset
 
-from LambdaZero.core.alpha_zero_policy import torch
-from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
-from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
-from LambdaZero.datasets.brutal_dock.loggers.mlflow_logger import MLFlowLogger
-from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
-from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
-from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
-    MODEL_PARAMETERS_KEY, PATHS_KEY, CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY
+from LambdaZero.datasets.temp_brunos_work.datasets import D4MoleculesDataset
+from LambdaZero.datasets.temp_brunos_work.experiment_driver import experiment_driver
+from LambdaZero.datasets.temp_brunos_work.loggers.mlflow_logger import MLFlowLogger
+from LambdaZero.datasets.temp_brunos_work.models.chemprop_model import ChempropNet
+from LambdaZero.datasets.temp_brunos_work.models.message_passing_model import MessagePassingNet
+from LambdaZero.datasets.temp_brunos_work.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY, \
+    PATHS_KEY, MODEL_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, RUN_PARAMETERS_KEY
 
 
 @pytest.fixture
@@ -105,10 +103,6 @@ def model_class(model_name):
 
 
 @pytest.fixture
-def model_parameters(model_name, number_of_node_features, number_of_edge_features):
-    pass
-
-@pytest.fixture
 def model_class(model_name):
     if model_name == "MPNN":
         return MessagePassingNet
@@ -117,7 +111,7 @@ def model_class(model_name):
 
 
 @pytest.fixture
-def model_parameters(model_name, number_of_node_features):
+def model_parameters(model_name, number_of_node_features, number_of_edge_features):
 
     parameters = None
     if model_name == "MPNN":

@@ -3,8 +3,8 @@ from typing import Dict
 import mlflow
 import logging
 
-from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
-from LambdaZero.datasets.brutal_dock.parameter_inputs import get_git_hash, get_user
+from LambdaZero.datasets.temp_brunos_work.loggers.experiment_logger import ExperimentLogger
+from LambdaZero.datasets.temp_brunos_work.parameter_inputs import get_user, get_git_hash
 
 
 class MLFlowLogger(ExperimentLogger):

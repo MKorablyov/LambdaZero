@@ -1,7 +1,5 @@
 import os, sys, time, socket, os.path as osp
 import numpy as np
-from affinity_models.alpha_zero.environments.molecule import BlockMolEnv_v3
-from affinity_models.rl_molecule.rlmol.env import MolMDP, QEDReward, PredDockReward
 
 from copy import deepcopy
 from matplotlib import pyplot as plt

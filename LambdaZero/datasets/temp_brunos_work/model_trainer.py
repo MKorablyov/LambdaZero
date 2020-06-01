@@ -11,7 +11,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
+from LambdaZero.datasets.temp_brunos_work.loggers.experiment_logger import ExperimentLogger
 
 
 class AbstractModelTrainer(ABC):

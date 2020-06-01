@@ -4,7 +4,7 @@ from torch_geometric.data import Data
 
 from torch_geometric.data import DataLoader
 
-from LambdaZero.datasets.brutal_dock.dataset_utils import get_scores_statistics
+from LambdaZero.datasets.temp_brunos_work.dataset_utils import get_scores_statistics
 
 
 @pytest.fixture

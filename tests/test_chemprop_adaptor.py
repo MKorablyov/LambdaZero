@@ -4,7 +4,7 @@ from rdkit.Chem.rdmolfiles import MolFromSmiles
 import numpy as np
 
 from LambdaZero.chem import mol_to_graph, Chem
-from LambdaZero.datasets.brutal_dock.models.chemprop_adaptor import graph_to_mol
+from LambdaZero.datasets.temp_brunos_work.models.chemprop_adaptor import graph_to_mol
 
 
 @pytest.mark.xfail

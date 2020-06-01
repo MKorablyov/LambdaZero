@@ -6,7 +6,7 @@ import getpass
 
 import git
 
-from LambdaZero.datasets.brutal_dock import ROOT_DIR
+from LambdaZero.datasets.temp_brunos_work import ROOT_DIR
 
 CONFIG_KEY = "config"
 MODEL_PARAMETERS_KEY = "model"
