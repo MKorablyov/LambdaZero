@@ -2,8 +2,9 @@ from chemprop.args import TrainArgs
 from torch_geometric.data import Batch
 import numpy as np
 
-from LambdaZero.datasets.brutal_dock.models.model_base import ModelBase
 from chemprop.models import MoleculeModel
+
+from LambdaZero.datasets.temp_brunos_work.models.model_base import ModelBase
 
 
 class ChempropNet(ModelBase):

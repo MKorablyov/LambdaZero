@@ -1,4 +1,4 @@
-from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_list_edge_indices_for_a_ring
+from tests.fake_molecules import get_list_edge_indices_for_a_ring
 
 
 def test_get_list_edge_indices_for_a_ring():

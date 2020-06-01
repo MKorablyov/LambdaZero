@@ -1,7 +1,7 @@
 import pytest
 
-from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
-from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
+from LambdaZero.datasets.temp_brunos_work.models.chemprop_model import ChempropNet
+from LambdaZero.datasets.temp_brunos_work.models.message_passing_model import MessagePassingNet
 
 
 @pytest.fixture

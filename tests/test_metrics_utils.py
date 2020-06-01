@@ -1,6 +1,6 @@
 import numpy as np
 
-from LambdaZero.datasets.brutal_dock.metrics_utils import get_prediction_statistics
+from LambdaZero.datasets.temp_brunos_work.metrics_utils import get_prediction_statistics
 
 
 def test_get_prediction_statistics():
