@@ -1,13 +1,15 @@
-import os, time, socket, os.path as osp
+# TODO: this code depends on "mol_blocks_v4_config", which does not exist.
+import os
+import os.path as osp
+import time
+
 import numpy as np
-from LambdaZero.environments.molecule import BlockMolEnv_v3, MolMDP, QEDReward, PredDockReward
-from copy import deepcopy
-import ray
-import os, sys
-from LambdaZero.examples.config import mol_blocks_v4_config
-from rdkit import Chem
-from LambdaZero.chem import Dock_smi
 import pandas as pd
+import ray
+from rdkit import Chem
+
+from LambdaZero.chem import Dock_smi
+
 
 def exhaustive_subs(env, env_config):
     # find some starting state
