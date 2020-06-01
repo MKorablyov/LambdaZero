@@ -114,7 +114,7 @@ fi
 #datasets = /home/maksym/Datasets
 #programs = /home/maksym/Programs
 #summaries = /home/maksym/Summaries
-echo -en "[dir]\ndatasets_dir=$DATASETS_DIR\nprograms_dir=$PROGRAMS_DIR\nsummaries_dir=$SUMMARIES_DIR" > external_dirs.cfg
+echo -en "[dir]\ndatasets=$DATASETS_DIR\nprograms=$PROGRAMS_DIR\nsummaries=$SUMMARIES_DIR" > external_dirs.cfg
 
 
 mkdir -p "$DATASETS_DIR"
