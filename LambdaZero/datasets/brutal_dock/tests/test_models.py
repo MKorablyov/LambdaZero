@@ -1,6 +1,6 @@
 import pytest
 
-# from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
+from LambdaZero.datasets.brutal_dock.models.chemprop_model import ChempropNet
 from LambdaZero.datasets.brutal_dock.models.gin import GraphIsomorphismNet
 from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
 
@@ -28,7 +28,6 @@ def test_message_passing_net(mpnn_model, random_molecule_batch):
     """
     _ = mpnn_model.forward(random_molecule_batch)
 
-'''
 def test_chemprop_net(real_molecule_batch):
     """
     A smoke test showing that the chemprop model runs on data of the expected shape.
@@ -38,7 +37,6 @@ def test_chemprop_net(real_molecule_batch):
     net = ChempropNet(**parameters)
 
     _ = net.forward(real_molecule_batch)
-'''
 
 @pytest.fixture
 def gin_model(number_of_node_features, number_of_edge_features, number_of_layers, gin_size, gin_mlp_hidden_size,
