@@ -1,14 +1,13 @@
-import os,sys,time,timeit
+import os
+import sys
+
+import matplotlib.cm as cm
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
 from matplotlib import pyplot as plt
-import matplotlib.cm as cm
-import seaborn as sns
-#import pylab as pl
+
 sys.path.append("../..")
-from affinity_torch.py_tools import utils
-from affinity_torch.py_tools import chem
 
 
 # sample size / top 100 affinity
