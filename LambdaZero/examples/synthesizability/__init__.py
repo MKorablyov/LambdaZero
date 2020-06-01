@@ -1,1 +1,1 @@
-from .predict_synthesis import predict_synthesizability
+from .predict_synthesis import ChempropPredictor

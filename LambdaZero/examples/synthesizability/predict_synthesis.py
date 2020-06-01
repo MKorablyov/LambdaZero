@@ -1,44 +1,36 @@
 '''
-from LambdaZero.examples.synthesizability import predict_synthesizability
-predict_synthesizability(path, smiles, "binary"/"regression") #to predict synthesizability
+from LambdaZero.examples.synthesizability import ChempropPredictor # or predict_synthesis
+synthesizability = ChempropPredictor(dataset = "/path/")
+synthesizability.predict(smi = "ccc", binary=True/False) # or mol = mol
 '''
-from tap import Tap
 import torch
-from typing import List, Union
 import numpy as np
 import sys, os
+from rdkit import Chem
+from collections import OrderedDict
 
-from chemprop.args import TrainArgs
-from chemprop.data import MoleculeDataLoader, MoleculeDataset
-from chemprop.data.utils import get_data_from_smiles
-from chemprop.utils import load_args, load_checkpoint, load_scalers
+from LambdaZero.utils import get_external_dirs
+from chemprop.data import MoleculeDataLoader, MoleculeDataset, MoleculeDatapoint
+from chemprop.utils import load_checkpoint, load_scalers
 from chemprop.train import predict
 
-class PredictArgs(Tap):
-    checkpoint_paths: List[str]
-    num_workers: int = 8   # Number of workers for the parallel data loading (0 means sequential)
-    batch_size: int = 50  # Batch size
-    no_features_scaling: bool = False
 
-    @property
-    def ensemble_size(self) -> int:
-        return len(self.checkpoint_paths)
+class ChempropPredictor():
+    def __init__(self, dataset=None, load_weights=True):
+        self.no_cuda: bool = False
+        self.dataset = dataset
+        self.load_weights = load_weights
+        self.model = None
+        if self.load_weights:
+            sys.stdout = open(os.devnull, "w")  # silience the checkpoint logger
+            self.model = load_checkpoint(dataset, device=self.device)
+            sys.stdout = sys.__stdout__
+        self.scaler, self.features_scaler = load_scalers(dataset)
 
-    def process_args(self) -> None:
-        super(PredictArgs, self).process_args()
-
-        if self.checkpoint_paths is None or len(self.checkpoint_paths) == 0:
-            raise ValueError('Found no checkpoints. Must specify --checkpoint_path <path> or '
-                             '--checkpoint_dir <dir> containing at least one checkpoint.')
-
-    @property
-    def features_scaling(self) -> bool:
-        return not self.no_features_scaling
 
     @property
     def device(self) -> torch.device:
         if not self.cuda:
-            print (1)
             return torch.device('cpu')
 
         return torch.device('cuda', self.gpu)
@@ -56,91 +48,52 @@ class PredictArgs(Tap):
     def cuda(self, cuda: bool) -> None:
         self.no_cuda = not cuda
 
+    def train_epoch(self, dataset):
+        return {"loss"}
 
-def make_predictions(args: PredictArgs, smiles: List[str] = None, type: str = "Binary") -> int: #-> List[Optional[List[float]]]:
+    def eval_epoch(self):
+        return None
 
-    #print('Loading training args')
-    scaler, features_scaler = load_scalers(args.checkpoint_paths[0])
-    train_args = load_args(args.checkpoint_paths[0])
-    num_tasks, task_names = train_args.num_tasks, train_args.task_names
+    def predict(self, smi=None, mol=None, binary=True):
+        if smi is None:
+            smi = Chem.MolToSmiles(mol)
 
-    # Update predict args with training arguments to create a merged args object
-    for key, value in vars(train_args).items():
-        if not hasattr(args, key):
-            setattr(args, key, value)
-    args: Union[PredictArgs, TrainArgs]
+        test_data = MoleculeDataset([
+            MoleculeDatapoint(
+                smiles=smi,
+                row=OrderedDict({'smiles': smi}),
+                features_generator=None
+            )
+        ])
 
-    #print('Loading data')
-    full_data = get_data_from_smiles(smiles=smiles, skip_invalid_smiles=False, features_generator=args.features_generator)
+        test_data_loader = MoleculeDataLoader(
+            dataset=test_data,
+        )
 
-    #print('Validating SMILES')
-    full_to_valid_indices = {}
-    valid_index = 0
-    for full_index in range(len(full_data)):
-        if full_data[full_index].mol is not None:
-            full_to_valid_indices[full_index] = valid_index
-            valid_index += 1
+        model_preds = predict(
+            model=self.model,
+            data_loader=test_data_loader,
+            disable_progress_bar=True,
+            scaler=self.scaler
+        ) # prediction = self.model(mol)
 
-    test_data = MoleculeDataset([full_data[i] for i in sorted(full_to_valid_indices.keys())])
-
-    avg_preds = np.zeros((len(test_data), num_tasks))
-
-    # Create data loader
-    test_data_loader = MoleculeDataLoader(
-        dataset=test_data,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers
-    )
-    #print(f'Predicting with an ensemble of {len(args.checkpoint_paths)} models')
-    # Load model
-    sys.stdout = open(os.devnull, "w") #silience the checkpoint logger
-    model = load_checkpoint(args.checkpoint_paths[0], device=args.device)
-    sys.stdout = sys.__stdout__
-
-    model_preds = predict(
-        model=model,
-        data_loader=test_data_loader,
-        disable_progress_bar=True,
-        scaler=scaler
-    )
-    avg_preds += np.array(model_preds)
-
-    if type == "binary":
-        return int(round(avg_preds[0][0])) #binary, you can also return fulldata.row for the smiles
-    else: #default is regression
-        return avg_preds[0][0]
+        model_preds = np.array(model_preds)[0][0]
+        if binary:
+            return int(round(model_preds))  # binary, you can also return fulldata.row for the smiles
+        else:  # regression
+            return model_preds
 
 
-def predict_synthesizability(checkpoint_path, smiles, type):
-    args = PredictArgs()
-    args.checkpoint_paths = [checkpoint_path]
-    return make_predictions(args, [smiles], type)
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+
+if __name__ == '__main__':
+    synthesizability = ChempropPredictor(dataset = os.path.join(datasets_dir, "synthesizability/binary_corrected/model_0/model.pt"))
+    print (synthesizability.predict(smi = "Clc1cc(N2CCN(CC2)CCCN2c3c(c(OC)ccc3)CCC2=O)ccc1"))
 
 
-
-
-# DEFAULT_CONFIG({cuda=True, chemprop_pars={num_layer=2, num_ensembles=4}})
-
-# class ChemPropPredictor()
-#   def __init__(dataset=None, load_weights=None):
-#   self.model = init_model()
-
-#   def train_epoch(dataset)
-#       return {"loss":loss}
-
-#   def eval_epoch():
-        # return
-
-#   def predict(mol=None, smi=None)
-        # if mol is None: mol = Chem.MolFromSmiles(smi)
-        # precition = self.model(mol)
-        # return prdiciton
-
-
-# if __name__ == "__main__":
-    # pass
-
-
-
-
-# train_chemprop_.py
+#DEFAULT_CONFIG = {
+#    "chemprop_pars"={num_layer=2, num_ensembles=4}}
+#    "num_workers": 8  # Number of workers for the parallel data loading (0 means sequential)
+#    "batch_size": int = 50  # Batch size
+#    "no_features_scaling": = False
+#}
