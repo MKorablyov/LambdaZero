@@ -22,7 +22,7 @@ class GraphIsomorphismNet(ModelBase):
         Args:
             name (str, optional): name of this model
             node_feat (int, optional): number of input features. Defaults to 14.
-            edge_feat (int, optional): number of edge features. Defaults to 3.
+            edge_feat (int, optional): number of edge features. Defaults to 4.
             gin_layers (int, optional): number of GIN layers. Defaults to 2.
             gin_size (int, optional): size of GCN embedding size. Defaults to 128.
             gin_mlp_hidden (int, optional): size of hidden layer in GIN MLP. Defaults to 128.
