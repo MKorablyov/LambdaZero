@@ -1,0 +1,23 @@
+{
+  "callbacks": {
+    "on_episode_end": "<function dock_metrics at 0x7f615f36f598>"
+  },
+  "env": "<class 'LambdaZero.environments.block_mol_v3.BlockMolEnv_v3'>",
+  "env_config": {
+    "allow_removal": true
+  },
+  "local_tf_session_args": {
+    "inter_op_parallelism_threads": 4,
+    "intra_op_parallelism_threads": 4
+  },
+  "model": {
+    "custom_model": "MolActorCritic_tfv1"
+  },
+  "num_gpus": 0.5,
+  "num_gpus_per_worker": 0.1,
+  "num_workers": 1,
+  "tf_session_args": {
+    "inter_op_parallelism_threads": 1,
+    "intra_op_parallelism_threads": 1
+  }
+}

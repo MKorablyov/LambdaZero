@@ -1,0 +1,130 @@
+{
+  "checkpoints": [
+    {
+      "trainable_name": "PPO",
+      "trial_id": "00000",
+      "config": {
+        "tf_session_args": {
+          "intra_op_parallelism_threads": 1,
+          "inter_op_parallelism_threads": 1
+        },
+        "local_tf_session_args": {
+          "intra_op_parallelism_threads": 4,
+          "inter_op_parallelism_threads": 4
+        },
+        "num_workers": 1,
+        "num_gpus_per_worker": 0.1,
+        "num_gpus": 0.5,
+        "model": {
+          "custom_model": "MolActorCritic_tfv1"
+        },
+        "callbacks": {
+          "on_episode_end": {
+            "_type": "CLOUDPICKLE_FALLBACK",
+            "value": "8004952e000000000000008c194c616d6264615a65726f2e7574696c732e7574696c735f6f70948c0c646f636b5f6d6574726963739493942e"
+          }
+        },
+        "env": {
+          "_type": "CLOUDPICKLE_FALLBACK",
+          "value": "8004953b000000000000008c244c616d6264615a65726f2e656e7669726f6e6d656e74732e626c6f636b5f6d6f6c5f7633948c0e426c6f636b4d6f6c456e765f76339493942e"
+        },
+        "env_config": {
+          "allow_removal": true
+        }
+      },
+      "local_dir": "/home/nova/LambdaZero/summaries/ppo001",
+      "evaluated_params": {},
+      "experiment_tag": "0",
+      "location": {
+        "_type": "CLOUDPICKLE_FALLBACK",
+        "value": "8004953a000000000000008c0e7261792e74756e652e747269616c948c084c6f636174696f6e9493942981947d94288c08686f73746e616d65944e8c03706964944e75622e"
+      },
+      "resources": {
+        "cpu": 1,
+        "gpu": 0.5,
+        "memory": 0,
+        "object_store_memory": 0,
+        "extra_cpu": 1,
+        "extra_gpu": 0.1,
+        "extra_memory": 0,
+        "extra_object_store_memory": 0,
+        "custom_resources": {},
+        "extra_custom_resources": {}
+      },
+      "stopping_criterion": {
+        "training_iteration": 2000000
+      },
+      "loggers": "80044e2e",
+      "sync_to_driver_fn": "80044e2e",
+      "verbose": true,
+      "max_failures": 0,
+      "last_result": {},
+      "last_update_time": -Infinity,
+      "metric_analysis": {},
+      "export_formats": [],
+      "status": "PENDING",
+      "start_time": null,
+      "logdir": "/home/nova/LambdaZero/summaries/ppo001/PPO_BlockMolEnv_v3_0_2020-06-01_13-47-03qvdlibie",
+      "runner": null,
+      "result_logger": null,
+      "last_debug": 0,
+      "error_file": null,
+      "error_msg": null,
+      "custom_trial_name": null,
+      "saving_to": null,
+      "remote_checkpoint_dir_prefix": null,
+      "checkpoint_freq": 250,
+      "checkpoint_at_end": false,
+      "sync_on_checkpoint": true,
+      "checkpoint_manager": {
+        "_type": "CLOUDPICKLE_FALLBACK",
+        "value": "80049565010000000000008c1b7261792e74756e652e636865636b706f696e745f6d616e61676572948c11436865636b706f696e744d616e616765729493942981947d94288c146b6565705f636865636b706f696e74735f6e756d94477ff00000000000008c165f636865636b706f696e745f73636f72655f6465736394898c165f636865636b706f696e745f73636f72655f61747472948c12747261696e696e675f697465726174696f6e948c1c6e65776573745f70657273697374656e745f636865636b706f696e749468008c0a436865636b706f696e749493942981947d94288c0773746f72616765948c0a70657273697374656e74948c0576616c7565944e8c06726573756c74947d9475628c186e65776573745f6d656d6f72795f636865636b706f696e7494680b2981947d9428680e8c066d656d6f72799468104e68117d9475628c115f626573745f636865636b706f696e7473945d948c0b5f6d656d62657273686970948f9475622e"
+      },
+      "restore_path": null,
+      "restoring_from": null,
+      "num_failures": 0,
+      "results": "80044e2e",
+      "best_result": "80044e2e",
+      "param_config": "80044e2e",
+      "extra_arg": "80044e2e",
+      "_nonjson_fields": [
+        "loggers",
+        "sync_to_driver_fn",
+        "results",
+        "best_result",
+        "param_config",
+        "extra_arg"
+      ],
+      "resuming_from": null,
+      "__logger_started__": true
+    }
+  ],
+  "runner_data": {
+    "_global_time_limit": Infinity,
+    "_total_time": 0,
+    "_iteration": 0,
+    "_has_errored": false,
+    "_fail_fast": false,
+    "_verbose": true,
+    "_server_port": 4321,
+    "_cached_trial_decisions": {},
+    "_should_stop_experiment": false,
+    "_local_checkpoint_dir": "/home/nova/LambdaZero/summaries/ppo001",
+    "_remote_checkpoint_dir": null,
+    "_stopper": {
+      "_type": "CLOUDPICKLE_FALLBACK",
+      "value": "80049527000000000000008c107261792e74756e652e73746f70706572948c0b4e6f6f7053746f707065729493942981942e"
+    },
+    "_resumed": false,
+    "_start_time": 1591033623.3162205,
+    "_last_checkpoint_time": 1591033623.4398527,
+    "_checkpoint_period": 10,
+    "_session_str": "2020-06-01_13-47-03",
+    "checkpoint_file": "/home/nova/LambdaZero/summaries/ppo001/experiment_state-2020-06-01_13-47-03.json",
+    "launch_web_server": false
+  },
+  "stats": {
+    "start_time": 1591033623.3162205,
+    "timestamp": 1591033623.4398527
+  }
+}

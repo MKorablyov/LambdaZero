@@ -1,0 +1,61 @@
+Failure # 1 (occurred at 2020-06-01_16-25-23)
+Traceback (most recent call last):
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/tune/trial_runner.py", line 467, in _process_trial
+    result = self.trial_executor.fetch_result(trial)
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/tune/ray_trial_executor.py", line 381, in fetch_result
+    result = ray.get(trial_future[0], DEFAULT_GET_TIMEOUT)
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/worker.py", line 1491, in get
+    raise value.as_instanceof_cause()
+ray.exceptions.RayTaskError(RuntimeError): [36mray::PPO.train()[39m (pid=51668, ip=10.0.0.131)
+  File "python/ray/_raylet.pyx", line 450, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 405, in ray._raylet.execute_task.function_executor
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/agents/trainer.py", line 502, in train
+    raise e
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/agents/trainer.py", line 491, in train
+    result = Trainable.train(self)
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/tune/trainable.py", line 261, in train
+    result = self._train()
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/agents/trainer_template.py", line 150, in _train
+    fetches = self.optimizer.step()
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/optimizers/multi_gpu_optimizer.py", line 148, in step
+    self.train_batch_size)
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/optimizers/rollout.py", line 25, in collect_samples
+    next_sample = ray_get_and_free(fut_sample)
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/utils/memory.py", line 29, in ray_get_and_free
+    result = ray.get(object_ids)
+ray.exceptions.RayTaskError(RuntimeError): [36mray::RolloutWorker.sample()[39m (pid=51675, ip=10.0.0.131)
+  File "python/ray/_raylet.pyx", line 450, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 405, in ray._raylet.execute_task.function_executor
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/evaluation/rollout_worker.py", line 492, in sample
+    batches = [self.input_reader.next()]
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/evaluation/sampler.py", line 53, in next
+    batches = [self.get_data()]
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/evaluation/sampler.py", line 96, in get_data
+    item = next(self.rollout_provider)
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/evaluation/sampler.py", line 332, in _env_runner
+    base_env.poll()
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/env/base_env.py", line 308, in poll
+    self.new_obs = self.vector_env.vector_reset()
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/env/vector_env.py", line 96, in vector_reset
+    return [e.reset() for e in self.envs]
+  File "/home/nova/anaconda3/envs/lz/lib/python3.6/site-packages/ray/rllib/env/vector_env.py", line 96, in <listcomp>
+    return [e.reset() for e in self.envs]
+  File "/home/nova/LambdaZero/LambdaZero/environments/block_mol_v3.py", line 126, in reset
+    self.step(action)
+  File "/home/nova/LambdaZero/LambdaZero/environments/block_mol_v3.py", line 147, in step
+    obs = self._make_obs()
+  File "/home/nova/LambdaZero/LambdaZero/environments/block_mol_v3.py", line 78, in _make_obs
+    mol_fp, stem_fps_, jbond_fps_ = self.get_fps(self.molMDP.molecule)
+  File "/home/nova/LambdaZero/LambdaZero/chem/chem_op.py", line 462, in __call__
+    mol_fp = get_fp(mol, self.mol_fp_len, self.mol_fp_radiis)
+  File "/home/nova/LambdaZero/LambdaZero/chem/chem_op.py", line 441, in get_fp
+    fps = [AllChem.GetMorganFingerprintAsBitVect(mol, r, fp_length) for r in fp_radiis]
+  File "/home/nova/LambdaZero/LambdaZero/chem/chem_op.py", line 441, in <listcomp>
+    fps = [AllChem.GetMorganFingerprintAsBitVect(mol, r, fp_length) for r in fp_radiis]
+RuntimeError: Pre-condition Violation
+	RingInfo not initialized
+	Violation occurred on line 45 in file Code/GraphMol/RingInfo.cpp
+	Failed Expression: df_init
+	RDKIT: 2020.03.2
+	BOOST: 1_72
+
