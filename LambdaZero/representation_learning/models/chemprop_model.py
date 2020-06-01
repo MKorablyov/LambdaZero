@@ -4,7 +4,7 @@ import numpy as np
 
 from chemprop.models import MoleculeModel
 
-from LambdaZero.datasets.temp_brunos_work.models.model_base import ModelBase
+from LambdaZero.representation_learning.models.model_base import ModelBase
 
 
 class ChempropNet(ModelBase):

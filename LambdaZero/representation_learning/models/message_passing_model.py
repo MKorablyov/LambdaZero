@@ -2,7 +2,7 @@ from torch import nn as nn
 from torch.nn import functional as F
 from torch_geometric.nn import NNConv, Set2Set
 
-from LambdaZero.datasets.temp_brunos_work.models.model_base import ModelBase
+from LambdaZero.representation_learning.models.model_base import ModelBase
 
 
 class MessagePassingNet(ModelBase):
