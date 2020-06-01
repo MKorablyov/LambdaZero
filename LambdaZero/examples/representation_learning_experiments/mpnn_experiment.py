@@ -17,12 +17,13 @@ from pathlib import Path
 from orion.client import report_results
 
 
-from LambdaZero.datasets.brutal_dock.datasets import D4MoleculesDataset
-from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
-from LambdaZero.datasets.brutal_dock.models.message_passing_model import MessagePassingNet
-from LambdaZero.datasets.brutal_dock.parameter_inputs import get_input_and_run_configuration
 
 # Specify which model class we want to instantiate and train
+from LambdaZero.representation_learning.datasets import D4MoleculesDataset
+from LambdaZero.representation_learning.experiment_driver import experiment_driver
+from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet
+from LambdaZero.representation_learning.parameter_inputs import get_input_and_run_configuration
+
 model_class = MessagePassingNet
 
 # Specify which dataset class we want to use

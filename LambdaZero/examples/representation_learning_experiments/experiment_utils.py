@@ -1,5 +1,5 @@
-from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR
-from LambdaZero.datasets.brutal_dock.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
+from LambdaZero import ROOT_DIR
+from LambdaZero.representation_learning.parameter_inputs import RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, \
     MODEL_PARAMETERS_KEY, write_configuration_file
 
 
@@ -30,6 +30,9 @@ def get_example_config():
 
 
 if __name__ == '__main__':
-    json_config_path = str(RESULTS_DIR.joinpath("input.json"))
+    results_dir = ROOT_DIR.joinpath("results")
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    json_config_path = str(results_dir.joinpath("input.json"))
     config_dict = get_example_config()
     write_configuration_file(json_config_path, config_dict)
