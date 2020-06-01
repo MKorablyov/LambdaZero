@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from LambdaZero.datasets.temp_brunos_work.datasets import D4MoleculesDataset
+from LambdaZero.representation_learning.datasets import D4MoleculesDataset
 
 
 @pytest.fixture

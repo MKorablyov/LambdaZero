@@ -6,10 +6,10 @@ import pytest
 import torch
 from torch_geometric.data import InMemoryDataset
 
-from LambdaZero.datasets.temp_brunos_work.datasets import D4MoleculesDataset
-from LambdaZero.datasets.temp_brunos_work.experiment_driver import experiment_driver
+from LambdaZero.representation_learning.datasets import D4MoleculesDataset
+from LambdaZero.representation_learning.experiment_driver import experiment_driver
 from LambdaZero.loggers.mlflow_logger import MLFlowLogger
-from LambdaZero.datasets.temp_brunos_work.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY, \
+from LambdaZero.representation_learning.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY, \
     PATHS_KEY, MODEL_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, RUN_PARAMETERS_KEY
 from LambdaZero.representation_learning.models.chemprop_model import ChempropNet
 from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet

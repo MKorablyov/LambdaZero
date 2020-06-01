@@ -8,14 +8,14 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero import set_logging_directory
-from LambdaZero.datasets.temp_brunos_work.dataset_splitting import KnnDatasetSplitter
-from LambdaZero.datasets.temp_brunos_work.dataset_utils import get_scores_statistics
-from LambdaZero.datasets.temp_brunos_work.datasets import MoleculesDatasetBase
+from LambdaZero.representation_learning.dataset_splitting import KnnDatasetSplitter
+from LambdaZero.representation_learning.dataset_utils import get_scores_statistics
+from LambdaZero.representation_learning.datasets import MoleculesDatasetBase
 from LambdaZero.loggers.experiment_logger import ExperimentLogger
-from LambdaZero.datasets.temp_brunos_work.metrics_utils import get_prediction_statistics
-from LambdaZero.datasets.temp_brunos_work.model_trainer import MoleculeModelTrainer
+from LambdaZero.representation_learning.metrics_utils import get_prediction_statistics
+from LambdaZero.representation_learning.model_trainer import MoleculeModelTrainer
 from LambdaZero.representation_learning.models.model_base import ModelBase
-from LambdaZero.datasets.temp_brunos_work.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, \
+from LambdaZero.representation_learning.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, \
     EXECUTION_FILENAME_KEY, RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, write_configuration_file
 from LambdaZero.loggers.wandb_logger import WandbLogger
 

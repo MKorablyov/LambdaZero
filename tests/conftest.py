@@ -11,7 +11,7 @@ import pytest
 import torch
 from torch_geometric.data import Batch
 
-from LambdaZero.datasets.temp_brunos_work.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
+from LambdaZero.representation_learning.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
 from tests.fake_molecule_dataset import FakeMoleculeDataset
 from tests.fake_molecules import get_random_molecule_data
 from tests.testing_utils import generate_random_string

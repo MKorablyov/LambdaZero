@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.loggers.mlflow_logger import MLFlowLogger
-from LambdaZero.datasets.temp_brunos_work.model_trainer import XYModelTrainer
+from LambdaZero.representation_learning.model_trainer import XYModelTrainer
 from tests.fake_linear_dataset import FakeLinearDataset
 from tests.linear_regression import LinearRegression
 

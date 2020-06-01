@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import torch
 
-from LambdaZero.datasets.temp_brunos_work.graph_score_normalizer import GraphScoreNormalizer
+from LambdaZero.representation_learning.graph_score_normalizer import GraphScoreNormalizer
 
 
 @pytest.fixture

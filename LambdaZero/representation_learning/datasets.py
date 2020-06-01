@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from torch_geometric.data import InMemoryDataset
 
-from LambdaZero.datasets.temp_brunos_work.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
+from LambdaZero.representation_learning.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
 
 
 class MoleculesDatasetBase(InMemoryDataset):
