@@ -1,8 +1,20 @@
+from pathlib import Path
 from typing import List
 
 import pandas as pd
 from chemprop.features import MolGraph
 from rdkit.Chem.rdchem import Mol, Atom
+
+from LambdaZero.utils import get_external_dirs
+
+
+def get_dock_blocks105_dataframe(file_name):
+    relative_file_path = f"brutal_dock/d4/raw/{file_name}"
+    data_dir_string, _, _ = get_external_dirs()
+
+    d4_feather_data_path = Path(data_dir_string).joinpath(relative_file_path)
+    df = pd.read_feather(d4_feather_data_path)
+    return df
 
 
 def get_all_formal_charges(mol: Mol) -> List[int]:

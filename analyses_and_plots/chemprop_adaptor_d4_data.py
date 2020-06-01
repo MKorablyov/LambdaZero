@@ -6,16 +6,14 @@ without a deep understanding of how RDKit works.
 """
 
 import numpy as np
-
 import pandas as pd
 from rdkit.Chem.rdchem import AtomValenceException, KekulizeException
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 
 from LambdaZero.chem import mol_to_graph
-from LambdaZero.datasets.brutal_dock import BRUTAL_DOCK_DATA_DIR
-from LambdaZero.datasets.brutal_dock.analysis.analysis_utils import get_all_formal_charges, \
-    are_two_mols_the_same_for_chemprop
-from LambdaZero.datasets.brutal_dock.models.chemprop_adaptor import graph_to_mol
+from LambdaZero.representation_learning.models.chemprop_adaptor import graph_to_mol
+from analyses_and_plots.analysis_utils import get_all_formal_charges, are_two_mols_the_same_for_chemprop, \
+    get_dock_blocks105_dataframe
 
 feather_filenames = ["dock_blocks105_walk40_clust.feather", "dock_blocks105_walk40_2_clust.feather"]
 
@@ -25,8 +23,7 @@ if __name__ == "__main__":
 
     list_df = []
     for raw_file_name in feather_filenames:
-        d4_feather_data_path = BRUTAL_DOCK_DATA_DIR.joinpath(f"d4/raw/{raw_file_name}")
-        df = pd.read_feather(d4_feather_data_path)
+        df = get_dock_blocks105_dataframe(raw_file_name)
         list_df.append(df)
 
     raw_data_df = pd.concat(list_df).reset_index(drop=True)
