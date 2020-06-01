@@ -11,10 +11,11 @@ import pytest
 import torch
 from torch_geometric.data import Batch
 
-from LambdaZero.datasets.brutal_dock.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
-from LambdaZero.datasets.brutal_dock.tests.fake_molecules import get_random_molecule_data
-from LambdaZero.datasets.brutal_dock.tests.fake_molecule_dataset import FakeMoleculeDataset
-from LambdaZero.datasets.brutal_dock.tests.testing_utils import generate_random_string
+from LambdaZero.datasets.temp_brunos_work.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
+from tests.fake_molecule_dataset import FakeMoleculeDataset
+from tests.fake_molecules import get_random_molecule_data
+from tests.testing_utils import generate_random_string
+
 
 @pytest.fixture
 def number_of_molecules():
