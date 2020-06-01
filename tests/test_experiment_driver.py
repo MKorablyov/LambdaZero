@@ -8,7 +8,7 @@ from torch_geometric.data import InMemoryDataset
 
 from LambdaZero.datasets.temp_brunos_work.datasets import D4MoleculesDataset
 from LambdaZero.datasets.temp_brunos_work.experiment_driver import experiment_driver
-from LambdaZero.datasets.temp_brunos_work.loggers.mlflow_logger import MLFlowLogger
+from LambdaZero.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.datasets.temp_brunos_work.models.chemprop_model import ChempropNet
 from LambdaZero.datasets.temp_brunos_work.models.message_passing_model import MessagePassingNet
 from LambdaZero.datasets.temp_brunos_work.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY, \

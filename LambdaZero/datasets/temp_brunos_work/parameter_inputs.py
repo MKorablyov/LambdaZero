@@ -2,11 +2,8 @@ import argparse
 import json
 import sys
 from pathlib import Path
-import getpass
 
-import git
-
-from LambdaZero.datasets.temp_brunos_work import ROOT_DIR
+from LambdaZero import ROOT_DIR
 
 CONFIG_KEY = "config"
 MODEL_PARAMETERS_KEY = "model"
@@ -52,18 +49,6 @@ def read_configuration_file(json_config_path: str):
         input_config = json.load(f)
 
     return input_config
-
-
-def get_git_hash():
-    repo = git.Repo(ROOT_DIR)
-    git_hash = repo.head.object.hexsha
-    if git_hash is None:
-        git_hash = 'none'
-    return git_hash
-
-
-def get_user():
-    return getpass.getuser()
 
 
 def default_json_writer(object):

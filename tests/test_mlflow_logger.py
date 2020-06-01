@@ -3,8 +3,8 @@ import numpy as np
 
 import pytest
 
-from LambdaZero.datasets.temp_brunos_work.loggers.mlflow_logger import MLFlowLogger
-from LambdaZero.datasets.temp_brunos_work.loggers.step_counter import StepCounter
+from LambdaZero.loggers.mlflow_logger import MLFlowLogger
+from LambdaZero.loggers.step_counter import StepCounter
 
 
 @pytest.fixture

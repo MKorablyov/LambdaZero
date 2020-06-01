@@ -1,10 +1,12 @@
+import getpass
 from typing import Dict
 
+import git
 import mlflow
 import logging
 
-from LambdaZero.datasets.temp_brunos_work.loggers.experiment_logger import ExperimentLogger
-from LambdaZero.datasets.temp_brunos_work.parameter_inputs import get_user, get_git_hash
+from LambdaZero import ROOT_DIR
+from LambdaZero.loggers.experiment_logger import ExperimentLogger
 
 
 class MLFlowLogger(ExperimentLogger):
@@ -70,3 +72,15 @@ class MLFlowLogger(ExperimentLogger):
                                    "mlflow.runName": self.run_name}
 
         return tags_with_correct_names
+
+
+def get_git_hash():
+    repo = git.Repo(ROOT_DIR)
+    git_hash = repo.head.object.hexsha
+    if git_hash is None:
+        git_hash = 'none'
+    return git_hash
+
+
+def get_user():
+    return getpass.getuser()

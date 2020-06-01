@@ -4,7 +4,7 @@ from typing import Dict, List
 import wandb
 from torch import nn
 
-from LambdaZero.datasets.temp_brunos_work.loggers.experiment_logger import ExperimentLogger
+from LambdaZero.loggers.experiment_logger import ExperimentLogger
 
 ENTITY = "lambdazero"  # this is the name of the group in our wandb account
 

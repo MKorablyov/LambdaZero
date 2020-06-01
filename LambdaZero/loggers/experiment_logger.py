@@ -3,7 +3,7 @@ from abc import abstractmethod
 
 from torch import nn
 
-from LambdaZero.datasets.temp_brunos_work.loggers.step_counter import StepCounter
+from LambdaZero.loggers.step_counter import StepCounter
 
 
 class ExperimentLogger:
