@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import Dataset
 from torch_geometric.data import InMemoryDataset
 
+from LambdaZero.datasets.brutal_dock.chemprop_adaptors.utils import get_chemprop_graphs_from_raw_data_dataframe
 from LambdaZero.representation_learning.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
 
 
