@@ -1,7 +1,8 @@
 from typing import Dict
 
-from LambdaZero.core.alpha_zero_trainer import nn
-from LambdaZero.datasets.brutal_dock.loggers.experiment_logger import ExperimentLogger
+from torch import nn
+
+from LambdaZero.loggers.experiment_logger import ExperimentLogger
 
 
 class NullLogger(ExperimentLogger):
