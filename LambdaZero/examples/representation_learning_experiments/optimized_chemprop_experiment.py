@@ -16,8 +16,8 @@ from pathlib import Path
 
 from orion.client import report_results
 
-from LambdaZero.datasets.brutal_dock.chemprop_adaptors.dataloader_utils import get_chemprop_dataloaders
-from LambdaZero.datasets.brutal_dock.chemprop_adaptors.model_trainer import ChempropModelTrainer
+from LambdaZero.representation_learning.chemprop_adaptors.dataloader_utils import get_chemprop_dataloaders
+from LambdaZero.representation_learning.chemprop_adaptors import ChempropModelTrainer
 from LambdaZero.datasets.brutal_dock.datasets import D4ChempropMoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import OptimizedChempropNet

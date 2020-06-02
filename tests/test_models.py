@@ -5,7 +5,7 @@ import torch
 from chemprop.features import BatchMolGraph
 import itertools
 
-from LambdaZero.datasets.brutal_dock.chemprop_adaptors.utils import get_chemprop_graphs_from_raw_data_dataframe
+from LambdaZero.representation_learning.chemprop_adaptors.utils import get_chemprop_graphs_from_raw_data_dataframe
 from LambdaZero.representation_learning.models.chemprop_model import ChempropNet, OptimizedChempropNet
 from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet
 
