@@ -5,7 +5,6 @@ import yaml
 
 # Define the path to the project's root directory.
 ROOT_DIR = Path(__file__).parent.parent
-ROOT_DIR.mkdir(parents=True, exist_ok=True)
 
 LOG_DIR = ROOT_DIR.joinpath("logs/")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
