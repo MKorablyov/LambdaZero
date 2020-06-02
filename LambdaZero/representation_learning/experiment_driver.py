@@ -7,7 +7,7 @@ import torch
 import torch.nn.functional as F
 
 from LambdaZero import set_logging_directory
-from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
+from LambdaZero.representation_learning.dataloader_utils import get_geometric_dataloaders
 from LambdaZero.loggers.experiment_logger import ExperimentLogger
 from LambdaZero.loggers.wandb_logger import WandbLogger
 from LambdaZero.representation_learning.dataset_utils import get_scores_statistics

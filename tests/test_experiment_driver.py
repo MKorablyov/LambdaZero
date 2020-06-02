@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from LambdaZero.representation_learning.chemprop_adaptors.dataloader_utils import get_chemprop_dataloaders
-from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
+from LambdaZero.representation_learning.dataloader_utils import get_geometric_dataloaders
 from LambdaZero.loggers.mlflow_logger import MLFlowLogger
 from LambdaZero.representation_learning.chemprop_adaptors.model_trainer import ChempropModelTrainer
 from LambdaZero.representation_learning.datasets import D4GeometricMoleculesDataset, D4ChempropMoleculesDataset
