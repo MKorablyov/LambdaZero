@@ -1,7 +1,12 @@
-from LambdaZero.datasets.brutal_dock import RESULTS_DIR, BRUTAL_DOCK_DATA_DIR
-from LambdaZero.datasets.brutal_dock.experiments import EXPERIMENT_DATA_DIR
-from LambdaZero.datasets.brutal_dock.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, \
-    PATHS_KEY, EXECUTION_FILENAME_KEY
+from pathlib import Path
+
+from LambdaZero.examples.representation_learning_experiments import EXPERIMENT_DATA_DIR
+from LambdaZero.representation_learning.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY, \
+    PATHS_KEY
+from LambdaZero.utils import get_external_dirs
+from analyses_and_plots import ANALYSIS_RESULTS_DIR
+
+data_dir_string, _, _ = get_external_dirs()
 
 config = {"run_parameters": {"experiment_name": "Chemprop",
                              "run_name": "default_parameters"
@@ -23,8 +28,8 @@ config = {"run_parameters": {"experiment_name": "Chemprop",
 
 paths = {"tracking_uri": "fake_traking_uri",
          "working_directory": EXPERIMENT_DATA_DIR,
-         "output_directory": RESULTS_DIR,
-         "data_directory": BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/"),
+         "output_directory": ANALYSIS_RESULTS_DIR,
+         "data_directory": str(Path(data_dir_string).joinpath("/brutal_dock/d4/raw"))
          }
 
 non_config_dict = {PATHS_KEY: paths,

@@ -7,24 +7,25 @@ import numpy as np
 import pandas as pd
 from chemprop.features import BatchMolGraph
 
-from LambdaZero.datasets.brutal_dock import BRUTAL_DOCK_DATA_DIR, RESULTS_DIR
 from LambdaZero.representation_learning.chemprop_adaptors.utils import get_chemprop_graphs_from_raw_data_dataframe
 
 import matplotlib.pyplot as plt
 
-file_name = "dock_blocks105_walk40_clust.feather"
-data_dir = BRUTAL_DOCK_DATA_DIR.joinpath("d4/raw/")
-feather_data_path = data_dir.joinpath(file_name)
+from analyses_and_plots import ANALYSIS_RESULTS_DIR
+from analyses_and_plots.analysis_utils import get_dock_blocks105_dataframe
 
+file_name = "dock_blocks105_walk40_clust.feather"
 np.random.seed(0)
 
 highest_power = 12
 number_of_mols = 2**highest_power
 number_of_trials = 20
-output_path = RESULTS_DIR.joinpath("batchmolgraph_timing.png")
+output_path = ANALYSIS_RESULTS_DIR.joinpath("batchmolgraph_timing.png")
+
 
 if __name__ == '__main__':
-    raw_data_df = pd.read_feather(feather_data_path)
+
+    raw_data_df = get_dock_blocks105_dataframe(file_name)
 
     list_data = get_chemprop_graphs_from_raw_data_dataframe(raw_data_df[:number_of_mols])
 
