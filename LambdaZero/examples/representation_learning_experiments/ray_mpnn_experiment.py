@@ -136,13 +136,9 @@ class ModelTrainer(tune.Trainable):
         return average_epoch_loss
 
     def _train(self):
-        train_scores = self._train_epoch(self.training_dataloader, self.model)
-        eval_scores = self._validation_epoch(self.validation_dataloader, self.model)
-
-        # rename to make scope
-        train_scores = [("train_" + k, v) for k, v in train_scores.items()]
-        eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
-        scores = dict(train_scores + eval_scores)
+        train_loss = self._train_epoch(self.training_dataloader, self.model)
+        eval_loss = self._validation_epoch(self.validation_dataloader, self.model)
+        scores = dict(train_loss=train_loss, eval_loss=eval_loss)
         return scores
 
     def _save(self, tmp_checkpoint_dir):
@@ -188,9 +184,9 @@ if __name__ == '__main__':
     ray.init()
     analysis = tune.run(ModelTrainer,
                         config=config,
-                        stop={"training_iteration": 2},
+                        stop={"training_iteration": 1},
                         resources_per_trial={
-                           "cpu": 2,
+                           "cpu": 4,
                            "gpu": 0
                         },
                         num_samples=1,
