@@ -4,7 +4,7 @@ from typing import Dict, Union
 from torch_geometric.data import DataLoader as GeometricDataLoader
 from torch_geometric.data import Dataset as GeometricDataset
 
-from LambdaZero.datasets.brutal_dock.dataset_splitting import KnnDatasetSplitter
+from LambdaZero.representation_learning.dataset_splitting import KnnDatasetSplitter
 
 
 def get_geometric_dataloaders(dataset: GeometricDataset,

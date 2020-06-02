@@ -1,4 +1,4 @@
-from LambdaZero.datasets.brutal_dock.model_trainer import AbstractModelTrainer
+from LambdaZero.representation_learning.model_trainer import AbstractModelTrainer
 
 
 class ChempropModelTrainer(AbstractModelTrainer):
