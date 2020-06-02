@@ -7,16 +7,16 @@ import torch
 import torch.nn.functional as F
 
 from LambdaZero import set_logging_directory
-from LambdaZero.representation_learning.dataset_splitting import KnnDatasetSplitter
+from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
+from LambdaZero.loggers.experiment_logger import ExperimentLogger
+from LambdaZero.loggers.wandb_logger import WandbLogger
 from LambdaZero.representation_learning.dataset_utils import get_scores_statistics
 from LambdaZero.representation_learning.datasets import MoleculesDatasetBase
-from LambdaZero.loggers.experiment_logger import ExperimentLogger
 from LambdaZero.representation_learning.metrics_utils import get_prediction_statistics
-from LambdaZero.representation_learning.model_trainer import MoleculeModelTrainer
+from LambdaZero.representation_learning.model_trainer import MoleculeModelTrainer, AbstractModelTrainer
 from LambdaZero.representation_learning.models.model_base import ModelBase
 from LambdaZero.representation_learning.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, \
     EXECUTION_FILENAME_KEY, RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, write_configuration_file
-from LambdaZero.loggers.wandb_logger import WandbLogger
 
 loss_function = F.mse_loss
 
