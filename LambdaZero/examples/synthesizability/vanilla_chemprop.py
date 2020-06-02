@@ -25,9 +25,13 @@ from chemprop.train import predict
 from chemprop.train import cross_validate
 
 
-class ChempropPredictor():
-    def __init__(self, checkpoint_path=None, dataset_type='classification', load_weights=True, molecule_dataset=None, save_dir=None):
-        self.no_cuda: bool = False
+class ChempropModel:
+    def __init__(self, checkpoint_path="kkk", dataset_type='classification', dataset=None, save_dir=None):
+        #self.no_cuda: bool = False
+
+        if checkpoint_path is None:
+            pass
+
         self.gpu = None
         self.checkpoint_path = checkpoint_path
         self.load_weights = load_weights
@@ -46,31 +50,31 @@ class ChempropPredictor():
             sys.stdout = sys.__stdout__
             self.scaler, self.features_scaler = load_scalers(self.checkpoint_path)
 
-    @property
-    def device(self) -> torch.device:
-        if not self.cuda:
-            return torch.device('cpu')
+    # @property
+    # def device(self) -> torch.device:
+    #     if not self.cuda:
+    #         return torch.device('cpu')
+    #
+    #     return torch.device('cuda', self.gpu)
+    #
+    # @device.setter
+    # def device(self, device: torch.device) -> None:
+    #     self.cuda = device.type == 'cuda'
+    #     self.gpu = device.index
+    #
+    # @property
+    # def cuda(self) -> bool:
+    #     return not self.no_cuda and torch.cuda.is_available()
+    #
+    # @cuda.setter
+    # def cuda(self, cuda: bool) -> None:
+    #     self.no_cuda = not cuda
 
-        return torch.device('cuda', self.gpu)
-
-    @device.setter
-    def device(self, device: torch.device) -> None:
-        self.cuda = device.type == 'cuda'
-        self.gpu = device.index
-
-    @property
-    def cuda(self) -> bool:
-        return not self.no_cuda and torch.cuda.is_available()
-
-    @cuda.setter
-    def cuda(self, cuda: bool) -> None:
-        self.no_cuda = not cuda
-
-    def train(self, trainer_config):
-        args = TrainArgs().parse_args()
-        args.data_path = self.molecule_dataset
-        args.dataset_type = self.dataset_type
-        args.save_dir = self.save_dir
+    def train(self):
+        #args = TrainArgs().parse_args()                                         # todo: no parse args anywhere
+        #args.data_path = self.molecule_dataset
+        #args.dataset_type = self.dataset_type
+        #args.save_dir = self.save_dir
 
         for key, value in trainer_config:
             args.key = value
@@ -80,56 +84,60 @@ class ChempropPredictor():
 
     # to write a train_epoch, and hyperparameter_opt
 
-    def predict(self, predict_config, smi=None, mol=None): #smi and mol can be a single string, or a list of strings
-        if smi is None:
-            if isinstance(mol, list):
-                smi = (Chem.MolFromSmiles(single_mol) for single_mol in mol)
-            else:
-                smi = Chem.MolToSmiles(mol)
+    def __call__(self, smi=None): #smi and mol can be a single string, or a list of strings
 
-        if isinstance(smi, list): #if it's a list
-            test_data = MoleculeDataset([
-                MoleculeDatapoint(
-                    smiles=smile,
-                    row=OrderedDict({'smiles': smile}),
-                    features_generator=predict_config["features_generator"]
-                ) for smile in smi
-            ])
-        else:
-            test_data = MoleculeDataset([
-                MoleculeDatapoint(
+
+        #if smi is None:
+        #    if isinstance(mol, list):
+        #        smi = (Chem.MolFromSmiles(single_mol) for single_mol in mol)
+        #    else:
+        #        smi = Chem.MolToSmiles(mol)
+
+        # if isinstance(smi, list): #if it's a list
+        #     test_data = MoleculeDataset([
+        #         MoleculeDatapoint(
+        #             smiles=smile,
+        #             row=OrderedDict({'smiles': smile}),
+        #             features_generator=predict_config["features_generator"]
+        #         ) for smile in smi
+        #     ])
+        # else:
+
+        dataset = MoleculeDataset([
+            MoleculeDatapoint(
                     smiles=str(smi),
                     row=OrderedDict({'smiles': smi}),
                     features_generator=predict_config["features_generator"]
                 )
             ])
 
-        test_data_loader = MoleculeDataLoader(
-            dataset=test_data,
+        data_loader = MoleculeDataLoader(
+            dataset=dataset,
             batch_size=predict_config["batch_size"],
-            num_workers=predict_config["num_workers"]
-        )
+            num_workers=predict_config["num_workers"])
 
-        model_preds = predict(
+        preds = predict(
             model=self.model,
-            data_loader=test_data_loader,
+            data_loader=data_loader,
             disable_progress_bar=predict_config["disable_progress_bar"],
-            scaler=self.scaler
-        )  # prediction = self.model(mol)
+            scaler=self.scaler)
 
-        model_preds = np.array(model_preds)
-        if self.dataset_type == ("classification" or "multiclass"):
-            # binary, you can also return fulldata.row for the smiles
-            if isinstance(smi, list):
-                return np.round(model_preds.astype(int), 0)  # return the list
-            else:
-                return np.round(model_preds.astype(int), 0)[0][0]
-        else:
-            # regression
-            if isinstance(smi, list):
-                return model_preds
-            else:
-                return model_preds[0][0]
+        return preds[0]
+
+        # prediction = self.model(mol)
+        #model_preds = np.array(model_preds)
+        #if self.dataset_type == ("classification" or "multiclass"):
+        #    # binary, you can also return fulldata.row for the smiles
+        #    if isinstance(smi, list):
+        #        return np.round(model_preds.astype(int), 0)  # return the list
+        #    else:
+        #        return np.round(model_preds.astype(int), 0)[0][0]
+        # else:
+        #     # regression
+        #     if isinstance(smi, list):
+        #         return model_preds
+        #     else:
+        #         return model_preds[0][0]
 
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
@@ -182,6 +190,9 @@ predict_config = DEFAULT_CONFIG["predict_config"]
 config = DEFAULT_CONFIG
 
 if __name__ == '__main__':
-    synthesizability = ChempropPredictor(dataset_type="classification", checkpoint_path=os.path.join(datasets_dir, "synthesizability/binary_corrected/model_0/model.pt"))
-    print (synthesizability.predict(predict_config=predict_config, smi="Clc1cc(N2CCN(CC2)CCCN2c3c(c(OC)ccc3)CCC2=O)ccc1"))
+    synthesizability = ChempropPredictor(dataset_type="classification",
+                                         checkpoint_path=os.path.join(datasets_dir,
+                                                                      "synthesizability/binary_corrected/model_0/model.pt"))
+    print (synthesizability.predict(predict_config=predict_config,
+                                    smi="Clc1cc(N2CCN(CC2)CCCN2c3c(c(OC)ccc3)CCC2=O)ccc1"))
 
