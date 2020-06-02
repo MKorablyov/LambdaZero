@@ -5,7 +5,8 @@ import torch
 from chemprop.features import BatchMolGraph
 import itertools
 
-from LambdaZero.representation_learning.models.chemprop_model import ChempropNet
+from LambdaZero.datasets.brutal_dock.chemprop_adaptors.utils import get_chemprop_graphs_from_raw_data_dataframe
+from LambdaZero.representation_learning.models.chemprop_model import ChempropNet, OptimizedChempropNet
 from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet
 
 # There is a tradeoff between how many combinations we consider and how long the tests take to run.
