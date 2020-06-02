@@ -17,9 +17,8 @@ from pathlib import Path
 from orion.client import report_results
 
 
-
 # Specify which model class we want to instantiate and train
-from LambdaZero.representation_learning.datasets import D4MoleculesDataset
+from LambdaZero.representation_learning.datasets import D4GeometricMoleculesDataset
 from LambdaZero.representation_learning.experiment_driver import experiment_driver
 from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet
 from LambdaZero.representation_learning.parameter_inputs import get_input_and_run_configuration
