@@ -4,16 +4,18 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import torch
-from torch_geometric.data import InMemoryDataset
 
-from LambdaZero.representation_learning.datasets import D4MoleculesDataset
-from LambdaZero.representation_learning.experiment_driver import experiment_driver
+from LambdaZero.datasets.brutal_dock.chemprop_adaptors.dataloader_utils import get_chemprop_dataloaders
+from LambdaZero.datasets.brutal_dock.chemprop_adaptors.model_trainer import ChempropModelTrainer
+from LambdaZero.datasets.brutal_dock.dataloader_utils import get_geometric_dataloaders
 from LambdaZero.loggers.mlflow_logger import MLFlowLogger
+from LambdaZero.representation_learning.datasets import D4GeometricMoleculesDataset, D4ChempropMoleculesDataset
+from LambdaZero.representation_learning.experiment_driver import experiment_driver
+from LambdaZero.representation_learning.model_trainer import MoleculeModelTrainer
+from LambdaZero.representation_learning.models.chemprop_model import ChempropNet, OptimizedChempropNet
+from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet
 from LambdaZero.representation_learning.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, EXECUTION_FILENAME_KEY, \
     PATHS_KEY, MODEL_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, RUN_PARAMETERS_KEY
-from LambdaZero.representation_learning.models.chemprop_model import ChempropNet
-from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet
 
 
 @pytest.fixture
