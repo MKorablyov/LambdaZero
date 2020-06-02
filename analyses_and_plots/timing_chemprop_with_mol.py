@@ -7,7 +7,7 @@ from LambdaZero.datasets.brutal_dock.chemprop_adaptors.dataloader_utils import g
 from LambdaZero.datasets.brutal_dock.chemprop_adaptors.model_trainer import ChempropModelTrainer
 from LambdaZero.datasets.brutal_dock.datasets import D4ChempropMoleculesDataset
 from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
-from LambdaZero.datasets.brutal_dock.loggers.null_logger import NullLogger
+from LambdaZero.loggers.null_logger import NullLogger
 from LambdaZero.datasets.brutal_dock.models.chemprop_model import OptimizedChempropNet
 
 dataset_class = D4ChempropMoleculesDataset
