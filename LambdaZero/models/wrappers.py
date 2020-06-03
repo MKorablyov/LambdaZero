@@ -10,31 +10,19 @@ class ChempropWrapper_v1:
     def __init__(self, config):
         self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
-        checkpoint_path = None
-        dataset_type = 'classification'
-        train_dataset = None,
-        train_save_dir = None
-
-        # load_weights = True
-        # if checkpoint_path is None:
-        #     load_weights = False
-        # if train_dataset is not None:
-        #     load_weights = False
-
         # prediction
-        self.checkpoint_path = checkpoint_path
-        self.load_weights = load_weights
-        self.dataset_type = dataset_type  # regression, classification, (multiclass to be done)
+        self.checkpoint_path = config["predict_config"]["checkpoint_path"]
         self.predict_config = config["predict_config"]
         self.model = None
 
         # training
-        self.train_dataset = train_dataset
-        self.train_save_dir = train_save_dir
+        self.train_dataset = config["trainer_config"]["train_dataset"]
+        self.train_save_dir = config["trainer_config"]["save_dir"]
+        self.dataset_type = config["trainer_config"]["dataset_type"]
         self.trainer_config = config["trainer_config"]
 
         # to add features_generator
-        if config['laod weights'] is not None:  # for prediction
+        if self.predict_config["load_weight"] is True:  # for prediction
             sys.stdout = open(os.devnull, "w")  # silience the checkpoint logger
             self.model = load_checkpoint(self.checkpoint_path, device=self.device)
             sys.stdout = sys.__stdout__

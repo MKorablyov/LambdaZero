@@ -10,8 +10,6 @@ synthesizability = ChempropModel(config=config, dataset_type = "classification",
 synthesizability.train()
 """
 
-import torch
-import sys
 import os
 from rdkit import Chem
 
@@ -24,6 +22,10 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 DEFAULT_CONFIG = {
     "trainer_config": {
+        "dataset_type": "regression",
+        "train_dataset": None,
+        "save_dir": None,
+
         "features_generator": None,  # Method(s) of generating additional features
         "features_path": None,  # Path(s) to features to use in FNN (instead of features_generator)
         "no_features_scaling": False,  # Turn off scaling of features
@@ -57,6 +59,9 @@ DEFAULT_CONFIG = {
         "class_balance": False,
         },
     "predict_config": {
+        "load_weight": True,
+        "dataset_type": "regression",
+        "checkpoint_path": os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt"),
         "features_generator": None,
         "features_path": None,  # Path(s) to features to use in FNN (instead of features_generator)
         "no_features_scaling": False,  # Turn off scaling of features
@@ -70,9 +75,7 @@ config = DEFAULT_CONFIG
 
 if __name__ == '__main__':
 
-    synthesizability = ChempropWrapper_v1(config=config, dataset_type="classification",
-                                     checkpoint_path=os.path.join(datasets_dir,
-                                    "Synthesizability/MPNN_model/Regression/model_0/model.pt"))
+    synthesizability = ChempropWrapper_v1(config=config)
                                      #"Synthesizability/MPNN_model/Binary_corrected/model_0/model.pt"))
     mol = Chem.MolFromSmiles("Clc1cc(N2CCN(CC2)CCCN2c3c(c(OC)ccc3)CCC2=O)ccc1")
     # 6 is average for zinc
