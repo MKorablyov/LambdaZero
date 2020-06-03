@@ -19,8 +19,8 @@ def train_epoch(loader, model, optimizer, device, config):
     target_norm = config["target_norms"][0]
     model.train()
 
-    metrics = {"loss":0, "mse": 0, "mae":0}
-    for bidx,data in enumerate(loader):
+    metrics = {"loss": 0, "mse": 0, "mae": 0}
+    for bidx, data in enumerate(loader):
         # compute y_hat and y
         data = data.to(device)
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
                         stop={"training_iteration":100}, #EarlyStop(),
                         resources_per_trial={
                            "cpu": 4, # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
-                           "gpu": 1.0
+                           "gpu": 0.0
                         },
                         num_samples=1,
                         checkpoint_at_end=False,
