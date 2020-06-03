@@ -1,20 +1,17 @@
-import socket, os, time
-import numpy as np
+iimport os
 import os.path as osp
+
+import numpy as np
+import ray
 import torch as th
 import torch.nn.functional as F
-
-from torch_geometric.utils import remove_self_loops
-import torch_geometric.transforms as T
-from torch_geometric.data import DataLoader
-import ray
 from ray import tune
+from torch_geometric.data import DataLoader
 
-from LambdaZero.utils import get_external_dirs
 import LambdaZero.inputs
-import LambdaZero.utils
 import LambdaZero.models
-
+import LambdaZero.utils
+from LambdaZero.utils import get_external_dirs
 
 
 def train_epoch(loader, model, optimizer, device, config):
