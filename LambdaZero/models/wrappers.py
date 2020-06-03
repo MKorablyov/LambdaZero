@@ -13,7 +13,6 @@ class ChempropWrapper_v1:
         # prediction
         self.checkpoint_path = config["predict_config"]["checkpoint_path"]
         self.predict_config = config["predict_config"]
-        self.model = None
 
         # training
         self.train_dataset = config["trainer_config"]["train_dataset"]
@@ -22,10 +21,8 @@ class ChempropWrapper_v1:
         self.trainer_config = config["trainer_config"]
 
         # to add features_generator
-        if self.predict_config["load_weight"] is True:  # for prediction
-            sys.stdout = open(os.devnull, "w")  # silience the checkpoint logger
+        if self.predict_config["checkpoint_path"] is not None:  # for prediction
             self.model = load_checkpoint(self.checkpoint_path, device=self.device)
-            sys.stdout = sys.__stdout__
             self.scaler, self.features_scaler = load_scalers(self.checkpoint_path)
 
     def train(self):
@@ -40,7 +37,7 @@ class ChempropWrapper_v1:
         return mean_score
 
     # to write a train_epoch, and hyperparameter_opt
-    def __call__(self, mol=None):  # takes both mol and smiles
+    def __call__(self, mol):  # takes both mol and smiles
 
         mol = BatchMolGraph([MolGraph(mol)])
 

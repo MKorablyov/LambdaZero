@@ -80,13 +80,12 @@ class PredDockReward:
 
 
 class PredDockReward_v2:
-    def __init__(self, load_model, natm_cutoff, qed_cutoff, soft_stop, exp, delta, simulation_cost, device,
-
-
-                 transform=T.Compose([LambdaZero.utils.Complete()])):
+    def __init__(self, load_model, natm_cutoff, qed_cutoff, synth_cutoff, synth_config,
+                 soft_stop, exp, delta, simulation_cost, device, transform=T.Compose([LambdaZero.utils.Complete()])):
 
         self.natm_cutoff = natm_cutoff
         self.qed_cutoff = qed_cutoff
+        self.synth_cutoff = synth_cutoff
         self.soft_stop = soft_stop
         self.exp = exp
         self.delta = delta
@@ -98,6 +97,8 @@ class PredDockReward_v2:
         self.net.to(device)
         self.net.load_state_dict(th.load(load_model, map_location=th.device(device)))
         self.net.eval()
+
+        self.synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
 
     def reset(self):
         self.previous_reward = 0.0
@@ -113,13 +114,15 @@ class PredDockReward_v2:
         qed = QED.qed(mol)
         qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
         qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
-        disc_reward = min(reward, reward * natm_discount * qed_discount) # don't appy to negative rewards
-        if self.exp is not None: disc_reward = self.exp ** disc_reward
-
 
         # Synthesizability constraint
-        LambdaZero.models.ChempropWrapper_v1()
+        synth = self.synth_net(mol=mol)
+        synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
+        synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
 
+        # combine rewards
+        disc_reward = reward * natm_discount * qed_discount * synth_discount
+        if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
@@ -154,9 +157,6 @@ class PredDockReward_v2:
                 reward, discounted_reward, qed = -0.5, -0.5, -0.5
         else:
             reward, discounted_reward, qed = 0.0, 0.0, 0.0
-
-        print("molecule env V1 is working", molecule)
-
         return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed}
 
 

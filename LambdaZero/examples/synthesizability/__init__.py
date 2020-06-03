@@ -1,1 +1,1 @@
-from .vanilla_chemprop import ChempropModel, config
+#from .vanilla_chemprop import ChempropModel, config

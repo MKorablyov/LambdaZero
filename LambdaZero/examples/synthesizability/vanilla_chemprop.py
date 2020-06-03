@@ -59,7 +59,6 @@ DEFAULT_CONFIG = {
         "class_balance": False,
         },
     "predict_config": {
-        "load_weight": True,
         "dataset_type": "regression",
         "checkpoint_path": os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt"),
         "features_generator": None,

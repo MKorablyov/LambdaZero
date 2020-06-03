@@ -4,6 +4,7 @@ from copy import deepcopy
 from LambdaZero.environments import BlockMolEnv_v3
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v2
+from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -25,9 +26,10 @@ ppo022 = {
         "env": BlockMolEnv_v3,
         "env_config": {
             "allow_removal": True,
-
             "reward": PredDockReward_v2,
-
+            "reward_config":{
+                "synth_cutoff":[0, 5],
+                "synth_config": chemprop_cfg}
 
         }
     }
