@@ -44,7 +44,6 @@ class ChempropModel:
         self.trainer_config = config["trainer_config"]
 
         # to add features_generator
-
         if load_weights:  #for prediction
             sys.stdout = open(os.devnull, "w")  # silience the checkpoint logger
             self.model = load_checkpoint(self.checkpoint_path, device=self.device)
@@ -63,7 +62,6 @@ class ChempropModel:
         return mean_score
 
     # to write a train_epoch, and hyperparameter_opt
-
     def __call__(self, mol=None): #takes both mol and smiles
 
         mol = BatchMolGraph([MolGraph(mol)])
@@ -71,8 +69,7 @@ class ChempropModel:
         model = self.model
         model.eval()
         features = self.predict_config["features_generator"]
-        with torch.no_grad():
-            preds = model(mol, features)
+        with torch.no_grad(): preds = model(mol, features)
         preds = preds.data.cpu().numpy()
 
         # Inverse scale if regression
@@ -132,6 +129,11 @@ config = DEFAULT_CONFIG
 if __name__ == '__main__':
 
     synthesizability = ChempropModel(config=config, dataset_type="classification",
-                                         checkpoint_path=os.path.join(datasets_dir,"Synthesizability/binary_corrected/model_0/model.pt"))
+                                     checkpoint_path=os.path.join(datasets_dir,
+                                     "Synthesizability/MPNN_model/Binary_corrected/model_0/model.pt"))
     mol = Chem.MolFromSmiles("Clc1cc(N2CCN(CC2)CCCN2c3c(c(OC)ccc3)CCC2=O)ccc1")
     print (synthesizability(mol=mol))
+
+    # /home/maksym/Datasets/Synthesizability/MPNN_model/Binary_corrected/model_0/model.pt
+
+    # /home/maksym/Datasets/Synthesizability/binary_corrected/model_0/model.pt
