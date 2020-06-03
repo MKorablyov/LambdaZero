@@ -5,10 +5,10 @@ import typing
 import torch
 from torch import distributions
 
-from . import greedy_models
-from . import bayes_models
-from . import querier
-from . import chem_ops
+import greedy_models
+import bayes_models
+import querier
+import chem_ops
 
 
 
@@ -37,11 +37,13 @@ class AcquisitionFunc(metaclass=abc.ABCMeta):
 
 
 class BestFromPreviousOracleAcq(AcquisitionFunc):
+    # previous_molecule_heap.all_smiles_sorted
+    # sort them and grab the first from sorted bc next(self.sorted_smiles)
     def __init__(self, previous_molecule_heap: querier.QueriedHeap):
         self.sorted_smiles = previous_molecule_heap.all_smiles_sorted
-        self.seen_smiles = set()
+        self.seen_smiles = set() #create a empty set
 
-    def get_batch(self, batch_size=500):
+    def get_batch(self, batch_size=500): # get 500 unseen mole
 
         batch_results = []
         while len(batch_results) < batch_size:
@@ -51,15 +53,16 @@ class BestFromPreviousOracleAcq(AcquisitionFunc):
 
         return batch_results
 
-    def update_with_seen(self, seen_molecules_smiles, seen_molecules_values):
+    def update_with_seen(self, seen_molecules_smiles, seen_molecules_values): #grab the new seen mole, update the seen_smiles list
         self.seen_smiles.update(set(seen_molecules_smiles))
 
-    @classmethod
+    @classmethod #**params: other parameters; classmethod: a fufnction return class
     def create_acquisition_function(cls, queried_results_so_far: typing.List[querier.QueriedHeap], **params):
         return cls(queried_results_so_far[-2])  # ie init with the heap from the previous stage
-
+#cls:same class. pass queried_results_so_far as input para; [-2]- all available/unseen molecule, take it as acquisition
 
 class ThompsonSamplingAcq(AcquisitionFunc):
+    #available_molecules:unseen; seen_molecule2value: seen w/ mole+dockscore (x,y) dictionary
     def __init__(self, bayesian_model, available_molecules: typing.Set[str], seen_molecule2value: dict):
         self.available_molecules = available_molecules
         self.seen_molecule2value = seen_molecule2value
@@ -133,36 +136,50 @@ class ThompsonSamplingAcq(AcquisitionFunc):
 
 
 class GreedySamplingAcq(AcquisitionFunc):
-    def __init__(self, trainer, available_molecules: typing.Set[str], seen_molecule2value: dict, noise_std = 0., noise_mean = 0.):
+    #own trainer, use John's available_molecules, seen_molecule2value
+    def __init__(self, trainer, available_molecules: typing.Set[str], seen_molecule2value: dict, noise_std = 1., noise_mean = 0.):
         self.available_molecules = available_molecules
         self.seen_molecule2value = seen_molecule2value
         self.noise_mean = noise_mean
         self.noise_std = noise_std
         self.trainer = trainer
         self._train_model()
-
+#abc
     def update_with_seen(self, seen_molecules_smiles, seen_molecules_values):
         self.seen_molecule2value.update(dict(zip(seen_molecules_smiles, seen_molecules_values)))
-        self.available_molecules.difference_update(set(seen_molecules_smiles))
+        self.available_molecules.difference_update(set(seen_molecules_smiles)) # take avail mo subtract, rm from list
+        #avil 100k, seen2value 500, so avil 100k-500, seen2value 1000
+        #update - append to seen2value list
         self._train_model()
 
-    def get_batch(self, batch_size=500):
+#abc
+    def get_batch(self, batch_size=500): #get unseen 500
         fingerprints = [torch.tensor(chem_ops.morgan_fp_from_smiles(smi, radius=2, number_bits=1024),
                                          dtype=torch.float32)
-                            for smi in self.available_molecules]
-        fingerprints = torch.stack(fingerprints)
-        predicted_scores = self.trainer.predict(fingerprints)
-        predicted_scores = predicted_scores * self.noise_std + self.noise_mean
+                            for smi in self.available_molecules] #available_molecules in smiles format, convert smi to fp 1024 encoding
+        fingerprints = torch.stack(fingerprints) #stack and pass to NN
+        predicted_scores = self.trainer.predict(fingerprints) 
+        predicted_scores = predicted_scores * self.noise_std + self.noise_mean # add uncertainty
 
         sorted_scores = sorted(predicted_scores)
-        sorted_score_index = [index for index, num in sorted(enumerate(predicted_scores), key=lambda x: x[-1])]
-        sorted_available_molecules = list(self.available_molecules)
-        sorted_available_molecules = set([sorted_available_molecules[i] for i in sorted_score_index])
+        sorted_score_index = [index for index, num in sorted(enumerate(predicted_scores), key=lambda x: x[-1])] #reverse sorting
+        #lambda is inline fct (key want to follow) take idx of sorted score, 
+        #x input, x[-1] (highest, best) output
+        #give index of best out all avilable molecule - close to 100k (x_out)
 
-        sorted_available_molecules = iter(sorted_available_molecules)
-        seen_smiles, seen_values = zip(*self.seen_molecule2value.items())
+        #create a idx list
+        #look at pred score, make a idx of their idx, so we will be able to look at avilable mole and create a
+        #5,1,8 (5 is the highest, 1 is the second highest) - sort all the mo together
+
+        sorted_available_molecules = list(self.available_molecules) 
+        sorted_available_molecules = set([sorted_available_molecules[i] for i in sorted_score_index]) #100k-length(seen)
+        #reorder the avil mole in order of sorted_score idx
+
+        sorted_available_molecules = iter(sorted_available_molecules) #creates a iterator, iterate the set 
+        seen_smiles, seen_values = zip(*self.seen_molecule2value.items())#smiles and dockscore
         batch_results = []
 
+#grab batch_size unseen molecule
         while len(batch_results) < batch_size:
             new_molecule = next(sorted_available_molecules)
             if new_molecule not in list(seen_smiles):
@@ -180,7 +197,7 @@ class GreedySamplingAcq(AcquisitionFunc):
         seen_values_tensor = torch.tensor(seen_values)[:, None]
         fingerprints = torch.stack(fingerprints)
         self.trainer.train(fingerprints, seen_values_tensor, batch_size = 500)
-
+#abc
     @classmethod
     def create_acquisition_function(cls, queried_results_so_far: typing.List[querier.QueriedHeap], **params):
 

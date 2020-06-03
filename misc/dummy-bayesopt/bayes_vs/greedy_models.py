@@ -2,7 +2,7 @@
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
-from . import chem_ops
+import chem_ops
 import torch.nn.functional as F
 
 class cfg:
@@ -12,6 +12,7 @@ class cfg:
     std = 0.5
     mean = 0.
     mode = 'y'
+    place_to_save_model = 'place_to_save_model.pt'
 
 class CustomBatch:
     def __init__(self, data):
@@ -33,6 +34,7 @@ class Model(nn.Module):
 class Trainer:
     def __init__(self, model):
         self.model = model
+        self.variance_list = []
 
     def create_dataloader(self, x, y, batch_size = 500):
         
@@ -41,7 +43,10 @@ class Trainer:
         return loader
 
     def train(self, x_train, y_train, batch_size = 500):
-
+        try:
+            self.load_model()
+        except:
+            pass
         model = self.model
         train_loader = self.create_dataloader(x_train, y_train, batch_size)
         optimizer = torch.optim.Adam(model.parameters())
@@ -53,6 +58,8 @@ class Trainer:
                 loss = F.mse_loss(pred.squeeze(), batch.y)
                 loss.backward()
                 optimizer.step()
+        self.save_model()
+
 
     def predict(self, x_test):
         model = self.model
@@ -61,3 +68,11 @@ class Trainer:
 
     def collate_wrapper(self, batch):
         return CustomBatch(batch)
+
+    def save_model(self):
+        torch.save(self.model.state_dict(), cfg.place_to_save_model)
+
+    def load_model(self):
+        self.model.load_state_dict(torch.load(cfg.place_to_save_model))
+
+
