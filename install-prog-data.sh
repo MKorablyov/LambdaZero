@@ -122,6 +122,7 @@ cd $DATASETS_DIR
 echo $DATASETS_DIR
 git clone --depth 1 https://github.com/MKorablyov/fragdb
 git clone --depth 1 https://github.com/MKorablyov/brutal_dock
+git clone --depth 1 https://github.com/pchliu/Synthesizability
 cd ..
 
 mkdir -p "$PROGRAMS_DIR"
