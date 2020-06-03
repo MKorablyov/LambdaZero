@@ -5,6 +5,7 @@ import typing
 import torch
 from torch import distributions
 
+from . import greedy_models
 from . import bayes_models
 from . import querier
 from . import chem_ops
@@ -128,5 +129,81 @@ class ThompsonSamplingAcq(AcquisitionFunc):
         bayes_regress = bayes_models.BayesianRegression(embedding_func)
         return cls(bayes_regress, available_molecules, seen_molecule2value)
 
+class GreedySamplingAcq(AcquisitionFunc):
+    #own trainer, use John's available_molecules, seen_molecule2value
+    def __init__(self, trainer, available_molecules: typing.Set[str], seen_molecule2value: dict, noise_std = 1., noise_mean = 0.):
+        self.available_molecules = available_molecules
+        self.seen_molecule2value = seen_molecule2value
+        self.noise_mean = noise_mean
+        self.noise_std = noise_std
+        self.trainer = trainer
+        self._train_model()
+#abc
+    def update_with_seen(self, seen_molecules_smiles, seen_molecules_values):
+        self.seen_molecule2value.update(dict(zip(seen_molecules_smiles, seen_molecules_values)))
+        self.available_molecules.difference_update(set(seen_molecules_smiles)) # take avail mo subtract, rm from list
+        #avil 100k, seen2value 500, so avil 100k-500, seen2value 1000
+        #update - append to seen2value list
+        self._train_model()
 
+#abc
+    def get_batch(self, batch_size=500): #get unseen 500
+        fingerprints = [torch.tensor(chem_ops.morgan_fp_from_smiles(smi, radius=2, number_bits=1024),
+                                         dtype=torch.float32)
+                            for smi in self.available_molecules] #available_molecules in smiles format, convert smi to fp 1024 encoding
+        fingerprints = torch.stack(fingerprints) #stack and pass to NN
+        predicted_scores = self.trainer.predict(fingerprints) 
+        predicted_scores = predicted_scores * self.noise_std + self.noise_mean # add uncertainty
 
+        sorted_scores = sorted(predicted_scores)
+        sorted_score_index = [index for index, num in sorted(enumerate(predicted_scores), key=lambda x: x[-1])] #reverse sorting
+        #lambda is inline fct (key want to follow) take idx of sorted score, 
+        #x input, x[-1] (highest, best) output
+        #give index of best out all avilable molecule - close to 100k (x_out)
+
+        #create a idx list
+        #look at pred score, make a idx of their idx, so we will be able to look at avilable mole and create a
+        #5,1,8 (5 is the highest, 1 is the second highest) - sort all the mo together
+
+        sorted_available_molecules = list(self.available_molecules) 
+        sorted_available_molecules = set([sorted_available_molecules[i] for i in sorted_score_index]) #100k-length(seen)
+        #reorder the avil mole in order of sorted_score idx
+
+        sorted_available_molecules = iter(sorted_available_molecules) #creates a iterator, iterate the set 
+        seen_smiles, seen_values = zip(*self.seen_molecule2value.items())#smiles and dockscore
+        batch_results = []
+
+#grab batch_size unseen molecule
+        while len(batch_results) < batch_size:
+            new_molecule = next(sorted_available_molecules)
+            if new_molecule not in list(seen_smiles):
+                batch_results.append(new_molecule)
+
+        return batch_results
+
+    def _train_model(self):
+        seen_smiles, seen_values = zip(*self.seen_molecule2value.items())
+        seen_smiles = list(seen_smiles)
+        seen_values = list(seen_values)
+        fingerprints = [torch.tensor(chem_ops.morgan_fp_from_smiles(smi, radius=2, number_bits=1024),
+                                         dtype=torch.float32)
+                            for smi in seen_smiles]
+        seen_values_tensor = torch.tensor(seen_values)[:, None]
+        fingerprints = torch.stack(fingerprints)
+        self.trainer.train(fingerprints, seen_values_tensor, batch_size = 500)
+#abc
+    @classmethod
+    def create_acquisition_function(cls, queried_results_so_far: typing.List[querier.QueriedHeap], **params):
+
+        available_molecules = queried_results_so_far[-2].all_smiles_set
+        # ^ the available molecules are given by all the molecules seen by the previous oracle
+
+        seen_molecule2value = queried_results_so_far[-1].smi_to_value_dict
+        # ^ the values seen so far are those given by the querier that this acquisition function will suggest molecules
+        # tp
+
+        # bayes_regress = bayes_models.BayesianRegression(embedding_func)
+        #TODO: implement proper init for model
+        model = greedy_models.Model()
+        trainer = greedy_models.Trainer(model)
+        return cls(trainer, available_molecules, seen_molecule2value)
