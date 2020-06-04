@@ -673,6 +673,7 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     else:
         raise NotImplementedError(feat)
     graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
+    graph.smiles = smiles
     return graph
 
 
