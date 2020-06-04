@@ -11,6 +11,18 @@ from LambdaZero.utils import get_external_dirs
 transform = LambdaZero.utils.Complete()
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
+model_parameters = {
+    "name": "chemprop",
+    "bias": False,
+    "hidden_size": 300,
+    "depth": 3,
+    "dropout": 0.0,
+    "atom_messages": False,
+    "undirected": False,
+    "ffn_hidden_size": 300,
+    "ffn_num_layers": 2}
+
+
 DEFAULT_CONFIG = {
     "trainer": ChempropRegressor,
     "trainer_config": {
@@ -24,7 +36,7 @@ DEFAULT_CONFIG = {
         "b_size": 64,
         "dim": 64,
         "num_epochs": 120,
-
+        "model_parameters": model_parameters,
         #"model": "some_model", todo
 
         "molprops": ["gridscore", "klabel"],
