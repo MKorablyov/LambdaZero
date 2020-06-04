@@ -1,10 +1,11 @@
 import socket
 from copy import deepcopy
-
+import os.path as osp
 from LambdaZero.environments import BlockMolEnv_v3
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v2
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
+
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -34,6 +35,20 @@ ppo022 = {
         }
     }
 }
+
+ppo023 = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "molMDP_config": {
+                "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_210.json"),
+            },
+            "allow_removal": True,
+        }
+    }
+}
+
 
 # "reward_config": {
 #     "soft_stop": True,

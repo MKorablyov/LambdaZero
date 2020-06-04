@@ -14,7 +14,7 @@ import LambdaZero.utils
 from LambdaZero.examples.PPO import config
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo022"
+else: config_name = "ppo023"
 config = getattr(config,config_name)
 
 _, _, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -27,7 +27,7 @@ DEFAULT_CONFIG = {
         "num_gpus_per_worker": 0.075,
         "num_gpus": 0.4,
         "model": {"custom_model": "MolActorCritic_tfv1"},
-        "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}
+        "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics} # fixme (report all)
         },
     "summaries_dir": summaries_dir,
     "memory": 60 * 10 ** 9,
