@@ -1,9 +1,9 @@
 import socket
 from copy import deepcopy
 import os.path as osp
-from LambdaZero.environments.persistent_search import BlockMolEnv_PersistentBuffer
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v2
+from LambdaZero.environments.persistent_search import BlockMolEnv_PersistentBuffer
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
 
 from ray.rllib.agents.ppo import PPOTrainer
@@ -24,7 +24,7 @@ ppo001_buf = {
                 "synth_cutoff":[0, 5],
                 "synth_config": chemprop_cfg}
         }
-    }
+    },
     "trainer": PPOTrainer,
     "buffer_size": 100_000,
 }

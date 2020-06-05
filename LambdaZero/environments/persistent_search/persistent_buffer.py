@@ -19,7 +19,8 @@ from rdkit.Chem import QED
 import warnings
 warnings.filterwarnings('ignore')
 
-from LambdaZero.environments.molecule import BlockMoleculeData
+from LambdaZero.environments.molMDP import BlockMoleculeData
+from LambdaZero.environments.block_mol_v3 import BlockMolEnv_v3
 from LambdaZero.environments.persistent_search.fast_sumtree import SumTree
 
 from LambdaZero import chem
@@ -63,8 +64,8 @@ class PersistentSearchBuffer:
         mol.blocks = None
         if smi in self.smiles:
             return
-        self.mols.append((mol, mol_info['base_reward'], mol_info['QED'], smi))
-        self.sumtree.set(len(self.mols)-1, np.exp(mol_info['base_reward'] / self.temperature))
+        self.mols.append((mol, mol_info['reward'], mol_info['QED'], smi))
+        self.sumtree.set(len(self.mols)-1, np.exp(mol_info['reward'] / self.temperature))
         self.smiles.add(smi)
 
     def sample(self):
@@ -85,44 +86,22 @@ class PersistentSearchBuffer:
         self.smiles = new_smiles
 
 
-class BlockMolEnv_PersistentBuffer:
+class BlockMolEnv_PersistentBuffer(BlockMolEnv_v3):
     mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems", "blockidxs"]
 
-    def __init__(self, config):
-        self.num_blocks = config["num_blocks"]
-        self.max_blocks = config["max_blocks"]
-        self.max_steps = config["max_steps"]
-        self.max_simulations = config["max_simulations"]
-        self.random_blocks = config["random_blocks"]
-        #
-        self.molMDP = MolMDP(**config["molMDP_config"])
-        self.observ = FPObs_v1(config, self.molMDP)
-        self.reward = config["reward"](**config["reward_config"])
-
-        self.action_space = self.observ.action_space
-        self.observation_space = self.observ.observation_space
+    def __init__(self, config=None):
+        super().__init__(config)
         self.searchbuf = config['searchbuf']
         self.penalize_repeat = config.get('penalize_repeat', False)
         self.first_reset = True
-
-    def _if_terminate(self):
-        terminate = False
-        # max steps
-        if self.num_steps >= self.max_steps:
-            terminate = True
-        # max simulations
-        if self.max_simulations is not None:
-            if self.num_simulations >= self.max_simulations:
-                terminate = True
-        return terminate
+        self._reset = super().reset
 
     def reset(self):
         self.num_steps = 0
         self.num_simulations = 0
         if self.first_reset:
             self.first_reset = False
-            self.molMDP.reset()
-            self.molMDP.random_walk(self.random_blocks)
+            self._reset()
             last_reward = 0
         else:
             self.molMDP.molecule.blocks = None
@@ -133,7 +112,7 @@ class BlockMolEnv_PersistentBuffer:
                                            for idx in self.molMDP.molecule.blockidxs]
             self.molMDP.molecule._mol = None
         self.reward.reset(last_reward)
-        return self.observ(self.molMDP.molecule, self.num_steps)
+        return self._make_obs()
 
     def step(self, action):
         try:
@@ -164,7 +143,7 @@ class BlockMolEnv_PersistentBuffer:
             self.set_state(state)
 
         self.num_steps += 1
-        obs = self.observ(self.molMDP.molecule, self.num_steps)
+        obs = self._make_obs()
         done = self._if_terminate()
         reward, info = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
         self.last_reward_info = copy(info)
@@ -173,23 +152,3 @@ class BlockMolEnv_PersistentBuffer:
             if ray.get(self.searchbuf.contains.remote(self.molMDP.molecule)):
                 reward = 0 # exploration penalty
         return obs, reward, done, info
-
-    def get_state(self):
-        mol_attr = {attr: deepcopy(getattr(self.molMDP.molecule, attr)) for attr in self.mol_attr}
-        num_steps = deepcopy(self.num_steps)
-        num_simulations = deepcopy(self.num_simulations)
-        previous_reward = deepcopy(self.reward.previous_reward)
-        mol = deepcopy(self.molMDP.molecule._mol)
-        return mol_attr, num_steps, num_simulations, previous_reward, mol
-
-    def set_state(self,state):
-        mol_attr, self.num_steps, self.num_simulations, self.reward.previous_reward, self.molMDP.molecule._mol \
-            = deepcopy(state)
-        [setattr(self.molMDP.molecule, key, value) for key, value in mol_attr.items()]
-        self.molMDP.molecule.blocks = [self.molMDP.block_mols[idx] for idx in state[0]["blockidxs"]]
-        self.molMDP.molecule._mol = None
-        return self.observ(self.molMDP.molecule, self.num_steps)
-
-    def render(self, outpath):
-        mol = self.molMDP.molecule.mol
-        if mol is not None: Chem.Draw.MolToFile(mol, outpath)

@@ -24,8 +24,11 @@ warnings.filterwarnings('ignore')
 from LambdaZero.environments.persistent_search.fast_sumtree import SumTree
 import LambdaZero.models
 from LambdaZero import chem
-from LambdaZero.environments.molecule import BlockMoleculeData, Complete, PredDockReward, FPObs_v1
-from LambdaZero.examples.config import datasets_dir
+from LambdaZero.environments.molMDP import BlockMoleculeData
+from LambdaZero.environments.reward import PredDockReward
+from LambdaZero.utils import Complete, get_external_dirs
+
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 import psutil
 
