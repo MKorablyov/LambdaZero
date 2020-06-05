@@ -12,12 +12,12 @@ from torch_geometric.nn import Set2Set
 
 
 # import torch and torch.nn using ray utils
-th, nn = try_import_torch()
+torch, nn = try_import_torch()
 
 
 def convert_to_tensor(arr):
-    tensor = th.from_numpy(np.asarray(arr))
-    if tensor.dtype == th.double:
+    tensor = torch.from_numpy(np.asarray(arr))
+    if tensor.dtype == torch.double:
         tensor = tensor.float()
     return tensor
 
@@ -51,11 +51,11 @@ class ActorCriticModel(TorchModelV2, nn.Module, ABC):
         obs = convert_to_tensor([self.preprocessor.transform(obs)])
         input_dict = restore_original_dimensions(obs, self.obs_space, "torch")
 
-        with th.no_grad():
+        with torch.no_grad():
             model_out = self.forward(input_dict, None, [1])
             logits, _ = model_out
             value = self.value_function()
-            logits, value = th.squeeze(logits), th.squeeze(value)
+            logits, value = torch.squeeze(logits), torch.squeeze(value)
             priors = nn.Softmax(dim=-1)(logits)
 
             priors = priors.cpu().numpy()
@@ -102,29 +102,29 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         action_mask = input_dict["action_mask"]
 
         # shared layers
-        mol_embed = self.shared_layers(th.cat([mol_fp, num_steps], 1))
+        mol_embed = self.shared_layers(torch.cat([mol_fp, num_steps], 1))
 
         # actor outputs
         stop_logit = self.actor_stop(mol_embed)
         #
         jbond_embed = self.stem_layers(jbond_fps)
         mol_embed_ = mol_embed[:, None, :].repeat([1, jbond_embed.shape[1], 1])
-        jbond_embed = th.cat([jbond_embed, mol_embed_, jbond_embed * mol_embed_], dim=2)
+        jbond_embed = torch.cat([jbond_embed, mol_embed_, jbond_embed * mol_embed_], dim=2)
         break_logits = self.actor_break(jbond_embed)[:, :, 0]
         #
         stem_embed = self.stem_layers(stem_fps)
         mol_embed_ = mol_embed[:, None, :].repeat([1, stem_embed.shape[1], 1])
-        stem_embed = th.cat([stem_embed, mol_embed_, stem_embed * mol_embed_], dim=2)
+        stem_embed = torch.cat([stem_embed, mol_embed_, stem_embed * mol_embed_], dim=2)
         add_logits = self.actor_add(stem_embed)
         add_logits = add_logits.reshape([add_logits.shape[0], -1])
         #
-        actor_logits = th.cat([stop_logit, break_logits, add_logits], axis=1)
+        actor_logits = torch.cat([stop_logit, break_logits, add_logits], axis=1)
         # compute value
         critic_logits = self.critic_layers(mol_embed)
         self._value_out = critic_logits[:, 0]
 
         # mask not available actions
-        masked_actions = (1. - action_mask).to(th.bool)
+        masked_actions = (1. - action_mask).to(torch.bool)
         actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
         return actor_logits, None
 
@@ -132,14 +132,14 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         return self._value_out
 
     def compute_priors_and_value(self, obs):
-        obs = th.tensor([self.preprocessor.transform(obs)]).float().cuda()
+        obs = torch.tensor([self.preprocessor.transform(obs)]).float().cuda()
         input_dict = restore_original_dimensions(obs, self.obs_space, "torch")
 
-        with th.no_grad():
+        with torch.no_grad():
             model_out = self.forward(input_dict, None, [1])
             logits, _ = model_out
             value = self.value_function()
-            logits, value = th.squeeze(logits), th.squeeze(value)
+            logits, value = torch.squeeze(logits), torch.squeeze(value)
             priors = nn.Softmax(dim=-1)(logits)
 
             priors = priors.cpu().numpy()
@@ -148,11 +148,11 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-        th.save(self.model.state_dict(), checkpoint_path)
+        torch.save(self.model.state_dict(), checkpoint_path)
         return checkpoint_path
 
     def _restore(self, checkpoint_path):
-        self.model.load_state_dict(th.load(checkpoint_path))
+        self.model.load_state_dict(torch.load(checkpoint_path))
 
 
 class MPNNet(nn.Module):
