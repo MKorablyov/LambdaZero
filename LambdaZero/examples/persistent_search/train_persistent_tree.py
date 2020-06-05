@@ -354,8 +354,9 @@ if __name__ == '__main__':
         guided_search({'priority_pred': 'max_desc_r', #'greedy_q',
                        'update_prio_on_refresh': True,
                        'return_type':'max_desc_r',
-                       'save_path': os.environ["SCRATCH"]+'/lz',
-                       #'save_path': '/network/tmp1/bengioe/lz',
+                       'save_path': os.path.join(summaries_dir, 'persistent_search_tree'),
                        'num_molecules': int(10e6),
                        'prune_at': int(200e3),
+                       'num_rollout_actors': 1,
+                       'num_docking_threads': 1,
                        'score_temperature': 1.5})
