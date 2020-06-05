@@ -587,9 +587,14 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
     atmfeat = th.tensor(atmfeat, dtype=th.float32)
-    edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
-    edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
-    edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    if bond.shape[0] > 0:
+        edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
+        edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
+        edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    else:
+        edge_index = th.zeros((0,2), dtype=th.int64)
+        edge_attr = th.tensor(bondfeat, dtype=th.float32)
+
     # make torch data
     if coord is not None:
         coord = th.tensor(coord,dtype=th.float32)
@@ -597,7 +602,6 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
-
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
     " mol to graph convertor "
