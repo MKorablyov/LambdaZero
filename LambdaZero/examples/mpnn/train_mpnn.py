@@ -7,10 +7,10 @@ import torch
 from torch_geometric.data import DataLoader
 import torch.nn.functional as F
 
-from LambdaZero.utils import get_external_dirs
 import LambdaZero.inputs
-import LambdaZero.utils
 import LambdaZero.models
+import LambdaZero.utils
+from LambdaZero.utils import get_external_dirs
 
 
 def train_epoch(loader, model, optimizer, device, config):
