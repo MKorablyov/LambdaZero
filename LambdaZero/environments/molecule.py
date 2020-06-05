@@ -1,5 +1,5 @@
 import time
-from copy import deepcopy
+from copy import deepcopy, copy
 import gym
 import numpy as np
 import pandas as pd
@@ -17,6 +17,7 @@ from rdkit import DataStructs
 #from affinity_torch.py_tools import chem
 from rdkit import Chem
 from rdkit.Chem import QED
+import ray
 
 import torch.nn.functional as F
 from torch.nn import Sequential, Linear, ReLU, GRU
@@ -665,8 +666,8 @@ class PredDockReward:
         self.net.load_state_dict(th.load(load_model, map_location=th.device(device)))
         self.net.eval()
 
-    def reset(self):
-        self.previous_reward = 0.0
+    def reset(self, previous_reward=0.0):
+        self.previous_reward = previous_reward
 
     def _discount(self, mol, reward):
         # num atoms constraint
@@ -684,6 +685,7 @@ class PredDockReward:
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
+        self.base_reward = disc_reward
         if self.delta: disc_reward = delta_reward
         return disc_reward, qed
 
@@ -706,6 +708,7 @@ class PredDockReward:
         else:
             simulate = simulate
 
+        self.base_reward = 0
         if simulate:
             reward = self._simulation(molecule)
             if reward is not None:
@@ -714,4 +717,113 @@ class PredDockReward:
                 reward, discounted_reward, qed = -0.5, -0.5, -0.5
         else:
             reward, discounted_reward, qed = 0.0, 0.0, 0.0
-        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed}
+        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward,
+                                   "QED": qed, "base_reward": self.base_reward}
+
+
+class BlockMolEnv_v6:
+    mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems", "blockidxs"]
+
+    def __init__(self, config):
+        self.num_blocks = config["num_blocks"]
+        self.max_blocks = config["max_blocks"]
+        self.max_steps = config["max_steps"]
+        self.max_simulations = config["max_simulations"]
+        self.random_blocks = config["random_blocks"]
+        #
+        self.molMDP = MolMDP(**config["molMDP_config"])
+        self.observ = FPObs_v1(config, self.molMDP)
+        self.reward = config["reward"](**config["reward_config"])
+
+        self.action_space = self.observ.action_space
+        self.observation_space = self.observ.observation_space
+        self.searchbuf = config['searchbuf']
+        self.first_reset = True
+
+    def _if_terminate(self):
+        terminate = False
+        # max steps
+        if self.num_steps >= self.max_steps:
+            terminate = True
+        # max simulations
+        if self.max_simulations is not None:
+            if self.num_simulations >= self.max_simulations:
+                terminate = True
+        return terminate
+
+    def reset(self):
+        self.num_steps = 0
+        self.num_simulations = 0
+        if self.first_reset:
+            self.first_reset = False
+            self.molMDP.reset()
+            self.molMDP.random_walk(self.random_blocks)
+            last_reward = 0
+        else:
+            self.molMDP.molecule.blocks = None
+            ray.get(self.searchbuf.add.remote(self.molMDP.molecule, self.last_reward_info))
+            self.molMDP.reset()
+            self.molMDP.molecule, last_reward = ray.get(self.searchbuf.sample.remote())
+            self.molMDP.molecule.blocks = [self.molMDP.block_mols[idx]
+                                           for idx in self.molMDP.molecule.blockidxs]
+            self.molMDP.molecule._mol = None
+        self.reward.reset(last_reward)
+        return self.observ(self.molMDP.molecule, self.num_steps)
+
+    def step(self, action):
+        try:
+            state = self.get_state()
+            if (action == 0):
+                simulate = True
+                self.num_simulations += 1
+            elif action <= (self.max_blocks - 1):
+                simulate = False
+                self.molMDP.remove_jbond(jbond_idx=action-1)
+            else:
+                simulate = False
+                stem_idx = (action - self.max_blocks)//self.num_blocks
+                block_idx = (action - self.max_blocks) % self.num_blocks
+                self.molMDP.add_block(block_idx=block_idx, stem_idx=stem_idx)
+        except Exception as e:
+            print("error taking action", action)
+            print(e)
+            _mol = self.molMDP.molecule.mol
+            print(Chem.MolToSmiles(_mol) if _mol else "no mol")
+            print(self.get_state())
+            with open('blockmolenv_step_error.txt', 'a') as f:
+                print("error taking action", action, file=f)
+                print(e, file=f)
+                print(Chem.MolToSmiles(_mol) if _mol else "no mol", file=f)
+                print(state, file=f)
+                print(self.get_state(), file=f)
+            self.set_state(state)
+
+        self.num_steps += 1
+        obs = self.observ(self.molMDP.molecule, self.num_steps)
+        done = self._if_terminate()
+        reward, info = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
+        self.last_reward_info = copy(info)
+        info["molecule"] = self.molMDP.molecule
+        if reward != 0 and ray.get(self.searchbuf.contains.remote(self.molMDP.molecule)):
+            reward = 0 # exploration penalty
+        return obs, reward, done, info
+
+    def get_state(self):
+        mol_attr = {attr: deepcopy(getattr(self.molMDP.molecule, attr)) for attr in self.mol_attr}
+        num_steps = deepcopy(self.num_steps)
+        num_simulations = deepcopy(self.num_simulations)
+        previous_reward = deepcopy(self.reward.previous_reward)
+        mol = deepcopy(self.molMDP.molecule._mol)
+        return mol_attr, num_steps, num_simulations, previous_reward, mol
+
+    def set_state(self,state):
+        mol_attr, self.num_steps, self.num_simulations, self.reward.previous_reward, self.molMDP.molecule._mol \
+            = deepcopy(state)
+        [setattr(self.molMDP.molecule, key, value) for key, value in mol_attr.items()]
+        self.molMDP.molecule.blocks = [self.molMDP.block_mols[idx] for idx in state[0]["blockidxs"]]
+        self.molMDP.molecule._mol = None
+        return self.observ(self.molMDP.molecule, self.num_steps)
+
+    def render(self, outpath):
+        mol = self.molMDP.molecule.mol
+        if mol is not None: Chem.Draw.MolToFile(mol, outpath)

@@ -4,21 +4,22 @@ import ray
 from ray import tune
 from ray.rllib.models.catalog import ModelCatalog
 from LambdaZero.models.custom_torch_models import MolActorCritic_thv1
-from LambdaZero.models.custom_tf_models import MolActorCritic_tfv1
+#from LambdaZero.models.custom_tf_models import MolActorCritic_tfv1
 from LambdaZero.examples.config import get_config, alphazero_config
 if len(sys.argv) >= 2: config_name = sys.argv[1]
 else: config_name = "ppo001" # "apex001"
 
-trainer, config, memory, summaries_dir, checkpoint_freq = get_config(config_name)
-print("starting with config:", config_name)
 
 
 if __name__ == "__main__":
-    ray.init(memory=memory)
+    ray.init(memory=int(60e9), num_cpus=16)
              #object_store_memory=6*10**9,
              #driver_object_store_memory=3*10**9)
+
+    trainer, config, memory, summaries_dir, checkpoint_freq = get_config(config_name)
+    print("starting with config:", config_name)
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
-    ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
+    #ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
     tune.run(trainer,
         stop={"training_iteration": 2000000},
         max_failures=0,

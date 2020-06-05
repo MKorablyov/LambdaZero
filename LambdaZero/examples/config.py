@@ -4,10 +4,11 @@ from ray.rllib.agents.trainer import with_base_config
 from ray.rllib.utils import merge_dicts
 
 from LambdaZero.environments.molecule import MolMDP, QEDReward, PredDockReward
-from LambdaZero.environments.molecule import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnv_v5
+from LambdaZero.environments.molecule import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnv_v5, BlockMolEnv_v6
+from LambdaZero.environments.persistent_search.persistent_search_buffer import PersistentSearchBuffer
 from LambdaZero.core.alpha_zero_trainer import AlphaZeroTrainer
 
-
+import ray
 from ray.rllib.agents.dqn import ApexTrainer
 from ray.rllib.agents.a3c import A3CTrainer
 from ray.rllib.agents.dqn import DQNTrainer
@@ -30,6 +31,7 @@ def dock_metrics(info):
     episode.custom_metrics["reward"] = env_info["reward"]
     episode.custom_metrics["QED"] = env_info["QED"]
     episode.custom_metrics["discounted_reward"] = env_info["discounted_reward"]
+    episode.custom_metrics["base_reward"] = env_info.get("base_reward", 0)
 
 def mol_blocks_v3_config():
     machine = socket.gethostname()
@@ -117,6 +119,56 @@ def mol_blocks_v4_config():
     return config
 
 
+def mol_blocks_v6_config():
+    machine = socket.gethostname()
+    obs_config = {"mol_fp_len": 512,
+                  "mol_fp_radiis": [3],
+                  "stem_fp_len": 64,
+                  "stem_fp_radiis": [4, 3, 2]
+                  }
+
+    molMDP_config = {
+        "blocks_file": osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"),
+    }
+
+    reward_config = {
+        "soft_stop": True,
+        "load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
+        "natm_cutoff": [45, 50],
+        "qed_cutoff": [0.2, 0.7],
+        "exp": None,
+        "delta": True,
+        "simulation_cost": 0.00,
+        "device": "cuda",
+    }
+
+    env_config = {
+        "obs_config": obs_config,
+        "reward": PredDockReward,
+        "molMDP_config": molMDP_config,
+        "reward_config": reward_config,
+        "num_blocks": 105,
+        "max_steps": 7,
+        "max_blocks": 7,
+        "max_atoms": 50,
+        "max_branches": 20,
+        "random_blocks": 2,
+        "max_simulations": 1,
+        "allow_removal": True
+    }
+
+    searchbuf = ray.remote(PersistentSearchBuffer).remote(
+        {'blocks_file': molMDP_config['blocks_file'],
+         'max_size': 50_000})
+
+    env_config['searchbuf'] = searchbuf
+
+    config = {
+        "env": BlockMolEnv_v6,
+              "env_config": env_config,
+              "callbacks": {"on_episode_end": dock_metrics}
+              }
+    return config
 
 def alphazero_config():
     machine = socket.gethostname()
@@ -176,12 +228,13 @@ def ppo_config():
         memory = 60 * 10 ** 9
 
     config = {
-        "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
-        "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
+        #"tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
+        #"local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
         "num_workers": num_workers,
         "num_gpus_per_worker": 0.075,
         "num_gpus": 0.4,
-        "model": {"custom_model": "MolActorCritic_tfv1"}
+        "framework": "torch",
+        "model": {"custom_model": "MolActorCritic_thv1"}
     }
     checkpoint_freq = 250
     return PPOTrainer, config, memory, checkpoint_freq
@@ -216,13 +269,13 @@ def get_config(config_name):
     machine = socket.gethostname()
     config = deepcopy(eval(config_name))
     base_env_config = config.pop("base_env_config")()
-    trainer, base_trainer_config, memory, checkpoint_freq = config.pop("base_trainer_config")()  
+    trainer, base_trainer_config, memory, checkpoint_freq = config.pop("base_trainer_config")()
 
     assert not bool(set(base_env_config.keys()) & set(base_trainer_config.keys())), "default configs overlap"
     base_config = merge_dicts(base_env_config, base_trainer_config)
     config = merge_dicts(base_config, config)
-    if memory in config.keys(): memory = config.pop("memory")
-  
+    if "memory" in config.keys(): memory = config.pop("memory")
+
     return trainer, config, memory, summaries_dir, checkpoint_freq
 
 az000 = { # killed OOM
@@ -925,4 +978,24 @@ apex009 = {
                    "allow_removal": True,
                    "reward_config": {"exp": 2.5}
                    }
+}
+
+
+
+ppo001_persistent = {
+    # 3.23 instead of 2.68 mean; 3.3 instead of 3.2 final huge improvement !!
+    "base_env_config": mol_blocks_v6_config,
+    "base_trainer_config": ppo_config,
+    "env_config": {
+        "max_steps": 10,
+    }
+}
+
+ppo002_persistent = {
+    # 3.23 instead of 2.68 mean; 3.3 instead of 3.2 final huge improvement !!
+    "base_env_config": mol_blocks_v6_config,
+    "base_trainer_config": ppo_config,
+    "env_config": {
+        "max_steps": 3,
+    }
 }
