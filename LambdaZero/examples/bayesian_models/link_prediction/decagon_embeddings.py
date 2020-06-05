@@ -52,11 +52,6 @@ def train_epoch(loader, model, optimizer, device, config):
         # Q = sigmoid(logits)
         # P = probs
 
-        # CE = -P log(Q)
-        #P = th.FloatTensor(labels.shape[0], 2)
-        #P.zero_()
-        #P.scatter_(th.LongTensor(1), labels, th.LongTensor(1))
-        #print("P", P)
 
         loss = ((logits - labels)**2).sum()
         # true_xent = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(aff), logits=aff)
@@ -91,11 +86,22 @@ def eval_epoch(loader, model, device, config):
     labels_all, preds_all = np.concatenate(labels_all, axis=0), np.concatenate(preds_all, axis=0)
     auc = sklearn.metrics.roc_auc_score(labels_all, preds_all)
 
-    #confusion = sklearn.metrics.confusion_matrix(labels_all, preds_all)
-
-
-    print("test", auc, len(labels_all), sum(labels_all))
+    confusion = sklearn.metrics.confusion_matrix(labels_all,
+                                                 np.asarray((preds_all - preds_all.mean()) > 0,dtype=np.int32))
+    print("test", auc, len(labels_all), sum(labels_all), confusion)
     return {"AUC": auc}
+
+def egreedy_aq(loader, model, device, config):
+    model.eval()
+    preds_all = []
+    for bidx, (Zi, Zj, labels) in enumerate(loader):
+        Zi, Zj, labels = Zi.to(device), Zj.to(device), labels.to(device)
+        logits = model(Zi, Zj)
+        preds_all.append(th.nn.Sigmoid()(logits).detach().cpu().numpy())
+
+    aq_order = np.argsort(np.concatenate(preds_all, axis=0))
+    return aq_order[:config["aq_batch_size"]]
+
 
 
 class BasicRegressor(tune.Trainable):
@@ -108,10 +114,15 @@ class BasicRegressor(tune.Trainable):
 
         # split dataset
         Z, D, R, _, is_train = load_decagon(config["dataset_root"], config["relation"])
-        train_set = Subset(dataset, np.where(is_train)[0][10:13]) # fixme
-        self.train_set = th.utils.data.DataLoader(train_set, batch_size=config["b_size"], shuffle=True)
-        test_set = Subset(dataset, np.where(~is_train)[0])
-        self.test_set = th.utils.data.DataLoader(test_set, batch_size=config["b_size"])
+        self.train_set = Subset(dataset, np.where(is_train)[0])
+
+        self.train_loader = th.utils.data.DataLoader(self.train_set, batch_size=config["b_size"], shuffle=True)
+        self.test_set = Subset(dataset, np.where(~is_train)[0])
+        self.test_loader = th.utils.data.DataLoader(self.test_set, batch_size=config["b_size"])
+
+        # acquire
+        self.is_aquired = np.zeros(len(self.train_set),dtype=np.bool)
+        self.is_aquired[np.random.choice(np.arange(len(self.train_set)), config["aq_batch_size"])] = True
 
         # make model
         self.model = LinearDec(Z=th.tensor(Z).to(self.device),
@@ -125,9 +136,24 @@ class BasicRegressor(tune.Trainable):
         self.eval_epoch = config["eval_epoch"]
 
     def _train(self):
-        train_scores = self.train_epoch(self.train_set, self.model, self.optim, self.device, self.config)
-        eval_scores = self.eval_epoch(self.test_set, self.model,  self.device, self.config)
-        # rename to make scope
+
+        # make loader
+        aq_set = Subset(self.train_set, np.where(self.is_aquired)[0])
+        aq_loader = th.utils.data.DataLoader(aq_set, batch_size=self.config["b_size"])
+        # train model
+        for i in range(3):
+            train_scores = self.train_epoch(aq_loader, self.model, self.optim, self.device, self.config)
+        eval_scores = self.eval_epoch(self.test_loader, self.model,  self.device, self.config)
+
+        # acquire more data
+        rest_set = Subset(self.train_set, np.where(~self.is_aquired)[0])
+        rest_loader = DataLoader(rest_set, batch_size=self.config["b_size"])
+        batch_aq = egreedy_aq(rest_loader,self.model,self.device, self.config )
+        batch_aq = np.arange(len(self.train_set))[~self.is_aquired][batch_aq]
+        self.is_aquired[batch_aq] = 1
+
+
+        # rename/report to make scope
         train_scores = [("train_" + k, v) for k,v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
         scores = dict(train_scores + eval_scores)
@@ -144,23 +170,24 @@ class BasicRegressor(tune.Trainable):
 
 
 
-
 relations = ['C0003126','C0020456','C0027947', 'C0026780', 'C0009193', 'C0038019' ]
 
 DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
-        "relation": relations[0],
+        "relation": relations[1],
         "dataset_root": os.path.join(datasets_dir, "decagon_embeddings"),
         "lr": 0.001,
         "b_size": 64,
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
+
+        "aq_batch_size": 512,
         },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 250000000,
-    "stop": {"training_iteration": 2},
+    "stop": {"training_iteration": 100},
 }
 
 config = DEFAULT_CONFIG
@@ -170,12 +197,12 @@ if __name__ == "__main__":
 
     analysis = tune.run(config["trainer"],
                         config=config["trainer_config"],
-                        stop={"training_iteration":100}, #EarlyStop(),
+                        stop=config["stop"], #EarlyStop(),
                         resources_per_trial={
                            "cpu": 4, # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
                            "gpu": 1.0
                         },
-                        num_samples=1,
+                        num_samples=100,
                         checkpoint_at_end=False,
                         local_dir=summaries_dir,
                         checkpoint_freq=100000)
