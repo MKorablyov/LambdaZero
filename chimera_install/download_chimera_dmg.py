@@ -56,8 +56,7 @@ if __name__ == '__main__':
     download_relative_url = extract_download_relative_url(redirect_page_html)
     download_url = f"{base_url}/{download_relative_url}"
 
-    dir = Path(__file__).parent
-    local_file_path = str(dir.joinpath(filename))
+    local_file_path = str(Path(__file__).parent.joinpath(filename))
     print(f"Downoading file {filename} from {download_url}...")
     download_file(download_url, local_file_path)
     print(f"Finished downloading.")
