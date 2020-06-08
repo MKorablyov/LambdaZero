@@ -3,6 +3,8 @@ DATASETS_DEFAULT=1
 PROGRAMS_DEFAULT=1
 SUMMARIES_DEFAULT=1
 
+SCRIPT_DIR=`pwd`
+
 function help() {
 cat <<EOF
 Usage:
@@ -128,13 +130,41 @@ cd ..
 mkdir -p "$PROGRAMS_DIR"
 cd $PROGRAMS_DIR
 git clone --depth 1 https://github.com/MKorablyov/dock6
-git clone --depth 1 https://github.com/MKorablyov/chimera tmp
-cd tmp
-cat xaa xab > chimera.bin
-chmod 755 chimera.bin
-echo '../chimera' | ./chimera.bin
-cd ..
-rm -rf tmp
-cd ..
 
+# install chimera
+ARCH=`uname`
+echo "The architecture is $ARCH"
+if [ $ARCH == 'Darwin' ]; then
+      APP_FOLDER=/Users/$USER/Applications/
+      DMG=chimera-1.14-mac64.dmg
+
+      echo "Download dmg"
+      ./$SCRIPT_DIR/chimera_install/download_chimera_dmg.py
+
+      echo "attach dmg"
+      hdiutil attach $DMG
+      echo "copy content of dmg to user Application folder"
+      cp -rf /Volumes/ChimeraInstaller/Chimera.app $APP_FOLDER
+      echo "detach dmg"
+      hdiutil detach /Volumes/ChimeraInstaller/
+
+      echo "delete dmg"
+      rm ./$SCRIPT_DIR/chimera_install/$DMG
+
+      echo "Create symlink to executable"
+      CHIMERA_BIN=$PROGRAMS_DIR/chimera/bin
+      mkdir -p $CHIMERA_BIN
+      ln -s $APP_FOLDER/Chimera.app/Contents/Resources/bin/chimera $CHIMERA_BIN/chimera
+
+    elif [ $ARCH == 'Linux' ]; then
+      git clone --depth 1 https://github.com/MKorablyov/chimera tmp
+      cd tmp
+      cat xaa xab > chimera.bin
+      chmod 755 chimera.bin
+      echo '../chimera' | ./chimera.bin
+      cd ..
+      rm -rf tmp
+      cd ..
+fi
+    
 mkdir -p "$SUMMARIES_DIR"
