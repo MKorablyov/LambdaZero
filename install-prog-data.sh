@@ -137,19 +137,20 @@ echo "The architecture is $ARCH"
 if [ $ARCH == 'Darwin' ]; then
       APP_FOLDER=/Users/$USER/Applications/
       DMG=chimera-1.14-mac64.dmg
+      PATH_TO_DMG=$SCRIPT_DIR/chimera_install/$DMG
 
       echo "Download dmg"
       $SCRIPT_DIR/chimera_install/download_chimera_dmg.py
 
       echo "attach dmg"
-      hdiutil attach $DMG
+      hdiutil attach $PATH_TO_DMG
       echo "copy content of dmg to user Application folder"
       cp -rf /Volumes/ChimeraInstaller/Chimera.app $APP_FOLDER
       echo "detach dmg"
       hdiutil detach /Volumes/ChimeraInstaller/
 
       echo "delete dmg"
-      rm ./$SCRIPT_DIR/chimera_install/$DMG
+      rm $PATH_TO_DMG
 
       echo "Create symlink to executable"
       CHIMERA_BIN=$PROGRAMS_DIR/chimera/bin
