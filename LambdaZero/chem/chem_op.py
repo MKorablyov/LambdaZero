@@ -505,42 +505,56 @@ def onehot(arr,num_classes,dtype=np.int):
     return onehot_arr
 
 
-def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
+_mpnn_feat_cache = [None]
+
+def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_features=True):
     atomtypes = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
     bondtypes = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
 
     natm = len(mol.GetAtoms())
+    ntypes = len(atomtypes)
     # featurize elements
-    atmfeat = pd.DataFrame(index=range(natm),columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic",
-                                                      "sp", "sp2", "sp3", "num_hs"])
+    # columns are: ["type_idx" .. , "atomic_number", "acceptor", "donor",
+    # "aromatic", "sp", "sp2", "sp3", "num_hs", [atomic_number_onehot] .. ])
+
+    nfeat = ntypes + 1 + 8
+    if one_hot_atom:
+        nfeat += len(atomic_numbers)
+    atmfeat = np.zeros((natm, nfeat))
 
     # featurize
-    fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
-    factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
     for i,atom in enumerate(mol.GetAtoms()):
-        type_idx = atomtypes.get(atom.GetSymbol(),5)
-        atmfeat["type_idx"][i] = onehot([type_idx], num_classes=len(atomtypes) + 1)[0]
-        atmfeat["atomic_number"][i] = atom.GetAtomicNum()
-        atmfeat["aromatic"][i] = 1 if atom.GetIsAromatic() else 0
+        type_idx = atomtypes.get(atom.GetSymbol(), 5)
+        atmfeat[i, type_idx] = 1
+        if one_hot_atom:
+            atmfeat[i, ntypes + 9 + atom.GetAtomicNum() - 1] = 1
+        else:
+            atmfeat[i, ntypes + 1] = atom.GetAtomicNum()
+        atmfeat[i, ntypes + 4] = atom.GetIsAromatic()
         hybridization = atom.GetHybridization()
-        atmfeat["sp"][i] = 1 if hybridization == HybridizationType.SP else 0
-        atmfeat["sp2"][i] = 1 if hybridization == HybridizationType.SP2 else 0
-        atmfeat["sp3"][i] = 1 if hybridization == HybridizationType.SP3 else 0
-        atmfeat["num_hs"][i] = atom.GetTotalNumHs(includeNeighbors=True)
+        atmfeat[i, ntypes + 5] = hybridization == HybridizationType.SP
+        atmfeat[i, ntypes + 6] = hybridization == HybridizationType.SP2
+        atmfeat[i, ntypes + 7] = hybridization == HybridizationType.SP3
+        atmfeat[i, ntypes + 8] = atom.GetTotalNumHs(includeNeighbors=True)
 
     # get donors and acceptors
-    atmfeat["acceptor"].values[:] = 0
-    atmfeat["donor"].values[:] = 0
-    feats = factory.GetFeaturesForMol(mol)
-    for j in range(0, len(feats)):
-         if feats[j].GetFamily() == 'Donor':
-             node_list = feats[j].GetAtomIds()
-             for k in node_list:
-                 atmfeat["donor"][k] = 1
-         elif feats[j].GetFamily() == 'Acceptor':
-             node_list = feats[j].GetAtomIds()
-             for k in node_list:
-                 atmfeat["acceptor"][k] = 1
+    if donor_features:
+        if _mpnn_feat_cache[0] is None:
+            fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
+            factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
+            _mpnn_feat_cache[0] = factory
+        else:
+            factory = _mpnn_feat_cache[0]
+        feats = factory.GetFeaturesForMol(mol)
+        for j in range(0, len(feats)):
+             if feats[j].GetFamily() == 'Donor':
+                 node_list = feats[j].GetAtomIds()
+                 for k in node_list:
+                     atmfeat[k, ntypes + 3] = 1
+             elif feats[j].GetFamily() == 'Acceptor':
+                 node_list = feats[j].GetAtomIds()
+                 for k in node_list:
+                     atmfeat[k, ntypes + 2] = 1
     # get coord
     if ifcoord:
         coord = np.asarray([mol.GetConformer(0).GetAtomPosition(j) for j in range(natm)])
@@ -551,22 +565,36 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     bondfeat = [bondtypes[bond.GetBondType()] for bond in mol.GetBonds()]
     bondfeat = onehot(bondfeat,num_classes=len(bondtypes))
 
-    # convert atmfeat to numpy matrix
-    if not panda_fmt:
-        type_idx = np.stack(atmfeat["type_idx"].values,axis=0)
-        atmfeat = atmfeat[["atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3","num_hs"]]
-        atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
+    # convert atmfeat to pandas
+    if panda_fmt:
+        atmfeat_pd = pd.DataFrame(index=range(natm),columns=[
+            "type_idx", "atomic_number", "acceptor", "donor", "aromatic",
+            "sp", "sp2", "sp3", "num_hs"])
+        atmfeat_pd['type_idx'] = atmfeat[:, :ntypes+1]
+        atmfeat_pd['atomic_number'] = atmfeat[:, ntypes+1]
+        atmfeat_pd['acceptor'] = atmfeat[:, ntypes+2]
+        atmfeat_pd['donor'] = atmfeat[:, ntypes+3]
+        atmfeat_pd['aromatic'] = atmfeat[:, ntypes+4]
+        atmfeat_pd['sp'] = atmfeat[:, ntypes+5]
+        atmfeat_pd['sp2'] = atmfeat[:, ntypes+6]
+        atmfeat_pd['sp2'] = atmfeat[:, ntypes+7]
+        atmfeat_pd['sp3'] = atmfeat[:, ntypes+8]
+        atmfeat = atmfeat_pd
     return atmfeat, coord, bond, bondfeat
-
 
 def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
     atmfeat = th.tensor(atmfeat, dtype=th.float32)
-    edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
-    edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
-    edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    if bond.shape[0] > 0:
+        edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
+        edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
+        edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    else:
+        edge_index = th.zeros((0,2), dtype=th.int64)
+        edge_attr = th.tensor(bondfeat, dtype=th.float32)
+
     # make torch data
     if coord is not None:
         coord = th.tensor(coord,dtype=th.float32)
@@ -574,7 +602,6 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
-
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
     " mol to graph convertor "

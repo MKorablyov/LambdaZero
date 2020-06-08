@@ -27,8 +27,8 @@ class PredDockReward:
         self.net.load_state_dict(th.load(load_model, map_location=th.device(device)))
         self.net.eval()
 
-    def reset(self):
-        self.previous_reward = 0.0
+    def reset(self, previous_reward=0.0):
+        self.previous_reward = previous_reward
 
     def _discount(self, mol, reward):
         # num atoms constraint
@@ -100,8 +100,8 @@ class PredDockReward_v2:
 
         self.synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
 
-    def reset(self):
-        self.previous_reward = 0.0
+    def reset(self, previous_reward=0.0):
+        self.previous_reward = previous_reward
 
     def _discount(self, mol, reward):
 
