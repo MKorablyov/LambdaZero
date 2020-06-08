@@ -139,7 +139,7 @@ if [ $ARCH == 'Darwin' ]; then
       DMG=chimera-1.14-mac64.dmg
 
       echo "Download dmg"
-      ./$SCRIPT_DIR/chimera_install/download_chimera_dmg.py
+      $SCRIPT_DIR/chimera_install/download_chimera_dmg.py
 
       echo "attach dmg"
       hdiutil attach $DMG
