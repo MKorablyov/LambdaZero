@@ -137,7 +137,7 @@ DEFAULT_CONFIG = {
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
-    "checkpoint_freq": 250000000,
+    "checkpoint_freq": 1,
     "stop": {"training_iteration": 2},
 }
 
