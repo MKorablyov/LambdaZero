@@ -13,33 +13,33 @@ jobs:
     name: install programs and test
     strategy:
         matrix:
-            os: [macos-latest, ubuntu-latest]
+            include:
+              - os: macos-latest
+                conda_environment_filename: environment-mac.yml
+              - os: ubuntu-latest
+                conda_environment_filename: environment-linux.yml
     runs-on: ${{ matrix.os }}
-    steps:
-    - uses: goanpeca/setup-miniconda@v1
-      with:
-        auto-update-conda: true
-        python-version: 3.6
 
-    - name: checkout code 
+    steps:
+    - name: checkout code
       uses: actions/checkout@v2
 
-    - name: create Conda environment (mac)
-      run: conda env create -f environment-mac.yml
-      if: matrix.os == 'macos-latest'
+    - uses: goanpeca/setup-miniconda@v1
+      with:
+        auto-update-conda: false
+        python-version: 3.6
+        activate-environment: lz
+        environment-file: ${{ matrix.conda_environment_filename }}
+        auto-activate-base: false
 
-    - name: create Conda environment (linux)
-      run: conda env create -f environment-linux.yml
-      if: matrix.os == 'ubuntu-latest'
+    - name: setup python environment
+      shell: bash -l {0}
+      run: python setup.py develop
 
-    - name: activate and setup environment, install programs, and then test
-      run: |
-        source /usr/share/miniconda/etc/profile.d/conda.sh
-        echo "### activate environment"
-        conda activate lz
-        echo "### run setup develop"
-        python setup.py develop
-        echo "### run install-prog-data.sh"
-        bash install-prog-data.sh -d $HOME/datasets/ -p $HOME/programs/ -s $HOME/summaries/
-        echo "### running tests including external programs"
-        pytest --external_program
+    - name: execute install-prog-data.sh
+      shell: bash -l {0}
+      run: bash install-prog-data.sh -d $HOME/datasets/ -p $HOME/programs/ -s $HOME/summaries/
+
+    - name: run pytests including external programs
+      shell: bash -l {0}
+      run: pytest --external_program
