@@ -135,7 +135,13 @@ git clone --depth 1 https://github.com/MKorablyov/dock6
 ARCH=`uname`
 echo "The architecture is $ARCH"
 if [ $ARCH == 'Darwin' ]; then
-      APP_FOLDER=/Users/$USER/Applications/
+      echo "Create chimera folders"
+      CHIMERA_ROOT_DIR=$PROGRAMS_DIR/chimera/
+      mkdir -p $CHIMERA_ROOT_DIR
+
+      CHIMERA_BIN=$PCHIMERA_ROOT_DIR/bin
+      mkdir -p $CHIMERA_BIN
+
       DMG=chimera-1.14-mac64.dmg
       PATH_TO_DMG=$SCRIPT_DIR/chimera_install/$DMG
 
@@ -144,18 +150,17 @@ if [ $ARCH == 'Darwin' ]; then
 
       echo "attach dmg"
       hdiutil attach $PATH_TO_DMG
-      echo "copy content of dmg to user Application folder"
-      cp -rf /Volumes/ChimeraInstaller/Chimera.app $APP_FOLDER
+      echo "copy content of dmg to chimera folder"
+      cp -rf /Volumes/ChimeraInstaller/Chimera.app $CHIMERA_ROOT_DIR
       echo "detach dmg"
       hdiutil detach /Volumes/ChimeraInstaller/
 
       echo "delete dmg"
       rm $PATH_TO_DMG
 
-      echo "Create symlink to executable"
+      echo "copy executable script to expected location"
       CHIMERA_BIN=$PROGRAMS_DIR/chimera/bin
-      mkdir -p $CHIMERA_BIN
-      ln -s $APP_FOLDER/Chimera.app/Contents/Resources/bin/chimera $CHIMERA_BIN/chimera
+      cp $CHIMERA_ROOT_DIR/Chimera.app/Contents/Resources/bin/chimera $CHIMERA_BIN/chimera
 
     elif [ $ARCH == 'Linux' ]; then
       git clone --depth 1 https://github.com/MKorablyov/chimera tmp
