@@ -8,7 +8,10 @@ channels:
 dependencies:
   - python=3.6.*
   - pip
+  - tensorflow
+  - tensorboardX
   - pytorch==1.4.0
+  - torchvision
   - rdkit
   - pandas
   - networkx
