@@ -42,7 +42,7 @@ jobs:
 
     - name: sanity check the chimera executable
       shell: bash -l {0}
-      run: ./programs/chimera/bin/chimera --nogui --version
+      run: $HOME/programs/chimera/bin/chimera --nogui --version
 
     - name: run pytests including external programs
       shell: bash -l {0}
