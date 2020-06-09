@@ -16,6 +16,11 @@ jobs:
             os: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
+    - uses: goanpeca/setup-miniconda@v1
+        with:
+          auto-update-conda: true
+          python-version: 3.6
+
     - name: checkout code 
       uses: actions/checkout@v2
 
