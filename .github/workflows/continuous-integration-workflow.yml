@@ -24,7 +24,7 @@ jobs:
       with:
         auto-update-conda: false
         python-version: 3.6
-        activate-environment: debugging_ci_environment
+        activate-environment: lz
         environment-file: environment-linux.yml
         auto-activate-base: false
 
