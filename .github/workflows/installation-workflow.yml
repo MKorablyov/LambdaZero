@@ -1,8 +1,5 @@
 name: test install-prog-data.sh 
 on:
-  push:
-    branches:
-      - '*'
   pull_request:
     branches:
       - master
