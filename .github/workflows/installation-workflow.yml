@@ -1,5 +1,8 @@
 name: test install-prog-data.sh 
 on:
+  push:
+    branches:
+      - '*'
   pull_request:
     branches:
       - master
@@ -13,8 +16,8 @@ jobs:
             include:
               - os: macos-latest
                 conda_environment_filename: environment-mac.yml
-              - os: ubuntu-latest
-                conda_environment_filename: environment-linux.yml
+              #- os: ubuntu-latest
+              #  conda_environment_filename: environment-linux.yml
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -36,6 +39,13 @@ jobs:
     - name: execute install-prog-data.sh
       shell: bash -l {0}
       run: bash install-prog-data.sh -d $HOME/datasets/ -p $HOME/programs/ -s $HOME/summaries/
+
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v2
+
+    - name: sanity check the chimera executable
+      shell: bash -l {0}
+      run: $HOME/programs/chimera/bin/chimera --help
 
     - name: run pytests including external programs
       shell: bash -l {0}
