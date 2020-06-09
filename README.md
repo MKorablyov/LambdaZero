@@ -2,16 +2,23 @@
 
 ## Install
 Install anaconda: [miniconda](https://docs.conda.io/en/latest/miniconda.html)
-```
-conda env create -f environment-linux.yml [-n env_name]
-```
-This will create an environment named `lz`. 
-LambdaZero depends on external programs (such as Dock6 and UCSF Chimera) and datasets (brutal dock and fragdb etc. ) that are not provided in this repo. These could be installed by running:
 
+Create the conda environment, based on your os:
+```
+conda env create -f ( environment-linux.yml |environment-mac.yml ) [-n env_name]
+```
+This will create an environment named `lz` by default. Activate this environment
+```
+conda activate [env_name]
+```
+
+LambdaZero depends on external programs (such as Dock6 and UCSF Chimera) and datasets (brutal dock and fragdb etc. ) that are not provided in this repo. These can be installed by running:
 ```
 bash install-prog-datasets.sh [-d dataset_path] [-p programs_path] [-s summaries_path]
 ```
 this script would create a locator file called `external_dirs.cfg` that is machine specific and is used by the LambdaZero core to be able to call external dependencies. 
+Note that the `install-prog-datasets.sh` script should be executed from within the conda environment as some python
+dependencies are required to download the external programs.
 
 ## Getting started
 Run PPO
