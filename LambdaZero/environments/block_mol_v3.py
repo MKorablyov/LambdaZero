@@ -20,7 +20,7 @@ DEFAULT_CONFIG = {
                   "stem_fp_radiis": [4, 3, 2]
                   },
     "molMDP_config": {
-        "blocks_file": osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"),
+        "blocks_file": osp.join("/home/nova/vocabs", "pdb_blocks_105.json"),
     },
     "reward_config": {
         "soft_stop": True,
@@ -132,6 +132,9 @@ class BlockMolEnv_v3:
         return obs
 
     def step(self, action):
+        if not self.observation_space["action_mask"].contains(action):
+            raise ValueError('Illegal actions')
+
         if (action == 0):
             agent_stop = True
         elif action <= (self.max_blocks - 1):
