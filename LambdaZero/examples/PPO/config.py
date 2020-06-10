@@ -1,9 +1,11 @@
 import socket
 from copy import deepcopy
-
-
+import os.path as osp
 from LambdaZero.environments import BlockMolEnv_v3
 from LambdaZero.utils import get_external_dirs
+from LambdaZero.environments import PredDockReward_v2
+from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
+
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -13,10 +15,54 @@ ppo001 = {
     "rllib_config":{
         "env": BlockMolEnv_v3,
         "env_config": {
-            "allow_removal": True
+            "allow_removal": True,
         }
     }
 }
+
+
+ppo022 = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v2,
+            "reward_config":{
+                "synth_cutoff":[0, 5],
+                "synth_config": chemprop_cfg}
+
+        }
+    }
+}
+
+ppo023 = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "molMDP_config": {
+                "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_210.json"),
+            },
+            "allow_removal": True,
+        }
+    }
+}
+
+
+# "reward_config": {
+#     "soft_stop": True,
+#     "load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
+#     "natm_cutoff": [45, 50],
+#     "qed_cutoff": [0.2, 0.7],
+#     "exp": None,
+#     "delta": False,
+#     "simulation_cost": 0.0,
+#     "device": "cuda",
+# },
+
+
+
 
 # ppo002 = {
 #     # 3.1

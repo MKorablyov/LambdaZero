@@ -3,9 +3,8 @@
 # import numpy as np
 # import pandas as pd
 # sys.path.append("../../")
-# from affinity_torch.py_tools import chem
-# from affinity_torch.py_tools import multithread as mtr
-#
+
+
 # class cfg:
 #     # temp
 #     db_path = "/home/maksym/Datasets/brutal_dock"
@@ -16,7 +15,11 @@
 #     dock6_dir = "/home/maksym/Programs/dock6"
 #     chimera_dir = "/home/maksym/Programs/chimera"
 #     docksetup_dir = "/home/maksym/Datasets/brutal_dock/d4/docksetup"
-#
+
+
+
+
+
 # if __name__ == "__main__":
 #     chunk_size = 8
 #     dock_index = pd.read_parquet(os.path.join(cfg.db_path,cfg.docked_index))
