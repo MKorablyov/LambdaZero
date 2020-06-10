@@ -62,3 +62,4 @@ dependencies:
     - gym
     - dm-tree
     - sphinx-rtd-theme
+    - recommonmark
