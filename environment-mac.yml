@@ -7,6 +7,7 @@ channels:
 
 dependencies:
   - python=3.6.*
+  - sphinx
   - pip
   - tensorflow
   - tensorboardX
@@ -60,3 +61,4 @@ dependencies:
     - typed-argument-parser
     - gym
     - dm-tree
+    - sphinx-rtd-theme
