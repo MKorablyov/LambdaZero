@@ -4,5 +4,5 @@ sphinx-apidoc -f -o source/ ../LambdaZero
 make html
 
 # remove all the needless rst files
-rm sources/LambdaZero.*.rst
-rm sources/modules.rst
+rm ./source/LambdaZero*.rst
+rm ./source/modules.rst
