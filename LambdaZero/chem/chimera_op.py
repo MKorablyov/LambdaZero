@@ -1,8 +1,8 @@
 import subprocess
 
 
-def add_hydrogens_and_compute_gasteiger_charges_with_chimera(input_mol_file_path: str, charge_method: str,
-                                                             chimera_bin: str, output_mol2_file_path: str):
+def _add_hydrogens_and_compute_gasteiger_charges_with_chimera(input_mol_file_path: str, charge_method: str,
+                                                              chimera_bin: str, output_mol2_file_path: str):
     chimera_commands = f"open {input_mol_file_path}\n" + \
                        "addh\n" + \
                        f"addcharge all method {charge_method}\n" + \

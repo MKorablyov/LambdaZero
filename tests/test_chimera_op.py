@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from rdkit import Chem
 
-from LambdaZero.chem.chimera_op import add_hydrogens_and_compute_gasteiger_charges_with_chimera
+from LambdaZero.chem.chimera_op import _add_hydrogens_and_compute_gasteiger_charges_with_chimera
 from LambdaZero.utils import get_external_dirs
 
 
@@ -60,8 +60,8 @@ def test_add_hydrogens_and_compute_gasteiger_charges_with_chimera(input_mol_file
         pytest --external_program
     Otherwise this test will be skipped, as the chimera program is not always installed.
     """
-    add_hydrogens_and_compute_gasteiger_charges_with_chimera(input_mol_file_path, charge_method,
-                                                             chimera_bin, output_mol2_file_path)
+    _add_hydrogens_and_compute_gasteiger_charges_with_chimera(input_mol_file_path, charge_method,
+                                                              chimera_bin, output_mol2_file_path)
 
     assert Path(output_mol2_file_path).is_file()
 
