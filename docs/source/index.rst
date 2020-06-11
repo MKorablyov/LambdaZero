@@ -10,7 +10,6 @@ LambdaZero documentation
    :maxdepth: 1
    :caption: Contents:
 
-   readme
    LambdaZero.utils
    LambdaZero.chem
    LambdaZero.environments
