@@ -22,6 +22,7 @@ More text.
    :maxdepth: 1
    :caption: Get Started
 
+   readme_link
    example
 
 .. toctree::
