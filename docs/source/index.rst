@@ -12,16 +12,11 @@ Some general information about LambdaZero goes here.
 * bullet 2
 * some other thing
 
-more relevant text.
+more relevant text. You can create `rst` files in the source folder and link them here.
 
 Something important
 ---------------------------------------
-More blah blah.
-
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Contents:
+More text.
 
 .. toctree::
    :maxdepth: 1
@@ -36,7 +31,6 @@ More blah blah.
    ./generated/LambdaZero.inputs.rst
    ./generated/LambdaZero.models.rst
    ./generated/LambdaZero.utils.rst
-
 
 
 Indices and tables
