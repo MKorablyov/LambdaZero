@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from rdkit import Chem
 
-from LambdaZero.chem.chimera_op import get_chimera_commands, add_hydrogens_and_compute_gasteiger_charges_with_chimera
+from LambdaZero.chem.chimera_op import add_hydrogens_and_compute_gasteiger_charges_with_chimera
 from LambdaZero.utils import get_external_dirs
 
 
@@ -47,26 +47,9 @@ def output_mol2_file_path():
 
 
 @pytest.fixture
-def expected_command(input_mol_file_path, charge_method, output_mol2_file_path):
-    chimera_cmd = f"""open {input_mol_file_path}
-addh
-addcharge all method {charge_method}
-write format mol2 0 {output_mol2_file_path}
-stop now"""
-    return chimera_cmd
-
-
-@pytest.fixture
 def chimera_bin():
     _, programs_dir, _ = get_external_dirs()
     return str(Path(programs_dir).joinpath("chimera/bin/chimera"))
-
-
-def test_get_chimera_command(input_mol_file_path, charge_method, output_mol2_file_path, expected_command):
-
-    computed_command = get_chimera_commands(input_mol_file_path, charge_method, output_mol2_file_path)
-
-    assert computed_command == expected_command
 
 
 @pytest.mark.external_program
