@@ -3,6 +3,8 @@ DATASETS_DEFAULT=1
 PROGRAMS_DEFAULT=1
 SUMMARIES_DEFAULT=1
 
+ABSOLUTE_PATH_SCRIPT_DIR=`pwd`
+
 function help() {
 cat <<EOF
 Usage:
@@ -128,13 +130,51 @@ cd ..
 mkdir -p "$PROGRAMS_DIR"
 cd $PROGRAMS_DIR
 git clone --depth 1 https://github.com/MKorablyov/dock6
-git clone --depth 1 https://github.com/MKorablyov/chimera tmp
-cd tmp
-cat xaa xab > chimera.bin
-chmod 755 chimera.bin
-echo '../chimera' | ./chimera.bin
-cd ..
-rm -rf tmp
-cd ..
 
+# install chimera
+ARCH=`uname`
+echo "The architecture is $ARCH"
+if [ $ARCH == 'Darwin' ]; then
+
+      PROGRAM_DIR_ABSOLUTE_PATH=`pwd`
+      echo "Create chimera folders"
+      CHIMERA_ROOT_DIR=$PROGRAM_DIR_ABSOLUTE_PATH/chimera
+      mkdir -p $CHIMERA_ROOT_DIR
+
+      CHIMERA_BIN=$CHIMERA_ROOT_DIR/bin
+      mkdir -p $CHIMERA_BIN
+
+      DMG=chimera-1.14-mac64.dmg
+      ABSOLUTE_PATH_TO_DMG=$ABSOLUTE_PATH_SCRIPT_DIR/chimera_install/$DMG
+
+      echo "Download dmg"
+      $ABSOLUTE_PATH_SCRIPT_DIR/chimera_install/download_chimera_dmg.py
+
+      echo "attach dmg"
+      hdiutil attach $ABSOLUTE_PATH_TO_DMG
+      echo "copy content of dmg to chimera folder"
+      cp -rf /Volumes/ChimeraInstaller/Chimera.app $CHIMERA_ROOT_DIR
+      echo "detach dmg"
+      hdiutil detach /Volumes/ChimeraInstaller/
+
+      echo "delete dmg"
+      rm $ABSOLUTE_PATH_TO_DMG
+
+
+      SRC=$CHIMERA_ROOT_DIR/Chimera.app/Contents/Resources/bin/chimera
+      DST=$CHIMERA_BIN/chimera
+      echo "create symbolic link with source $SRC and destination $DST"
+      ln -s $SRC $DST
+
+    elif [ $ARCH == 'Linux' ]; then
+      git clone --depth 1 https://github.com/MKorablyov/chimera tmp
+      cd tmp
+      cat xaa xab > chimera.bin
+      chmod 755 chimera.bin
+      echo '../chimera' | ./chimera.bin
+      cd ..
+      rm -rf tmp
+      cd ..
+fi
+    
 mkdir -p "$SUMMARIES_DIR"
