@@ -23,13 +23,9 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
-    config.addinivalue_line("markers", "slow: mark test as slow to run")
-
-
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--external_program"):
-        # --external_program_integration given in cli: do not skip integration smoke tests
+        # if --external_program is given in cli, then do not skip external program integration smoke tests
         return
     skip_external_program_integration = pytest.mark.skip(reason="need --external_program option to run")
     for item in items:
