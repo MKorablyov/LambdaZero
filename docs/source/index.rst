@@ -24,19 +24,19 @@ More blah blah.
    :caption: Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: API Reference
    :hidden:
    :glob:
 
-   LambdaZero.utils
-   LambdaZero.chem
-   LambdaZero.environments
-   LambdaZero.inputs
-   LambdaZero.models
-   LambdaZero.datasets
-   LambdaZero.examples
-   LambdaZero.loggers
+   ./generated/LambdaZero.chem.rst
+   ./generated/LambdaZero.environments.rst
+   ./generated/LambdaZero.examples.rst
+   ./generated/LambdaZero.datasets.rst
+   ./generated/LambdaZero.inputs.rst
+   ./generated/LambdaZero.models.rst
+   ./generated/LambdaZero.utils.rst
+
 
 
 Indices and tables
