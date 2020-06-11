@@ -73,6 +73,7 @@ class BlockMolEnv_v3:
         self.molMDP = MolMDP(**config["molMDP_config"])
         self.reward = config["reward"](**config["reward_config"])
         self.get_fps = LambdaZero.chem.FPEmbedding_v2(**config["obs_config"])
+        self._prev_obs = None
 
     def _make_obs(self):
         mol_fp, stem_fps_, jbond_fps_ = self.get_fps(self.molMDP.molecule)
@@ -99,6 +100,8 @@ class BlockMolEnv_v3:
                "jbond_fps": jbond_fps,
                "action_mask": action_mask,
                "num_steps": self.num_steps}
+
+        self._prev_obs = obs
 
         return obs
 
@@ -132,7 +135,7 @@ class BlockMolEnv_v3:
         return obs
 
     def step(self, action):
-        if not self.observation_space["action_mask"].contains(action):
+        if not action in np.where(self._prev_obs["action_mask"])[0]:
             raise ValueError('Illegal actions')
 
         if (action == 0):
