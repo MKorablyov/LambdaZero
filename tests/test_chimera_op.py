@@ -43,8 +43,6 @@ def output_mol2_file_path():
         yield mol2_file_path
     logging.info("deleting test folder")
 
-    return 'test_output_file_path'
-
 
 @pytest.fixture
 def chimera_bin():
