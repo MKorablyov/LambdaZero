@@ -3,7 +3,7 @@ make clean
 sphinx-apidoc -f -o source/ ../LambdaZero  
 make html
 
-# replace static with static everywhere; static is ignored by github.io
+# replace _static with static everywhere; folders starting with an underscore (like _static) are ignored by github.io
 cd ./build/html/
 mv _static/ static/
 for file in `ls | grep .html`; do
