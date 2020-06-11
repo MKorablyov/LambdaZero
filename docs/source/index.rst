@@ -12,7 +12,8 @@ Some general information about LambdaZero goes here.
 * bullet 2
 * some other thing
 
-more relevant text. You can create `rst` files in the source folder and link them here, like this
+more relevant text. You can create `rst` files in the source folder and link them in the
+table of content (toctree).
 
 Something important
 ---------------------------------------
