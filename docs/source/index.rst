@@ -6,9 +6,28 @@
 LambdaZero documentation
 ==========================
 
+Some general information about LambdaZero goes here.
+
+* bullet 1
+* bullet 2
+* some other thing
+
+more relevant text.
+
+Something important
+---------------------------------------
+More blah blah.
+
+
 .. toctree::
    :maxdepth: 1
    :caption: Contents:
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference
+   :hidden:
+   :glob:
 
    LambdaZero.utils
    LambdaZero.chem
