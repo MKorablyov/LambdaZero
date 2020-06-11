@@ -5,68 +5,15 @@ import ray
 from ray import tune
 import torch
 from torch_geometric.data import DataLoader
-import torch.nn.functional as F
 
+from LambdaZero.examples.mpnn.train_mpnn import DEFAULT_CONFIG
 import LambdaZero.inputs
 import LambdaZero.models
 import LambdaZero.utils
 from LambdaZero.utils import get_external_dirs
 
 
-def train_epoch(loader, model, optimizer, device, config):
-    target = config["targets"][0]
-    target_norm = config["target_norms"][0]
-    model.train()
-
-    metrics = {"loss": 0, "mse": 0, "mae": 0}
-    for bidx, data in enumerate(loader):
-        # compute y_hat and y
-        data = data.to(device)
-
-        optimizer.zero_grad()
-        logit = model(data)
-        pred = (logit * target_norm[1]) + target_norm[0]
-        y = getattr(data, target)
-
-        loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
-        loss.backward()
-        optimizer.step()
-
-        metrics["loss"] += loss.item() * data.num_graphs
-        metrics["mse"] += ((y - pred) ** 2).sum().item()
-        metrics["mae"] += ((y - pred).abs()).sum().item()
-
-    metrics["loss"] = metrics["loss"] / len(loader.dataset)
-    metrics["mse"] = metrics["mse"] / len(loader.dataset)
-    metrics["mae"] = metrics["mae"] / len(loader.dataset)
-    return metrics
-
-
-def eval_epoch(loader, model, device, config):
-    target = config["targets"][0]
-    target_norm = config["target_norms"][0]
-    model.eval()
-
-    metrics = {"loss": 0, "mse": 0, "mae": 0}
-    for bidx, data in enumerate(loader):
-        # compute y_hat and y
-        data = data.to(device)
-        logit = model(data)
-        pred = (logit * target_norm[1]) + target_norm[0]
-        y = getattr(data, target)
-
-        loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
-        metrics["loss"] += loss.item() * data.num_graphs
-        metrics["mse"] += ((y - pred) ** 2).sum().item()
-        metrics["mae"] += ((y - pred).abs()).sum().item()
-
-    metrics["loss"] = metrics["loss"] / len(loader.dataset)
-    metrics["mse"] = metrics["mse"] / len(loader.dataset)
-    metrics["mae"] = metrics["mae"] / len(loader.dataset)
-    return metrics
-
-
-class BasicRegressor(tune.Trainable):
+class GINRegressor(tune.Trainable):
     def _setup(self, config):
 
         self.config = config
@@ -86,7 +33,7 @@ class BasicRegressor(tune.Trainable):
         self.test_set = DataLoader(dataset[torch.tensor(test_idxs)], batch_size=config["b_size"])
 
         # make model
-        self.model = LambdaZero.models.MPNNet()
+        self.model = LambdaZero.models.GraphIsomorphismNet()
         self.model.to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
 
@@ -112,36 +59,9 @@ class BasicRegressor(tune.Trainable):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
 
-transform = LambdaZero.utils.Complete()
-datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+_, _, summaries_dir = get_external_dirs()
 
-
-DEFAULT_CONFIG = {
-    "trainer": BasicRegressor,
-    "trainer_config": {
-        "dataset_root": os.path.join(datasets_dir, "brutal_dock/d4"),
-        "targets": ["gridscore"],
-        "target_norms": [[-26.3, 12.3]],
-        "file_names": ["dock_blocks105_walk40_clust"],
-        "transform": transform,
-        "split_name": "randsplit_dock_blocks105_walk40_clust",
-        "lr": 0.001,
-        "b_size": 64,
-        "dim": 64,
-        "num_epochs": 120,
-
-        # "model": "some_model", todo
-
-        "molprops": ["gridscore", "klabel"],
-        "train_epoch": train_epoch,
-        "eval_epoch": eval_epoch,
-        # todo: test epoch
-    },
-    "summaries_dir": summaries_dir,
-    "memory": 20 * 10 ** 9,
-    "checkpoint_freq": 250000000,
-    "stop": {"training_iteration": 2},
-}
+DEFAULT_CONFIG["trainer"] = GINRegressor
 
 config = DEFAULT_CONFIG
 
