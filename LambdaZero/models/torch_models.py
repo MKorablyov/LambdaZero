@@ -153,6 +153,9 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
 
 class MPNNet(th.nn.Module):
+    """
+    A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
+    """
     def __init__(self, num_feat=14, dim=64):
         super(MPNNet, self).__init__()
         self.lin0 = th.nn.Linear(num_feat, dim)
