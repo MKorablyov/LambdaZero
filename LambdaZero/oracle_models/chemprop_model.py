@@ -1,5 +1,6 @@
 from chemprop.args import TrainArgs
 from chemprop.features import BatchMolGraph
+import torch
 from torch_geometric.data import Batch
 import numpy as np
 
@@ -26,14 +27,12 @@ According to chemprop/args.py, the chemprop model arguments are given by:
 
 I indicate with "*" the variables I don't think we should consider at this time.
 """
-from LambdaZero.representation_learning.models.model_base import ModelBase
 
 
-class ChempropNet(ModelBase):
+class BaseChempropNet(torch.nn.Module):
     """
     This model class adapts the chemprop model to fit in within LambdaZero's framework.
-    The Forward method assumes that the pytorch_geometric batch of molecules contains
-    a field "smiles". This is used internally by chemprop to extract features.
+    The forward method must be implemented based on desired data type.
     """
 
     @classmethod
@@ -44,17 +43,18 @@ class ChempropNet(ModelBase):
         """
         return atom_messages and undirected and depth > 1
 
-    def __init__(self,
-                 name: str,
-                 bias: bool = False,
-                 hidden_size: int = 300,
-                 depth: int = 3,
-                 dropout: float = 0.0,
-                 atom_messages: bool = False,
-                 undirected: bool = False,
-                 ffn_hidden_size: int = None,
-                 ffn_num_layers: int = 2,
-                 ):
+    def __init__(
+        self,
+        name: str,
+        bias: bool = False,
+        hidden_size: int = 300,
+        depth: int = 3,
+        dropout: float = 0.0,
+        atom_messages: bool = False,
+        undirected: bool = False,
+        ffn_hidden_size: int = None,
+        ffn_num_layers: int = 2,
+    ):
         """
         Adaptor to the chemprop model.
 
@@ -64,22 +64,26 @@ class ChempropNet(ModelBase):
         """
 
         if self._buggy_input(atom_messages, undirected, depth):
-            raise NotImplementedError("There is a bug in Chemprop, which crashes for "
-                                      "atom_messages = True, and undirected = True and depth > 1. Review input")
+            raise NotImplementedError(
+                "There is a bug in Chemprop, which crashes for "
+                "atom_messages = True, and undirected = True and depth > 1. Review input"
+            )
 
-        super(ChempropNet, self).__init__()
+        super(BaseChempropNet, self).__init__()
 
-        required_parameter_dict = {'data_path': "NONE", 'dataset_type': "regression"}
+        required_parameter_dict = {"data_path": "NONE", "dataset_type": "regression"}
 
-        parameters_dict = dict(bias=bias,
-                               hidden_size=hidden_size,
-                               depth=depth,
-                               dropout=dropout,
-                               atom_messages=atom_messages,
-                               undirected=undirected,
-                               ffn_hidden_size=ffn_hidden_size,
-                               ffn_num_layers=ffn_num_layers,
-                               num_tasks=1)
+        parameters_dict = dict(
+            bias=bias,
+            hidden_size=hidden_size,
+            depth=depth,
+            dropout=dropout,
+            atom_messages=atom_messages,
+            undirected=undirected,
+            ffn_hidden_size=ffn_hidden_size,
+            ffn_num_layers=ffn_num_layers,
+            num_tasks=1,
+        )
 
         parameters_dict.update(required_parameter_dict)
 
@@ -87,6 +91,18 @@ class ChempropNet(ModelBase):
         args.from_dict(parameters_dict)
 
         self.chemprop_model = MoleculeModel(args=args, featurizer=False)
+
+    def forward(self, *args, **kargs):
+        raise NotImplementedError(
+            "This class must be subclassed and a specific implementation must be created"
+        )
+
+
+class GeometricChempropNet(BaseChempropNet):
+    """
+    This chemprop adaptor assumes that the input data is a pytorch_geometric batch of molecules containing
+    a field "smiles". This is used internally by chemprop to extract features.
+    """
 
     @staticmethod
     def _get_list_of_smiles_from_batch(batch: Batch):
@@ -107,27 +123,11 @@ class ChempropNet(ModelBase):
         return chemprop_output.flatten()
 
 
-class OptimizedChempropNet(ChempropNet):
-
-    def __init__(self,
-                 name: str,
-                 bias: bool = False,
-                 hidden_size: int = 300,
-                 depth: int = 3,
-                 dropout: float = 0.0,
-                 atom_messages: bool = False,
-                 undirected: bool = False,
-                 ffn_hidden_size: int = None,
-                 ffn_num_layers: int = 2,
-                 ):
-        """
-        Adaptor to the chemprop model.
-        """
-
-        super(OptimizedChempropNet, self).__init__(name, bias, hidden_size, depth, dropout, atom_messages,
-                                                   undirected, ffn_hidden_size, ffn_num_layers)
+class MolGraphChempropNet(BaseChempropNet):
+    """
+    This chemprop adaptor assumes that the input data is a BatchMolGraph object (a chemprop entity).
+    """
 
     def forward(self, batch: BatchMolGraph):
-            chemprop_output = self.chemprop_model.forward(batch)
-            return chemprop_output.flatten()
-
+        chemprop_output = self.chemprop_model.forward(batch)
+        return chemprop_output.flatten()
