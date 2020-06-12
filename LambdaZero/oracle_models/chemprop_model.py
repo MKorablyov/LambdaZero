@@ -1,10 +1,8 @@
+import numpy as np
 from chemprop.args import TrainArgs
 from chemprop.features import BatchMolGraph
-import torch
-from torch_geometric.data import Batch
-import numpy as np
-
 from chemprop.models import MoleculeModel
+from torch_geometric.data import Batch
 
 from LambdaZero.oracle_models.model_base import ModelBase
 
