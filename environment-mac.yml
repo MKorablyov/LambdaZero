@@ -7,6 +7,7 @@ channels:
 
 dependencies:
   - python=3.6.*
+  - sphinx
   - pip
   - tensorflow
   - tensorboardX
@@ -45,7 +46,7 @@ dependencies:
   - rdflib
   - scikit-learn
   - threadpoolctl
-  - pyinstrument
+  - requests
   - pip:
     - -f https://pytorch-geometric.com/whl/torch-1.4.0.html
     - torch-scatter==latest+cpu
@@ -61,3 +62,5 @@ dependencies:
     - typed-argument-parser
     - gym
     - dm-tree
+    - sphinx-rtd-theme
+    - recommonmark

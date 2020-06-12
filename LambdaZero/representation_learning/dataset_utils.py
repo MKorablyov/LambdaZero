@@ -1,9 +1,11 @@
+import sys
+
 import pandas as pd
 import torch
 from torch_geometric.data import DataLoader
 from tqdm import tqdm
 
-from LambdaZero.chem import mol_to_graph, sys
+from LambdaZero.chem import mol_to_graph
 
 
 def get_molecule_graphs_from_raw_data_dataframe(raw_data_df: pd.DataFrame):

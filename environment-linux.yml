@@ -7,6 +7,7 @@ channels:
 
 dependencies:
   - python=3.6.*
+  - sphinx
   - pip
   - cudatoolkit=10.1.*
   - tensorflow-gpu
@@ -62,3 +63,5 @@ dependencies:
     - typed-argument-parser
     - gym
     - dm-tree
+    - sphinx-rtd-theme
+    - recommonmark
