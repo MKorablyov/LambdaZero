@@ -21,6 +21,10 @@ Note that the `install-prog-datasets.sh` script should be executed from within t
 dependencies are required to download the external programs.
 
 ## Getting started
+Before running the experiments, set up the PYTHONPATH with the following command:
+```
+export PYTHONPATH=~/LambdaZero
+```
 Run PPO
 ```
 cd ~/LambdaZero/LambdaZero/examples/PPO  
