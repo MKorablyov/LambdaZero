@@ -153,7 +153,7 @@ if __name__ == "__main__":
                         config=config["trainer_config"],
                         stop={"training_iteration": 100},  # EarlyStop(),
                         resources_per_trial={
-                           "cpu": 4, # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
+                           "cpu": 4,  # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
                            "gpu": 0.0
                         },
                         num_samples=1,
