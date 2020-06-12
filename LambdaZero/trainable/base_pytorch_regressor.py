@@ -8,11 +8,11 @@ import os
 
 class BasePytorchRegressor(tune.Trainable):
     @abstractmethod
-    def train_epoch(self, train_set, model, optim, device, config):
+    def train_epoch(self, training_dataloader, model, optim, device, config):
         pass
 
     @abstractmethod
-    def eval_epoch(self, validation_set, model, device, config):
+    def eval_epoch(self, validation_dataloader, model, device, config):
         pass
 
     @abstractmethod
