@@ -1,20 +1,21 @@
 name: test install-prog-data.sh 
 on:
   pull_request:
+    types: [closed]
     branches:
       - master
 
 jobs:
   build:
-
+    if: github.event.pull_request.merged == true
     name: install programs and test
     strategy:
         matrix:
             include:
               # Running on macos is very expensive in github actions (x10 linux cost!).
               # We should only run it sparingly.
-              # - os: macos-latest
-              #  conda_environment_filename: environment-mac.yml
+              - os: macos-latest
+                conda_environment_filename: environment-mac.yml
               - os: ubuntu-latest
                 conda_environment_filename: environment-linux.yml
     runs-on: ${{ matrix.os }}
