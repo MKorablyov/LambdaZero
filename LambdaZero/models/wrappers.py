@@ -1,14 +1,13 @@
-import os,sys, time
-import torch as th
-from chemprop.utils import load_checkpoint, load_scalers, create_logger
-from chemprop.features import BatchMolGraph, MolGraph
+import torch
 from chemprop.args import TrainArgs
+from chemprop.features import BatchMolGraph, MolGraph
 from chemprop.train import cross_validate
+from chemprop.utils import load_checkpoint, load_scalers, create_logger
 
 
 class ChempropWrapper_v1:
     def __init__(self, config):
-        self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # prediction
         self.checkpoint_path = config["predict_config"]["checkpoint_path"]
@@ -32,7 +31,7 @@ class ChempropWrapper_v1:
         args.save_dir = self.train_save_dir
         for key, value in self.trainer_config:
             args.key = value
-        logger = create_logger(name='train', save_dir=args.save_dir, quiet=True)
+        logger = create_logger(name="train", save_dir=args.save_dir, quiet=True)
         mean_score, std_score = cross_validate(args, logger)
         return mean_score
 
@@ -44,7 +43,8 @@ class ChempropWrapper_v1:
         model = self.model
         model.eval()
         features = self.predict_config["features_generator"]
-        with th.no_grad(): preds = model(mol, features)
+        with torch.no_grad():
+            preds = model(mol, features)
         preds = preds.data.cpu().numpy()
 
         # Inverse scale if regression

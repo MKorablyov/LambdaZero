@@ -1,8 +1,8 @@
-import time
-import os.path as osp
 import configparser
+import os.path as osp
+
 import numpy as np
-import torch as th
+import torch
 from torch_geometric.utils import remove_self_loops
 
 
@@ -16,14 +16,16 @@ def get_external_dirs():
     ROOT = osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))
     config = configparser.ConfigParser()
 
-    if not osp.exists(osp.join(ROOT, 'external_dirs.cfg')):
-        raise ImportError("Locator file is missing. Can't locate third party dependencies. "
-                          "Please, run install_prog_data.sh which will install datasets and third party dependencies "
-                          "and also create external_dirs.cfg  in process needed to locate to these softwares."
-                          "In case you already have datasets and programs installed, you could create "
-                          "external_dirs.cfg manually to point to installations.")
+    if not osp.exists(osp.join(ROOT, "external_dirs.cfg")):
+        raise ImportError(
+            "Locator file is missing. Can't locate third party dependencies. "
+            "Please, run install_prog_data.sh which will install datasets and third party dependencies "
+            "and also create external_dirs.cfg  in process needed to locate to these softwares."
+            "In case you already have datasets and programs installed, you could create "
+            "external_dirs.cfg manually to point to installations."
+        )
 
-    config.read(osp.join(ROOT, 'external_dirs.cfg'))
+    config.read(osp.join(ROOT, "external_dirs.cfg"))
 
     if config["dir"]["datasets"].startswith("/"):
         datasets_dir = config["dir"]["datasets"]
@@ -54,9 +56,6 @@ def dock_metrics(info):
     episode.custom_metrics["discounted_reward"] = env_info["discounted_reward"]
 
 
-
-
-
 # class Normalize(object):
 #     def __init__(self, target, target_norm):
 #         self.target = target
@@ -73,11 +72,11 @@ def dock_metrics(info):
 class Complete(object):
     def __call__(self, data):
         device = data.edge_index.device
-        row = th.arange(data.num_nodes, dtype=th.long, device=device)
-        col = th.arange(data.num_nodes, dtype=th.long, device=device)
+        row = torch.arange(data.num_nodes, dtype=torch.long, device=device)
+        col = torch.arange(data.num_nodes, dtype=torch.long, device=device)
         row = row.view(-1, 1).repeat(1, data.num_nodes).view(-1)
         col = col.repeat(data.num_nodes)
-        edge_index = th.stack([row, col], dim=0)
+        edge_index = torch.stack([row, col], dim=0)
 
         edge_attr = None
         if data.edge_attr is not None:
@@ -92,18 +91,19 @@ class Complete(object):
         data.edge_index = edge_index
         return data
 
-def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
-    data = np.asarray(data,dtype=np.float)
-    assert len(data.shape)==1,"requires flat array"
+
+def uniform_sample(data, nsamples, nbins=20, nmargin=1, bin_low=None, bin_high=None):
+    data = np.asarray(data, dtype=np.float)
+    assert len(data.shape) == 1, "requires flat array"
     ndata = data.shape[0]
     if bin_low == None:
         bin_low = data[np.argpartition(data, nmargin)[nmargin]].max()
     if bin_high == None:
         bin_high = data[np.argpartition(-data, nmargin)[nmargin]].min()
     print("partitioning data with bin low high", bin_low, bin_high)
-    #print("smax smin:", smax,data.max(), smin, data.min())
-    bins = np.linspace(bin_low,bin_high,num=nbins+1)[:-1]
-    bin_data = np.digitize(data,bins) - 1
+    # print("smax smin:", smax,data.max(), smin, data.min())
+    bins = np.linspace(bin_low, bin_high, num=nbins + 1)[:-1]
+    bin_data = np.digitize(data, bins) - 1
     # todo: I don't think my sampler actually works properly for this distributuion of 100M
     n_per_bin = nsamples // nbins
     sele_idxs = [[] for i in range(nbins)]
@@ -114,7 +114,9 @@ def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
             sele_idxs[bin_data[data_idx]].append(data_idx)
     print("sele bincounts", [len(sele_idxs[i]) for i in range(nbins)])
     # print("sele binrange", [(i, ":", max(sele_idxs[i]), min(sele_idxs[i])) for i in range(nbins)])
-    sele_idxs = np.concatenate([np.asarray(sele_idxs[i], dtype=np.int) for i in range(nbins)])
+    sele_idxs = np.concatenate(
+        [np.asarray(sele_idxs[i], dtype=np.int) for i in range(nbins)]
+    )
     # print("min max bin data", bin_data.min(),bin_data.max())
     # bin_counts = Counter(bin_data)
     # bin_counts = np.asarray(list(bin_counts.values()),dtype=np.int32)[np.argsort(list(bin_counts.keys()))]
