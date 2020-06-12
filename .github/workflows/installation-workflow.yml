@@ -11,8 +11,10 @@ jobs:
     strategy:
         matrix:
             include:
-              - os: macos-latest
-                conda_environment_filename: environment-mac.yml
+              # Running on macos is very expensive in github actions (x10 linux cost!).
+              # We should only run it sparingly.
+              # - os: macos-latest
+              #  conda_environment_filename: environment-mac.yml
               - os: ubuntu-latest
                 conda_environment_filename: environment-linux.yml
     runs-on: ${{ matrix.os }}
