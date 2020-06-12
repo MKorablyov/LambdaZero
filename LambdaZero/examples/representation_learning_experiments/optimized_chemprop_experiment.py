@@ -16,15 +16,17 @@ from pathlib import Path
 
 from orion.client import report_results
 
-from LambdaZero.representation_learning.chemprop_adaptors.dataloader_utils import get_chemprop_dataloaders
-from LambdaZero.representation_learning.chemprop_adaptors import ChempropModelTrainer
-from LambdaZero.datasets.brutal_dock.datasets import D4ChempropMoleculesDataset
-from LambdaZero.datasets.brutal_dock.experiment_driver import experiment_driver
-from LambdaZero.datasets.brutal_dock.models.chemprop_model import OptimizedChempropNet
-from LambdaZero.datasets.brutal_dock.parameter_inputs import get_input_and_run_configuration
+from LambdaZero.oracle_models.chemprop_model import MolGraphChempropNet
+from LambdaZero.chemprop_adaptors.dataloader_utils import get_chemprop_dataloaders
+
 
 # Specify which model class we want to instantiate and train
-model_class = OptimizedChempropNet
+from LambdaZero.chemprop_adaptors import ChempropModelTrainer
+from LambdaZero.representation_learning.datasets import D4ChempropMoleculesDataset
+from LambdaZero.representation_learning.experiment_driver import experiment_driver
+from LambdaZero.representation_learning.parameter_inputs import get_input_and_run_configuration
+
+model_class = MolGraphChempropNet
 
 # Specify which dataset class we want to use
 dataset_class = D4ChempropMoleculesDataset

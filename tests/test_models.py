@@ -9,7 +9,7 @@ from LambdaZero.oracle_models.chemprop_model import (
     GeometricChempropNet,
     MolGraphChempropNet,
 )
-from LambdaZero.representation_learning.chemprop_adaptors.utils import (
+from LambdaZero.chemprop_adaptors.utils import (
     get_chemprop_graphs_from_raw_data_dataframe,
 )
 from LambdaZero.representation_learning.models.message_passing_model import (

@@ -5,16 +5,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from LambdaZero.representation_learning.chemprop_adaptors.dataloader_utils import (
+from LambdaZero.chemprop_adaptors.dataloader_utils import (
     get_chemprop_dataloaders,
 )
+from LambdaZero.chemprop_adaptors.model_trainer import ChempropModelTrainer
 from LambdaZero.representation_learning.dataloader_utils import (
     get_geometric_dataloaders,
 )
 from LambdaZero.loggers.mlflow_logger import MLFlowLogger
-from LambdaZero.representation_learning.chemprop_adaptors.model_trainer import (
-    ChempropModelTrainer,
-)
+
 from LambdaZero.representation_learning.datasets import (
     D4GeometricMoleculesDataset,
     D4ChempropMoleculesDataset,
@@ -189,7 +188,7 @@ def input_and_run_config(paths, model_parameters):
     return config_and_augmented
 
 
-@pytest.mark.parametrize("model_name", ["geometric-chemprop", "MPNN", "molgraph-chemprop"])
+@pytest.mark.parametrize("model_name", ["molgraph-chemprop", "geometric-chemprop", "MPNN"])
 def test_smoke_test_experiment_driver(input_and_run_config, driver_inputs):
     logger_class = MLFlowLogger
     with pytest.warns(None) as record:
