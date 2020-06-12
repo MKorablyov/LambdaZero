@@ -124,7 +124,7 @@ def driver_inputs(model_name):
             model_trainer_class=MoleculeModelTrainer,
             get_dataloaders=get_geometric_dataloaders,
         )
-    elif model_name == "chemprop":
+    elif model_name == "geometric-chemprop":
         inputs = dict(
             model_class=GeometricChempropNet,
             dataset_class=D4GeometricMoleculesDataset,
@@ -132,7 +132,7 @@ def driver_inputs(model_name):
             get_dataloaders=get_geometric_dataloaders,
         )
 
-    elif model_name == "optimized-chemprop":
+    elif model_name == "molgraph-chemprop":
         inputs = dict(
             model_class=MolGraphChempropNet,
             dataset_class=D4ChempropMoleculesDataset,
@@ -156,7 +156,7 @@ def model_parameters(model_name, number_of_node_features, number_of_edge_feature
             linear_hidden=8,
         )
 
-    elif model_name == "chemprop" or model_name == "optimized-chemprop":
+    elif model_name == "geometric-chemprop" or model_name == "molgraph-chemprop":
         parameters = dict(name=model_name, depth=2, ffn_num_layers=2, ffn_hidden_size=8)
     return parameters
 
@@ -189,7 +189,7 @@ def input_and_run_config(paths, model_parameters):
     return config_and_augmented
 
 
-@pytest.mark.parametrize("model_name", ["chemprop", "MPNN", "optimized-chemprop"])
+@pytest.mark.parametrize("model_name", ["geometric-chemprop", "MPNN", "molgraph-chemprop"])
 def test_smoke_test_experiment_driver(input_and_run_config, driver_inputs):
     logger_class = MLFlowLogger
     with pytest.warns(None) as record:
