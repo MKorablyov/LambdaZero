@@ -1,26 +1,32 @@
-import os, sys, logging,time,string, random, time, subprocess
 import contextlib
-
+import logging
+import os
+import random
+import string
+import subprocess
 from collections import Counter
+
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import BRICS
-from rdkit.Chem import Draw
-from rdkit.Chem import AllChem
-from rdkit.Chem.Scaffolds import MurckoScaffold
-
-from rdkit import rdBase
-from rdkit.Chem.rdchem import HybridizationType
 from rdkit import RDConfig
+from rdkit import rdBase
+from rdkit.Chem import AllChem
+from rdkit.Chem import BRICS
 from rdkit.Chem import ChemicalFeatures
+from rdkit.Chem import Draw
+from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.rdchem import BondType as BT
+from rdkit.Chem.rdchem import HybridizationType
+
+from LambdaZero.chem.chimera_op import _add_hydrogens_and_compute_gasteiger_charges_with_chimera
+
 rdBase.DisableLog('rdApp.error')
 
 import pandas as pd
 from rdkit import DataStructs
 
 import torch as th
-from torch_geometric.data import (InMemoryDataset, download_url, extract_zip, Data)
+from torch_geometric.data import (Data)
 from torch_sparse import coalesce
 
 atomic_numbers = {"H":1,"He":2,"Li":3,"Be":4,"B":5,"C":6,"N":7,"O":8,"F":9,"Ne":10,"Na":11,"Mg":12,"Al":13,"Si":14,
@@ -285,14 +291,8 @@ def _gen_mol2(smi, mol_name, outpath, chimera_bin, charge_method, num_conf):
     print(Chem.MolToMolBlock(mol,confId=int(mi)),file=open(mol_file,'w+'))
     # add hydrogens and compute gasteiger charges in Chimera
     mol2_file = os.path.join(outpath, mol_name + ".mol2")
-    chimera_cmd = "printf \"open {}" \
-              "\naddh" \
-              "\naddcharge all method {}" \
-              "\nwrite format mol2 0 {}" \
-              "\nstop now\"  | {} --nogui".format(
-        mol_file, charge_method, mol2_file, chimera_bin)
-    process = subprocess.Popen(chimera_cmd, shell=True, stdout=subprocess.PIPE)
-    process.wait()
+    _add_hydrogens_and_compute_gasteiger_charges_with_chimera(mol_file, charge_method, chimera_bin, mol2_file)
+
     return mol2_file
 
 

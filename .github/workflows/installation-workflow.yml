@@ -1,0 +1,46 @@
+name: test install-prog-data.sh 
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+
+    name: install programs and test
+    strategy:
+        matrix:
+            include:
+              - os: macos-latest
+                conda_environment_filename: environment-mac.yml
+              - os: ubuntu-latest
+                conda_environment_filename: environment-linux.yml
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: checkout code
+      uses: actions/checkout@v2
+
+    - uses: goanpeca/setup-miniconda@v1
+      with:
+        auto-update-conda: false
+        python-version: 3.6
+        activate-environment: lz
+        environment-file: ${{ matrix.conda_environment_filename }}
+        auto-activate-base: false
+
+    - name: setup python environment
+      shell: bash -l {0}
+      run: python setup.py develop
+
+    - name: execute install-prog-data.sh
+      shell: bash -l {0}
+      run: bash install-prog-data.sh -d $HOME/datasets/ -p $HOME/programs/ -s $HOME/summaries/
+
+    - name: sanity check the chimera executable
+      shell: bash -l {0}
+      run: $HOME/programs/chimera/bin/chimera --nogui --version
+
+    - name: run pytests including external programs
+      shell: bash -l {0}
+      run: pytest tests/ --external_program
