@@ -18,10 +18,10 @@ from orion.client import report_results
 # Specify which model class we want to instantiate and train
 from LambdaZero.representation_learning.datasets import D4GeometricMoleculesDataset
 from LambdaZero.representation_learning.experiment_driver import experiment_driver
-from LambdaZero.representation_learning.models.chemprop_model import ChempropNet
+from LambdaZero.oracle_models.chemprop_model import GeometricChempropNet
 from LambdaZero.representation_learning.parameter_inputs import get_input_and_run_configuration
 
-model_class = ChempropNet
+model_class = GeometricChempropNet
 
 # Specify which dataset class we want to use
 dataset_class = D4GeometricMoleculesDataset
