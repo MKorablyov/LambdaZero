@@ -6,6 +6,8 @@ import numpy as np
 
 from chemprop.models import MoleculeModel
 
+from LambdaZero.oracle_models.model_base import ModelBase
+
 """
 According to chemprop/args.py, the chemprop model arguments are given by:
 
@@ -29,7 +31,7 @@ I indicate with "*" the variables I don't think we should consider at this time.
 """
 
 
-class BaseChempropNet(torch.nn.Module):
+class BaseChempropNet(ModelBase):
     """
     This model class adapts the chemprop model to fit in within LambdaZero's framework.
     The forward method must be implemented based on desired data type.
