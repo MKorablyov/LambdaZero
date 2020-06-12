@@ -14,7 +14,7 @@ from LambdaZero.representation_learning.dataset_utils import get_scores_statisti
 from LambdaZero.representation_learning.datasets import MoleculesDatasetBase
 from LambdaZero.representation_learning.metrics_utils import get_prediction_statistics
 from LambdaZero.representation_learning.model_trainer import MoleculeModelTrainer, AbstractModelTrainer
-from LambdaZero.representation_learning.models.model_base import ModelBase
+from LambdaZero.oracle_models.model_base import ModelBase
 from LambdaZero.representation_learning.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, \
     EXECUTION_FILENAME_KEY, RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, write_configuration_file
 
