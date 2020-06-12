@@ -1,6 +1,8 @@
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 import sys
 
+from LambdaZero.chemprop_adaptors.dataloader_utils import chemprop_collate_fn
 from LambdaZero.oracle_models.chemprop_model import MolGraphChempropNet
 from LambdaZero.trainable.base_pytorch_regressor import BasePytorchRegressor
 import torch
@@ -17,19 +19,13 @@ def denormalize_target(normalized_y, mean, std):
 class ChempropRegressor(BasePytorchRegressor):
     loss_function = torch.nn.functional.mse_loss
 
-
-
     def _get_batch_loss(self, batch, model, config):
-
-
-
         y_actual = self._get_target_from_batch(batch)
         normalized_y_actual = self._normalize_target(y_actual)
 
         normalized_y_predicted = self._apply_model_to_batch(batch, model)
         batch_loss = self.loss_function(normalized_y_actual, normalized_y_predicted)
         return batch_loss
-
 
     def train_epoch(self, training_dataloader, model, optim, device, config):
         model.train()
@@ -53,8 +49,28 @@ class ChempropRegressor(BasePytorchRegressor):
     def eval_epoch(self, validation_set, model, device, config):
         pass
 
+
     def get_dataloaders(self, config):
-        pass
+
+        batch_size = config["b_size"]
+
+        training_dataloader = DataLoader(training_dataset,
+                                         batch_size=batch_size,
+                                         collate_fn=chemprop_collate_fn,
+                                         shuffle=True)
+
+        validation_dataloader = DataLoader(validation_dataset,
+                                           batch_size=batch_size,
+                                           collate_fn=chemprop_collate_fn,
+                                           shuffle=True)
+
+        test_dataloader = DataLoader(test_dataset,
+                                     batch_size=batch_size,
+                                     collate_fn=chemprop_collate_fn,
+                                     shuffle=False)
+
+        return training_dataloader, validation_dataloader, test_dataloader
+
 
     def get_model(self, config):
         return MolGraphChempropNet(**config["model_parameters"])
