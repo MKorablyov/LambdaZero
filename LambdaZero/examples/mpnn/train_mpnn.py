@@ -1,12 +1,18 @@
 import socket, os, time
 import numpy as np
 import os.path as osp
+import math
 import torch as th
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torch.utils.data import Subset
+#from torch_geometric.data import DataLoader
+from torch.utils.data import Sampler
+import time
 
+from torch_geometric.data import Data, Batch
 from torch_geometric.utils import remove_self_loops
 import torch_geometric.transforms as T
-from torch_geometric.data import DataLoader
 import ray
 from ray import tune
 
@@ -15,7 +21,9 @@ import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
 
+from custom_dataloader import DL
 
+np.set_printoptions(threshold=10)
 
 def train_epoch(loader, model, optimizer, device, config):
     target = config["targets"][0]
@@ -23,7 +31,12 @@ def train_epoch(loader, model, optimizer, device, config):
     model.train()
 
     metrics = {"loss":0, "mse": 0, "mae":0}
+
+    i = 0
     for bidx,data in enumerate(loader):
+        print(data)
+        print(bidx, i)
+        i += 1
         # compute y_hat and y
         data = data.to(device)
 
@@ -76,6 +89,11 @@ class BasicRegressor(tune.Trainable):
         self.config = config
         self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
+        # make model
+        self.model = LambdaZero.models.MPNNet()
+        self.model.to(self.device)
+        self.optim = th.optim.Adam(self.model.parameters(), lr=config["lr"])
+
         # load dataset
         dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
                                                props=config["molprops"],
@@ -85,14 +103,23 @@ class BasicRegressor(tune.Trainable):
         # split dataset
         split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
         train_idxs, val_idxs, test_idxs = np.load(split_path, allow_pickle=True)
-        self.train_set = DataLoader(dataset[th.tensor(train_idxs)], shuffle=True, batch_size=config["b_size"])
-        self.val_set = DataLoader(dataset[th.tensor(val_idxs)], batch_size=config["b_size"])
-        self.test_set = DataLoader(dataset[th.tensor(test_idxs)], batch_size=config["b_size"])
 
-        # make model
-        self.model = LambdaZero.models.MPNNet()
-        self.model.to(self.device)
-        self.optim = th.optim.Adam(self.model.parameters(), lr=config["lr"])
+        bsize = config["b_size"]
+        train_dataset = dataset[th.tensor(train_idxs)]
+
+        energies = []  # dataset has 10 class-1 samples, 1 class-2 samples, etc.
+        for i in range(len(train_idxs)):
+            energies.append(abs(train_dataset[i].gridscore))
+        energies = th.tensor(energies).double()
+        sampler = th.utils.data.sampler.WeightedRandomSampler(energies, len(energies), replacement=True)
+
+        train_subset = Subset(dataset, train_idxs.tolist())
+        val_subset = Subset(dataset, val_idxs.tolist())
+        test_subset = Subset(dataset, test_idxs.tolist())
+
+        self.train_set = DL(train_subset, batch_size=bsize, samp=sampler)
+        self.val_set = DL(val_subset, batch_size=bsize)
+        self.test_set = DL(test_subset, batch_size=bsize)
 
         # make epochs
         self.train_epoch = config["train_epoch"]
