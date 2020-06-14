@@ -1,5 +1,4 @@
 import os
-
 import numpy as np
 import ray
 from ray import tune
@@ -129,7 +128,6 @@ DEFAULT_CONFIG = {
         "b_size": 64,
         "dim": 64,
         "num_epochs": 120,
-
         # "model": "some_model", todo
 
         "molprops": ["gridscore", "klabel"],
