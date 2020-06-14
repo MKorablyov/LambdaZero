@@ -20,7 +20,14 @@ this script would create a locator file called `external_dirs.cfg` that is machi
 Note that the `install-prog-datasets.sh` script should be executed from within the conda environment as some python
 dependencies are required to download the external programs.
 
+Finally, install LambdaZero with the following command:
+```
+pip install -e .
+```
+
+
 ## Getting started
+
 Run PPO
 ```
 cd ~/LambdaZero/LambdaZero/examples/PPO  
