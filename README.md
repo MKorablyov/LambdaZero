@@ -21,6 +21,11 @@ Note that the `install-prog-datasets.sh` script should be executed from within t
 dependencies are required to download the external programs.
 
 ## Getting started
+Before running the experiments, install LambdaZero with the following command:
+```
+pip install -e .
+```
+
 Run PPO
 ```
 cd ~/LambdaZero/LambdaZero/examples/PPO  
