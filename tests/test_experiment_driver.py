@@ -5,25 +5,18 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from LambdaZero.chemprop_adaptors.dataloader_utils import (
-    get_chemprop_dataloaders,
+from LambdaZero.loggers.mlflow_logger import MLFlowLogger
+from LambdaZero.oracle_models.chemprop_model import (
+    GeometricChempropNet,
 )
-from LambdaZero.chemprop_adaptors.model_trainer import ChempropModelTrainer
 from LambdaZero.representation_learning.dataloader_utils import (
     get_geometric_dataloaders,
 )
-from LambdaZero.loggers.mlflow_logger import MLFlowLogger
-
 from LambdaZero.representation_learning.datasets import (
     D4GeometricMoleculesDataset,
 )
-from LambdaZero.examples.chemprop.datasets import D4ChempropMoleculesDataset
 from LambdaZero.representation_learning.experiment_driver import experiment_driver
 from LambdaZero.representation_learning.model_trainer import MoleculeModelTrainer
-from LambdaZero.oracle_models.chemprop_model import (
-    GeometricChempropNet,
-    MolGraphChempropNet,
-)
 from LambdaZero.representation_learning.models.message_passing_model import (
     MessagePassingNet,
 )
@@ -131,14 +124,6 @@ def driver_inputs(model_name):
             get_dataloaders=get_geometric_dataloaders,
         )
 
-    elif model_name == "molgraph-chemprop":
-        inputs = dict(
-            model_class=MolGraphChempropNet,
-            dataset_class=D4ChempropMoleculesDataset,
-            model_trainer_class=ChempropModelTrainer,
-            get_dataloaders=get_chemprop_dataloaders,
-        )
-
     return inputs
 
 
@@ -155,7 +140,7 @@ def model_parameters(model_name, number_of_node_features, number_of_edge_feature
             linear_hidden=8,
         )
 
-    elif model_name == "geometric-chemprop" or model_name == "molgraph-chemprop":
+    elif model_name == "geometric-chemprop":
         parameters = dict(name=model_name, depth=2, ffn_num_layers=2, ffn_hidden_size=8)
     return parameters
 
@@ -188,7 +173,7 @@ def input_and_run_config(paths, model_parameters):
     return config_and_augmented
 
 
-@pytest.mark.parametrize("model_name", ["molgraph-chemprop", "geometric-chemprop", "MPNN"])
+@pytest.mark.parametrize("model_name", ["geometric-chemprop", "MPNN"])
 def test_smoke_test_experiment_driver(input_and_run_config, driver_inputs):
     logger_class = MLFlowLogger
     with pytest.warns(None) as record:
