@@ -16,8 +16,8 @@ from LambdaZero.loggers.mlflow_logger import MLFlowLogger
 
 from LambdaZero.representation_learning.datasets import (
     D4GeometricMoleculesDataset,
-    D4ChempropMoleculesDataset,
 )
+from LambdaZero.examples.chemprop.datasets import D4ChempropMoleculesDataset
 from LambdaZero.representation_learning.experiment_driver import experiment_driver
 from LambdaZero.representation_learning.model_trainer import MoleculeModelTrainer
 from LambdaZero.oracle_models.chemprop_model import (

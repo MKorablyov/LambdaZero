@@ -22,7 +22,7 @@ from LambdaZero.chemprop_adaptors.dataloader_utils import get_chemprop_dataloade
 
 # Specify which model class we want to instantiate and train
 from LambdaZero.chemprop_adaptors import ChempropModelTrainer
-from LambdaZero.representation_learning.datasets import D4ChempropMoleculesDataset
+from LambdaZero.examples.chemprop.datasets import D4ChempropMoleculesDataset
 from LambdaZero.representation_learning.experiment_driver import experiment_driver
 from LambdaZero.representation_learning.parameter_inputs import get_input_and_run_configuration
 
