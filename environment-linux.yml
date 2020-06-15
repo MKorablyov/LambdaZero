@@ -12,7 +12,7 @@ dependencies:
   - cudatoolkit=10.1.*
   - tensorflow-gpu
   - tensorboardX
-  - pytorch==1.4.0
+  - pytorch==1.5.0
   - torchvision
   - rdkit
   - pandas
@@ -49,7 +49,7 @@ dependencies:
   - threadpoolctl
   - line_profiler==2.1.2
   - pip:
-    - -f https://pytorch-geometric.com/whl/torch-1.4.0.html
+    - -f https://pytorch-geometric.com/whl/torch-1.5.0.html
     - torch-scatter==latest+cu101
     - torch-sparse==latest+cu101
     - torch-cluster==latest+cu101

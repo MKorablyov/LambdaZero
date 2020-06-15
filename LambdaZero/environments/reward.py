@@ -128,7 +128,7 @@ class PredDockReward_v2:
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, qed
+        return disc_reward, {"reward": reward, "natm": natm, "qed" : qed, "synth" : synth}
 
     def _simulation(self, molecule):
         mol = molecule.mol
@@ -152,12 +152,13 @@ class PredDockReward_v2:
         if simulate:
             reward = self._simulation(molecule)
             if reward is not None:
-                discounted_reward, qed = self._discount(molecule.mol, reward)
+                discounted_reward, log_vals = self._discount(molecule.mol, reward)
             else:
-                reward, discounted_reward, qed = -0.5, -0.5, -0.5
+                discounted_reward, log_vals = -0.5, {"reward": -0.5, "natm": 0.0, "qed" : -0.5, "synth" : -0.5}
         else:
-            reward, discounted_reward, qed = 0.0, 0.0, 0.0
-        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed}
+            discounted_reward, log_vals = 0.0, {}
+
+        return discounted_reward, log_vals
 
 
 class QEDReward:

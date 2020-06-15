@@ -1,7 +1,7 @@
 import os,time
 import numpy as np
 import pandas as pd
-import torch as th
+import torch
 from torch_sparse import coalesce
 
 import rdkit
@@ -17,7 +17,7 @@ rdBase.DisableLog('rdApp.error')
 
 
 from torch.utils.data import Dataset as th_Dataset
-#th.multiprocessing.set_sharing_strategy('file_system') # bug https://github.com/pytorch/pytorch/issues/973
+#torch.multiprocessing.set_sharing_strategy('file_system') # bug https://github.com/pytorch/pytorch/issues/973
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -50,7 +50,7 @@ import LambdaZero.chem
 #         elem_feat.append(charge)
 #     return np.stack(elem_feat,axis=1)
 #
-# class Sampler(th.utils.data.Sampler):
+# class Sampler(torch.utils.data.Sampler):
 #     def __init__(self, idxs, probs=None, num_samples=None):
 #         self.idxs = idxs
 #         self.probs = probs
@@ -66,7 +66,7 @@ import LambdaZero.chem
 #     def __len__(self):
 #         return self.num_samples
 #
-# class ImgGen(th.nn.Module):
+# class ImgGen(torch.nn.Module):
 #     def __init__(self, grid_pix, pix_size, sigmas, input_d, pairwise=False):
 #         """
 #
@@ -88,12 +88,12 @@ import LambdaZero.chem
 #             img_depth = input_d * len(self._sigmas)
 #             pairwise_idx = np.tile(np.arange(img_depth)[:, None], [1, img_depth]).reshape(-1)[:, None]
 #             pairwise_idx = np.concatenate([pairwise_idx, np.tile(np.arange(img_depth), [img_depth])[:, None]], 1)
-#             self._pairwise_idx = th.tensor(pairwise_idx)
+#             self._pairwise_idx = torch.tensor(pairwise_idx)
 #         grid_dim = np.asarray([grid_pix, grid_pix, grid_pix])
 #         grid = np.stack([-grid_dim // 2, grid_dim - grid_dim // 2], 1)
 #         grid = np.mgrid[grid[0, 0]:grid[0, 1], grid[1, 0]:grid[1, 1], grid[2, 0]:grid[2, 1]]
-#         grid = th.tensor(np.asarray(grid, dtype=np.float32))
-#         self._grid = th.nn.Parameter(grid, requires_grad=False)
+#         grid = torch.tensor(np.asarray(grid, dtype=np.float32))
+#         self._grid = torch.nn.Parameter(grid, requires_grad=False)
 #
 #     def forward(self, coord, feat):
 #         """
@@ -110,14 +110,14 @@ import LambdaZero.chem
 #
 #         # explicitly compute distances
 #         scaled_coord = coord / self._pix_size
-#         dist_sq = th.sum(((self._grid[None, :, :, :] - scaled_coord[:, :, None, None, None]) ** 2), 1)
+#         dist_sq = torch.sum(((self._grid[None, :, :, :] - scaled_coord[:, :, None, None, None]) ** 2), 1)
 #         # generate images for each possible sigma
 #         gauss_imgs = []
 #         for sigma in self._sigmas:
-#             gauss_dist = th.exp(-dist_sq / (2 * (float(sigma) ** 2)))
+#             gauss_dist = torch.exp(-dist_sq / (2 * (float(sigma) ** 2)))
 #             gauss_img = (gauss_dist[:, None, :, :, :] * feat[:, :, None, None, None]).sum([0])
 #             gauss_imgs.append(gauss_img)
-#         gauss_img = th.cat(gauss_imgs, dim=0)
+#         gauss_img = torch.cat(gauss_imgs, dim=0)
 #
 #         # generate pairsies combinations when needed
 #         if self._pairwise:
@@ -260,7 +260,7 @@ import LambdaZero.chem
 #             feat = mtable_featurizer(elem, organic=organic)
 #         else:
 #             raise NotImplementedError("can't featurize")
-#         coord, feat = th.from_numpy(coord), th.from_numpy(feat)
+#         coord, feat = torch.from_numpy(coord), torch.from_numpy(feat)
 #         if self.oncuda: coord, feat = coord.cuda(), feat.cuda()
 #         return imgGen(coord, feat)
 #
@@ -270,7 +270,7 @@ import LambdaZero.chem
 #     def __getitem__(self, idx):
 #         #name, ufrag_num, ufrag_idx, frag_elem, frag_coord, root_elem, root_coord, rec_elem, rec_coord\
 #         sam = self.datasetFrag[idx]
-#         ufrag_idx = th.from_numpy(np.asarray(sam["ufrag_idx"], dtype=np.int64)) # convert to torch tensor
+#         ufrag_idx = torch.from_numpy(np.asarray(sam["ufrag_idx"], dtype=np.int64)) # convert to torch tensor
 #         out = {"idx": idx, "ufrag_idx":ufrag_idx}
 #         if self.rootImgGen is not None:
 #             out["root_img"] = self._gen_img(self.rootImgGen, sam["root_elem"], sam["root_coord"], organic=False)
@@ -316,7 +316,7 @@ import LambdaZero.chem
 #         #print("parameters in instance:", list(self.pr.parameters()))
 #         return (idx,) + self.pr(**pr_input)
 #
-# class PreprocVS(th.nn.Module):
+# class PreprocVS(torch.nn.Module):
 #     def __init__(self, rot_complex=True, rot_lig=False, rot_rec=False, rot_binder=True, shrange=3.0, featurize=None):
 #         """
 #
@@ -382,7 +382,7 @@ import LambdaZero.chem
 #         return lig_elem, lig_coord, rec_elem, rec_coord, binder_elem, binder_coord
 #
 #
-# class PreprocVSimg(th.nn.Module):
+# class PreprocVSimg(torch.nn.Module):
 #     def __init__(self,preprocVS_par,ligImgGen_par=None,recImgGen_par=None,binderImgGen_par=None):
 #         super(PreprocVSimg, self).__init__()
 #         # read coordinates and elements from the disk
@@ -408,17 +408,17 @@ import LambdaZero.chem
 #         # generate images
 #         imgs = []
 #         if self.ligImgGen is not None:
-#             lig_coord, lig_feat = th.from_numpy(lig_coord), th.from_numpy(lig_feat)
+#             lig_coord, lig_feat = torch.from_numpy(lig_coord), torch.from_numpy(lig_feat)
 #             if any([p.is_cuda for p in self.parameters()]):
 #                 lig_coord, lig_feat = lig_coord.cuda(), lig_feat.cuda()
 #             imgs.append(self.ligImgGen(lig_coord,lig_feat))
 #         if self.recImgGen is not None:
-#             rec_coord, rec_feat = th.from_numpy(rec_coord), th.from_numpy(rec_feat)
+#             rec_coord, rec_feat = torch.from_numpy(rec_coord), torch.from_numpy(rec_feat)
 #             if any([p.is_cuda for p in self.parameters()]):
 #                 rec_coord, rec_feat = rec_coord.cuda(), rec_feat.cuda()
 #             imgs.append(self.recImgGen(rec_coord,rec_feat))
 #         if self.binderImgGen is not None:
-#             binder_coord, binder_feat = th.from_numpy(binder_coord), th.from_numpy(binder_feat)
+#             binder_coord, binder_feat = torch.from_numpy(binder_coord), torch.from_numpy(binder_feat)
 #             if any([p.is_cuda for p in self.parameters()]):
 #                 binder_coord, binder_feat = binder_coord.cuda(), binder_feat.cuda()
 #             imgs.append(self.binderImgGen(binder_coord,binder_feat))
@@ -461,9 +461,9 @@ import LambdaZero.chem
 #     dataset = DatasetQM7(data_dir,rotate,shiftrange)
 #     ntest = int(len(dataset) * test_prob)
 #     ntrain = int(len(dataset) - (len(dataset) * test_prob))
-#     train_set, test_set = th.utils.data.random_split(dataset, [ntrain, ntest])
-#     train_set = th.utils.data.DataLoader(train_set, batch_size=1, shuffle=shuffle)
-#     test_set = th.utils.data.DataLoader(test_set, batch_size=1, shuffle=shuffle)
+#     train_set, test_set = torch.utils.data.random_split(dataset, [ntrain, ntest])
+#     train_set = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=shuffle)
+#     test_set = torch.utils.data.DataLoader(test_set, batch_size=1, shuffle=shuffle)
 #     return train_set, test_set
 #
 #
@@ -502,9 +502,9 @@ import LambdaZero.chem
 #     dataset = Embedding_qm_dataset(data_dir)
 #     ntest = int(len(dataset) * test_prob)
 #     ntrain = int(len(dataset) - (len(dataset) * test_prob))
-#     train_set, test_set = th.utils.data.random_split(dataset, [ntrain, ntest])
-#     train_set = th.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
-#     test_set = th.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
+#     train_set, test_set = torch.utils.data.random_split(dataset, [ntrain, ntest])
+#     train_set = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
+#     test_set = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
 #     return train_set, test_set
 
 
@@ -577,14 +577,14 @@ import LambdaZero.chem
 #
 #         gauss_imgs = []
 #         for i in range(self.nframes):
-#             coord = th.tensor(self.coords[idx][i], dtype=th.float32)
-#             feat = th.tensor(feat,dtype=th.float32)
+#             coord = torch.tensor(self.coords[idx][i], dtype=torch.float32)
+#             feat = torch.tensor(feat,dtype=torch.float32)
 #             if self.oncuda:
 #                 coord = coord.cuda()
 #                 feat = feat.cuda()
 #             gauss_img = self.imgGen(coord,feat)
 #             gauss_imgs.append(gauss_img)
-#         gauss_imgs = th.stack(gauss_imgs,dim=0)
+#         gauss_imgs = torch.stack(gauss_imgs,dim=0)
 #
 #         return gauss_imgs,self.props[idx]
 
@@ -653,13 +653,13 @@ def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
-    atmfeat = th.tensor(atmfeat, dtype=th.float32)
-    edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
-    edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
+    atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
+    edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=torch.int64)
+    edge_attr = torch.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=torch.float32)
     edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
     # make torch data
     if coord is not None:
-        coord = th.tensor(coord,dtype=th.float32)
+        coord = torch.tensor(coord,dtype=torch.float32)
         data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
@@ -701,7 +701,7 @@ class BrutalDock(InMemoryDataset):
         #  todo: store a list, but have a custom collate function on batch making
         graphs = []
         for processed_path in self.processed_paths:
-            self.data, self.slices = th.load(processed_path)
+            self.data, self.slices = torch.load(processed_path)
             graphs += [self.get(i) for i in range(len(self))]
         if len(graphs) > 0:
             self.data, self.slices = self.collate(graphs)
@@ -729,7 +729,7 @@ class BrutalDock(InMemoryDataset):
                 graphs = ray.get(tasks)
                 graphs = [g for g in graphs if g is not None]
                 # save to the disk
-                th.save(self.collate(graphs), self.processed_paths[i])
+                torch.save(self.collate(graphs), self.processed_paths[i])
 
 
 
