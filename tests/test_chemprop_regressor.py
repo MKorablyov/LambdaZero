@@ -2,6 +2,7 @@ import logging
 import numpy as np
 import tempfile
 from pathlib import Path
+import torch
 
 import pytest
 import ray
@@ -80,8 +81,31 @@ def config(model_parameters, data_dir, summaries_dir):
     return config
 
 
-def test_chemprop_regressor(config):
-    tunable_regressor = ChempropRegressor(config=config)
+@pytest.fixture
+def mean():
+    np.random.seed(12312)
+    return np.random.rand()
+
+
+@pytest.fixture
+def std():
+    np.random.seed(22)
+    return np.random.rand()
+
+
+@pytest.fixture
+def random_values():
+    return torch.rand(10)
+
+
+def test_chemprop_regressor_normalizer(random_values, mean, std):
+
+    computed_normalized_values = ChempropRegressor._normalize_target(random_values, mean, std)
+    expected_normalized_values = (random_values-mean)/std
+    assert torch.all(torch.eq(computed_normalized_values, expected_normalized_values))
+
+    computed_values = ChempropRegressor._denormalize_target(expected_normalized_values, mean, std)
+    assert torch.all(torch.eq(computed_values, random_values))
 
 
 def test_smoke_test_tuning_chemprop_regressor(config, summaries_dir):
