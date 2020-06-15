@@ -5,7 +5,7 @@ import torch
 from chemprop.features import BatchMolGraph
 from torch.utils.data import Dataset, DataLoader
 
-from LambdaZero.representation_learning.dataset_splitting import DictKnnDatasetSplitter
+from LambdaZero.datasets.dataset_splitting import DictKnnDatasetSplitter
 
 
 def get_chemprop_dataloaders(dataset: Dataset,
