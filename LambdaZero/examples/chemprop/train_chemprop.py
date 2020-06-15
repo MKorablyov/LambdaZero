@@ -33,7 +33,7 @@ DEFAULT_CONFIG = {
         "lr": 0.001,
         "b_size": 64,
         "num_epochs": 120,
-        "model_parameters": model_parameters,
+        "xarray_dataset": model_parameters,
         "molprops": ["gridscore", "klabel"],
         },
     "summaries_dir": summaries_dir,
