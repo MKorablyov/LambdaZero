@@ -50,11 +50,8 @@ if __name__ == "__main__":
 
     analysis = tune.run(ChempropRegressor,
                         config=config["trainer_config"],
-                        stop={"training_iteration": 10}, #EarlyStop(),
-                        resources_per_trial={
-                           "cpu": 1,  # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
-                           "gpu": 0.0
-                        },
+                        stop={"training_iteration": 10},
+                        resources_per_trial={"cpu": 1, "gpu": 0.0},
                         num_samples=1,
                         checkpoint_at_end=False,
                         local_dir=summaries_dir,
