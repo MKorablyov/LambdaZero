@@ -72,10 +72,9 @@ def config(model_parameters, data_dir, summaries_dir):
         "target": "gridscore",
         "target_norm": [-26.3, 12.3],
         "lr": 0.001,
-        "b_size": 64,
+        "batch_size": 2,
         "num_epochs": 1,
         "model_parameters": model_parameters,
-        "summaries_dir": summaries_dir,
     }
 
     return config
@@ -85,7 +84,7 @@ def test_chemprop_regressor(config):
     tunable_regressor = ChempropRegressor(config=config)
 
 
-def test_smoke_test_tuning_chemprop_regressor(config):
+def test_smoke_test_tuning_chemprop_regressor(config, summaries_dir):
     """
     This is a SMOKE TEST. It just validates that the code will run without errors if given
     expected inputs. It does not validate that the results are correct.
@@ -98,5 +97,5 @@ def test_smoke_test_tuning_chemprop_regressor(config):
         stop={"training_iteration": 2},
         resources_per_trial={"cpu": 1, "gpu": 0.0},
         num_samples=1,
-        local_dir=config["summaries_dir"],
+        local_dir=summaries_dir,
     )

@@ -98,7 +98,7 @@ class ChempropRegressor(BasePytorchRegressor):
             dataset
         )
 
-        batch_size = config["b_size"]
+        batch_size = config["batch_size"]
 
         training_dataloader = DataLoader(
             training_dataset,
