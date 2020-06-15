@@ -41,18 +41,18 @@ def get_external_dirs():
     return datasets_dir, programs_dir, summaries_dir
 
 
+
+# log_env_info
 def dock_metrics(info):
-    """
-    Report custom metrics for each episode in RayRllib
+    """ Report custom metrics for each episode in RayRllib
     :param info: episode info
     :return:
     """
     env_info = list(info["episode"]._agent_to_last_info.values())[0]
     episode = info["episode"]
-    episode.custom_metrics["reward"] = env_info["reward"]
-    episode.custom_metrics["QED"] = env_info["QED"]
-    episode.custom_metrics["discounted_reward"] = env_info["discounted_reward"]
 
+    for key, value in env_info["log_vals"].items():
+        episode.custom_metrics[key] = value
 
 
 

@@ -34,4 +34,5 @@ class BlockMolEnv_v5(BlockMolEnv_v4):
         #if done and action == 0:
             #mol_attr, num_steps, num_simulations, previous_reward, mol = self.get_state()
             #print("action", action, "num_steps", self.num_steps)
+
         return obs, reward, done, info
