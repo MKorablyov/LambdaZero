@@ -8,6 +8,11 @@ from torch.utils.data import Dataset, Subset
 
 
 class AbstractDatasetSplitter:
+    """
+    This base class implements what is needed to split pytorch datasets into train, validation
+    and test sets robustly. This class must be subclassed to determine the explicit way
+    in which each subset's indices are obtained.
+    """
 
     def __init__(self, train_fraction: float, validation_fraction: float, random_seed: int = 0):
         self.train_fraction = train_fraction
@@ -34,6 +39,18 @@ class AbstractDatasetSplitter:
                                                full_dataset: Dataset,
                                                train_size: int, valid_size: int,
                                                test_size: int) -> Tuple[List[int], List[int], List[int]]:
+        """
+        This method determines the indices used to subset the full dataset into train,valid, test subsets.
+        Args:
+            random_generator (RandomState): numpy random generator, fixed for reproducibility
+            full_dataset (Dataset): full dataset to be split
+            train_size (int): size of training set
+            valid_size (int): size of validation set
+            test_size (int): size of test set
+
+        Returns:
+            train_indices, validation_indices, test_indices
+        """
 
         pass
 
@@ -58,7 +75,10 @@ class AbstractDatasetSplitter:
 
 
 class RandomDatasetSplitter(AbstractDatasetSplitter):
-
+    """
+    This dataset splitter assigns indices to each subset randomly, given a fixed
+    random generator.
+    """
     def _get_train_validation_and_test_indices(self, random_generator: RandomState,
                                                full_dataset: Dataset,
                                                train_size: int, valid_size: int,
