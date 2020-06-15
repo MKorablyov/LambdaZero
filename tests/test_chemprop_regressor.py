@@ -17,6 +17,7 @@ def expected_raw_files():
         "dock_blocks105_walk40_2_clust.feather",
     ]
 
+
 @pytest.fixture
 def data_dir(expected_raw_files, smiles_and_scores_dataframe):
 
@@ -43,6 +44,7 @@ def summaries_dir():
         yield Path(tmp_dir_str)
     logging.info("deleting test folder")
 
+
 @pytest.fixture
 def model_parameters():
 
@@ -55,7 +57,8 @@ def model_parameters():
         "atom_messages": False,
         "undirected": False,
         "ffn_hidden_size": 7,
-        "ffn_num_layers": 3}
+        "ffn_num_layers": 3,
+    }
 
     return model_parameters
 
@@ -63,16 +66,17 @@ def model_parameters():
 @pytest.fixture
 def config(model_parameters, data_dir, summaries_dir):
 
-    config = {"dataset_root": str(data_dir),
-              "random_seed": 0,
-              "target": "gridscore",
-              "target_norm": [-26.3, 12.3],
-              "lr": 0.001,
-              "b_size": 64,
-              "num_epochs": 1,
-              "model_parameters": model_parameters,
-              "summaries_dir": summaries_dir,
-              }
+    config = {
+        "dataset_root": str(data_dir),
+        "random_seed": 0,
+        "target": "gridscore",
+        "target_norm": [-26.3, 12.3],
+        "lr": 0.001,
+        "b_size": 64,
+        "num_epochs": 1,
+        "model_parameters": model_parameters,
+        "summaries_dir": summaries_dir,
+    }
 
     return config
 
@@ -88,9 +92,11 @@ def test_smoke_test_tuning_chemprop_regressor(config):
     """
     ray.init(local_mode=True)
 
-    _ = tune.run(ChempropRegressor,
-                 config=config,
-                 stop={"training_iteration": 2},
-                 resources_per_trial={"cpu": 1, "gpu": 0.0},
-                 num_samples=1,
-                 local_dir=config["summaries_dir"])
+    _ = tune.run(
+        ChempropRegressor,
+        config=config,
+        stop={"training_iteration": 2},
+        resources_per_trial={"cpu": 1, "gpu": 0.0},
+        num_samples=1,
+        local_dir=config["summaries_dir"],
+    )
