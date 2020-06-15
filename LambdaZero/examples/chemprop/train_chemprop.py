@@ -25,8 +25,8 @@ model_parameters = {
 DEFAULT_CONFIG = {
     "trainer_config": {
         "dataset_root": os.path.join(datasets_dir, "brutal_dock/d4"),
-        "targets": ["gridscore"],
-        "target_norms": [[-26.3, 12.3]],
+        "target": "gridscore",
+        "target_norm": [-26.3, 12.3],
         "file_names": ["dock_blocks105_walk40_clust"],
         "transform": transform,
         "split_name": "randsplit_dock_blocks105_walk40_clust",
