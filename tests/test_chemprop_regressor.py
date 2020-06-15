@@ -84,13 +84,13 @@ def config(model_parameters, data_dir, summaries_dir):
 @pytest.fixture
 def mean():
     np.random.seed(12312)
-    return np.random.rand()
+    return torch.tensor(np.random.rand())
 
 
 @pytest.fixture
 def std():
     np.random.seed(22)
-    return np.random.rand()
+    return torch.tensor(np.random.rand())
 
 
 @pytest.fixture
@@ -100,12 +100,31 @@ def random_values():
 
 def test_chemprop_regressor_normalizer(random_values, mean, std):
 
-    computed_normalized_values = ChempropRegressor._normalize_target(random_values, mean, std)
-    expected_normalized_values = (random_values-mean)/std
-    assert torch.all(torch.eq(computed_normalized_values, expected_normalized_values))
+    computed_normalized_values = ChempropRegressor._normalize_target(
+        random_values, mean, std
+    )
+    expected_normalized_values = (random_values - mean) / std
 
-    computed_values = ChempropRegressor._denormalize_target(expected_normalized_values, mean, std)
-    assert torch.all(torch.eq(computed_values, random_values))
+    np.testing.assert_allclose(
+        computed_normalized_values.numpy(), expected_normalized_values.numpy(),
+        rtol=1e-6
+    )
+
+    computed_values = ChempropRegressor._denormalize_target(
+        expected_normalized_values, mean, std
+    )
+
+    np.testing.assert_allclose(computed_values.numpy(), random_values.numpy(), rtol=1e-6)
+
+
+def test_chemprop_regressor_get_size_of_batch(random_values, config):
+
+    batch = {config["target"]: random_values, "other": "test"}
+
+    expected_size = len(random_values)
+    computed_size = ChempropRegressor._get_size_of_batch(batch, config)
+
+    assert expected_size == computed_size
 
 
 def test_smoke_test_tuning_chemprop_regressor(config, summaries_dir):
