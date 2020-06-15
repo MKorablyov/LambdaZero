@@ -25,7 +25,8 @@ class ChempropRegressor(BasePytorchRegressor):
     def _denormalize_target(normalized_y, mean, std):
         return std * normalized_y + mean
 
-    def _get_size_of_batch(self, batch: Dict, config):
+    @staticmethod
+    def _get_size_of_batch(batch: Dict, config):
         return len(batch[config["target"]])
 
     def _get_batch_loss(self, batch: Dict, model, config):
