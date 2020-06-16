@@ -1,11 +1,10 @@
 import logging
-from typing import Dict, Union, List
+from typing import Dict, Union
 
-import torch
-from chemprop.features import BatchMolGraph
 from torch.utils.data import Dataset, DataLoader
 
 from LambdaZero.datasets.dataset_splitting import DictKnnDatasetSplitter
+from LambdaZero.examples.chemprop.ChempropRegressor import chemprop_collate_fn
 
 
 def get_chemprop_dataloaders(dataset: Dataset,
@@ -43,14 +42,3 @@ def get_chemprop_dataloaders(dataset: Dataset,
     return training_dataloader, validation_dataloader, test_dataloader
 
 
-def chemprop_collate_fn(list_dict: List[Dict]):
-
-        collated_dict = dict()
-        for key in list_dict[0].keys():
-            if key == 'mol_graph':
-                values = BatchMolGraph([d['mol_graph'] for d in list_dict])
-            else:
-                values = torch.tensor([d[key] for d in list_dict])
-            collated_dict[key] = values
-
-        return collated_dict
