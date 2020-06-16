@@ -7,6 +7,7 @@ import sys
 from LambdaZero.chemprop_adaptors.dataloader_utils import chemprop_collate_fn
 from LambdaZero.datasets.dataset_splitting import RandomDatasetSplitter
 from LambdaZero.examples.chemprop.datasets import D4ChempropMoleculesDataset
+from LambdaZero.loggers.wandb_logger import RayTuneWandbLogger
 from LambdaZero.oracle_models.chemprop_model import MolGraphChempropNet
 from LambdaZero.trainable.base_pytorch_regressor import BasePytorchRegressor
 import torch
@@ -16,6 +17,9 @@ from torch.nn.functional import mse_loss
 class ChempropRegressor(BasePytorchRegressor):
     def get_model(self, config):
         return MolGraphChempropNet(**config["model_parameters"])
+
+    def setup_logger(self, config):
+        self.logger = RayTuneWandbLogger(config=config, log_dir=self.logdir, trial_id=self.trial_id)
 
     @staticmethod
     def _normalize_target(y, mean, std):
