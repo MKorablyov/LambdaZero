@@ -132,6 +132,25 @@ def test_chemprop_regressor_get_size_of_batch(random_values, config):
     assert expected_size == computed_size
 
 
+def test_get_logging_metrics(config, summaries_dir):
+
+    std = config["target_norm"][1]
+    average_epoch_loss = 32.56
+
+    computed_results_dict = ChempropRegressor._get_logging_metrics(
+        average_epoch_loss, config
+    )
+
+    rmse = std * np.sqrt(average_epoch_loss)
+
+    expected_results_dict = {
+        "mse_normalized_units": average_epoch_loss,
+        "rmse_original_units": rmse,
+    }
+
+    assert computed_results_dict == expected_results_dict
+
+
 def test_smoke_test_tuning_chemprop_regressor(config, summaries_dir):
     """
     This is a SMOKE TEST. It just validates that the code will run without errors if given
