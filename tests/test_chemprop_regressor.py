@@ -69,14 +69,13 @@ def model_parameters():
 def config(model_parameters, data_dir, summaries_dir):
 
     config = {
-        "experiment_name": "TEST",
+        "experiment_name": f"TEST-{np.random.randint(1e3)}",
         "dataset_root": str(data_dir),
         "random_seed": 0,
         "target": "gridscore",
         "target_norm": [-26.3, 12.3],
         "lr": 0.001,
         "batch_size": 2,
-        "num_epochs": 1,
         "model_parameters": model_parameters,
     }
 
@@ -158,13 +157,12 @@ def test_smoke_test_tuning_chemprop_regressor(config, summaries_dir):
     """
 
     set_wandb_to_dryrun()
-
-    ray.init(local_mode=True)
+    ray.init()
 
     _ = tune.run(
         ChempropRegressor,
         config=config,
-        stop={"training_iteration": 2},
+        stop={"training_iteration": 10},
         resources_per_trial={"cpu": 1, "gpu": 0.0},
         num_samples=1,
         local_dir=summaries_dir,
