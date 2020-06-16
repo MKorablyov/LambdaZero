@@ -1,26 +1,32 @@
-import os, sys, logging,time,string, random, time, subprocess
 import contextlib
-
+import logging
+import os
+import random
+import string
+import subprocess
 from collections import Counter
+
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import BRICS
-from rdkit.Chem import Draw
-from rdkit.Chem import AllChem
-from rdkit.Chem.Scaffolds import MurckoScaffold
-
-from rdkit import rdBase
-from rdkit.Chem.rdchem import HybridizationType
 from rdkit import RDConfig
+from rdkit import rdBase
+from rdkit.Chem import AllChem
+from rdkit.Chem import BRICS
 from rdkit.Chem import ChemicalFeatures
+from rdkit.Chem import Draw
+from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.rdchem import BondType as BT
+from rdkit.Chem.rdchem import HybridizationType
+
+from LambdaZero.chem.chimera_op import _add_hydrogens_and_compute_gasteiger_charges_with_chimera
+
 rdBase.DisableLog('rdApp.error')
 
 import pandas as pd
 from rdkit import DataStructs
 
-import torch as th
-from torch_geometric.data import (InMemoryDataset, download_url, extract_zip, Data)
+import torch
+from torch_geometric.data import (Data)
 from torch_sparse import coalesce
 
 atomic_numbers = {"H":1,"He":2,"Li":3,"Be":4,"B":5,"C":6,"N":7,"O":8,"F":9,"Ne":10,"Na":11,"Mg":12,"Al":13,"Si":14,
@@ -285,14 +291,8 @@ def _gen_mol2(smi, mol_name, outpath, chimera_bin, charge_method, num_conf):
     print(Chem.MolToMolBlock(mol,confId=int(mi)),file=open(mol_file,'w+'))
     # add hydrogens and compute gasteiger charges in Chimera
     mol2_file = os.path.join(outpath, mol_name + ".mol2")
-    chimera_cmd = "printf \"open {}" \
-              "\naddh" \
-              "\naddcharge all method {}" \
-              "\nwrite format mol2 0 {}" \
-              "\nstop now\"  | {} --nogui".format(
-        mol_file, charge_method, mol2_file, chimera_bin)
-    process = subprocess.Popen(chimera_cmd, shell=True, stdout=subprocess.PIPE)
-    process.wait()
+    _add_hydrogens_and_compute_gasteiger_charges_with_chimera(mol_file, charge_method, chimera_bin, mol2_file)
+
     return mol2_file
 
 
@@ -586,18 +586,18 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
-    atmfeat = th.tensor(atmfeat, dtype=th.float32)
+    atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
     if bond.shape[0] > 0:
-        edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
-        edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
+        edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=torch.int64)
+        edge_attr = torch.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=torch.float32)
         edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
     else:
-        edge_index = th.zeros((0,2), dtype=th.int64)
-        edge_attr = th.tensor(bondfeat, dtype=th.float32)
+        edge_index = torch.zeros((0,2), dtype=torch.int64)
+        edge_attr = torch.tensor(bondfeat, dtype=torch.float32)
 
     # make torch data
     if coord is not None:
-        coord = th.tensor(coord,dtype=th.float32)
+        coord = torch.tensor(coord,dtype=torch.float32)
         data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)

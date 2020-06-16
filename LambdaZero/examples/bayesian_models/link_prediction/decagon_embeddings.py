@@ -1,6 +1,6 @@
 import numpy as np
 import os, time, os.path as osp
-import torch as th
+import torch
 import sklearn
 import ray
 from ray import tune
@@ -26,12 +26,12 @@ class DecagonEmbeddingDataset(Dataset):
     def __len__(self):
         return self.Z.shape[0] * self.Z.shape[0]
 
-class LinearDec(th.nn.Module):
+class LinearDec(torch.nn.Module):
     def __init__(self, Z, R, D):
         super(LinearDec, self).__init__()
         self.Z = Z
         self.R = R
-        self.D = th.nn.Parameter(th.empty(32,32).normal_(mean=0,std=0.01), requires_grad=True)
+        self.D = torch.nn.Parameter(torch.empty(32,32).normal_(mean=0,std=0.01), requires_grad=True)
 
     def forward(self, Zi, Zj):
         logits = (Zi @ self.D @ self.R @ self.D * Zj).sum(1)
@@ -62,7 +62,7 @@ def train_epoch(loader, model, optimizer, device, config):
         optimizer.step()
 
         labels_all.append(labels.cpu().numpy())
-        preds_all.append(th.nn.Sigmoid()(logits).detach().cpu().numpy())
+        preds_all.append(torch.nn.Sigmoid()(logits).detach().cpu().numpy())
         loss_all.append(loss.detach().cpu().numpy())
 
 
@@ -81,7 +81,7 @@ def eval_epoch(loader, model, device, config):
         Zi, Zj, labels = Zi.to(device), Zj.to(device), labels.to(device)
         logits = model(Zi, Zj)
         labels_all.append(labels.cpu().numpy())
-        preds_all.append(th.nn.Sigmoid()(logits).detach().cpu().numpy())
+        preds_all.append(torch.nn.Sigmoid()(logits).detach().cpu().numpy())
 
     labels_all, preds_all = np.concatenate(labels_all, axis=0), np.concatenate(preds_all, axis=0)
     auc = sklearn.metrics.roc_auc_score(labels_all, preds_all)
@@ -97,7 +97,7 @@ def egreedy_aq(loader, model, device, config):
     for bidx, (Zi, Zj, labels) in enumerate(loader):
         Zi, Zj, labels = Zi.to(device), Zj.to(device), labels.to(device)
         logits = model(Zi, Zj)
-        preds_all.append(th.nn.Sigmoid()(logits).detach().cpu().numpy())
+        preds_all.append(torch.nn.Sigmoid()(logits).detach().cpu().numpy())
 
     aq_order = np.argsort(np.concatenate(preds_all, axis=0))
     return aq_order[:config["aq_batch_size"]]
@@ -107,7 +107,7 @@ def egreedy_aq(loader, model, device, config):
 class BasicRegressor(tune.Trainable):
     def _setup(self, config):
         self.config = config
-        self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # load dataset
         dataset = DecagonEmbeddingDataset(config["dataset_root"], config["relation"])
@@ -116,20 +116,20 @@ class BasicRegressor(tune.Trainable):
         Z, D, R, _, is_train = load_decagon(config["dataset_root"], config["relation"])
         self.train_set = Subset(dataset, np.where(is_train)[0])
 
-        self.train_loader = th.utils.data.DataLoader(self.train_set, batch_size=config["b_size"], shuffle=True)
+        self.train_loader = torch.utils.data.DataLoader(self.train_set, batch_size=config["b_size"], shuffle=True)
         self.test_set = Subset(dataset, np.where(~is_train)[0])
-        self.test_loader = th.utils.data.DataLoader(self.test_set, batch_size=config["b_size"])
+        self.test_loader = torch.utils.data.DataLoader(self.test_set, batch_size=config["b_size"])
 
         # acquire
         self.is_aquired = np.zeros(len(self.train_set),dtype=np.bool)
         self.is_aquired[np.random.choice(np.arange(len(self.train_set)), config["aq_batch_size"])] = True
 
         # make model
-        self.model = LinearDec(Z=th.tensor(Z).to(self.device),
-                               R=th.tensor(R).to(self.device),
-                               D=th.tensor(D).to(self.device))
+        self.model = LinearDec(Z=torch.tensor(Z).to(self.device),
+                               R=torch.tensor(R).to(self.device),
+                               D=torch.tensor(D).to(self.device))
         self.model.to(self.device)
-        self.optim = th.optim.Adam(self.model.parameters(), lr=config["lr"])
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
 
         # make epochs
         self.train_epoch = config["train_epoch"]
@@ -139,7 +139,7 @@ class BasicRegressor(tune.Trainable):
 
         # make loader
         aq_set = Subset(self.train_set, np.where(self.is_aquired)[0])
-        aq_loader = th.utils.data.DataLoader(aq_set, batch_size=self.config["b_size"])
+        aq_loader = torch.utils.data.DataLoader(aq_set, batch_size=self.config["b_size"])
         # train model
         for i in range(3):
             train_scores = self.train_epoch(aq_loader, self.model, self.optim, self.device, self.config)
@@ -161,11 +161,11 @@ class BasicRegressor(tune.Trainable):
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-        th.save(self.model.state_dict(), checkpoint_path)
+        torch.save(self.model.state_dict(), checkpoint_path)
         return checkpoint_path
 
     def _restore(self, checkpoint_path):
-        self.model.load_state_dict(th.load(checkpoint_path))
+        self.model.load_state_dict(torch.load(checkpoint_path))
 
 
 
@@ -213,8 +213,8 @@ if __name__ == "__main__":
 # dataset = DecagonEmbeddingDataset()
 # _, _, _, _, is_test = load_decagon()
 # test_set = Subset(dataset, np.where(~is_test)[0])
-# test_set = th.utils.data.DataLoader(test_set, batch_size=902, shuffle=True)
+# test_set = torch.utils.data.DataLoader(test_set, batch_size=902, shuffle=True)
 # for (Zi, Zj, labels) in test_set:
-#     D, R = th.tensor(dataset.D), th.tensor(dataset.R)
+#     D, R = torch.tensor(dataset.D), torch.tensor(dataset.R)
 #     preds = (Zi @ D @ R @ D * Zj).sum(1)
 #     print("AUC", sklearn.metrics.roc_auc_score(labels, preds))

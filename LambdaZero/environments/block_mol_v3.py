@@ -152,8 +152,8 @@ class BlockMolEnv_v3:
         self.num_steps += 1
         obs = self._make_obs()
         env_stop = self._if_terminate()
-        reward, info = self.reward(self.molMDP.molecule, agent_stop, env_stop, self.num_steps)
-        info["molecule"] = self.molMDP.molecule
+        reward, log_vals = self.reward(self.molMDP.molecule, agent_stop, env_stop, self.num_steps)
+        info = {"molecule" : self.molMDP.molecule, "log_vals": log_vals}
         done = any((agent_stop, env_stop))
         return obs, reward, done, info
 

@@ -17,6 +17,24 @@ from tests.fake_molecules import get_random_molecule_data
 from tests.testing_utils import generate_random_string
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--external_program", action="store_true", default=False, help="run external program integration tests"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--external_program"):
+        # if --external_program is given in cli, then do not skip external program integration smoke tests
+        return
+    skip_external_program_integration = pytest.mark.skip(reason="need --external_program option to run")
+    for item in items:
+        if "external_program" in item.keywords:
+            item.add_marker(skip_external_program_integration)
+
+
+
+
 @pytest.fixture
 def number_of_molecules():
     return 1
