@@ -1,5 +1,6 @@
 import logging
 import tempfile
+import time
 from pathlib import Path
 
 import numpy as np
@@ -167,3 +168,5 @@ def test_smoke_test_tuning_chemprop_regressor(config, summaries_dir):
         num_samples=1,
         local_dir=summaries_dir,
     )
+    time.sleep(2)  # sleep to let W&B finish with folder stuff
+
