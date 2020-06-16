@@ -23,7 +23,7 @@ model_parameters = {
 
 config = {
     "experiment_name": "TuneChemprop",
-    "dataset_root": os.path.join(datasets_dir, "brutal_dock/d4"),
+    "dataset_root": os.path.join(datasets_dir, "brutal_dock/d4/raw/"),
     "random_seed": 0,
     "target": "gridscore",
     "target_norm": [-26.3, 12.3],
