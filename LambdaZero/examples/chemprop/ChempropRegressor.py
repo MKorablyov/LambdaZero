@@ -11,15 +11,36 @@ from LambdaZero.loggers.wandb_logger import RayTuneWandbLogger
 from LambdaZero.oracle_models.chemprop_model import MolGraphChempropNet
 from LambdaZero.trainable.base_pytorch_regressor import BasePytorchRegressor
 import torch
-from torch.nn.functional import mse_loss
+import numpy as np
 
 
 class ChempropRegressor(BasePytorchRegressor):
+
+    loss = torch.nn.MSELoss()
+
     def get_model(self, config):
         return MolGraphChempropNet(**config["model_parameters"])
 
     def setup_logger(self, config):
-        self.logger = RayTuneWandbLogger(config=config, log_dir=self.logdir, trial_id=self.trial_id)
+        self.logger = RayTuneWandbLogger(
+            config=config, log_dir=self.logdir, trial_id=self.trial_id
+        )
+
+    def _get_mean_and_std(self, config):
+        mean = torch.tensor(
+            config["target_norm"][0], device=self.device, requires_grad=False
+        )
+        std = torch.tensor(
+            config["target_norm"][1], device=self.device, requires_grad=False
+        )
+        return mean, std
+
+    @staticmethod
+    def _get_logging_metrics(average_epoch_loss: float, config: Dict):
+        std = config["target_norm"][1]
+        rmse = std * np.sqrt(average_epoch_loss)
+
+        return {"mse_normalized_units": average_epoch_loss, "rmse_original_units": rmse}
 
     @staticmethod
     def _normalize_target(y, mean, std):
@@ -34,12 +55,7 @@ class ChempropRegressor(BasePytorchRegressor):
         return len(batch[config["target"]])
 
     def _get_batch_loss(self, batch: Dict, model, config):
-        mean = torch.tensor(
-            config["target_norm"][0], device=self.device, requires_grad=False
-        )
-        std = torch.tensor(
-            config["target_norm"][1], device=self.device, requires_grad=False
-        )
+        mean, std = self._get_mean_and_std(config)
 
         batch_mol_graph = batch["mol_graph"]
         y_actual = batch[config["target"]].to(self.device)
@@ -49,7 +65,7 @@ class ChempropRegressor(BasePytorchRegressor):
         model.to(self.device)
         normalized_y_predicted = model.forward(batch_mol_graph)
 
-        batch_loss = mse_loss(normalized_y_actual, normalized_y_predicted)
+        batch_loss = self.loss(normalized_y_actual, normalized_y_predicted)
         return batch_loss
 
     def train_epoch(self, training_dataloader, model, optim, device, config):
@@ -69,7 +85,7 @@ class ChempropRegressor(BasePytorchRegressor):
             )
 
         average_epoch_loss = total_epoch_loss / len(training_dataloader.dataset)
-        return {"mse": average_epoch_loss}
+        return self._get_logging_metrics(average_epoch_loss, config)
 
     def eval_epoch(self, validation_dataloader, model, device, config):
         model.eval()
@@ -83,8 +99,7 @@ class ChempropRegressor(BasePytorchRegressor):
             )
 
         average_epoch_loss = total_epoch_loss / len(validation_dataloader.dataset)
-
-        return {"mse": average_epoch_loss}
+        return self._get_logging_metrics(average_epoch_loss, config)
 
     def get_dataset(self, config):
         dataset = D4ChempropMoleculesDataset(config["dataset_root"])
