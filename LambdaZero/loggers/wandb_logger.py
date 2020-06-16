@@ -50,6 +50,8 @@ class WandbLogger(ExperimentLogger):
 class RayTuneWandbLogger(RayTuneLogger):
     """
     Class to manage the Weights-and-Biases logger within a ray.tune trainable object.
+    The initialisation follows the instructions here:
+    <https://docs.ray.io/en/master/tune/api_docs/logging.html?highlight=tune%20logger#trainable-logging>
     """
 
     def __init__(self, config: Dict[str, str], log_dir: str, trial_id: str):
