@@ -20,6 +20,7 @@ model_parameters = {
     "ffn_num_layers": 2}
 
 config = {
+    "experiment_name": "chemprop_smoke_test",
     "dataset_root": os.path.join(datasets_dir, "brutal_dock/d4"),
     "random_seed": 0,
     "target": "gridscore",
