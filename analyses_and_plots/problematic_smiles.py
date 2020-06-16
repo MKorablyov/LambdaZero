@@ -3,7 +3,7 @@ from rdkit.Chem import Draw
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 
 from LambdaZero.chem import mol_to_graph, build_mol, mpnn_feat
-from LambdaZero.representation_learning.models.chemprop_adaptor import graph_to_mol
+from analyses_and_plots.chemprop_adaptor import graph_to_mol
 from analyses_and_plots import ANALYSIS_RESULTS_DIR
 from analyses_and_plots.analysis_utils import get_number_of_hydrogens, get_atom_series
 

@@ -11,7 +11,7 @@ from rdkit.Chem.rdchem import AtomValenceException, KekulizeException
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 
 from LambdaZero.chem import mol_to_graph
-from LambdaZero.representation_learning.models.chemprop_adaptor import graph_to_mol
+from analyses_and_plots.chemprop_adaptor import graph_to_mol
 from analyses_and_plots.analysis_utils import get_all_formal_charges, are_two_mols_the_same_for_chemprop, \
     get_dock_blocks105_dataframe
 
