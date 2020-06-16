@@ -1,14 +1,15 @@
 import logging
-import numpy as np
 import tempfile
 from pathlib import Path
-import torch
 
+import numpy as np
 import pytest
 import ray
+import torch
 from ray.tune import tune
 
 from LambdaZero.examples.chemprop.ChempropRegressor import ChempropRegressor
+from LambdaZero.loggers.wandb_logger import set_wandb_to_dryrun
 
 
 @pytest.fixture
@@ -68,6 +69,7 @@ def model_parameters():
 def config(model_parameters, data_dir, summaries_dir):
 
     config = {
+        "experiment_name": "TEST",
         "dataset_root": str(data_dir),
         "random_seed": 0,
         "target": "gridscore",
@@ -106,15 +108,18 @@ def test_chemprop_regressor_normalizer(random_values, mean, std):
     expected_normalized_values = (random_values - mean) / std
 
     np.testing.assert_allclose(
-        computed_normalized_values.numpy(), expected_normalized_values.numpy(),
-        rtol=1e-6
+        computed_normalized_values.numpy(),
+        expected_normalized_values.numpy(),
+        atol=1e-6,
     )
 
     computed_values = ChempropRegressor._denormalize_target(
         expected_normalized_values, mean, std
     )
 
-    np.testing.assert_allclose(computed_values.numpy(), random_values.numpy(), rtol=1e-6)
+    np.testing.assert_allclose(
+        computed_values.numpy(), random_values.numpy(), atol=1e-6
+    )
 
 
 def test_chemprop_regressor_get_size_of_batch(random_values, config):
@@ -132,6 +137,9 @@ def test_smoke_test_tuning_chemprop_regressor(config, summaries_dir):
     This is a SMOKE TEST. It just validates that the code will run without errors if given
     expected inputs. It does not validate that the results are correct.
     """
+
+    set_wandb_to_dryrun()
+
     ray.init(local_mode=True)
 
     _ = tune.run(
