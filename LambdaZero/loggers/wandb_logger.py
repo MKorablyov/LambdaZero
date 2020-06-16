@@ -68,7 +68,7 @@ class RayTuneWandbLogger(RayTuneLogger):
                    allow_val_change=True,
                    )
 
-        wandb.config.update(config)
+        wandb.config.update(config, allow_val_change=True)
 
     def log_metrics(self, result_dict: Dict, step: int):
         wandb.log(result_dict, step=step)
