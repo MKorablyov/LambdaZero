@@ -2,7 +2,7 @@ import time
 import os.path as osp
 import configparser
 import numpy as np
-import torch as th
+import torch
 from torch_geometric.utils import remove_self_loops
 
 
@@ -73,11 +73,11 @@ def dock_metrics(info):
 class Complete(object):
     def __call__(self, data):
         device = data.edge_index.device
-        row = th.arange(data.num_nodes, dtype=th.long, device=device)
-        col = th.arange(data.num_nodes, dtype=th.long, device=device)
+        row = torch.arange(data.num_nodes, dtype=torch.long, device=device)
+        col = torch.arange(data.num_nodes, dtype=torch.long, device=device)
         row = row.view(-1, 1).repeat(1, data.num_nodes).view(-1)
         col = col.repeat(data.num_nodes)
-        edge_index = th.stack([row, col], dim=0)
+        edge_index = torch.stack([row, col], dim=0)
 
         edge_attr = None
         if data.edge_attr is not None:
