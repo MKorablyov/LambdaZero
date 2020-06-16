@@ -14,7 +14,7 @@ from torch_geometric.utils import remove_self_loops
 from tqdm import tqdm
 
 from LambdaZero import inputs
-from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet
+from LambdaZero.oracle_models.message_passing_model import MessagePassingNet
 
 from LambdaZero.utils import get_external_dirs
 

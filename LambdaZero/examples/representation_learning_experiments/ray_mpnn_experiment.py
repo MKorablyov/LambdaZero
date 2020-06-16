@@ -15,7 +15,7 @@ from LambdaZero import ROOT_DIR
 from LambdaZero.representation_learning.dataloader_utils import get_geometric_dataloaders
 from LambdaZero.representation_learning.dataset_utils import get_scores_statistics
 from LambdaZero.representation_learning.datasets import D4GeometricMoleculesDataset
-from LambdaZero.representation_learning.models.message_passing_model import MessagePassingNet
+from LambdaZero.oracle_models.message_passing_model import MessagePassingNet
 from LambdaZero.representation_learning.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, \
     TRAINING_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, read_configuration_file, EXECUTION_FILENAME_KEY
 from LambdaZero.utils import get_external_dirs

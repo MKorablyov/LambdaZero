@@ -17,7 +17,7 @@ from LambdaZero.representation_learning.datasets import (
 )
 from LambdaZero.representation_learning.experiment_driver import experiment_driver
 from LambdaZero.representation_learning.model_trainer import MoleculeModelTrainer
-from LambdaZero.representation_learning.models.message_passing_model import (
+from LambdaZero.oracle_models.message_passing_model import (
     MessagePassingNet,
 )
 from LambdaZero.representation_learning.parameter_inputs import (
