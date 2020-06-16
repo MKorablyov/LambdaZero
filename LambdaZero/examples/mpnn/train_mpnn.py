@@ -23,9 +23,8 @@ import LambdaZero.models
 
 from custom_dataloader import DL
 
-np.set_printoptions(threshold=10)
 
-def train_epoch(loader, model, optimizer, device, config):
+def train_epoch(loader, model, optimizer, device, config, max_val):
     target = config["targets"][0]
     target_norm = config["target_norms"][0]
     model.train()
@@ -34,8 +33,8 @@ def train_epoch(loader, model, optimizer, device, config):
 
     i = 0
     for bidx,data in enumerate(loader):
-        print(data)
-        print(bidx, i)
+        l_mul = 1
+        #l_mul = (sum(th.abs(data['gridscore'])/max_val)/max_val).tolist()[0]
         i += 1
         # compute y_hat and y
         data = data.to(device)
@@ -45,7 +44,7 @@ def train_epoch(loader, model, optimizer, device, config):
         pred = (logit * target_norm[1]) + target_norm[0]
         y = getattr(data, target)
 
-        loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
+        loss = l_mul * F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
         loss.backward()
         optimizer.step()
 
@@ -64,13 +63,26 @@ def eval_epoch(loader, model, device, config):
     target_norm = config["target_norms"][0]
     model.eval()
 
-    metrics = {"loss": 0, "mse": 0, "mae": 0}
+    metrics = {"loss": 0, "mse": 0, "mae": 0, "regret": 0}
+
+    running_preds = th.tensor([]).cuda()
+    running_gc = th.tensor([]).cuda()
+
     for bidx, data in enumerate(loader):
         # compute y_hat and y
         data = data.to(device)
         logit = model(data)
+
         pred = (logit * target_norm[1]) + target_norm[0]
         y = getattr(data, target)
+
+        highest_ys = th.topk(y, 15)
+        running_gc = th.cat((running_gc, highest_ys[0]), 0)
+        running_gc = th.topk(running_gc, 15)[0]
+
+        highest_preds = th.topk(pred, 15)
+        running_preds = th.cat((running_preds, highest_preds[0]), 0)
+        running_preds = th.topk(running_preds, 15)[0]
 
         loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
         metrics["loss"] += loss.item() * data.num_graphs
@@ -80,6 +92,8 @@ def eval_epoch(loader, model, device, config):
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
+    metrics["regret"] = F.mse_loss(running_preds, running_gc)
+
     return metrics
 
 
@@ -110,24 +124,26 @@ class BasicRegressor(tune.Trainable):
         energies = []  # dataset has 10 class-1 samples, 1 class-2 samples, etc.
         for i in range(len(train_idxs)):
             energies.append(abs(train_dataset[i].gridscore))
-        energies = th.tensor(energies).double()
+
+        self.max_val = max(energies)
+        energies = th.tensor(energies).double() / sum(energies)
         sampler = th.utils.data.sampler.WeightedRandomSampler(energies, len(energies), replacement=True)
 
         train_subset = Subset(dataset, train_idxs.tolist())
         val_subset = Subset(dataset, val_idxs.tolist())
         test_subset = Subset(dataset, test_idxs.tolist())
 
-        self.train_set = DL(train_subset, batch_size=bsize, samp=sampler)
-        self.val_set = DL(val_subset, batch_size=bsize)
-        self.test_set = DL(test_subset, batch_size=bsize)
+        self.train_set = DL(train_subset, batch_size=64, samp=sampler)
+        self.val_set = DL(val_subset, batch_size=64)
+        self.test_set = DL(test_subset, batch_size=1)
 
         # make epochs
         self.train_epoch = config["train_epoch"]
         self.eval_epoch = config["eval_epoch"]
 
     def _train(self):
-        train_scores = self.train_epoch(self.train_set, self.model, self.optim, self.device, self.config)
-        eval_scores = self.eval_epoch(self.train_set, self.model,  self.device, self.config)
+        train_scores = self.train_epoch(self.train_set, self.model, self.optim, self.device, self.config, self.max_val)
+        eval_scores = self.eval_epoch(self.val_set, self.model,  self.device, self.config)
         # rename to make scope
         train_scores = [("train_" + k, v) for k,v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
@@ -191,4 +207,5 @@ if __name__ == "__main__":
                         num_samples=1,
                         checkpoint_at_end=False,
                         local_dir=summaries_dir,
+                        loggers=None,
                         checkpoint_freq=100000)
