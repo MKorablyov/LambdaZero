@@ -1,12 +1,18 @@
+import os
 from abc import abstractmethod
 from typing import Dict
 
 import torch
 from ray.tune import tune
-import os
+
+from LambdaZero.loggers.ray_tune_logger import RayTuneLogger
 
 
 class BasePytorchRegressor(tune.Trainable):
+    @abstractmethod
+    def setup_logger(self, config):
+        self.logger = RayTuneLogger(config=config, log_dir=self.logdir, trial_id=self.trial_id)
+
     @abstractmethod
     def train_epoch(self, training_dataloader, model, optim, device, config):
         pass
@@ -40,6 +46,8 @@ class BasePytorchRegressor(tune.Trainable):
         return torch.optim.Adam(model.parameters(), lr=config["lr"])
 
     def _setup(self, config):
+        self.setup_logger(config)
+
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -71,6 +79,15 @@ class BasePytorchRegressor(tune.Trainable):
 
         scores = self._combine_scores(train_scores, validation_scores)
         return scores
+
+    def _log_result(self, result):
+        res_dict = {
+            str(k): v
+            for k, v in result.items()
+            if (v and "config" not in k and not isinstance(v, str))
+        }
+        step = result["training_iteration"]
+        self.logger.log_metrics(res_dict, step=step)
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")

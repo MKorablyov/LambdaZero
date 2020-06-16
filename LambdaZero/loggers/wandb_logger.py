@@ -5,6 +5,7 @@ import wandb
 from torch import nn
 
 from LambdaZero.loggers.experiment_logger import ExperimentLogger
+from LambdaZero.loggers.ray_tune_logger import RayTuneLogger
 
 ENTITY = "lambdazero"  # this is the name of the group in our wandb account
 
@@ -44,3 +45,28 @@ class WandbLogger(ExperimentLogger):
 
     def finalize(self):
         pass
+
+
+class RayTuneWandbLogger(RayTuneLogger):
+    """
+    Class to manage the Weights-and-Biases logger within a ray.tune trainable object.
+    """
+
+    def __init__(self, config: Dict[str, str], log_dir: str, trial_id: str):
+
+        super().__init__(config, log_dir, trial_id)
+
+        wandb.init(project=config["experiment_name"],
+                   entity=ENTITY,
+                   name=trial_id,
+                   id=trial_id,
+                   reinit=True,
+                   resume=trial_id,
+                   dir=log_dir,
+                   allow_val_change=True,
+                   )
+
+        wandb.config.update(config)
+
+    def log_metrics(self, result_dict: Dict, step: int):
+        wandb.log(result_dict, step=step)
