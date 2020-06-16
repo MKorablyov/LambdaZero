@@ -11,9 +11,7 @@ import pytest
 import torch
 from torch_geometric.data import Batch
 
-from LambdaZero.representation_learning.dataset_utils import (
-    get_molecule_graphs_from_raw_data_dataframe,
-)
+
 from tests.fake_molecule_dataset import FakeMoleculeDataset
 from tests.fake_molecules import get_random_molecule_data
 from tests.testing_utils import generate_random_string
@@ -216,14 +214,6 @@ def smiles_and_scores_dataframe(realistic_smiles):
     )
 
     return df
-
-
-@pytest.fixture(scope="session")
-def list_real_molecules(smiles_and_scores_dataframe):
-    list_graphs = get_molecule_graphs_from_raw_data_dataframe(
-        smiles_and_scores_dataframe
-    )
-    return list_graphs
 
 
 @pytest.fixture(scope="session")
