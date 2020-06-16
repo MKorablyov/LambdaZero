@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 from torch.utils.data import Dataset
 
-from LambdaZero.chemprop_adaptors.utils import get_chemprop_graphs_from_raw_data_dataframe
+from LambdaZero.examples.chemprop.utils import get_chemprop_graphs_from_raw_data_dataframe
 
 
 class D4ChempropMoleculesDataset(Dataset):

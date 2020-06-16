@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from chemprop.features import BatchMolGraph
 
-from LambdaZero.chemprop_adaptors.utils import get_chemprop_graphs_from_raw_data_dataframe
+from LambdaZero.examples.chemprop.utils import get_chemprop_graphs_from_raw_data_dataframe
 
 import matplotlib.pyplot as plt
 
