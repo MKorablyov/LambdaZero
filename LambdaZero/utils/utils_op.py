@@ -2,7 +2,7 @@ import time
 import os.path as osp
 import configparser
 import numpy as np
-import torch as th
+import torch
 from torch_geometric.utils import remove_self_loops
 
 
@@ -41,18 +41,18 @@ def get_external_dirs():
     return datasets_dir, programs_dir, summaries_dir
 
 
+
+# log_env_info
 def dock_metrics(info):
-    """
-    Report custom metrics for each episode in RayRllib
+    """ Report custom metrics for each episode in RayRllib
     :param info: episode info
     :return:
     """
     env_info = list(info["episode"]._agent_to_last_info.values())[0]
     episode = info["episode"]
-    episode.custom_metrics["reward"] = env_info["reward"]
-    episode.custom_metrics["QED"] = env_info["QED"]
-    episode.custom_metrics["discounted_reward"] = env_info["discounted_reward"]
 
+    for key, value in env_info["log_vals"].items():
+        episode.custom_metrics[key] = value
 
 
 
@@ -73,11 +73,11 @@ def dock_metrics(info):
 class Complete(object):
     def __call__(self, data):
         device = data.edge_index.device
-        row = th.arange(data.num_nodes, dtype=th.long, device=device)
-        col = th.arange(data.num_nodes, dtype=th.long, device=device)
+        row = torch.arange(data.num_nodes, dtype=torch.long, device=device)
+        col = torch.arange(data.num_nodes, dtype=torch.long, device=device)
         row = row.view(-1, 1).repeat(1, data.num_nodes).view(-1)
         col = col.repeat(data.num_nodes)
-        edge_index = th.stack([row, col], dim=0)
+        edge_index = torch.stack([row, col], dim=0)
 
         edge_attr = None
         if data.edge_attr is not None:

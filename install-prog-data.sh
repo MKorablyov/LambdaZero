@@ -2,8 +2,8 @@ script_name="$0"
 DATASETS_DEFAULT=1
 PROGRAMS_DEFAULT=1
 SUMMARIES_DEFAULT=1
+THIS_SCRIPT_DIR=`pwd`
 
-ABSOLUTE_PATH_SCRIPT_DIR=`pwd`
 
 function help() {
 cat <<EOF
@@ -136,30 +136,21 @@ ARCH=`uname`
 echo "The architecture is $ARCH"
 if [ $ARCH == 'Darwin' ]; then
 
-      PROGRAM_DIR_ABSOLUTE_PATH=`pwd`
-      echo "Create chimera folders"
-      CHIMERA_ROOT_DIR=$PROGRAM_DIR_ABSOLUTE_PATH/chimera
-      mkdir -p $CHIMERA_ROOT_DIR
-
-      CHIMERA_BIN=$CHIMERA_ROOT_DIR/bin
+      CHIMERA_BIN=$PROGRAMS_DIR/chimera/bin
       mkdir -p $CHIMERA_BIN
 
       DMG=chimera-1.14-mac64.dmg
-      ABSOLUTE_PATH_TO_DMG=$ABSOLUTE_PATH_SCRIPT_DIR/chimera_install/$DMG
-
       echo "Download dmg"
-      $ABSOLUTE_PATH_SCRIPT_DIR/chimera_install/download_chimera_dmg.py
+      $THIS_SCRIPT_DIR/misc/chimera_installer.py
 
       echo "attach dmg"
-      hdiutil attach $ABSOLUTE_PATH_TO_DMG
+      hdiutil attach $THIS_SCRIPT_DIR/misc/$DMG
       echo "copy content of dmg to chimera folder"
       cp -rf /Volumes/ChimeraInstaller/Chimera.app $CHIMERA_ROOT_DIR
       echo "detach dmg"
       hdiutil detach /Volumes/ChimeraInstaller/
-
       echo "delete dmg"
-      rm $ABSOLUTE_PATH_TO_DMG
-
+      rm $THIS_SCRIPT_DIR/misc/$DMG
 
       SRC=$CHIMERA_ROOT_DIR/Chimera.app/Contents/Resources/bin/chimera
       DST=$CHIMERA_BIN/chimera

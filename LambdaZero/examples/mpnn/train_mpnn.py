@@ -1,5 +1,4 @@
 import os
-
 import numpy as np
 import ray
 from ray import tune
@@ -96,7 +95,7 @@ class BasicRegressor(tune.Trainable):
 
     def _train(self):
         train_scores = self.train_epoch(self.train_set, self.model, self.optim, self.device, self.config)
-        eval_scores = self.eval_epoch(self.train_set, self.model, self.device, self.config)
+        eval_scores = self.eval_epoch(self.val_set, self.model, self.device, self.config)
         # rename to make scope
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
@@ -129,7 +128,6 @@ DEFAULT_CONFIG = {
         "b_size": 64,
         "dim": 64,
         "num_epochs": 120,
-
         # "model": "some_model", todo
 
         "molprops": ["gridscore", "klabel"],
