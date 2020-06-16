@@ -9,7 +9,7 @@ from LambdaZero.loggers.ray_tune_logger import RayTuneLogger
 
 
 class BasePytorchRegressor(tune.Trainable):
-    @abstractmethod
+
     def setup_logger(self, config):
         self.logger = RayTuneLogger(config=config, log_dir=self.logdir, trial_id=self.trial_id)
 
