@@ -582,7 +582,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
         atmfeat = atmfeat_pd
     return atmfeat, coord, bond, bondfeat
 
-def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
+def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}, data_cls=Data):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
@@ -598,9 +598,9 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     # make torch data
     if coord is not None:
         coord = th.tensor(coord,dtype=th.float32)
-        data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+        data = data_cls(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
-        data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+        data = data_cls(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
