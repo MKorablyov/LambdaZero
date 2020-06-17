@@ -1,7 +1,7 @@
 import socket
 from copy import deepcopy
 import os.path as osp
-from LambdaZero.environments import BlockMolEnv_v3
+from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnvGraph_v1
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v2
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
@@ -32,7 +32,7 @@ ppo022 = {
                 "synth_cutoff":[0, 5],
                 "synth_config": chemprop_cfg}
 
-        }
+        },
     }
 }
 
@@ -47,6 +47,27 @@ ppo023 = {
             "allow_removal": True,
         }
     }
+}
+
+
+ppo_graph_001 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v2,
+            "reward_config":{
+                "synth_cutoff":[0, 5],
+                "synth_config": chemprop_cfg}
+
+        },
+        "lr": 1e-4,
+        "model": {"custom_model": "GraphMolActorCritic_thv1",
+                  #"custom_model_config":{"test_name": 42} # does a **kw to __init__
+        },
+        "framework": "torch",
+    },
+    "checkpoint_freq": 10,
 }
 
 
@@ -268,4 +289,3 @@ ppo023 = {
 #     }
 # }
 #
-
