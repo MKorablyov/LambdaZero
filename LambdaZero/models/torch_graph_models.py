@@ -44,10 +44,12 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         self._value_out = None
 
     def forward(self, input_dict, state, seq_lens):
-        # shared molecule embedding
-        # weak todo (maksym) use mask before compute
         obs = input_dict['obs']
         device = obs["mol_graph"].device
+
+        # This part might be slow, because I'm unzipping a lot of data
+        # into graphs, but from some tests it seems to be relatively
+        # marginal, at most 10% extra cost
         graphs = [self.space.unpack(i.data.cpu().numpy().astype(np.uint8)) for i in obs["mol_graph"]]
         num_steps = obs["num_steps"]
         action_mask = obs["action_mask"]
@@ -59,7 +61,10 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         scalar_outs, data = self.model(data)
 
         stop_logit = scalar_outs[:, 1:2]
-        if 0:
+        # Both these methods of zero-padding the logits are about as
+        # fast, I'm not sure where else I could be doing something
+        # wrong/better
+        if 1:
             add_logits = torch.zeros((data.num_graphs, self.max_branches, self.num_blocks),
                                      device=action_mask.device)
             break_logits = torch.zeros((data.num_graphs, self.max_blocks-1), device=action_mask.device)
@@ -67,7 +72,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
                 add_logits[i, :len(g.stem_atmidx)] = g.stem_preds
                 break_logits[i, :len(g.jbond_atmidx)] = g.jbond_preds
 
-        if 1:
+        if 0:
             add_logits = []
             break_logits = []
             for i, g in enumerate(data.to_data_list()):
