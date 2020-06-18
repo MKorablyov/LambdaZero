@@ -13,7 +13,10 @@ from torch_geometric.data import Data, Batch
 import torch.nn.functional as F
 
 # import torch and torch.nn using ray utils
+from analyses_and_plots.profiling import profile
+
 torch, nn = try_import_torch()
+
 
 
 def convert_to_tensor(arr):
@@ -43,6 +46,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         self._value_out = None
 
+    @profile
     def forward(self, input_dict, state, seq_lens):
         obs = input_dict['obs']
         device = obs["mol_graph"].device
@@ -131,7 +135,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
 
 class MPNNet_Parametric(nn.Module):
-
     def __init__(self, num_feat=14, dim=64, num_out_per_stem=105):
         super().__init__()
         self.lin0 = nn.Linear(num_feat, dim)
@@ -150,12 +153,21 @@ class MPNNet_Parametric(nn.Module):
         # 2 = [v, simulate logit]
         self.lin_out = nn.Linear(dim * 2, 2)
 
+    @profile
     def forward(self, data):
-        out = F.leaky_relu(self.lin0(data.x))
+        # unravel this code to see where the time is spent
+        x = data.x
+        intermediate = self.lin0(x)
+        out = F.leaky_relu(intermediate)
         h = out.unsqueeze(0)
 
         for i in range(6):
-            m = F.leaky_relu(self.conv(out, data.edge_index, data.edge_attr))
+            # unravel this code to see where the time is spent
+            edge_index = data.edge_index
+            edge_attr = data.edge_attr
+            intermediate = self.conv(out, edge_index, edge_attr)
+            m = F.leaky_relu(intermediate)
+
             out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
             out = out.squeeze(0)
 
