@@ -25,7 +25,7 @@ rdBase.DisableLog('rdApp.error')
 import pandas as pd
 from rdkit import DataStructs
 
-import torch as th
+import torch
 from torch_geometric.data import (Data)
 from torch_sparse import coalesce
 
@@ -586,18 +586,18 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}, data_cls=Data
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
-    atmfeat = th.tensor(atmfeat, dtype=th.float32)
+    atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
     if bond.shape[0] > 0:
-        edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
-        edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
+        edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=torch.int64)
+        edge_attr = torch.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=torch.float32)
         edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
     else:
-        edge_index = th.zeros((0,2), dtype=th.int64)
-        edge_attr = th.tensor(bondfeat, dtype=th.float32)
+        edge_index = torch.zeros((0,2), dtype=torch.int64)
+        edge_attr = torch.tensor(bondfeat, dtype=torch.float32)
 
     # make torch data
     if coord is not None:
-        coord = th.tensor(coord,dtype=th.float32)
+        coord = torch.tensor(coord,dtype=th.float32)
         data = data_cls(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
         data = data_cls(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
