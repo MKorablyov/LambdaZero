@@ -115,8 +115,12 @@ def main(local_config: Dict):
     # Create a bunch of random graphs from the environment
     list_numpy_observations = []
     number_of_graphs = (
-        6
+        4
     )  # I would like to do more, but the code crashes because of the random_walk issue above
+
+    # something about the random walk doesn't always work. Let's pin the random seed to always get the same
+    # set of molecules
+    np.random.seed(0)
     for _ in range(number_of_graphs):
         environment.molMDP.random_walk(random_walk_length)
         # Create an "observation", and transform it in the format needed for the actor_critic model.
@@ -151,6 +155,8 @@ if __name__ == "__main__":
     datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
     # over-write various default configs
+
+    #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     reward_config = dict(device="cpu")
 
