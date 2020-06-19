@@ -58,6 +58,10 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         num_steps = obs["num_steps"]
         action_mask = obs["action_mask"]
 
+        d1 = obs["mol_graph"].device
+        d2 = action_mask.device
+        print(f"mol_graph device in GraphMolActorCritic_thv1.forward is {d1}")
+        print(f"action_mask device in GraphMolActorCritic_thv1.forward is {d2}")
 
         data = Batch.from_data_list(graphs, ['stem_atmidx', 'jbond_atmidx',
                                              'stem_preds', 'jbond_preds']).to(device)
