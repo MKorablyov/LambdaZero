@@ -597,7 +597,7 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}, data_cls=Data
 
     # make torch data
     if coord is not None:
-        coord = torch.tensor(coord,dtype=th.float32)
+        coord = torch.tensor(coord,dtype=torch.float32)
         data = data_cls(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
         data = data_cls(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
