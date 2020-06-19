@@ -9,12 +9,13 @@ with some extra help from this blog: <https://lothiraldan.github.io/2018-02-18-p
 
 I also try to document what I understand (or don't!) about the underlying code.
 """
-import os
-import numpy as np
 from collections import namedtuple
-import torch.nn.functional as F
+from pathlib import Path
+from typing import Dict
 
+import numpy as np
 import torch
+import torch.nn.functional as F
 from torch import tensor
 
 from LambdaZero.environments import BlockMolEnvGraph_v1
@@ -24,12 +25,12 @@ from analyses_and_plots.profiling import profile
 
 
 @profile
-def main():
+def main(local_config: Dict):
 
     config = dict(reward_config=dict(device='cpu'))  # debug locally on a non-gpu machine
     mpnn_parametric_config = dict(
         num_hidden=32)  # only one parameter of the model can be changed from this config dict.
-    environment = BlockMolEnvGraph_v1(config=config)
+    environment = BlockMolEnvGraph_v1(config=local_config)
 
     """
     Running a modified version of "train_ppo" in debug mode and putting break points inside the "__init__" method of
@@ -141,4 +142,19 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+
+    datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+
+    # over-write various default configs
+
+    reward_config = dict(device='cpu')
+
+    # the path has been hardcoded to someone's local machine directory in the DEFAULT_DIR
+    blocks_file_path = Path(datasets_dir).joinpath("fragdb/pdb_blocks_105.json")
+
+    molMDP_config = dict(blocks_file=str(blocks_file_path))
+
+    local_config = dict(reward_config=reward_config, molMDP_config=molMDP_config)
+
+
+    main(local_config)
