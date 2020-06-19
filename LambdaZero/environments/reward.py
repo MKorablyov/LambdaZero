@@ -202,7 +202,7 @@ class PredDockReward_v3:
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"natm": natm, "qed": qed, "synth": synth, "ebind": ebind}
+        return disc_reward, {"qed": qed, "synth": synth, "ebind": ebind}
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:
