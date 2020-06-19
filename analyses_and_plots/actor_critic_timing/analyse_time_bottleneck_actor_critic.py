@@ -26,10 +26,9 @@ from analyses_and_plots.profiling import profile
 
 @profile
 def main(local_config: Dict):
-
-    config = dict(reward_config=dict(device='cpu'))  # debug locally on a non-gpu machine
     mpnn_parametric_config = dict(
-        num_hidden=32)  # only one parameter of the model can be changed from this config dict.
+        num_hidden=32
+    )  # only one parameter of the model can be changed from this config dict.
     environment = BlockMolEnvGraph_v1(config=local_config)
 
     """
@@ -66,11 +65,13 @@ def main(local_config: Dict):
     action_space = environment.action_space
     number_of_actions = action_space.n
 
-    actor_critic = GraphMolActorCritic_thv1(obs_space=obs_space,
-                                            action_space=action_space,
-                                            num_outputs=number_of_actions,
-                                            model_config=mpnn_parametric_config,
-                                            name="time_test_debugging")
+    actor_critic = GraphMolActorCritic_thv1(
+        obs_space=obs_space,
+        action_space=action_space,
+        num_outputs=number_of_actions,
+        model_config=mpnn_parametric_config,
+        name="time_test_debugging",
+    )
 
     """
     Running a modified version of "train_ppo" in debug mode and putting break points inside the "forward" method of
@@ -106,12 +107,16 @@ def main(local_config: Dict):
      g.jbond_atmidx increases in dimension with the number of samples from the MDP in the environment.
     """
 
-    environment.num_steps = 8  # forcing this variable to be present. It is not used in the model, but it is
-                               # needed to generate observations.
+    environment.num_steps = (
+        8
+    )  # forcing this variable to be present. It is not used in the model, but it is
+    # needed to generate observations.
 
     # Create a bunch of random graphs from the environment
     list_numpy_observations = []
-    number_of_graphs = 6  # I would like to do more, but the code crashes because of the random_walk issue above
+    number_of_graphs = (
+        6
+    )  # I would like to do more, but the code crashes because of the random_walk issue above
     for _ in range(number_of_graphs):
         environment.molMDP.random_walk(random_walk_length)
         # Create an "observation", and transform it in the format needed for the actor_critic model.
@@ -120,20 +125,20 @@ def main(local_config: Dict):
 
     # Create the correct object to pass to the model
     obs = {}
-    for key in ['mol_graph', 'action_mask']:
+    for key in ["mol_graph", "action_mask"]:
         stacked_values = np.array([o[key] for o in list_numpy_observations])
         obs[key] = torch.from_numpy(stacked_values)
 
-    obs['num_steps'] = torch.zeros(number_of_graphs, 8)  # not used so it doesn't really matter
+    obs["num_steps"] = torch.zeros(
+        number_of_graphs, 8
+    )  # not used so it doesn't really matter
 
     input_dict = dict(obs=obs)
 
     state = []
     seq_lens = tensor([1], dtype=torch.int32)
 
-    logits, s = actor_critic.forward(input_dict,
-                                     state=state,
-                                     seq_lens=seq_lens)
+    logits, s = actor_critic.forward(input_dict, state=state, seq_lens=seq_lens)
 
     # Make a dummy loss to do a backwards pass
     zeros = torch.zeros(logits.shape)
@@ -141,13 +146,13 @@ def main(local_config: Dict):
     loss.backward()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
     # over-write various default configs
 
-    reward_config = dict(device='cpu')
+    reward_config = dict(device="cpu")
 
     # the path has been hardcoded to someone's local machine directory in the DEFAULT_DIR
     blocks_file_path = Path(datasets_dir).joinpath("fragdb/pdb_blocks_105.json")
@@ -155,6 +160,5 @@ if __name__ == '__main__':
     molMDP_config = dict(blocks_file=str(blocks_file_path))
 
     local_config = dict(reward_config=reward_config, molMDP_config=molMDP_config)
-
 
     main(local_config)
