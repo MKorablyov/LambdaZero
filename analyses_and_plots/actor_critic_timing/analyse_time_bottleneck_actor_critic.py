@@ -24,11 +24,22 @@ from LambdaZero.utils import get_external_dirs
 from analyses_and_plots.profiling import profile
 
 
-@profile
-def main(local_config: Dict):
+#@profile
+def main(local_config: Dict, use_gpu=False):
     mpnn_parametric_config = dict(
         num_hidden=32
     )  # only one parameter of the model can be changed from this config dict.
+
+    gpu_are_available = torch.cuda.is_available()
+
+    if use_gpu and not gpu_are_available:
+        raise ValueError("Cannot use GPU; device not available")
+
+    if use_gpu:
+        device = torch.device("cuda:0")
+    else:
+        device = torch.device("cpu")
+
     environment = BlockMolEnvGraph_v1(config=local_config)
 
     """
@@ -131,21 +142,24 @@ def main(local_config: Dict):
     obs = {}
     for key in ["mol_graph", "action_mask"]:
         stacked_values = np.array([o[key] for o in list_numpy_observations])
-        obs[key] = torch.from_numpy(stacked_values)
+        obs[key] = torch.from_numpy(stacked_values).to(device)
 
     obs["num_steps"] = torch.zeros(
         number_of_graphs, 8
-    )  # not used so it doesn't really matter
+    ).to(device)  # not used so it doesn't really matter
 
     input_dict = dict(obs=obs)
 
     state = []
-    seq_lens = tensor([1], dtype=torch.int32)
+    seq_lens = tensor([1], dtype=torch.int32).to(device)
+
+    # force model to be on correct device
+    actor_critic.model = actor_critic.model.to(device)
 
     logits, s = actor_critic.forward(input_dict, state=state, seq_lens=seq_lens)
 
     # Make a dummy loss to do a backwards pass
-    zeros = torch.zeros(logits.shape)
+    zeros = torch.zeros(logits.shape).to(device)
     loss = F.mse_loss(logits, zeros)
     loss.backward()
 
@@ -156,8 +170,6 @@ if __name__ == "__main__":
 
     # over-write various default configs
 
-    #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
     reward_config = dict(device="cpu")
 
     # the path has been hardcoded to someone's local machine directory in the DEFAULT_DIR
@@ -167,4 +179,4 @@ if __name__ == "__main__":
 
     local_config = dict(reward_config=reward_config, molMDP_config=molMDP_config)
 
-    main(local_config)
+    main(local_config, use_gpu=False)
