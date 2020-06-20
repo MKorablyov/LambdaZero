@@ -13,10 +13,7 @@ from torch_geometric.data import Data, Batch
 import torch.nn.functional as F
 
 # import torch and torch.nn using ray utils
-from analyses_and_plots.profiling import profile
-
 torch, nn = try_import_torch()
-
 
 
 def convert_to_tensor(arr):
@@ -29,7 +26,7 @@ def convert_to_tensor(arr):
 
 
 class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
-    def __init__(self, obs_space, action_space, num_outputs, model_config, name):
+    def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kw):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
 
@@ -41,75 +38,48 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
-                                       model_config.get('num_hidden', 32),
+                                       kw.get('num_hidden', 32),
                                        self.num_blocks)
 
         self._value_out = None
 
-    @profile
     def forward(self, input_dict, state, seq_lens):
         obs = input_dict['obs']
         device = obs["mol_graph"].device
 
-        # This part might be slow, because I'm unzipping a lot of data
-        # into graphs, but from some tests it seems to be relatively
-        # marginal, at most 10% extra cost
-        graphs = [self.space.unpack(i.data.cpu().numpy().astype(np.uint8)) for i in obs["mol_graph"]]
+        # Due to the way RLLib forces encodeing observations into
+        # fixed length vectors, this part is quite expensive (~timings
+        # on big batch), first there's a useless
+        # uint8->float->cpu->gpu->cpu->uint8 (~3ms), then we unpack
+        # each graph individually which involves a decompress call and
+        # more memory copying (~12ms), then we create a Batch from the
+        # "data list" of graphs which involves stacking and
+        # incrementing arrays (~4ms) and send it back to gpu (<.5ms).
+        enc_graphs = obs["mol_graph"].data.cpu().numpy().astype(np.uint8)
+        graphs = [self.space.unpack(i) for i in enc_graphs]
         num_steps = obs["num_steps"]
         action_mask = obs["action_mask"]
 
-        # print out which device various objects are on
-        mol_graph_device = obs["mol_graph"].device
-        action_mask_device = action_mask.device
-        model_device = next(self.model.parameters()).device
-        print(f"mol_graph device in GraphMolActorCritic_thv1.forward is {mol_graph_device}")
-        print(f"action_mask device in GraphMolActorCritic_thv1.forward is {action_mask_device}")
-        print(f"the MPNN model device in GraphMolActorCritic_thv1.forward is {model_device}")
-
-        data = Batch.from_data_list(graphs, ['stem_atmidx', 'jbond_atmidx',
-                                             'stem_preds', 'jbond_preds']).to(device)
+        data = fast_from_data_list(graphs)
+        data = data.to(device)
+        # </end of expensive unpacking> The rest of this is the
+        # forward pass (~5ms) and then a backward pass + update (which
+        # I can't measure directly but seems to take at most ~20ms)
 
         scalar_outs, data = self.model(data)
 
-
         stop_logit = scalar_outs[:, 1:2]
-        # Both these methods of zero-padding the logits are about as
-        # fast, I'm not sure where else I could be doing something
-        # wrong/better
-        if 1:
-            add_logits = torch.zeros((data.num_graphs, self.max_branches, self.num_blocks),
-                                     device=action_mask.device)
-            break_logits = torch.zeros((data.num_graphs, self.max_blocks-1), device=action_mask.device)
-            for i, g in enumerate(data.to_data_list()):
-                add_logits[i, :len(g.stem_atmidx)] = g.stem_preds
-                break_logits[i, :len(g.jbond_atmidx)] = g.jbond_preds
-
-        if 0:
-            add_logits = []
-            break_logits = []
-            for i, g in enumerate(data.to_data_list()):
-                al = g.stem_preds
-                if al.shape[0] < self.max_branches:
-                    al = torch.cat( [al,
-                                     torch.zeros((self.max_branches - al.shape[0],
-                                                  self.num_blocks), device=device)], 0)
-                bl = g.jbond_preds
-                if bl.shape[0] < self.max_blocks-1:
-                    bl = torch.cat( [bl,
-                                     torch.zeros((self.max_blocks-1 - bl.shape[0]),
-                                                 device=device)], 0)
-                add_logits.append(al)
-                break_logits.append(bl)
-            add_logits = torch.stack(add_logits)
-            break_logits = torch.stack(break_logits)
+        add_logits = data.stem_preds.reshape((data.num_graphs, -1))
+        break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
 
         actor_logits = torch.cat([stop_logit,
-                                  add_logits.reshape((data.num_graphs, -1)),
+                                  add_logits,
                                   break_logits], 1)
 
         # mask not available actions
         masked_actions = (1. - action_mask).to(torch.bool)
         actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
+
 
         self._value_out = scalar_outs[:, 0]
         return actor_logits, state
@@ -143,6 +113,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
 
 class MPNNet_Parametric(nn.Module):
+
     def __init__(self, num_feat=14, dim=64, num_out_per_stem=105):
         super().__init__()
         self.lin0 = nn.Linear(num_feat, dim)
@@ -161,21 +132,12 @@ class MPNNet_Parametric(nn.Module):
         # 2 = [v, simulate logit]
         self.lin_out = nn.Linear(dim * 2, 2)
 
-    @profile
     def forward(self, data):
-        # unravel this code to see where the time is spent
-        x = data.x
-        intermediate = self.lin0(x)
-        out = F.leaky_relu(intermediate)
+        out = F.leaky_relu(self.lin0(data.x))
         h = out.unsqueeze(0)
 
         for i in range(6):
-            # unravel this code to see where the time is spent
-            edge_index = data.edge_index
-            edge_attr = data.edge_attr
-            intermediate = self.conv(out, edge_index, edge_attr)
-            m = F.leaky_relu(intermediate)
-
+            m = F.leaky_relu(self.conv(out, data.edge_index, data.edge_attr))
             out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
             out = out.squeeze(0)
 
@@ -187,3 +149,49 @@ class MPNNet_Parametric(nn.Module):
         out = self.set2set(out, data.batch)
         out = self.lin_out(out)
         return out, data
+
+
+
+
+# This is mostly copied from torch_geometric, but with a few checks
+# and generalities removed, as well as some speed improvements
+def fast_from_data_list(data_list,
+                        inckeys=set(['stem_atmidx','edge_index','jbond_atmidx'])):
+    r"""Constructs a batch object from a python list holding
+    :class:`torch_geometric.data.Data` objects.
+    The assignment vector :obj:`batch` is created on the fly.
+    """
+
+    keys = data_list[0].keys
+
+    batch = Batch()
+    batch.__data_class__ = data_list[0].__class__
+    batch.__slices__ = {key: [0] for key in keys}
+
+    for key in keys:
+        batch[key] = []
+
+    cumsum = [0] * len(keys)
+    batch.batch = []
+    for j, key in enumerate(keys):
+        cat_dim = 1 if key == 'edge_index' else 0
+        slc = batch.__slices__[key]
+        bk = batch[key]
+        for i, data in enumerate(data_list):
+            item = data[key]
+            if cumsum[j] > 0:
+                item = item + cumsum[j]
+            slc.append(item.shape[cat_dim] + slc[-1])
+            if key in inckeys:
+                cumsum[j] += data.x.shape[0]
+            bk.append(item)
+            if j == 0:
+                batch.batch.append(torch.full((data.x.shape[0], ), i, dtype=torch.long))
+
+    for key in batch.keys:
+        item = batch[key][0]
+        cd = data_list[0].__cat_dim__(key, item)
+        batch[key] = torch.cat(batch[key],
+                               dim=cd)
+
+    return batch.contiguous()
