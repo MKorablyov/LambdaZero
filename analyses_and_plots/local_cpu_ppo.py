@@ -1,3 +1,8 @@
+"""
+The goal of this script is to run an rl algorithm on a local machine without a GPU. This is useful
+for quick debugging.
+"""
+
 import ray
 from ray import tune
 from ray.rllib.agents.ppo import PPOTrainer
