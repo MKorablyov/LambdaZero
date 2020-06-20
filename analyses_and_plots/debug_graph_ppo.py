@@ -1,51 +1,18 @@
-import time
-
 import ray
 from ray import tune
 from ray.rllib.agents.ppo import PPOTrainer
-from ray.rllib.models.catalog import ModelCatalog
+from ray.rllib.models import ModelCatalog
 from ray.rllib.utils import merge_dicts
-from ray.tune import Stopper
+import os
 
 import LambdaZero.utils
-from LambdaZero.environments import BlockMolEnvGraph_v1, PredDockReward_v2
+from LambdaZero.environments import PredDockReward_v2, BlockMolEnv_v3
 from LambdaZero.examples.synthesizability.vanilla_chemprop import (
     DEFAULT_CONFIG as chemprop_cfg,
 )
-from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
+from LambdaZero.models import MolActorCritic_thv1
 
-
-class TimeStopper(Stopper):
-    def __init__(self):
-        self._start = time.time()
-        self._deadline = 10
-
-    def __call__(self, trial_id, result):
-        return False
-
-    def stop_all(self):
-        return time.time() - self._start > self._deadline
-
-
-_, _, summaries_dir = LambdaZero.utils.get_external_dirs()
-
-ppo_graph_001 = {
-    "rllib_config": {
-        "env": BlockMolEnvGraph_v1,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v2,
-            "reward_config": {"synth_cutoff": [0, 5],
-                              "device": "cpu",
-                              "synth_config": chemprop_cfg},
-        },
-        "lr": 1e-4,
-        "model": {"custom_model": "GraphMolActorCritic_thv1"},
-#        "framework": "torch",
-        "use_pytorch": True,  # I seem to be using an older version of ray...
-    },
-    "checkpoint_freq": 10,
-}
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 DEFAULT_CONFIG = {
     "rllib_config": {
@@ -54,41 +21,59 @@ DEFAULT_CONFIG = {
             "inter_op_parallelism_threads": 1,
         },
         "local_tf_session_args": {
-            "intra_op_parallelism_threads": 1,
-            "inter_op_parallelism_threads": 1,
+            "intra_op_parallelism_threads": 4,
+            "inter_op_parallelism_threads": 4,
         },
-        "num_workers": 1,
-        "num_gpus_per_worker": 0.0,
-        "num_gpus": 0.0,
+        "num_workers": 7,
+        "num_gpus_per_worker": 0.075,
+        "num_gpus": 0.4,
         "model": {"custom_model": "MolActorCritic_tfv1"},
-        "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},
+        "callbacks": {
+            "on_episode_end": LambdaZero.utils.dock_metrics
+        },  # fixme (report all)
     },
     "summaries_dir": summaries_dir,
     "memory": 10 * 10 ** 9,
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
-    "stop": {"training_iteration": 1},
+    "stop": {"training_iteration": 2000000},
 }
 
-config = merge_dicts(DEFAULT_CONFIG, ppo_graph_001)
+ppo024 = {
+    "rllib_config": {
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v2,
+            "molMDP_config": {
+                "blocks_file": os.path.join(datasets_dir, "fragdb/pdb_blocks_105.json"),
+            },
+            "reward_config": {
+                "synth_cutoff": [0, 5],
+                "synth_config": chemprop_cfg,
+                "device": "cpu",
+            },
+        },
+        "model": {"custom_model": "MolActorCritic_thv1"},
+        "use_pytorch": True,
+        "num_gpus_per_worker": 0.0,
+        "num_gpus": 0.0,
+    }
+}
+
+config = merge_dicts(DEFAULT_CONFIG, ppo024)
 
 
 if __name__ == "__main__":
-    #profiler = Profiler()
-    #profiler.start()
+    ray.init(memory=config["memory"])
+    ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
 
-    ray.init(local_mode=True)
-    #ray.init()
-    ModelCatalog.register_custom_model(
-        "GraphMolActorCritic_thv1", GraphMolActorCritic_thv1
-    )
     tune.run(
         config["trainer"],
-        stop=TimeStopper(),
+        stop={"training_iteration": 3},
         max_failures=0,
         config=config["rllib_config"],
         local_dir=summaries_dir,
-        name="debugging_graph_ppo",
+        name="debugging_ppo",
         checkpoint_freq=config["checkpoint_freq"],
     )
-
