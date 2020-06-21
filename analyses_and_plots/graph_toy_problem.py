@@ -34,8 +34,9 @@ class GraphSpace(Space):
         self.max_nodes = 10
 
     def sample(self):
-        """Randomly sample an element of this space. Can be
-        uniform or non-uniform sampling based on boundedness of space."""
+        """This code just creates a random graph with random edges with trivial
+        node features .
+        """
 
         number_of_nodes = np.random.randint(2, self.max_nodes)
         maximum_number_of_edges = number_of_nodes * (number_of_nodes - 1) // 2
@@ -64,6 +65,8 @@ class GraphSpace(Space):
 class DummyGraphEnv(gym.Env):
     def __init__(self, env_config):
         self.action_space = Box(low=0, high=1, shape=(1,), dtype=np.float32)
+
+        # I'm fiddling with this; it does not currently work.
         self.observation_space = DICT_SPACE #GraphSpace(shape=(2, 1))
         self.current_state = self.observation_space.sample()
         self.counter = 0
@@ -72,6 +75,11 @@ class DummyGraphEnv(gym.Env):
         return self.observation_space.sample()
 
     def step(self, action):
+        """
+        Everything here is trivial: the idea is to go through the code with
+        break points to see if Ray will accept the data we are trying to feed
+        to the Torch model. The implicit RL problem is ill-defined and pointless.
+        """
         self.counter += 1
 
         obs = self.current_state
@@ -83,6 +91,9 @@ class DummyGraphEnv(gym.Env):
 
 class GymWrapper(ObservationWrapper):
     def observation(self, observation):
+
+        # This does not work. A space is not a dict, I don't know how to shove the graph sub-objects
+        # into a gym.Dict observation
         wrapped_observation = Dict({'x': observation.x, 'edge_index': observation.edge_index})
         raise wrapped_observation
 
@@ -98,6 +109,8 @@ class ToyGraphActorCriticModel(TorchModelV2, nn.Module):
             self, obs_space, action_space, num_outputs, model_config, name
         )
         nn.Module.__init__(self)
+        # completely trivial (and useless) model. the model needs to have nn.Module parameters or else
+        # ray crashes by saying the optimizer has no parameters to optimize.
         self.fc = nn.Linear(in_features=1, out_features=1)
 
     def forward(self, input_dict, state, seq_lens):
