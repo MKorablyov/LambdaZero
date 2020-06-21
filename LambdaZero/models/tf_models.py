@@ -3,7 +3,7 @@ from ray.rllib.utils import try_import_tf
 import numpy as np
 tf = try_import_tf()
 
-from ray.rllib.agents.dqn.distributional_q_tf_model import DistributionalQTFModel as DistributionalQModel
+from ray.rllib.agents.dqn.distributional_q_model import DistributionalQModel
 from ray.rllib.models.tf.tf_modelv2 import TFModelV2
 from ray.rllib.models.tf.misc import normc_initializer
 

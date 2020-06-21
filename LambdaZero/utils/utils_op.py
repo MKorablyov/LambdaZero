@@ -25,18 +25,18 @@ def get_external_dirs():
 
     config.read(osp.join(ROOT, 'external_dirs.cfg'))
 
-    if config["dir"]["datasets_dir"].startswith("/"):
-        datasets_dir = config["dir"]["datasets_dir"]
+    if config["dir"]["datasets"].startswith("/"):
+        datasets_dir = config["dir"]["datasets"]
     else:
-        datasets_dir = osp.join(ROOT, config["dir"]["datasets_dir"])
-    if config["dir"]["programs_dir"].startswith("/"):
-        programs_dir = config["dir"]["programs_dir"]
+        datasets_dir = osp.join(ROOT, config["dir"]["datasets"])
+    if config["dir"]["programs"].startswith("/"):
+        programs_dir = config["dir"]["programs"]
     else:
-        programs_dir = osp.join(ROOT, config["dir"]["programs_dir"])
-    if config["dir"]["summaries_dir"].startswith("/"):
-        summaries_dir = config["dir"]["summaries_dir"]
+        programs_dir = osp.join(ROOT, config["dir"]["programs"])
+    if config["dir"]["summaries"].startswith("/"):
+        summaries_dir = config["dir"]["summaries"]
     else:
-        summaries_dir = osp.join(ROOT, config["dir"]["summaries_dir"])
+        summaries_dir = osp.join(ROOT, config["dir"]["summaries"])
 
     return datasets_dir, programs_dir, summaries_dir
 
