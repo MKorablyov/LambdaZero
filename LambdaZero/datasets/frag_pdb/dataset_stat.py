@@ -5,7 +5,7 @@ import numpy as np
 sys.path.append("../../")
 from rdkit import Chem # todo: strange import problem
 from affinity_torch.python_tools import fragdb
-import torch as th
+import torch
 import affinity_torch as af
 from affinity_torch.python_tools import chem
 from matplotlib import pyplot as plt
@@ -40,7 +40,7 @@ def make_conn_table(cfg):
     ufrag_probs = np.load(os.path.join(cfg.db_path, cfg.ufrag_index))["ufrag_probs"]
     dataset = af.inputs.DatasetFrag(**cfg.dataset_frag)
     train_sampler = af.inputs.Sampler(train_idxs, probs=ufrag_probs[train_idxs], num_samples=100000)
-    train_q = th.utils.data.DataLoader(dataset, batch_size=1, num_workers=0, sampler=train_sampler)
+    train_q = torch.utils.data.DataLoader(dataset, batch_size=1, num_workers=0, sampler=train_sampler)
 
     # compute conneciton prob table:
     frag_bar = np.zeros(105)
