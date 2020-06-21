@@ -3,6 +3,7 @@ A simple toy problem unrelated to LambdaZero to show how pytorch_geometric
 objects can be passed to the underlying actor-critic model
 """
 import itertools
+from collections import OrderedDict
 
 import gym.spaces.dict
 import numpy as np
@@ -23,7 +24,7 @@ from LambdaZero.utils import get_external_dirs
 
 
 DICT_SPACE = spaces.Dict({
-    "x": spaces.Box(low=-100, high=100, shape=(10, 1)),
+    "x": spaces.Box(low=0, high=1, shape=(10, 1), dtype=np.int),
     "edge_index": spaces.Box(low=0, high=100, shape=(2, 100), dtype=np.int),
 })
 
@@ -67,7 +68,8 @@ class DummyGraphEnv(gym.Env):
         self.action_space = Box(low=0, high=1, shape=(1,), dtype=np.float32)
 
         # I'm fiddling with this; it does not currently work.
-        self.observation_space = DICT_SPACE #GraphSpace(shape=(2, 1))
+        #self.observation_space = DICT_SPACE #GraphSpace(shape=(2, 1))
+        self.observation_space = GraphSpace(shape=(2, 1))
         self.current_state = self.observation_space.sample()
         self.counter = 0
 
@@ -94,8 +96,9 @@ class GymWrapper(ObservationWrapper):
 
         # This does not work. A space is not a dict, I don't know how to shove the graph sub-objects
         # into a gym.Dict observation
-        wrapped_observation = Dict({'x': observation.x, 'edge_index': observation.edge_index})
-        raise wrapped_observation
+        #wrapped_observation = Dict({'x': observation.x, 'edge_index': observation.edge_index})
+        wrapped_observation = OrderedDict({'x': observation.x, 'edge_index': observation.edge_index})
+        return wrapped_observation
 
 
 def wrapped_env_creator(env_config):
@@ -121,7 +124,8 @@ class ToyGraphActorCriticModel(TorchModelV2, nn.Module):
 
 if __name__ == "__main__":
     _, _, summaries_dir = get_external_dirs()
-    config = dict(env=DummyGraphEnv,#"my_wrapped_env",
+    config = dict(#env=DummyGraphEnv,#"my_wrapped_env",
+                  env="my_wrapped_env",
                   model={"custom_model": "ToyGraphActorCriticModel"},
                   lr=1e-4,
                   use_pytorch=True,
