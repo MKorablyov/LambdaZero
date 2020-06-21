@@ -25,12 +25,18 @@ DEFAULT_CONFIG = {
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
         "num_workers": 7,
         "num_gpus_per_worker": 0.075,
-        "num_gpus": 0.4,
-        "model": {"custom_model": "MolActorCritic_tfv1"},
+        "num_gpus": 4,
+        "model": {
+            "custom_model": "MolActorCritic_tfv1",
+            "custom_options": {
+                "rnd_weight": 0
+            }
+
+        },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics} # fixme (report all)
         },
     "summaries_dir": summaries_dir,
-    "memory": 60 * 10 ** 9,
+    "memory": 70 * 10 ** 9,
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
     "stop":{"training_iteration": 2000000},
@@ -46,6 +52,7 @@ if machine == "Ikarus":
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
+    time.sleep(60)
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
     tune.run(config["trainer"],

@@ -24,7 +24,7 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 19,
+        "num_workers": 15,
         "sample_batch_size": 200,
         "train_batch_size": 4000,
         "sgd_minibatch_size": 128,
@@ -50,6 +50,9 @@ DEFAULT_CONFIG = {
         },
         "model": {
             "custom_model": "MolActorCritic_thv1",
+            "custom_options": {
+                "rnd_weight": 0
+            }
         },
         "evaluation_interval": 1,
         # Number of episodes to run per evaluation period.
@@ -77,8 +80,10 @@ if machine == "Ikarus":
 
 
 if __name__ == "__main__":
-    ray.init(memory=config["memory"])
+    ray.init(memory=config["memory"], temp_dir=sys.argv[2])
+    time.sleep(120)
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
+    time.sleep(60)
     #ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
     tune.run(config["trainer"],
         stop=config["stop"],

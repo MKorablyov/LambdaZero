@@ -3,6 +3,7 @@ from abc import ABC
 import numpy as np
 from ray.rllib.models.model import restore_original_dimensions
 from ray.rllib.models.preprocessors import get_preprocessor
+from ray.rllib.utils.annotations import override
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
 from ray.rllib.models.tf.misc import normc_initializer
@@ -10,6 +11,7 @@ from ray.rllib.models.tf.misc import normc_initializer
 th, nn = try_import_torch()
 from torch_geometric.nn import NNConv, Set2Set
 
+from LambdaZero.utils import RunningMeanStd
 
 def convert_to_tensor(arr):
     tensor = th.from_numpy(np.asarray(arr))
@@ -61,10 +63,9 @@ class ActorCriticModel(TorchModelV2, nn.Module, ABC):
 
 
 class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
-    def __init__(self, obs_space, action_space, num_outputs, model_config, name):
+    def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kwargs):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
-
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         mol_fp_len = obs_space.original_space["mol_fp"].shape[0]
         stem_fp_len = obs_space.original_space["stem_fps"].shape[1]
@@ -86,12 +87,33 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         # build critic
         self.critic_layers = nn.Sequential(nn.ReLU(), nn.Linear(in_features=256, out_features=1))
         self._value_out = None
+        
+        # RND
+        if "rnd_weight" in kwargs.keys():
+            self.rnd_weight = kwargs["rnd_weight"]
+        else: 
+            self.rnd_weight = 0
+
+        if self.rnd_weight > 0:
+            self.rnd_target = nn.Sequential(
+                nn.Linear(in_features=mol_fp_len, out_features=256),nn.ReLU(),
+                nn.Linear(in_features=256, out_features=256), nn.ReLU(),
+                nn.Linear(in_features=265, out_features=1))
+            self.rnd_predictor = nn.Sequential(
+                nn.Linear(in_features=mol_fp_len, out_features=256),nn.ReLU(),
+                nn.Linear(in_features=256, out_features=256), nn.ReLU(),
+                nn.Linear(in_features=265, out_features=1))
+            self.rnd_stats = RunningMeanStd(shape=(mol_fp_len))
+            # Freeze target network
+            self.rnd_target.eval()
+            for param in self.rnd_target.parameters():
+                param.requires_grad = False
 
 
     def forward(self, input_dict, state, seq_lens):
         # shared molecule embedding
         # weak todo (maksym) use mask before compute
-        obs = input_dict['obs']
+        obs = input_dict # ['obs']
         mol_fp = obs["mol_fp"]
         stem_fps = obs["stem_fps"]
         jbond_fps = obs["jbond_fps"]
@@ -142,7 +164,19 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
             priors = priors.cpu().numpy()
             value = value.cpu().numpy()
             return priors, value
-
+        
+    @override(TorchModelV2)
+    def custom_loss(self, policy_loss, loss_inputs):
+        if self.rnd_weight > 0:
+            obs = ((loss_inputs['obs']['mol_fp'] - self.rnd_stats.mean) / (np.sqrt(obs_rms.var))).clip(0, 10)
+            target_reward = self.rnd_target(obs)
+            predictor_reward = self.rnd_predictor_reward(obs)
+            rnd_loss = ((target_reward - predictor_reward) ** 2).sum()
+            self.rnd_stats.update(loss_inputs['obs']['mol_fp'])
+            return policy_loss + self.rnd_weight * rnd_loss
+        else:
+            return policy_loss
+        
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
         th.save(self.model.state_dict(), checkpoint_path)
