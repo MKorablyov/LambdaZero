@@ -2,7 +2,8 @@ import socket
 from copy import deepcopy
 import os
 import os.path as osp
-from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnvGraph_v1
+from LambdaZero.environments import BlockMolEnv_v3, PredDockReward_v2
+from LambdaZero.environments.block_mol_graph_v1 import BlockMolEnvGraph_v1
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v3
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg

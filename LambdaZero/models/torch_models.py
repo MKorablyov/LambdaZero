@@ -7,8 +7,7 @@ from ray.rllib.models.preprocessors import get_preprocessor
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
 
-#from torch_geometric.nn import GINEConv
-from torch_geometric.nn import NNConv
+from torch_geometric.nn import NNConv, GINEConv
 from torch_geometric.nn import Set2Set
 
 
@@ -97,11 +96,13 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         # shared molecule embedding
         # weak todo (maksym) use mask before compute
 
-        mol_fp = input_dict["mol_fp"]
-        stem_fps = input_dict["stem_fps"]
-        jbond_fps = input_dict["jbond_fps"]
-        num_steps = input_dict["num_steps"]
-        action_mask = input_dict["action_mask"]
+        obs = input_dict['obs']
+
+        mol_fp = obs["mol_fp"]
+        stem_fps = obs["stem_fps"]
+        jbond_fps = obs["jbond_fps"]
+        num_steps = obs["num_steps"]
+        action_mask = obs["action_mask"]
 
         # shared layers
         mol_embed = self.shared_layers(torch.cat([mol_fp, num_steps], 1))
