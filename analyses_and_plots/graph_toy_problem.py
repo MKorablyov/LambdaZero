@@ -23,10 +23,70 @@ from torch_geometric.data import Data
 from LambdaZero.utils import get_external_dirs
 
 
-DICT_SPACE = spaces.Dict({
-    "x": spaces.Box(low=0, high=1, shape=(10, 1), dtype=np.int),
-    "edge_index": spaces.Box(low=0, high=100, shape=(2, 100), dtype=np.int),
+MAX_NUMBER_OF_NODES = 10
+MAX_NUMBER_OF_EDGES = MAX_NUMBER_OF_NODES*(MAX_NUMBER_OF_NODES-1)
+
+
+def make_random_graph():
+    number_of_nodes = np.random.randint(2, MAX_NUMBER_OF_NODES+1)
+    maximum_number_of_edges = number_of_nodes * (number_of_nodes - 1) // 2
+    number_of_edges = np.random.randint(0, maximum_number_of_edges)
+    node_indices = list(range(number_of_nodes))
+    all_possible_pairs = np.array(list(itertools.combinations(node_indices, 2)))
+    edge_pair_indices = np.random.choice(
+        range(len(all_possible_pairs)), number_of_edges, replace=False
+    )
+    edge_pairs = all_possible_pairs[edge_pair_indices]
+    edge_index = torch.from_numpy(
+        np.concatenate([edge_pairs, edge_pairs[:, ::-1]]).transpose()
+    )
+    x = torch.ones(number_of_nodes, 1)
+    graph = Data(x=x, edge_index=edge_index)
+    return graph
+
+
+def make_dict_from_graph(graph):
+    zero_padded_x = torch.zeros(MAX_NUMBER_OF_NODES, 1, dtype=torch.int)
+    zero_padded_edge_index = torch.zeros(2, MAX_NUMBER_OF_EDGES, dtype=torch.int)
+
+    x = graph.x
+    zero_padded_x[:(len(x)), :] = x
+
+    edge_index = graph.edge_index
+    zero_padded_edge_index[:, :edge_index.shape[1]] = edge_index
+
+    cutoff = (len(x), edge_index.shape[1])
+
+    return OrderedDict({'cutoff': cutoff, 'x': zero_padded_x, 'edge_index': zero_padded_edge_index})
+
+
+def make_graph_from_dict(data_dict: OrderedDict):
+    x_cutoff, edge_cutoff = data_dict['cutoff']
+    x = data_dict['x'][:x_cutoff, :]
+    edge_index = data_dict["edge_index"][:, :edge_cutoff]
+
+    graph = Data(x=x, edge_index=edge_index)
+    return graph
+
+
+class DictGraphSpace(spaces.Dict):
+    def sample(self):
+        """
+        Overload the sample method to create sane graphs.
+        """
+        graph = make_random_graph()
+        dict = make_dict_from_graph(graph)
+        return dict
+
+
+DICT_SPACE = DictGraphSpace({
+    "cutoff": spaces.Tuple((spaces.Discrete(MAX_NUMBER_OF_NODES), spaces.Discrete(MAX_NUMBER_OF_EDGES))),
+    "x": spaces.Box(low=0, high=1, shape=(MAX_NUMBER_OF_NODES, 1), dtype=np.int),
+    "edge_index": spaces.Box(low=0, high=MAX_NUMBER_OF_NODES, shape=(2, MAX_NUMBER_OF_EDGES), dtype=np.int),
 })
+
+
+
 
 
 class GraphSpace(Space):
@@ -68,8 +128,8 @@ class DummyGraphEnv(gym.Env):
         self.action_space = Box(low=0, high=1, shape=(1,), dtype=np.float32)
 
         # I'm fiddling with this; it does not currently work.
-        #self.observation_space = DICT_SPACE #GraphSpace(shape=(2, 1))
-        self.observation_space = GraphSpace(shape=(2, 1))
+        self.observation_space = DICT_SPACE #GraphSpace(shape=(2, 1))
+        #self.observation_space = GraphSpace(shape=(2, 1))
         self.current_state = self.observation_space.sample()
         self.counter = 0
 
@@ -124,8 +184,8 @@ class ToyGraphActorCriticModel(TorchModelV2, nn.Module):
 
 if __name__ == "__main__":
     _, _, summaries_dir = get_external_dirs()
-    config = dict(#env=DummyGraphEnv,#"my_wrapped_env",
-                  env="my_wrapped_env",
+    config = dict(env=DummyGraphEnv,
+                  #env="my_wrapped_env",
                   model={"custom_model": "ToyGraphActorCriticModel"},
                   lr=1e-4,
                   use_pytorch=True,
