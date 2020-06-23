@@ -21,7 +21,8 @@ from torch_geometric.data import Data
 from LambdaZero.utils import get_external_dirs
 
 MAX_NUMBER_OF_NODES = 10
-MAX_NUMBER_OF_EDGES = MAX_NUMBER_OF_NODES*(MAX_NUMBER_OF_NODES-1)
+MAX_NUMBER_OF_EDGES = MAX_NUMBER_OF_NODES*(MAX_NUMBER_OF_NODES-1) # 2 x (number_of_nodes choose 2)
+
 
 
 def make_random_graph():
@@ -32,7 +33,7 @@ def make_random_graph():
 
     number_of_nodes = np.random.randint(2, MAX_NUMBER_OF_NODES+1) # between 2 and MAX_NUMBER_OF_NODES
 
-    maximum_number_of_edges = number_of_nodes * (number_of_nodes - 1) // 2  # 2 x (number_of_nodes choose 2)
+    maximum_number_of_edges = number_of_nodes * (number_of_nodes - 1) // 2  # (number_of_nodes choose 2)
 
     number_of_edges = np.random.randint(1, maximum_number_of_edges + 1)  # between 1 and maximum_number_of_edges
     node_indices = list(range(number_of_nodes))
