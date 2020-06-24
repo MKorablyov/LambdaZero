@@ -25,6 +25,13 @@ Finally, install LambdaZero with the following command:
 pip install -e .
 ```
 
+### Setup on Beluga
+To setup the environment for Beluga, add the following command to your job script.
+```bash
+bash setup_beluga.sh
+```
+
+This will load the required modules and install the dependencies.
 
 ## Getting started
 
