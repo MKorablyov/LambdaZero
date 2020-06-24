@@ -1,3 +1,4 @@
+
 """
 A simple toy problem unrelated to LambdaZero to show how pytorch_geometric
 objects can be passed to the underlying actor-critic model using gym.Dict space.
@@ -24,14 +25,13 @@ MAX_NUMBER_OF_NODES = 10
 MAX_NUMBER_OF_EDGES = MAX_NUMBER_OF_NODES*(MAX_NUMBER_OF_NODES-1) # 2 x (number_of_nodes choose 2)
 
 
-
 def make_random_graph():
     """
     This  method just creates a random graph with a random number of nodes
     and random edges. The node features will just be x = [1] for each node.
     """
 
-    number_of_nodes = np.random.randint(2, MAX_NUMBER_OF_NODES+1) # between 2 and MAX_NUMBER_OF_NODES
+    number_of_nodes = np.random.randint(2, MAX_NUMBER_OF_NODES+1)  # between 2 and MAX_NUMBER_OF_NODES
 
     maximum_number_of_edges = number_of_nodes * (number_of_nodes - 1) // 2  # (number_of_nodes choose 2)
 
