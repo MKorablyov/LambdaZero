@@ -76,9 +76,13 @@ def make_graph_from_dict(data_dict: OrderedDict):
     """
     Extract a graph from a dict, taking zero-padding into account.
     """
-    x_cutoff, edge_cutoff = data_dict['cutoff']
+    x_cutoff = int(data_dict['cutoff'][0][0])
+    edge_cutoff = int(data_dict['cutoff'][0][1])
+
     x = data_dict['x'][:x_cutoff, :]
     edge_index = data_dict["edge_index"][:, :edge_cutoff]
+
+    edge_index = edge_index.type(torch.long)
 
     graph = Data(x=x, edge_index=edge_index)
     return graph
@@ -95,13 +99,15 @@ class DictGraphSpace(spaces.Dict):
 
 
 SPACE = OrderedDict({
-    "cutoff": spaces.Tuple((spaces.Discrete(MAX_NUMBER_OF_NODES), spaces.Discrete(MAX_NUMBER_OF_EDGES))),
+    "cutoff": spaces.Box(low=0, high=MAX_NUMBER_OF_EDGES, shape=(2,), dtype=np.int),
     "x": spaces.Box(low=0, high=1, shape=(MAX_NUMBER_OF_NODES, 1), dtype=np.int),
     "edge_index": spaces.Box(low=0, high=MAX_NUMBER_OF_NODES, shape=(2, MAX_NUMBER_OF_EDGES), dtype=np.int),
 })
 
-#DICT_SPACE = spaces.Dict(SPACE)   # this does bad (not graphs!) sampling??
-DICT_SPACE = DictGraphSpace(SPACE) # this breaks ray.preprocessors somehow???
+
+WRONG_DICT_SPACE = DictGraphSpace(SPACE)  # this breaks ray.preprocessors somehow???
+DICT_SPACE = spaces.Dict(SPACE)   # this does bad (not graphs!) sampling??
+#DICT_SPACE.sample = WRONG_DICT_SPACE.sample # dirty hack to get the right samples
 
 
 class DummyGraphEnv(gym.Env):

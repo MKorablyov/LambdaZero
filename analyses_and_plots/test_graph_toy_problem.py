@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+import numpy as np
 import pytest
 import torch
 from torch_geometric.data import Data
@@ -26,8 +27,8 @@ def graph(x, edge_index):
 
 @pytest.fixture
 def data_dict(x, edge_index):
-    zero_padded_x = torch.zeros(MAX_NUMBER_OF_NODES, 1, dtype=torch.int)
-    zero_padded_edge_index = torch.zeros(2, MAX_NUMBER_OF_EDGES, dtype=torch.long)
+    zero_padded_x = np.zeros([MAX_NUMBER_OF_NODES, 1], dtype=np.int)
+    zero_padded_edge_index = np.zeros([2, MAX_NUMBER_OF_EDGES], dtype=np.int)
 
     zero_padded_x[:len(x), :] = x
     zero_padded_edge_index[:, :edge_index.shape[1]] = edge_index
