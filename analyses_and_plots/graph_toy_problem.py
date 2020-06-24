@@ -85,7 +85,7 @@ def make_graphs_from_dict(data_dict: OrderedDict):
     edge_cutoff = edge_cutoff.long().squeeze(1)
     for i in range(data_dict['x'].shape[0]):
         x = data_dict['x'][i, :x_cutoff[i], :]
-        edge_index = data_dict["edge_index"][i, :, :edge_cutoff[i]]
+        edge_index = data_dict["edge_index"][i, :, :edge_cutoff[i]].long()
         graphs.append(Data(x=x, edge_index=edge_index))
 
     return graphs
