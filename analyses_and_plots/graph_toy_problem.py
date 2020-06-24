@@ -16,7 +16,7 @@ from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.models import ModelCatalog
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from torch import nn
-from torch_geometric.data import Data
+from torch_geometric.data import Data, Batch
 
 from LambdaZero.utils import get_external_dirs
 
@@ -67,25 +67,28 @@ def make_dict_from_graph(graph):
     edge_index = graph.edge_index
     zero_padded_edge_index[:, :edge_index.shape[1]] = edge_index
 
-    cutoff = (len(x), edge_index.shape[1])  # this variable indicates where zero-padding starts.
-
+    cutoff = np.int32((len(x),)), np.int32((edge_index.shape[1],))  # this variable indicates where zero-padding starts.
     return OrderedDict({'cutoff': cutoff, 'x': zero_padded_x, 'edge_index': zero_padded_edge_index})
 
 
-def make_graph_from_dict(data_dict: OrderedDict):
+def make_graphs_from_dict(data_dict: OrderedDict):
     """
     Extract a graph from a dict, taking zero-padding into account.
     """
-    x_cutoff = int(data_dict['cutoff'][0][0])
-    edge_cutoff = int(data_dict['cutoff'][0][1])
+    graphs = []
+    x_cutoff, edge_cutoff = data_dict['cutoff']
+    # RLLib doesn't seem to be respecting the observation space's
+    # dtype arguments, so we have to cast to the right type by hand.
+    # Plus, gym can't handle zero-dimensional boxes, or I'm doing it
+    # wrong, either way a squeeze is necessary to undo the extra dimension
+    x_cutoff = x_cutoff.long().squeeze(1)
+    edge_cutoff = edge_cutoff.long().squeeze(1)
+    for i in range(data_dict['x'].shape[0]):
+        x = data_dict['x'][i, :x_cutoff[i], :]
+        edge_index = data_dict["edge_index"][i, :, :edge_cutoff[i]]
+        graphs.append(Data(x=x, edge_index=edge_index))
 
-    x = data_dict['x'][:x_cutoff, :]
-    edge_index = data_dict["edge_index"][:, :edge_cutoff]
-
-    edge_index = edge_index.type(torch.long)
-
-    graph = Data(x=x, edge_index=edge_index)
-    return graph
+    return graphs
 
 
 class DictGraphSpace(spaces.Dict):
@@ -99,15 +102,14 @@ class DictGraphSpace(spaces.Dict):
 
 
 SPACE = OrderedDict({
-    "cutoff": spaces.Box(low=0, high=MAX_NUMBER_OF_EDGES, shape=(2,), dtype=np.int),
+    "cutoff": spaces.Tuple((spaces.Box(low=0, high=MAX_NUMBER_OF_NODES, shape=(1,), dtype=np.int32),
+                            spaces.Box(low=0, high=MAX_NUMBER_OF_EDGES, shape=(1,), dtype=np.int32),)),
     "x": spaces.Box(low=0, high=1, shape=(MAX_NUMBER_OF_NODES, 1), dtype=np.int),
     "edge_index": spaces.Box(low=0, high=MAX_NUMBER_OF_NODES, shape=(2, MAX_NUMBER_OF_EDGES), dtype=np.int),
 })
 
-
-WRONG_DICT_SPACE = DictGraphSpace(SPACE)  # this breaks ray.preprocessors somehow???
-DICT_SPACE = spaces.Dict(SPACE)   # this does bad (not graphs!) sampling??
-#DICT_SPACE.sample = WRONG_DICT_SPACE.sample # dirty hack to get the right samples
+#DICT_SPACE = spaces.Dict(SPACE)   # this does bad (not graphs!) sampling??
+DICT_SPACE = DictGraphSpace(SPACE) # this breaks ray.preprocessors somehow???
 
 
 class DummyGraphEnv(gym.Env):
@@ -149,10 +151,16 @@ class ToyGraphActorCriticModel(TorchModelV2, nn.Module):
 
     def forward(self, input_dict, state, seq_lens):
         data_dict_observation = input_dict["obs"]
-        graph = make_graph_from_dict(data_dict_observation)
 
-        logits = torch.tensor([0.5, 0.5])
-        return logits, None
+        graphs = make_graphs_from_dict(data_dict_observation)
+        data = Batch.from_data_list(graphs)  # Normally we'd pass this to the GraphNN
+
+        logits = torch.zeros(len(graphs), 2)
+        self._value_out = torch.zeros(len(graphs))
+        return logits, state
+
+    def value_function(self): # So PPO doesn't crash
+        return self._value_out
 
 
 if __name__ == "__main__":
