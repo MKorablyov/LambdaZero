@@ -10,7 +10,7 @@ from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 binding_config = deepcopy(chemprop_cfg)
-binding_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "brutal_dock/sars-cov-2/trained_weights/chemprop/model_0/model.pt")
+binding_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
 synth_config = deepcopy(chemprop_cfg)
 synth_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 

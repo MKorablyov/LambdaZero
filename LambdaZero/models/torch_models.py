@@ -118,21 +118,12 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     def forward(self, input_dict, state, seq_lens):
         # shared molecule embedding
         # weak todo (maksym) use mask before compute
-<<<<<<< HEAD
-        obs = input_dict # ['obs']
-        mol_fp = obs["mol_fp"]
-        stem_fps = obs["stem_fps"]
-        jbond_fps = obs["jbond_fps"]
-        num_steps = obs["num_steps"]
-        action_mask = obs["action_mask"]
-=======
 
         mol_fp = input_dict["mol_fp"]
         stem_fps = input_dict["stem_fps"]
         jbond_fps = input_dict["jbond_fps"]
         num_steps = input_dict["num_steps"]
         action_mask = input_dict["action_mask"]
->>>>>>> 475134c002777b3e73b08a3fc1166b5d95b5acfd
 
         # shared layers
         mol_embed = self.shared_layers(torch.cat([mol_fp, num_steps], 1))

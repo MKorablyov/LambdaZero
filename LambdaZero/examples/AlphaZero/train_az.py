@@ -80,10 +80,8 @@ if machine == "Ikarus":
 
 
 if __name__ == "__main__":
-    ray.init(memory=config["memory"], temp_dir=sys.argv[2])
-    time.sleep(120)
+    ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
-    time.sleep(60)
     #ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
     tune.run(config["trainer"],
         stop=config["stop"],

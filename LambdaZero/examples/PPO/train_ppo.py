@@ -25,7 +25,7 @@ DEFAULT_CONFIG = {
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
         "num_workers": 7,
         "num_gpus_per_worker": 0.075,
-        "num_gpus": 4,
+        "num_gpus": 0.4,
         "model": {
             "custom_model": "MolActorCritic_tfv1",
             "custom_options": {
@@ -52,7 +52,6 @@ if machine == "Ikarus":
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
-    time.sleep(60)
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
     tune.run(config["trainer"],

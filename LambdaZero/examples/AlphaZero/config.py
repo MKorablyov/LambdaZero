@@ -23,6 +23,32 @@ az000 = {
     }
 }
 
+
+az034 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_cutoff": [0, 4],
+                "ebind_cutoff": [42.5, 109.1], #8.5 std away
+                "synth_config": synth_config,
+                "binding_config": binding_config,
+            }
+
+        },
+        "num_sgd_iter": 3
+    }
+
+}
+
 # az001 = { # killed OOM
 #     "base_env_config": mol_blocks_v3_config,
 #     "base_trainer_config": alphazero_config,
@@ -229,30 +255,6 @@ az000 = {
 # }
 #
 #
-az034 = {
-    # eval max      3.1
-    # eval mean     2.7
-    # eval mean     2.8
-    # eval max      3.1
-    # max           3.3
-    # mean          2.4
-    "rllib_config":{
-        "env": BlockMolEnv_v3,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v2,
-            "reward_config":{
-                "synth_cutoff":[0, 5],
-                "synth_config": chemprop_cfg
-            }
-
-        },
-        "num_sgd_iter": 3
-    }
-
-}
-
-
 #
 # az035 = {
 #     "base_env_config": mol_blocks_v3_config,
