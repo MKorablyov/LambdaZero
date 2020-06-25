@@ -107,7 +107,6 @@ class MolActorCritic_tfv1(DistributionalQModel, TFModelV2):
     
     @override(TFModelV2)
     def custom_loss(self, policy_loss, loss_inputs):
-        import pdb;pdb.set_trace()
         if self.rnd_weight and self.rnd_weight > 0:
             obs = ((loss_inputs['obs']['mol_fp'] - self.rnd_stats.mean) / (np.sqrt(obs_rms.var))).clip(0, 10)
             target_reward = self.rnd_target(obs)
