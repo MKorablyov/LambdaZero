@@ -1,7 +1,17 @@
+import socket
+from copy import deepcopy
+import os
+import os.path as osp
 from LambdaZero.environments import BlockMolEnv_v3 
 from LambdaZero.utils import get_external_dirs
-from LambdaZero.environments import PredDockReward_v2
+from LambdaZero.environments import PredDockReward_v3
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
+
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+binding_config = deepcopy(chemprop_cfg)
+binding_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
+synth_config = deepcopy(chemprop_cfg)
+synth_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 
 az000 = {
     "rllib_config":{
