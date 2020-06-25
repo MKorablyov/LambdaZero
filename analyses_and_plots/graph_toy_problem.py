@@ -26,11 +26,13 @@ from torch_geometric.nn import NNConv, Set2Set
 
 from LambdaZero.utils import get_external_dirs
 
-MAX_NUMBER_OF_NODES = 10
+MAX_NUMBER_OF_NODES = 40
 MAX_NUMBER_OF_EDGES = MAX_NUMBER_OF_NODES*(MAX_NUMBER_OF_NODES-1) # 2 x (number_of_nodes choose 2)
 
-NUMBER_OF_NODE_FEATURES = 3
+NUMBER_OF_NODE_FEATURES = 8
 NUMBER_OF_EDGE_FEATURES = 4
+
+BUFFER_SIZE = 8096 * 4
 
 
 def pack(g):
@@ -41,14 +43,13 @@ def pack(g):
     attributes = ['x', 'edge_index', 'edge_attr']
     _ndims = [2, 2, 2]
 
-    _size = 8096 * 2
 
     msg = b''
     shapes = np.int16(np.hstack([getattr(g, i).shape for i in attributes])).tostring()
     msg += shapes
     msg += b''.join([getattr(g, i).numpy().tobytes() for i in attributes])
     msg = zlib.compress(msg)
-    buf = np.zeros(_size, dtype=np.uint8)
+    buf = np.zeros(BUFFER_SIZE, dtype=np.uint8)
     buf[:2] = np.frombuffer(np.uint16(len(msg)).data, np.uint8)
     buf[2:2 + len(msg)] = np.frombuffer(msg, np.uint8)
     return buf
@@ -174,7 +175,7 @@ SPACE = OrderedDict({
     "x": spaces.Box(low=0, high=1, shape=(MAX_NUMBER_OF_NODES, NUMBER_OF_NODE_FEATURES), dtype=np.float32),
     "edge_index": spaces.Box(low=0, high=MAX_NUMBER_OF_NODES, shape=(2, MAX_NUMBER_OF_EDGES), dtype=np.int32),
     "edge_attr": spaces.Box(low=0, high=1, shape=(MAX_NUMBER_OF_EDGES, NUMBER_OF_EDGE_FEATURES), dtype=np.float32),
-    "pack_buffer": spaces.Box(low=0, high=256, shape=(8096 * 2, ), dtype=np.int32),
+    "pack_buffer": spaces.Box(low=0, high=256, shape=(BUFFER_SIZE, ), dtype=np.int32),
 })
 
 DICT_SPACE = DictGraphSpace(SPACE)
