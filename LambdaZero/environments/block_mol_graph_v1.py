@@ -197,6 +197,7 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
 
         self.molMDP = MolMDP(**config["molMDP_config"])
         self.reward = config["reward"](**config["reward_config"])
+        self._prev_obs = None
 
 
     def step(self, action):
@@ -208,6 +209,11 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
                 print(self.get_state(), file=f)
                 print(action, file=f)
                 print(traceback.format_exc(), file=f)
+                f.flush()
+            print(e)
+            print(self.get_state())
+            print(action)
+            print(traceback.format_exc())
             return super().step(0)
 
     def _make_obs(self):
@@ -228,5 +234,7 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         obs = {"mol_graph": graph,
                "action_mask": action_mask,
                "num_steps": self.num_steps}
+
+        self._prev_obs = obs
 
         return obs
