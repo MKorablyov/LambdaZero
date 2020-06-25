@@ -4,8 +4,10 @@ A simple toy problem unrelated to LambdaZero to show how pytorch_geometric
 objects can be passed to the underlying actor-critic model using gym.Dict space.
 """
 import itertools
+import time
+import zlib
 from collections import OrderedDict
-
+from pathlib import Path
 
 import torch.nn.functional as F
 import gym.spaces.dict
@@ -29,6 +31,53 @@ MAX_NUMBER_OF_EDGES = MAX_NUMBER_OF_NODES*(MAX_NUMBER_OF_NODES-1) # 2 x (number_
 
 NUMBER_OF_NODE_FEATURES = 3
 NUMBER_OF_EDGE_FEATURES = 4
+
+
+def pack(g):
+    """
+    Slightly modified copy of the pack method of MolGraphSpace class, unthethered to a class. Hardcoding some values
+    to what they should be in this toy example.
+    """
+    attributes = ['x', 'edge_index', 'edge_attr']
+    _ndims = [2, 2, 2]
+
+    _size = 8096 * 2
+
+    msg = b''
+    shapes = np.int16(np.hstack([getattr(g, i).shape for i in attributes])).tostring()
+    msg += shapes
+    msg += b''.join([getattr(g, i).numpy().tobytes() for i in attributes])
+    msg = zlib.compress(msg)
+    buf = np.zeros(_size, dtype=np.uint8)
+    buf[:2] = np.frombuffer(np.uint16(len(msg)).data, np.uint8)
+    buf[2:2 + len(msg)] = np.frombuffer(msg, np.uint8)
+    return buf
+
+
+def unpack(buf):
+    """
+    Slightly modified copy of the unpack method of MolGraphSpace class, unthethered to a class. Hardcoding some values
+    to what they should be in this toy example.
+    """
+    attributes = ['x', 'edge_index', 'edge_attr']
+    _ndims = [2, 2, 2]
+    _dtypes = [np.float32, np.int64, np.float32]
+    _shapeslen = 12
+
+    _dsizes = [i().itemsize for i in _dtypes]
+
+    l = np.fromstring(buf[:2], np.uint16)[0]
+    msg = zlib.decompress(buf[2:2 + l])
+    d = {}
+    shapes = np.fromstring(msg[:_shapeslen], np.int16)
+    idx = _shapeslen
+    for attr, ndim, dtype, dsize in zip(attributes, _ndims, _dtypes, _dsizes):
+        shape = shapes[:ndim]
+        l = shape[0] * (1 if ndim == 1 else shape[1]) * dsize
+        d[attr] = torch.from_numpy(np.frombuffer(msg[idx:idx + l], dtype).reshape(shape))
+        idx += l
+        shapes = shapes[ndim:]
+    return Data(**d)
 
 
 def make_random_graph():
@@ -79,10 +128,13 @@ def make_dict_from_graph(graph):
     zero_padded_edge_attr[:edge_index.shape[1], :] = graph.edge_attr
 
     cutoff = np.int32((len(x),)), np.int32((edge_index.shape[1],))  # this variable indicates where zero-padding starts.
+
+    buffer = pack(graph)
     return OrderedDict({'cutoff': cutoff,
                         'x': zero_padded_x,
                         'edge_index': zero_padded_edge_index,
-                        'edge_attr': zero_padded_edge_attr})
+                        'edge_attr': zero_padded_edge_attr,
+                        'pack_buffer': buffer})
 
 
 def make_graphs_from_dict(data_dict: OrderedDict):
@@ -122,6 +174,7 @@ SPACE = OrderedDict({
     "x": spaces.Box(low=0, high=1, shape=(MAX_NUMBER_OF_NODES, NUMBER_OF_NODE_FEATURES), dtype=np.float32),
     "edge_index": spaces.Box(low=0, high=MAX_NUMBER_OF_NODES, shape=(2, MAX_NUMBER_OF_EDGES), dtype=np.int32),
     "edge_attr": spaces.Box(low=0, high=1, shape=(MAX_NUMBER_OF_EDGES, NUMBER_OF_EDGE_FEATURES), dtype=np.float32),
+    "pack_buffer": spaces.Box(low=0, high=256, shape=(8096 * 2, ), dtype=np.int32),
 })
 
 DICT_SPACE = DictGraphSpace(SPACE)
@@ -158,6 +211,14 @@ class ToyGraphActorCriticModel(TorchModelV2, nn.Module):
         )
         nn.Module.__init__(self)
 
+        # I don't know how to propagate this from the outside to here through model_config.
+        # Ray's config parameters are obscure.
+        file_path = Path(__file__).parent.joinpath("forward_timing.csv")
+        print(f"output file is {file_path}")
+        self.file = open(file_path, 'w')
+
+        self.file.write("device, number_of_graphs, unpacking graphs time (s), make graphs from dict time (s), model time (s)\n")
+
         self.model = DummyMPNN(num_node_features=NUMBER_OF_NODE_FEATURES,
                                num_edge_features=NUMBER_OF_EDGE_FEATURES,
                                dim=64)
@@ -165,17 +226,31 @@ class ToyGraphActorCriticModel(TorchModelV2, nn.Module):
     def forward(self, input_dict, state, seq_lens):
         data_dict_observation = input_dict["obs"]
 
+        buf = data_dict_observation.pop('pack_buffer')
+        t1 = time.time()
+        enc_graphs = buf.data.cpu().numpy().astype(np.uint8)
+        buffer_graphs = [unpack(i) for i in enc_graphs]
+        t2 = time.time()
+        unpacking_time = t2-t1
+
+        t1 = time.time()
         graphs = make_graphs_from_dict(data_dict_observation)
         data = Batch.from_data_list(graphs)  # Normally we'd pass this to the GraphNN
+        t2 = time.time()
+        dict_graph_time = t2-t1
 
+        t1 = time.time()
         scalar_outs, _ = self.model(data)
+        t2 = time.time()
+        model_time = t2-t1
+        self.file.write(f"{data.x.device}, {data.num_graphs}, {unpacking_time}, {dict_graph_time}, {model_time}\n")
+        self.file.flush()
 
         # Ray should put the data on the correct device.
         #  the code in /ray/rllib/policy/torch_policy.py:: line 414
         # is executed (I checked by following breakpoints). This code
         # transforms the numpy array to torch tensors and puts them on
         # self.device.
-        print(f"The device inside the forward loop is {data.x.device}")
 
         self._value_out = torch.zeros(len(graphs))
         return scalar_outs, state
@@ -211,13 +286,22 @@ class DummyMPNN(nn.Module):
         out = self.lin_out(out)
         return out, data
 
+
 if __name__ == "__main__":
+    """
+    g = make_random_graph()
+    buf = pack(g)
+    g2 = unpack(buf)
+    """
+
     _, _, summaries_dir = get_external_dirs()
+
     config = dict(env=DummyGraphEnv,
                   model={"custom_model": "ToyGraphActorCriticModel"},
+                  train_batch_size=128, # use the smallest possible batch so things will run fast. Default is 4000, and slooow.
                   lr=1e-4,
                   use_pytorch=True,
-                  num_workers=1,
+                  num_workers=0,
                   num_gpus_per_worker=0,
                   num_gpus=0)
 
@@ -230,6 +314,6 @@ if __name__ == "__main__":
         PPOTrainer,
         config=config,
         local_dir=summaries_dir,
-        stop={"training_iteration": 3},
+        stop={"training_iteration": 1},
         name="graph_toy_model",
     )
