@@ -63,11 +63,13 @@ ppo_graph_001 = {
         "env": BlockMolEnvGraph_v1,
         "env_config": {
             "allow_removal": True,
-            "reward": PredDockReward_v2,
-            "reward_config":{
-                "synth_cutoff":[0, 5],
-                "synth_config": chemprop_cfg}
-
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_cutoff": [0, 4],
+                "ebind_cutoff": [42.5, 109.1], #8.5 std away
+                "synth_config": synth_config,
+                "binding_config": binding_config,
+            }
         },
         "model": {"custom_model": "GraphMolActorCritic_thv1",
                   "custom_options":{"num_hidden": 64} # does a **kw to __init__
