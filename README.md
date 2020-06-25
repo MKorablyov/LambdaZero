@@ -26,7 +26,15 @@ pip install -e .
 ```
 
 ### Setup on Beluga
-To setup the environment for Beluga, add the following command to your job script.
+To setup the environment for Beluga, create a virtual environment and install dependencies.
+# Create virtual environments and install dependencies
+```bash
+virtualenv --no-download ~/env
+source ~/env/bin/activate
+cd ~/LambdaZero
+pip install -r requirements.txt
+```
+
 ```bash
 bash setup_beluga.sh
 ```
