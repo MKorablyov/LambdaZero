@@ -252,27 +252,6 @@ az034 = {
 
 }
 
-az035 = {
-    "rllib_config":{
-        "env": BlockMolEnv_v3,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v2,
-            "reward_config":{
-                "synth_cutoff":[0, 5],
-                "synth_config": chemprop_cfg
-            }
-
-        },
-        "num_sgd_iter": 3,
-        "model": {
-            "custom_options": {
-                "rnd_weight": 1
-            }
-        }
-    }
-
-}
 
 #
 # az035 = {
