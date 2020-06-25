@@ -235,10 +235,11 @@ class ToyGraphActorCriticModel(TorchModelV2, nn.Module):
         unpacking_time = t2-t1
 
         t1 = time.time()
-        graphs = make_graphs_from_dict(data_dict_observation)
-        data = Batch.from_data_list(graphs)  # Normally we'd pass this to the GraphNN
+        dict_graphs = make_graphs_from_dict(data_dict_observation)
         t2 = time.time()
         dict_graph_time = t2-t1
+
+        data = Batch.from_data_list(dict_graphs)
 
         t1 = time.time()
         scalar_outs, _ = self.model(data)
@@ -253,7 +254,7 @@ class ToyGraphActorCriticModel(TorchModelV2, nn.Module):
         # transforms the numpy array to torch tensors and puts them on
         # self.device.
 
-        self._value_out = torch.zeros(len(graphs))
+        self._value_out = torch.zeros(len(dict_graphs))
         return scalar_outs, state
 
     def value_function(self):  # So PPO doesn't crash
