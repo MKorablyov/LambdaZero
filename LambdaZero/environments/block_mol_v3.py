@@ -24,8 +24,8 @@ DEFAULT_CONFIG = {
     },
     "reward_config": {
         "soft_stop": True,
-        "load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
-        "natm_cutoff": [45, 50],
+        #"load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
+        #"natm_cutoff": [45, 50],
         "qed_cutoff": [0.2, 0.7],
         "exp": None,
         "delta": False,
@@ -73,6 +73,7 @@ class BlockMolEnv_v3:
         self.molMDP = MolMDP(**config["molMDP_config"])
         self.reward = config["reward"](**config["reward_config"])
         self.get_fps = LambdaZero.chem.FPEmbedding_v2(**config["obs_config"])
+        self._prev_obs = None
 
     def _make_obs(self):
         mol_fp, stem_fps_, jbond_fps_ = self.get_fps(self.molMDP.molecule)
@@ -99,6 +100,8 @@ class BlockMolEnv_v3:
                "jbond_fps": jbond_fps,
                "action_mask": action_mask,
                "num_steps": self.num_steps}
+
+        self._prev_obs = obs
 
         return obs
 
@@ -132,6 +135,9 @@ class BlockMolEnv_v3:
         return obs
 
     def step(self, action):
+        if not action in np.where(self._prev_obs["action_mask"])[0]:
+            raise ValueError('Illegal actions')
+
         if (action == 0):
             agent_stop = True
         elif action <= (self.max_blocks - 1):
@@ -146,8 +152,8 @@ class BlockMolEnv_v3:
         self.num_steps += 1
         obs = self._make_obs()
         env_stop = self._if_terminate()
-        reward, info = self.reward(self.molMDP.molecule, agent_stop, env_stop, self.num_steps)
-        info["molecule"] = self.molMDP.molecule
+        reward, log_vals = self.reward(self.molMDP.molecule, agent_stop, env_stop, self.num_steps)
+        info = {"molecule" : self.molMDP.molecule, "log_vals": log_vals}
         done = any((agent_stop, env_stop))
         return obs, reward, done, info
 

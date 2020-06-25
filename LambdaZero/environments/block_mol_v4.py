@@ -162,8 +162,8 @@ class BlockMolEnv_v4:
         self.num_steps += 1
         obs = self.observ(self.molMDP.molecule, self.num_steps)
         done = self._if_terminate()
-        reward, info = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
-        info["molecule"] = self.molMDP.molecule
+        reward, log_vals = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
+        info = {"molecule" : self.molMDP.molecule, "log_vals": log_vals}
         return obs, reward, done, info
 
     def get_state(self):
