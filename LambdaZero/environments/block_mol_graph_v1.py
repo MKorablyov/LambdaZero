@@ -9,6 +9,8 @@ import torch
 from torch_geometric.data import Data, Batch
 import pickle
 import zlib
+import struct
+import traceback
 
 import LambdaZero.chem as chem
 import LambdaZero.utils
@@ -56,10 +58,10 @@ class MolGraphSpace(Space):
         return buf
 
     def unpack(self, buf):
-        l = np.fromstring(buf[:2], np.uint16)[0]
+        l, = struct.unpack('H', buf[:2])
         msg = zlib.decompress(buf[2:2+l])
         d = {}
-        shapes = np.fromstring(msg[:self._shapeslen], np.int16)
+        shapes = struct.unpack((self._shapeslen // 2) * 'h', msg[:self._shapeslen])
         idx = self._shapeslen
         for attr, ndim, dtype, dsize in zip(self.attributes, self._ndims, self._dtypes, self._dsizes):
             shape = shapes[:ndim]
@@ -195,6 +197,18 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
 
         self.molMDP = MolMDP(**config["molMDP_config"])
         self.reward = config["reward"](**config["reward_config"])
+
+
+    def step(self, action):
+        try:
+            return super().step(action)
+        except Exception as e:
+            with open(osp.join(summaries_dir, 'block_mol_graph_v1.error.txt'), 'a') as f:
+                print(e, file=f)
+                print(self.get_state(), file=f)
+                print(action, file=f)
+                print(traceback.format_exc(), file=f)
+            return super().step(0)
 
     def _make_obs(self):
         mol = self.molMDP.molecule

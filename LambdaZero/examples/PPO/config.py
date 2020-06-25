@@ -36,6 +36,7 @@ ppo022 = {
     }
 }
 
+
 ppo023 = {
     # 3.2-3.3
     "rllib_config":{
@@ -61,13 +62,14 @@ ppo_graph_001 = {
                 "synth_config": chemprop_cfg}
 
         },
-        "lr": 1e-4,
         "model": {"custom_model": "GraphMolActorCritic_thv1",
-                  #"custom_model_config":{"test_name": 42} # does a **kw to __init__
+                  "custom_options":{"num_hidden": 64} # does a **kw to __init__
         },
-        "framework": "torch",
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "use_pytorch": True,
     },
-    "checkpoint_freq": 10,
+    "checkpoint_freq": 25,
 }
 
 

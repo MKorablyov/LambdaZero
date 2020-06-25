@@ -30,7 +30,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
 
-        print('model_config', model_config)
         self.max_steps = obs_space.original_space["num_steps"].n
         self.max_blocks = action_space.max_blocks
         self.max_branches = action_space.max_branches
@@ -38,7 +37,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
-                                       kw.get('num_hidden', 32),
+                                       kw.get('num_hidden', 64),
                                        self.num_blocks)
 
         self._value_out = None
