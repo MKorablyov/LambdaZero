@@ -2,6 +2,7 @@
 -f /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/nix/avx2
 -f /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/nix/generic
 -f /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic
+-f https://pytorch-geometric.com/whl/torch-1.5.0.html
 absl-py==0.7.1
 aiohttp==3.6.2
 alabaster==0.7.12
@@ -21,7 +22,7 @@ cachetools==4.1.0
 certifi==2020.4.5.2
 cffi==1.14.0
 chardet==3.0.4
-chemprop==0.0.2
+git+https://github.com/chemprop/chemprop.git#egg=chemprop
 click==7.1.2
 cloudpickle==1.3.0
 colorama==0.4.3
