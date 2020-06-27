@@ -9,19 +9,85 @@ from matplotlib import pyplot as plt
 import json
 import pandas
 import itertools
+import timeit
+from tqdm import tqdm
 
 import ray
 from ray import tune
 
 import LambdaZero.utils
-
 from LambdaZero.environments.block_mol_v5 import BlockMolEnv_v5
 from LambdaZero.environments.block_mol_v4 import DEFAULT_CONFIG as DEFAULT_ENV_CONFIG
+from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as DEFAULT_SYNTH_CONFIG
 
 from LambdaZero.examples.mf_gp_ucb.replay_buffer import ReplayBuffer
 from LambdaZero.examples.mf_gp_ucb.model import ValNetwork
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+
+c = DEFAULT_ENV_CONFIG
+c["reward_config"]["device"] = "cpu"
+dummy_env = BlockMolEnv_v5(c)
+
+# Reward function
+#dockscore_model = os.path.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002")
+dockscore_model = '/home/ml/hhuang63/Summaries/BasicRegressor/BasicRegressor_0_2020-06-02_17-41-06bzogful8/checkpoint_200/model.pth'
+reward = LambdaZero.environments.reward.PredDockReward(load_model=dockscore_model,
+                        natm_cutoff=[45, 50],
+                        qed_cutoff=[0.2, 0.7],
+                        soft_stop=False,
+                        exp=None,
+                        delta=False,
+                        simulation_cost=0.0,
+                        device="cpu")
+def oracle_mpnn(mol):
+    reward.reset()
+    return reward(mol,env_stop=False,simulate=True,num_steps=1)[0]
+
+synth_config = DEFAULT_SYNTH_CONFIG
+#synth_config['predict_config']['checkpoint_path'] = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
+reward_synth = LambdaZero.models.ChempropWrapper_v1(config=synth_config)
+def oracle_synth(mol):
+    return reward_synth(mol.mol)
+
+
+db_name = "actor_dock"
+#docksetup_dir = os.path.join(datasets_dir, "brutal_dock/d4/docksetup")
+docksetup_dir = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup")
+dock_smi = LambdaZero.chem.Dock_smi(outpath=os.path.join(datasets_dir, db_name, "dock"),
+                 chimera_dir=os.path.join(programs_dir, "chimera"),
+                 dock6_dir=os.path.join(programs_dir, "dock6"),
+                 docksetup_dir=docksetup_dir,
+                 gas_charge=True)
+def oracle_dock(mol):
+    try:
+        name, energy, coord = dock_smi.dock(Chem.MolToSmiles(mol.mol))
+        return energy
+    except AssertionError as e:
+        # AssertionError: parsing error - multiple gridscores
+        # Dock6 fails sometimes, and those failure are most likely on very high energy molecules
+        return 0
+    except AttributeError as e:
+        print('Failed on molecule:',Chem.MolToSmiles(mol.mol))
+        raise Exception(Chem.MolToSmiles(mol.mol))
+
+def eval_state(state, n=5):
+    dummy_env.set_state(state)
+    mol = dummy_env.molMDP.molecule
+    vals = [oracle_dock(mol) for _ in range(n)]
+    print(vals)
+    return np.mean(vals)
+
+def get_top_k_indices(vals,k):
+    best_indices = list(range(k))
+    current_min = np.min([vals[i] for i in best_indices])
+    max_index = np.argmax([vals[i] for i in best_indices])
+    for i,v in enumerate(vals):
+        if v < current_min:
+            best_indices[max_index] = i
+            max_index = np.argmax([vals[i] for i in best_indices])
+            current_min = np.min([vals[i] for i in best_indices])
+    return best_indices
 
 class TrainableRandom(tune.Trainable):
     def _setup(self, config):
@@ -30,46 +96,24 @@ class TrainableRandom(tune.Trainable):
         c["reward_config"]["device"] = "cpu"
         self.env = BlockMolEnv_v5(c)
         self.done = True
-        # Reward function
-        reward = LambdaZero.environments.reward.PredDockReward(load_model=config['dockscore_model'],
-                                natm_cutoff=[45, 50],
-                                qed_cutoff=[0.2, 0.7],
-                                soft_stop=False,
-                                exp=None,
-                                delta=False,
-                                simulation_cost=0.0,
-                                device="cpu")
-        db_name = "actor_dock"
-        docksetup_dir = os.path.join(datasets_dir, "brutal_dock/d4/docksetup")
-        #docksetup_dir = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
-        dock_smi = LambdaZero.chem.Dock_smi(outpath=os.path.join(datasets_dir, db_name, "dock"),
-                         chimera_dir=os.path.join(programs_dir, "chimera"),
-                         dock6_dir=os.path.join(programs_dir, "dock6"),
-                         docksetup_dir=docksetup_dir,
-                         gas_charge=True)
-        def oracle1(mol):
-            reward.reset()
-            return reward(mol,env_stop=False,simulate=True,num_steps=1)[0]
-        def oracle2(mol):
-            try:
-                name, energy, coord = dock_smi.dock(Chem.MolToSmiles(mol.mol))
-                return energy
-            except AssertionError as e:
-                # AssertionError: parsing error - multiple gridscores
-                # Dock6 fails sometimes, and those failure are most likely on very high energy molecules
-                return 0
-        self.oracles = [
-            oracle2
-        ]
+
+        self.epoch = config['epoch']
+        self.top_k = config['top_k']
+
+        self.runtime = 0
+        self.oracles = config['oracles']
+
         # Store all visited states and their values
         self.values = []
         self.states = []
+        self.true_values = []
     def evaluate_molecules(self, molecules):
         return [self.oracles[0](mol) for mol in molecules]
     def save_current_state(self):
         mol = self.info['molecule']
         self.states.append(self.env.get_state())
         self.values.append(self.oracles[0](mol))
+        self.true_values.append(None)
     def step(self):
         if self.done:
             self.obs = self.env.reset()
@@ -78,17 +122,36 @@ class TrainableRandom(tune.Trainable):
         self.obs, _, self.done, self.info = self.env.step(action)
         # Save visited states and their values
         self.save_current_state()
-    def get_top_k(self, top_k):
+    def get_top_k_score(self, top_k):
         """ Return the the top k molecules and their scores """
         print('NUMBER OF MOLECULES',len(self.values))
         if len(self.values) < top_k:
             return [(None,None) for _ in range(top_k)]
-        top_idx = np.argsort(self.values)[:top_k]
-        return tuple(zip(*[(self.values[i], self.states[i]) for i in top_idx]))
+        #top_idx = np.argsort(self.values)[:top_k]
+        top_idx = get_top_k_indices(self.values,top_k)
+
+        self.states = [self.states[i] for i in top_idx]
+        self.values = [self.values[i] for i in top_idx]
+        self.true_values = [self.true_values[i] for i in top_idx]
+
+        for i in range(top_k):
+            if self.true_values[i] is None:
+                self.true_values[i] = eval_state(self.states[i],1)
+        return {
+                'scores': self.values,
+                'true_values': self.true_values,
+        }
     def _train(self):
-        self.step()
-        top_k = self.get_top_k(1)
-        return {'score': top_k[0]}
+        start_time = time.time()
+        for _ in range(self.epoch):
+            self.step()
+        end_time = time.time()
+        self.runtime += end_time-start_time
+        top_k_score = self.get_top_k_score(5)
+        scores = top_k_score['scores']
+        true_values = top_k_score['true_values']
+        eval_end_time = time.time()
+        return {'score': np.mean(scores), 'true_values': np.mean(true_values), 'best': np.min(true_values), 'runtime': self.runtime, 'eval_time': eval_end_time-end_time}
     def _save(self, chkpt_dir):
         return {}
 
@@ -341,58 +404,8 @@ class TrainableMFGPUCB(TrainableRandom):
             if self.last_query[i] >= self.oracle_costs[i+1]/self.oracle_costs[i]:
                 self.gamma[i] *= 2
 
-DEFAULT_RANDOM_CONFIG = {
-    'name': 'DEFAULT_RANDOM',
-    'run_or_experiment': TrainableRandom,
-    'config': {
-        'dockscore_model': '/home/ml/hhuang63/Summaries/BasicRegressor/BasicRegressor_0_2020-06-02_17-41-06bzogful8/checkpoint_200/model.pth'
-    },
-    "local_dir": summaries_dir,
-    "checkpoint_freq": 250,
-    "stop":{"training_iteration": 100},
-    'resources_per_trial': {
-        'cpu': 10
-    }
-}
-
-DEFAULT_BOLTZMANN_CONFIG = {
-    'name': 'DEFAULT_BOLTZMANN',
-    'run_or_experiment': TrainableBoltzmann,
-    'config': {
-        'dockscore_model': '/home/ml/hhuang63/Summaries/BasicRegressor/BasicRegressor_0_2020-06-02_17-41-06bzogful8/checkpoint_200/model.pth'
-    },
-    "local_dir": summaries_dir,
-    "checkpoint_freq": 250,
-    "stop":{"training_iteration": 100},
-    'resources_per_trial': {
-        'cpu': 10
-    }
-}
-
-DEFAULT_MFGPUCB_CONFIG = {
-    'name': 'DEFAULT_MFGPUCB',
-    'run_or_experiment': TrainableMFGPUCB,
-    'config': {
-        'dockscore_model': '/home/ml/hhuang63/Summaries/BasicRegressor/BasicRegressor_0_2020-06-02_17-41-06bzogful8/checkpoint_200/model.pth',
-        'replay_buffer_size': 1000,
-        'warmup_steps': 10,
-        'net_structure': [512,256,1],
-        'learning_rate': 1e-3,
-        'zeta': 0.1, # Max difference between oracles
-        'gamma': [0.1], # Threshold for deciding between oracles
-        'beta': 1, # Standard deviation weighting
-        'device': 'cuda',
-    },
-    "local_dir": summaries_dir,
-    "checkpoint_freq": 250,
-    "stop":{"training_iteration": 100},
-    'resources_per_trial': {
-        'cpu': 10,
-        'gpu': 0.25
-    }
-}
-
-def plot(filename):
+def plot(filename, label='', columns=['true_values']):
+    print('Plotting',filename)
     with open(filename, 'r') as f:
         data = json.load(f)
     dfs = []
@@ -407,7 +420,10 @@ def plot(filename):
         output_t = []
         curr_t = start_time
         for v0,v1,t0,t1 in zip(v,v[1:],t,t[1:]):
-            a = (v1-v0)/(t1-t0)
+            if t1-t0 == 0:
+                a = 0
+            else:
+                a = (v1-v0)/(t1-t0)
             while curr_t <= t1:
                 output_v.append(a*(curr_t-t0)+v0)
                 output_t.append(curr_t-start_time)
@@ -420,35 +436,192 @@ def plot(filename):
             output.append(np.mean(list(filter(lambda a: a is not None, x))))
         return output
 
-    stride = 1
-    data = [normalize_time(d.timestamp,d.score.apply(lambda x: eval(x)[0]),stride=stride) for d in dfs]
-    y = mean([y for x,y in data])
-    t = range(0,len(y)*stride,stride)
+    for col in columns:
+        stride = 0.1
+        data = [normalize_time(d.runtime,d[col],stride) for d in dfs]
+        y = mean([y for x,y in data])
+        t = np.arange(0,len(y)*stride,stride)
+        l = label if len(columns) == 1 else col
+        plt.plot(t,y,label=l)
 
-    plt.plot(t,y)
+def plot_oracle_vs_oracle(oracle1, oracle2, n=100):
+    c = DEFAULT_ENV_CONFIG
+    c["reward_config"]["device"] = "cpu"
+    env = BlockMolEnv_v5(c)
+
+    x = []
+    y = []
+
+    done = True
+    for _ in tqdm(range(n)):
+        if done:
+            obs = env.reset()
+        actions = np.where(obs['action_mask'])[0]
+        action = np.random.choice(actions.flatten())
+        obs, _, done, info = env.step(action)
+        mol = info['molecule']
+        try:
+            v1 = oracle1(mol)
+            v2 = oracle2(mol)
+            # Only add to x/y if both values computed successfully
+            x.append(v1)
+            y.append(v2)
+        except:
+            continue
+
+        plt.scatter(x,y,alpha=0.5)
+        plt.savefig('ovo.png')
+        plt.close()
+
+def get_experiment_configs():
+    runtime = 1000
+
+    configs = {
+        'RANDOM_MPNN': {
+            'run_or_experiment': TrainableRandom,
+            'config': {
+                'epoch': 1000,
+                'top_k': 5,
+                'oracles': [
+                    oracle_mpnn
+                ]
+            },
+            "local_dir": summaries_dir,
+            "checkpoint_freq": 250,
+            "stop":{"runtime": runtime},
+            'resources_per_trial': {
+                'cpu': 4
+            }
+        },
+        'RANDOM_SYNTH_MPNN': {
+            'run_or_experiment': TrainableRandom,
+            'config': {
+                'epoch': 1000,
+                'top_k': 5,
+                'oracles': [
+                    oracle_synth
+                ]
+            },
+            "local_dir": summaries_dir,
+            "checkpoint_freq": 250,
+            "stop":{"runtime": runtime},
+            'resources_per_trial': {
+                'cpu': 4,
+                'gpu': 0.1
+            }
+        },
+        'RANDOM_DOCK': {
+            'run_or_experiment': TrainableRandom,
+            'config': {
+                'epoch': 10,
+                'top_k': 5,
+                'oracles': [
+                    oracle_dock
+                ]
+            },
+            "local_dir": summaries_dir,
+            "checkpoint_freq": 250,
+            "stop":{"runtime": runtime},
+            'resources_per_trial': {
+                'cpu': 4
+            }
+        },
+        'BOLTZMANN_MPNN': {
+            'run_or_experiment': TrainableBoltzmann,
+            'config': {
+                'epoch': 10,
+                'top_k': 5,
+                'oracles': [
+                    oracle_mpnn
+                ]
+            },
+            "local_dir": summaries_dir,
+            "checkpoint_freq": 250,
+            "stop":{"runtime": runtime},
+            'resources_per_trial': {
+                'cpu': 4
+            }
+        },
+        'BOLTZMANN_DOCK': {
+            'run_or_experiment': TrainableBoltzmann,
+            'config': {
+                'epoch': 1,
+                'top_k': 5,
+                'oracles': [
+                    oracle_dock
+                ]
+            },
+            "local_dir": summaries_dir,
+            "checkpoint_freq": 250,
+            "stop":{"runtime": runtime},
+            'resources_per_trial': {
+                'cpu': 4
+            }
+        },
+        'DEFAULT_MFGPUCB': {
+            'run_or_experiment': TrainableMFGPUCB,
+            'config': {
+                'replay_buffer_size': 1000,
+                'warmup_steps': 10,
+                'net_structure': [512,256,1],
+                'learning_rate': 1e-3,
+                'zeta': 0.1, # Max difference between oracles
+                'gamma': [0.1], # Threshold for deciding between oracles
+                'beta': 1, # Standard deviation weighting
+                'device': 'cuda',
+                'epoch': 1,
+                'top_k': 5,
+                'oracles': [
+                    oracle_mpnn,
+                    oracle_dock
+                ]
+            },
+            "local_dir": summaries_dir,
+            "checkpoint_freq": 250,
+            "stop":{"runtime": runtime},
+            'resources_per_trial': {
+                'cpu': 10,
+                'gpu': 0.25
+            }
+        }
+    }
+
+    return configs
+experiment_configs = get_experiment_configs()
 
 if __name__=='__main__':
-    config = DEFAULT_RANDOM_CONFIG
-    #config = DEFAULT_BOLTZMANN_CONFIG
-    #config = DEFAULT_MFGPUCB_CONFIG
-    analysis = tune.run(
-        max_failures=0,
-        num_samples=10,
-        **config
-    )
-
-    #from matplotlib import pyplot as plt
-    #import pandas
-    #dfs = analysis.trial_dataframes
-    #data = [d.score.apply(lambda x: eval(x)[0]) for d in dfs.values()]
-    #ax = pandas.concat(data,axis=1).mean(axis=1).plot()
-    #ax.set_xlabel('Iterations')
-    #ax.set_ylabel('Binding Energy')
-    #ax.grid(which='both')
-    #plt.savefig('b.png')
-
-    #plot(os.path.join(summaries_dir, 'DEFAULT_RANDOM', 'experiment_state-2020-06-20_19-28-18.json'))
-    #plt.xlabel('Time')
-    #plt.ylabel('Binding Energy')
-    #plt.grid(which='both')
-    #plt.savefig('b.png')
+    import sys
+    print(sys.argv)
+    if len(sys.argv) >= 2:
+        if sys.argv[1] == 'plot':
+            if len(sys.argv) > 2:
+                files = sys.argv[2:]
+                if len(files) > 1:
+                    for f in files:
+                        plot(f)
+                else:
+                    plot(files[0],columns=['true_values','score','best'])
+            else:
+                plot(os.path.join(
+                    summaries_dir, 'RANDOM_SYNTH_MPNN', 'experiment_state-2020-06-25_17-59-06.json'),'RANDOM_SYNTH_MPNN')
+                plot(os.path.join(
+                    summaries_dir, 'RANDOM_MPNN', 'experiment_state-2020-06-23_23-29-07.json'),'RANDOM_MPNN')
+                plot(os.path.join(
+                    summaries_dir, 'RANDOM_DOCK', 'experiment_state-2020-06-24_03-38-47.json'),'RANDOM_DOCK')
+            plt.xlabel('Time (s)')
+            plt.ylabel('Binding Energy')
+            plt.grid(which='both')
+            plt.legend(loc='best')
+            plt.savefig('b.png')
+        elif sys.argv[1] == 'plot_oracle_vs_oracle':
+            plot_oracle_vs_oracle(oracle_synth,oracle_dock,1000)
+        else:
+            config_name = sys.argv[1]
+            config = experiment_configs[config_name]
+            analysis = tune.run(
+                name=config_name,
+                max_failures=-1,
+                num_samples=10,
+                **config
+            )
+            print(analysis.runner_data()['checkpoint_file'])
