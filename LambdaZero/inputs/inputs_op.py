@@ -588,12 +588,41 @@ import LambdaZero.chem
 #
 #         return gauss_imgs,self.props[idx]
 
+N_GROUPS = 18
+N_PERIODS = 5
 
-def onehot(arr,num_classes,dtype=np.int):
-    arr = np.asarray(arr,dtype=np.int)
-    assert len(arr.shape) ==1, "dims other than 1 not implemented"
-    onehot_arr = np.zeros(arr.shape + (num_classes,),dtype=dtype)
-    onehot_arr[np.arange(arr.shape[0]), arr] = 1
+atomic_num_to_group = dict.fromkeys([1, 3, 11, 19, 37], 1)
+atomic_num_to_group.update(dict.fromkeys([4, 12, 20, 38], 2))
+atomic_num_to_group.update(dict.fromkeys([21, 39], 3))
+atomic_num_to_group.update(dict.fromkeys([22, 40], 4))
+atomic_num_to_group.update(dict.fromkeys([23, 41], 5))
+atomic_num_to_group.update(dict.fromkeys([24, 42], 6))
+atomic_num_to_group.update(dict.fromkeys([25, 43], 7))
+atomic_num_to_group.update(dict.fromkeys([26, 44], 8))
+atomic_num_to_group.update(dict.fromkeys([27, 45], 9))
+atomic_num_to_group.update(dict.fromkeys([28, 46], 10))
+atomic_num_to_group.update(dict.fromkeys([29, 47], 11))
+atomic_num_to_group.update(dict.fromkeys([30, 48], 12))
+atomic_num_to_group.update(dict.fromkeys([5, 13, 31, 49], 13))
+atomic_num_to_group.update(dict.fromkeys([6, 14, 32, 50], 14))
+atomic_num_to_group.update(dict.fromkeys([7, 15, 33, 51], 15))
+atomic_num_to_group.update(dict.fromkeys([8, 16, 34, 52], 16))
+atomic_num_to_group.update(dict.fromkeys([9, 17, 35, 53], 17))
+atomic_num_to_group.update(dict.fromkeys([10, 18, 36, 54], 18))
+
+atomic_num_to_period = dict.fromkeys([1, 2], 1)
+atomic_num_to_period.update(dict.fromkeys(list(range(3, 10+1)), 2))
+atomic_num_to_period.update(dict.fromkeys(list(range(11, 18+1)), 3))
+atomic_num_to_period.update(dict.fromkeys(list(range(19, 36+1)), 4))
+atomic_num_to_period.update(dict.fromkeys(list(range(37, 54+1)), 5))
+
+
+
+def onehot(arr, num_classes, dtype=np.int):
+    arr = np.asarray(arr, dtype=np.int)
+    assert arr.ndim == 1, "dims other than 1 not implemented"
+    onehot_arr = np.zeros((arr.size, num_classes), dtype=dtype)
+    onehot_arr[np.arange(arr.size), arr] = 1
     return onehot_arr
 
 def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
@@ -675,6 +704,39 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
     return graph
 
+def create_mol_graph_with_3d_coordinates(smi, props):
+    mol = rdkit.Chem.rdmolfiles.MolFromSmiles(smi)
+        
+    # x (tmp)
+    x = torch.tensor([a.GetAtomicNum() for a in mol.GetAtoms()], dtype=torch.int64)
+
+    # edge index
+    bonds = np.asarray([[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()] for bond in mol.GetBonds()])
+    bonds = np.vstack((bonds, bonds[:, ::-1]))
+    edge_index = torch.tensor(bonds.T, dtype=torch.int64)
+
+    # edge_attr (tmp)
+    edge_attr = None
+
+    # y
+    y = torch.tensor([props['gridscore']], dtype=torch.float64)
+
+    # pos
+    pos = torch.tensor(np.vstack(props['coord']), dtype=torch.float64) 
+
+    return Data(x, edge_index, edge_attr, y, pos)
+
+@ray.remote
+def tpnn_proc(smi, props, pre_filter, pre_transform):
+    try:
+        graph = create_mol_graph_with_3d_coordinates(smi, props)
+    except Exception as e:
+        return None
+    if pre_filter is not None and not pre_filter(graph):
+        return None
+    if pre_transform is not None:
+        graph = pre_transform(graph)
+    return graph
 
 @ray.remote
 def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
@@ -688,13 +750,36 @@ def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
         graph = pre_transform(graph)
     return graph
 
+def tpnn_transform(data):
+    def _group_period(atomic_numbers):
+        groups = np.array([atomic_num_to_group[atomic_number] for atomic_number in atomic_numbers.numpy()])
+        periods = np.array([atomic_num_to_period[atomic_number] for atomic_number in atomic_numbers.numpy()])
+        return groups, periods
+    
+    def _one_hot_group_period(groups, periods):
+        groups_one_hot = onehot(groups-1, N_GROUPS, dtype=np.float64)
+        periods_one_hot = onehot(periods-1, N_PERIODS, dtype=np.float64)
+
+        return torch.tensor(np.hstack((groups_one_hot, periods_one_hot)), dtype=torch.float64)
+    
+    def _rel_vectors(coordinates, bonds):
+        origin_pos = coordinates[bonds[0]]
+        neighbor_pos = coordinates[bonds[1]]
+        return neighbor_pos - origin_pos
+    
+    data = data.clone()
+    data.x = _one_hot_group_period(*_group_period(data.x))
+    data.edge_attr = _rel_vectors(data.pos, data.edge_index)
+
+    return data
+
 class BrutalDock(InMemoryDataset):
     # own internal dataset
     def __init__(self, root, transform=None, pre_transform=None, pre_filter=None,
                  props=["gridscore"], file_names=['ampc_100k']):
         self._props = props
         self.file_names = file_names
-        #self._chunksize = chunksize
+
         super(BrutalDock, self).__init__(root, transform, pre_transform, pre_filter)
 
         #  todo: store a list, but have a custom collate function on batch making
@@ -718,20 +803,13 @@ class BrutalDock(InMemoryDataset):
 
     def process(self):       
         print("processing", self.raw_paths)
-        for i in range(len(self.raw_file_names)):
-            if not os.path.exists(self.processed_file_names[i]):
-                docked_index = pd.read_feather(self.raw_paths[i])
-                smis = docked_index["smiles"].tolist()
-                props = {pr:docked_index[pr].tolist() for pr in self._props}
-                tasks = [_brutal_dock_proc.remote(smis[j], {pr: props[pr][j] for pr in props},
-                                                  self.pre_filter, self.pre_transform) for j in range(len(smis))]
-                graphs = ray.get(tasks)
-                graphs = [g for g in graphs if g is not None]
-                # save to the disk
-                torch.save(self.collate(graphs), self.processed_paths[i])
-
-
-
-
-#if __name__ == "__main__":
-#    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../..', 'data', 'QM9')
+        for raw_path, processed_path in zip(self.raw_paths, self.processed_paths):
+            docked_index = pd.read_feather(raw_path)
+            smis = docked_index["smiles"].tolist()
+            props = {pr:docked_index[pr].tolist() for pr in self._props}
+            tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
+                                           self.pre_filter, self.pre_transform) for j in range(len(smis))]
+            graphs = ray.get(tasks)
+            graphs = [g for g in graphs if g is not None]
+            # save to the disk
+            torch.save(self.collate(graphs), processed_path)
