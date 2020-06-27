@@ -58,7 +58,7 @@ DEFAULT_CONFIG = {
         # Number of episodes to run per evaluation period.
         "evaluation_num_episodes": 1,
         "num_cpus_per_worker": 1,
-        "num_gpus": 0.4,
+        "num_gpus": 2,
         "num_gpus_per_worker": 0.075,
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},
     },
@@ -81,8 +81,10 @@ if machine == "Ikarus":
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
+    time.sleep(40)
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     #ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
+    time.sleep(40)
     tune.run(config["trainer"],
         stop=config["stop"],
         max_failures=0,
