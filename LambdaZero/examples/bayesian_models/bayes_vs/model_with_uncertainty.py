@@ -21,6 +21,7 @@ print('using device: {}'.format(device))
 class cfg:
   sample_size = 20000
   batch_size = 500
+  mcdrop = True
 
 class FingerprintDataset:
     def __init__(self, filename='d4_250k_clust.parquet', batch_size=cfg.batch_size, x_name='fingerprint', y_name='dockscore'):
@@ -157,7 +158,10 @@ class Trainer:
       return loss
   
   def rest_evalu(self, rest_loader, regressor):
-      regressor = regressor.eval()
+      if cfg.mcdrop:
+          regressor.train()
+      else:
+          regressor.eval()
       y_all = []
       out_all = []
       for i, (x, y) in enumerate(rest_loader):
@@ -180,13 +184,12 @@ class Trainer:
       self.mean_loss = mean_loss
       return mean_loss
  
-class ModelWithUncertainty(GPyTorchModel, nn.Module):
+class ModelWithUncertainty(nn.Module):
     """
     This can be Bayesian Linear Regression, Gaussian Process, Ensemble etc...
     Also note before I have been thinking that these models have additional feature extractor, which acts on X
     first, this is still sensible to have here if we think necessary. eg this may be MPNN on SMILES
     """
-    _num_outputs = 1
     # Bayesian Linear Regression
     def __init__(self, input_dim, output_dim):
         super().__init__()
@@ -201,6 +204,7 @@ class ModelWithUncertainty(GPyTorchModel, nn.Module):
     def forward(self, x):
         x_ = self.blinear1(x)
         x_ = self.relu(x_)
+        x_ = self.dropout(x_)
         return self.blinear2(x_)
  
     def fit(self, aq_loader, test_loader):
@@ -258,7 +262,10 @@ class Acquirer:
     self.noise_mean = noise_mean
 
   def egreedy_aq(self,loader, model):
-      model.eval()
+      if cfg.mcdrop:
+          model.train()
+      else:
+          model.eval()
       
       preds_all = []
       for bidx, (x, y) in enumerate(loader):
@@ -275,7 +282,10 @@ class Acquirer:
       
   
   def thompson_aq(self, loader, model):
-      model.eval()
+      if cfg.mcdrop:
+          model.train()
+      else:
+          model.eval()
       eval_func = model.get_predict_sample()
       aq_batch = []
 
