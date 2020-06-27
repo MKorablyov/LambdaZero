@@ -12,15 +12,16 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import sklearn
 from sklearn.model_selection import train_test_split
+from blitz.modules import BayesianLinear
 
 writer = SummaryWriter()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print('using device: {}'.format(device))
 
 class cfg:
-  sample_size = 50000
+  sample_size = 20000
   batch_size = 500
- 
+
 class FingerprintDataset:
     def __init__(self, filename='d4_250k_clust.parquet', batch_size=cfg.batch_size, x_name='fingerprint', y_name='dockscore'):
         data = pd.read_parquet(filename, engine='pyarrow')
@@ -37,82 +38,90 @@ class FingerprintDataset:
  
     def train_set(self):
         train_dataset = TensorDataset(self.x_train, self.y_train)
-        train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size)
+        train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size)#, collate_fn=collate_wrapper)
         return train_dataset, train_loader
  
     def test_set(self):
         test_dataset = TensorDataset(self.x_test, self.y_test)
-        test_loader = DataLoader(test_dataset, batch_size=cfg.batch_size)
+        test_loader = DataLoader(test_dataset, batch_size=cfg.batch_size)#, collate_fn=collate_wrapper)
         return test_dataset, test_loader
  
     def val_set(self):
         val_dataset = TensorDataset(self.x_val, self.y_val)
-        val_loader = DataLoader(val_dataset, batch_size=cfg.batch_size)
+        val_loader = DataLoader(val_dataset, batch_size=cfg.batch_size)#, collate_fn=collate_wrapper)
         return val_dataset, val_loader
  
 def main():
-    regressor = ModelWithUncertainty(1024, 1)
-    regressor = regressor.to(device)
 
     acquirer = Acquirer(cfg.batch_size, device)
-    trainer = Trainer(torch.nn.MSELoss(), torch.optim.Adam(regressor.parameters(), lr=0.001))
- 
     dataset = FingerprintDataset()
     train_set, train_loader = dataset.train_set()
     test_set, test_loader = dataset.test_set()
- 
-    is_aquired = np.zeros(len(train_set),dtype=np.bool)
-    is_aquired[np.random.choice(np.arange(len(train_set)), cfg.batch_size)] = True
- 
-    test_losses = []
-    train_losses = []
- 
-    top_mol = []
-    top_y = []
-    top_batch = []
 
-    while np.count_nonzero(is_aquired) < len(train_set) and np.count_nonzero(is_aquired) < cfg.sample_size:
-        aq_set = Subset(train_set, np.where(is_aquired)[0])
-        aq_loader = torch.utils.data.DataLoader(aq_set, batch_size=cfg.batch_size)
+    top_mol_dict = {}
+    top_batch_dict = {}
+
+    aq_fxns = {'random': acquirer.random_aq, 'greedy': acquirer.egreedy_aq, 'egreedy': acquirer.egreedy_aq, 'ucb': acquirer.ucb_aq, 'thompson': acquirer.thompson_aq}
+
+    for name, aq_fxn in aq_fxns.items():
+
+        if name == 'egreedy':
+            acquirer.noise_std = 5
+            acquirer.noise_mean = 2.5
+
+        top_mol = []
+        top_batch = []
+
+        regressor = ModelWithUncertainty(1024, 1)
+        regressor = regressor.to(device)
+
+        trainer = Trainer(torch.nn.MSELoss(), torch.optim.Adam(regressor.parameters(), lr=0.001))
+
+        is_aquired = np.zeros(len(train_set),dtype=np.bool)
+        is_aquired[np.random.choice(np.arange(len(train_set)), cfg.batch_size)] = True
+    
+        test_losses = []
+        train_losses = []
+
+        while np.count_nonzero(is_aquired) < len(train_set) and np.count_nonzero(is_aquired) < cfg.sample_size:
+            aq_set = Subset(train_set, np.where(is_aquired)[0])
+            aq_loader = torch.utils.data.DataLoader(aq_set, batch_size=cfg.batch_size)
+            
+            # train model
+            for i in range(3):
+                trn_loss = trainer.train(regressor, aq_loader)
+    
+            tst_loss = trainer.evalu(test_loader, regressor)
+            test_losses.append(tst_loss)
+            train_losses.append(trn_loss)
+    
+            # acquire more data
+            rest_set = Subset(train_set, np.where(~is_aquired)[0])
+            rest_loader = DataLoader(rest_set, batch_size=cfg.batch_size)
+
+            ys, output = trainer.rest_evalu(aq_loader, regressor) 
+            output_indices = np.argsort(ys) 
+            ys = ys[output_indices]
+            top_pred = ys[0]
+            top_mol.append(top_pred)
+
+            writer.add_scalar('Values {}'.format(name), top_pred)
+    
+            aq_indices = aq_fxn(rest_loader, regressor)
+            is_aquired[aq_indices] = True
+
+            batch_set = Subset(train_set, aq_indices)      
+            batch_ys = [y.detach().cpu().numpy() for (_, y) in batch_set]
+            top_batch.append(np.amin(np.array(batch_ys)))
+
+        top_mol_dict[name] = top_mol
+        top_batch_dict[name] = top_batch
         
-        # train model
-        for i in range(3):
-            trn_loss = trainer.train(regressor, aq_loader)
- 
-        tst_loss = trainer.evalu(test_loader, regressor)
- 
-        test_losses.append(tst_loss)
-        train_losses.append(trn_loss)
- 
-        # acquire more data
-        rest_set = Subset(train_set, np.where(~is_aquired)[0])
-        rest_loader = DataLoader(rest_set, batch_size=cfg.batch_size)
-
-        ys, output = trainer.rest_evalu(aq_loader, regressor) 
-        output_indices = np.argsort(ys)
-        ys = ys[output_indices]
-        top_pred = ys[0]
-        top_mol.append(top_pred)
-
-        writer.add_scalar('Values', top_pred)
-
-        # randomly acquire batch size values from the rest_set and take the indicies
-        aq_indices = acquirer.random_aq(rest_loader, regressor)
-        # return a indices list, make sure not acquire the thing we have already acquire
-        batch_aq = np.arange(len(train_set))[~is_aquired][aq_indices] 
-
-        is_aquired[batch_aq] = True 
-
-        #*** Bug here! should use batch_aq rather than aq_indices
-        batch_set = Subset(train_set, aq_indices) # return x, y in the original dataset     
-
-        batch_ys = [y.detach().cpu().numpy() for (_, y) in batch_set]
-        top_batch.append(np.amin(np.array(batch_ys)))
-
-
     writer.close()
 
-    plt.scatter(np.linspace(cfg.batch_size, cfg.sample_size, len(top_mol)), top_mol, label = 'Random')
+    for name, vals in top_mol_dict.items():
+        plt.scatter(np.linspace(cfg.batch_size, cfg.sample_size, len(vals)), vals, label = name)
+    
     plt.title('Best Molecules So Far')
     plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
     plt.xlabel("num_samples ")
@@ -120,43 +129,43 @@ def main():
     plt.savefig('best_so_far.png')
     plt.show()
 
-    plt.scatter(np.linspace(cfg.batch_size, cfg.sample_size, len(top_batch)), top_batch, label = 'Random')
+    for name, vals in top_batch_dict.items():
+        plt.scatter(np.linspace(cfg.batch_size, cfg.sample_size, len(vals)), vals, label = name)
+
     plt.title('Best Molecules on Current Batch')
     plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
     plt.xlabel("num_samples ")
     plt.ylabel("best_energy_found")
     plt.savefig('best_on_batch.png')
     plt.show()
- 
- 
+
 class Trainer:
   def __init__(self, criterion, optimizer):
     self.criterion = criterion
     self.optimizer = optimizer
 
   def train(self, regressor, train_loader):
+  
       for i, batch in enumerate(train_loader):
           self.optimizer.zero_grad()
           output = regressor(batch[0])
           loss = self.criterion(output.squeeze(), batch[1].squeeze())
-          ys = batch[1].squeeze() #batch[0] is x and batch[1] is y
+          ys = batch[1].squeeze()
           loss.backward()
           self.optimizer.step()
+
       return loss
   
   def rest_evalu(self, rest_loader, regressor):
       regressor = regressor.eval()
       y_all = []
       out_all = []
-
       for i, (x, y) in enumerate(rest_loader):
           output = regressor(x)
           y_all.append(y.detach().cpu().numpy())
-          out_all.append(output.squeeze().detach().cpu().numpy())
+          out_all.append(1)
   
-      y_all = np.concatenate(y_all, axis = 0) # real value
-      out_all = np.concatenate(out_all, axis = 0) # predicted
-  
+      y_all = np.concatenate(y_all, axis = 0)
       return y_all, out_all
   
   def evalu(self, test_loader, regressor):
@@ -164,28 +173,34 @@ class Trainer:
       for i, batch in enumerate(test_loader):
           output = regressor(batch[0])
           loss = self.criterion(output.squeeze(), batch[1].squeeze())
+  
           mean_loss.append(loss.detach().cpu().numpy())
-
       mean_loss = np.array(mean_loss)
       print('Test mean loss: {}'.format(np.mean(mean_loss)))
       self.mean_loss = mean_loss
       return mean_loss
  
-class ModelWithUncertainty(nn.Module):
+class ModelWithUncertainty(GPyTorchModel, nn.Module):
     """
     This can be Bayesian Linear Regression, Gaussian Process, Ensemble etc...
     Also note before I have been thinking that these models have additional feature extractor, which acts on X
     first, this is still sensible to have here if we think necessary. eg this may be MPNN on SMILES
     """
-
+    _num_outputs = 1
     # Bayesian Linear Regression
     def __init__(self, input_dim, output_dim):
         super().__init__()
-        self.blinear1 = torch.nn.Linear(input_dim, 512)
-        self.blinear2 = torch.nn.Linear(512, output_dim)
+
+        self.blinear1 = BayesianLinear(input_dim, 512)
  
+        self.blinear2 = BayesianLinear(512, output_dim)
+ 
+        self.relu = torch.nn.ReLU()
+        self.dropout = torch.nn.Dropout(0.5)
+
     def forward(self, x):
         x_ = self.blinear1(x)
+        x_ = self.relu(x_)
         return self.blinear2(x_)
  
     def fit(self, aq_loader, test_loader):
@@ -233,18 +248,18 @@ class ModelWithUncertainty(nn.Module):
             return out
  
         return evaluator
- 
 
 class Acquirer:
   def __init__(self, batch_aq_num, device, noise_std = 1, noise_mean = 0):
-    self.batch_aq_num = batch_aq_num #batch size
+    self.batch_aq_num = batch_aq_num
     self.device = device
-    self.kappa = 0.2
+    self.kappa = 0.8
     self.noise_std = noise_std
     self.noise_mean = noise_mean
 
   def egreedy_aq(self,loader, model):
       model.eval()
+      
       preds_all = []
       for bidx, (x, y) in enumerate(loader):
           x, y = x.to(self.device), y.to(self.device)
@@ -302,4 +317,3 @@ class Acquirer:
   
 if __name__ == '__main__':
     main()
-
