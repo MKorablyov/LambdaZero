@@ -691,10 +691,10 @@ def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
 class BrutalDock(InMemoryDataset):
     # own internal dataset
     def __init__(self, root, transform=None, pre_transform=None, pre_filter=None,
-                 props=["gridscore"], file_names=['ampc_100k'], chunksize=550):
+                 props=["gridscore"], file_names=['ampc_100k']):
         self._props = props
         self.file_names = file_names
-        self._chunksize = chunksize
+        #self._chunksize = chunksize
         super(BrutalDock, self).__init__(root, transform, pre_transform, pre_filter)
 
         #  todo: store a list, but have a custom collate function on batch making
