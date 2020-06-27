@@ -109,7 +109,8 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
                 nn.Linear(in_features=mol_fp_len, out_features=256),nn.ReLU(),
                 nn.Linear(in_features=256, out_features=256), nn.ReLU(),
                 nn.Linear(in_features=265, out_features=1))
-            self.rnd_stats = RunningMeanStd(shape=(mol_fp_len))
+            self.rnd_obs_stats = RunningMeanStd(shape=(mol_fp_len))
+            self.rnd_rew_stats = RunningMeanStd(shape=())
             # Freeze target network
             self.rnd_target.eval()
             for param in self.rnd_target.parameters():
@@ -174,15 +175,25 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     @override(TorchModelV2)
     def custom_loss(self, policy_loss, loss_inputs):
         if self.rnd_weight > 0:
-            obs = ((loss_inputs['obs']['mol_fp'] - self.rnd_stats.mean) / (np.sqrt(obs_rms.var))).clip(0, 10)
+            obs = ((loss_inputs['obs']['mol_fp'] - self.rnd_obs_stats.mean) / (np.sqrt(self.rnd_obs_stats.var))).clip(-5, 5)
             target_reward = self.rnd_target(obs)
             predictor_reward = self.rnd_predictor_reward(obs)
             rnd_loss = ((target_reward - predictor_reward) ** 2).sum()
-            self.rnd_stats.update(loss_inputs['obs']['mol_fp'])
-            return policy_loss + self.rnd_weight * rnd_loss
+            self.rnd_loss = (rnd_loss - self.rnd_rew_stats.mean) / (np.sqrt(self.rnd_rew_stats.var))
+            self.policy_loss = policy_loss
+            self.rnd_obs_stats.update(loss_inputs['obs']['mol_fp'])
+            self.rnd_rew_stats.update(self.rnd_loss)
+            return policy_loss + self.rnd_weight * self.rnd_loss
         else:
             return policy_loss
-        
+
+    def custom_stats(self):
+        return {
+            "rnd_loss": self.rnd_loss,
+            "policy_loss": self.policy_loss
+        }
+
+
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
         torch.save(self.model.state_dict(), checkpoint_path)
