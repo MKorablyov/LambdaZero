@@ -59,7 +59,7 @@ ppo023 = {
 
         },
         "model": {
-            "custom_options": {
+            "custom_model_config": {
                 "rnd_weight": 1
             }
         }

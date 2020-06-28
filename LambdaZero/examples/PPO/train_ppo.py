@@ -27,14 +27,15 @@ DEFAULT_CONFIG = {
         "num_gpus_per_worker": 0.075,
         "num_gpus": 3,
         "model": {
-            "custom_model": "MolActorCritic_tfv1",
-            "custom_options": {
+            "custom_model": "MolActorCritic_thv1",
+            "custom_model_config": {
                 "rnd_weight": 0
             }
 
         },
-        "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics} # fixme (report all)
-        },
+        "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
+        "use_pytorch": True
+    },
     "summaries_dir": summaries_dir,
     "memory": 60 * 10 ** 9,
     "trainer": PPOTrainer,

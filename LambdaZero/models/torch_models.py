@@ -95,21 +95,21 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         self._value_out = None
         
         # RND
-        if "rnd_weight" in kwargs.keys():
-            self.rnd_weight = kwargs["rnd_weight"]
+        if "rnd_weight" in model_config['custom_model_config'].keys():
+            self.rnd_weight = model_config['custom_model_config']["rnd_weight"]
         else: 
             self.rnd_weight = 0
 
         if self.rnd_weight > 0:
             self.rnd_target = nn.Sequential(
-                nn.Linear(in_features=mol_fp_len, out_features=256),nn.ReLU(),
+                nn.Linear(in_features=7619, out_features=256),nn.ReLU(),
                 nn.Linear(in_features=256, out_features=256), nn.ReLU(),
-                nn.Linear(in_features=265, out_features=1))
+                nn.Linear(in_features=256, out_features=1))
             self.rnd_predictor = nn.Sequential(
-                nn.Linear(in_features=mol_fp_len, out_features=256),nn.ReLU(),
+                nn.Linear(in_features=7619, out_features=256),nn.ReLU(),
                 nn.Linear(in_features=256, out_features=256), nn.ReLU(),
-                nn.Linear(in_features=265, out_features=1))
-            self.rnd_obs_stats = RunningMeanStd(shape=(mol_fp_len))
+                nn.Linear(in_features=256, out_features=1))
+            self.rnd_obs_stats = RunningMeanStd(shape=(7619))
             self.rnd_rew_stats = RunningMeanStd(shape=())
             # Freeze target network
             self.rnd_target.eval()
@@ -119,12 +119,19 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     def forward(self, input_dict, state, seq_lens):
         # shared molecule embedding
         # weak todo (maksym) use mask before compute
-
-        mol_fp = input_dict["mol_fp"]
-        stem_fps = input_dict["stem_fps"]
-        jbond_fps = input_dict["jbond_fps"]
-        num_steps = input_dict["num_steps"]
-        action_mask = input_dict["action_mask"]
+        if "obs" in input_dict.keys():
+            obs = input_dict["obs"]
+            mol_fp = obs["mol_fp"]
+            stem_fps = obs["stem_fps"]
+            jbond_fps = obs["jbond_fps"]
+            num_steps = obs["num_steps"]
+            action_mask = obs["action_mask"]
+        else:
+            mol_fp = input_dict["mol_fp"]
+            stem_fps = input_dict["stem_fps"]
+            jbond_fps = input_dict["jbond_fps"]
+            num_steps = input_dict["num_steps"]
+            action_mask = input_dict["action_mask"]
 
         # shared layers
         mol_embed = self.shared_layers(torch.cat([mol_fp, num_steps], 1))
@@ -175,15 +182,22 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     @override(TorchModelV2)
     def custom_loss(self, policy_loss, loss_inputs):
         if self.rnd_weight > 0:
-            obs = ((loss_inputs['obs']['mol_fp'] - self.rnd_obs_stats.mean) / (np.sqrt(self.rnd_obs_stats.var))).clip(-5, 5)
+            obs_mean = torch.as_tensor(self.rnd_obs_stats.mean, dtype=torch.float32, device=loss_inputs['obs'].device)
+            obs_var = torch.as_tensor(self.rnd_obs_stats.var, dtype=torch.float32, device=loss_inputs['obs'].device)
+            obs = ((loss_inputs['obs'] - obs_mean) / (torch.sqrt(obs_var))).clamp(-5, 5)
+            
             target_reward = self.rnd_target(obs)
-            predictor_reward = self.rnd_predictor_reward(obs)
-            rnd_loss = ((target_reward - predictor_reward) ** 2).sum()
-            self.rnd_loss = (rnd_loss - self.rnd_rew_stats.mean) / (np.sqrt(self.rnd_rew_stats.var))
+            predictor_reward = self.rnd_predictor(obs)
+            rnd_loss = ((target_reward - predictor_reward) ** 2).sum(1).mean(0)
+
+            rew_mean = torch.as_tensor(self.rnd_rew_stats.mean, dtype=torch.float32, device=rnd_loss.device)
+            rew_var = torch.as_tensor(self.rnd_rew_stats.var, dtype=torch.float32, device=rnd_loss.device)
+            self.rnd_loss = (rnd_loss - rew_mean) / (torch.sqrt(rew_var))
+            
             self.policy_loss = policy_loss
-            self.rnd_obs_stats.update(loss_inputs['obs']['mol_fp'])
-            self.rnd_rew_stats.update(self.rnd_loss)
-            return policy_loss + self.rnd_weight * self.rnd_loss
+            self.rnd_obs_stats.update(loss_inputs['obs'].detach().cpu().numpy())
+            self.rnd_rew_stats.update(self.rnd_loss.detach().cpu().numpy())
+            return [self.rnd_weight * self.rnd_loss + l for l in policy_loss]
         else:
             return policy_loss
 

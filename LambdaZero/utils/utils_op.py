@@ -128,14 +128,20 @@ def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
 
 class RunningMeanStd(object):
     def __init__(self, epsilon=1e-4, shape=()):
-        self.mean = np.zeros(shape, 'float64')
-        self.var = np.ones(shape, 'float64')
+        self.mean = np.zeros(shape, 'float32')
+        self.var = np.ones(shape, 'float32')
         self.count = epsilon
 
     def update(self, x):
-        batch_mean = np.mean(x, axis=0)
-        batch_var = np.var(x, axis=0)
-        batch_count = x.shape[0]
+
+        if len(x.shape) > 0:
+            batch_count = x.shape[0]
+            batch_mean = np.mean(x, axis=0)
+            batch_var = np.var(x, axis=0)
+        else:
+            batch_mean = x
+            batch_var = 0
+            batch_count = 1
         self.update_from_moments(batch_mean, batch_var, batch_count)
 
     def update_from_moments(self, batch_mean, batch_var, batch_count):
