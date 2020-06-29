@@ -10,9 +10,11 @@ import LambdaZero.inputs
 import LambdaZero.utils
 
 import numpy as np
+import os
 import os.path as osp
 import pandas as pd
 import ray
+import time
 import torch
 
 from copy import deepcopy
@@ -23,13 +25,17 @@ from torch_geometric.data import (InMemoryDataset, download_url, extract_zip, Da
 class cfg:
 	datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 	
-	num_cpus = 8
-	num_gpus = 0
-	device = "cpu"  # TODO: change to "cuda"
+	num_cpus = 4
+	num_gpus = 4
+	device = "cuda"  # TODO: change to "cuda"
 	
 	db_name = "actor_dock"
 	db_path = osp.join(datasets_dir, db_name)
+	if not osp.exists(db_path):
+		os.mkdir(db_path)
 	results_dir = osp.join(datasets_dir, db_name, "raw")
+	if not osp.exists(results_dir):
+		os.mkdir(results_dir)
 	out_dir = osp.join(datasets_dir, db_name, "dock")
 	
 	# env parameters
@@ -39,7 +45,7 @@ class cfg:
 	dockscore_model = osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002")
 	
 	# dataset size
-	dataset_len = 20
+	dataset_len = 100000
 	
 	# data parallel
 	num_workers = 2
@@ -108,6 +114,7 @@ def generate_dataset():
 	:return: stores the generated dataset to disk
 	'''
 	ray.init()
+	time.sleep(60)
 	
 	workers = [Worker.remote() for i in range(cfg.num_workers)]
 	tasks = [worker._sample.remote() for worker in workers]
@@ -126,7 +133,7 @@ def generate_dataset():
 		
 		if (i % 500) == 0:
 			df = pd.DataFrame(samples, columns=('smile', 'initial_energry', 'stem_idxs', 'docking_energies'))
-			df.to_feather(osp.join(cfg.results_dir, cfg.db_name) + ".feather")
+			df.to_parquet(osp.join(cfg.results_dir, cfg.db_name) + ".feather")
 	
 	df = pd.DataFrame(samples, columns=('smile', 'initial_energry', 'stem_idxs', 'docking_energies'))
 	df.to_feather(osp.join(cfg.results_dir, cfg.db_name) + ".feather")
