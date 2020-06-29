@@ -7,7 +7,6 @@ import torch_scatter
 # Zhaocheng: Pseudo code. Never verified.
 
 class GiantGraphDataset(torch.utils.data.Dataset):
-    pass
     # this class should provide the adjacency tensor of the graph
     # usually stored in COO sparse matrix style
     # 
@@ -15,6 +14,16 @@ class GiantGraphDataset(torch.utils.data.Dataset):
     # edge_weight: (num_edge)
     # 
     # a COO sparse matrix can be easily constructed from edge_list and edge_weight
+    
+    def __init__(self, data, num_node, num_relation):
+        self.edge_list = data
+        
+        # Manually flatten 3D COO index to 2D COO index
+        row = data[0] * num_relation + data[2]
+        col = data[1]
+        index = torch.stack([row, col])
+        value = torch.ones(len(data))
+        self.adjacency = torch.sparse.FloatTensor(index, value, size=(num_node * num_relation, num_node))
 
 # General Message Passing style implementation of GNNs
 # Similar to the spirit of PyG / DGL
@@ -73,7 +82,9 @@ class RelationalGraphConv(MessagePassingBase):
 
     def aggregate(self, graph, message):
         assert graph.num_relation == self.num_relation
-
+        
+        # edge_list[:, 0] is node_out
+        # edge_list[:, 2] is relation
         node_out = graph.edge_list[:, 0] * self.num_relation + graph.edge_list[:, 2]
         edge_weight = graph.edge_weight.unsqueeze(-1)
         update = scatter_add(message * edge_weight, node_out, dim=0, dim_size=graph.num_node * self.num_relation) / \
@@ -172,6 +183,8 @@ if __name__ == "__main__":
     config = DEFAULT_CONFIG
     data = _fake_data(config["num_relations"], config["num_nodes"], config["num_edges"])
     print(data)
-
+        
+    GiantGraphDataset(data, config["num_relations"])
+            
     RGCN_v1().to("cuda")
 
