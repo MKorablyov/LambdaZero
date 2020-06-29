@@ -776,10 +776,10 @@ def tpnn_transform(data):
 class BrutalDock(InMemoryDataset):
     # own internal dataset
     def __init__(self, root, transform=None, pre_transform=None, pre_filter=None,
-                 props=["gridscore"], file_names=['ampc_100k'], proc_func=_brutal_dock_proc):
+                 props=["gridscore"], file_names=['ampc_100k']):
         self._props = props
         self.file_names = file_names
-        self.proc_func = proc_func
+
         super(BrutalDock, self).__init__(root, transform, pre_transform, pre_filter)
 
         #  todo: store a list, but have a custom collate function on batch making
