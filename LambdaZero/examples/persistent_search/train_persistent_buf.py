@@ -23,9 +23,9 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 5,
+        "num_workers": 7,
         "num_gpus_per_worker": 0.075,
-        "num_gpus": 0.4,
+        "num_gpus": 3,
         "model": {"custom_model": "MolActorCritic_thv1"},
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
         "framework": "torch",
@@ -49,7 +49,6 @@ if machine == "Ikarus":
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
-
     searchbuf = ray.remote(PersistentSearchBuffer).remote(
         {'blocks_file': block_mol_v3.DEFAULT_CONFIG['molMDP_config']['blocks_file'],
          'max_size': config['buffer_size']})

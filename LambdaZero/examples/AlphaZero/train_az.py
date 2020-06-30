@@ -24,7 +24,7 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 2,
+        "num_workers": 15,
         "sample_batch_size": 200,
         "train_batch_size": 4000,
         "sgd_minibatch_size": 128,
@@ -58,7 +58,7 @@ DEFAULT_CONFIG = {
         # Number of episodes to run per evaluation period.
         "evaluation_num_episodes": 1,
         "num_cpus_per_worker": 1,
-        "num_gpus": 0.4,
+        "num_gpus": 2,
         "num_gpus_per_worker": 0.075,
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},
     },

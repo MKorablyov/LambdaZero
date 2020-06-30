@@ -38,7 +38,6 @@ class BlocksData:
 
 
 class PersistentSearchBuffer:
-
     def __init__(self, config):
         self.mols = [(BlockMoleculeData(), -0.5, 0)]
         self.blocksd = BlocksData(config)
@@ -47,7 +46,7 @@ class PersistentSearchBuffer:
         self.sumtree = SumTree(self.max_size)
         self.temperature = config.get('temperature', 2)
         self.smiles = set()
-
+        self.mol_fps = []
 
     def contains(self, mol):
         mol.blocks = [self.blocksd.block_mols[i] for i in mol.blockidxs]
@@ -56,7 +55,15 @@ class PersistentSearchBuffer:
             return True
         return False
 
-    def add(self, mol, mol_info):
+    def distance(self, mol_fp):
+        if len(self.mol_fps) == 0:
+            return 0
+        mol_buff = np.asarray(self.mol_fps)
+        dist = np.sum(np.abs(mol_buff - mol_fp[None, :]), axis=1)
+        dist = 1 - (dist / (np.sum(np.abs(mol_buff),1) + np.sum(np.abs(mol_fp[None,:]),1)))
+        return np.mean(dist)
+
+    def add(self, mol, mol_info, mol_fp):
         if len(self.mols) >= self.max_size:
             self.prune()
         mol.blocks = [self.blocksd.block_mols[i] for i in mol.blockidxs]
@@ -64,7 +71,8 @@ class PersistentSearchBuffer:
         mol.blocks = None
         if smi in self.smiles:
             return
-        self.mols.append((mol, mol_info['reward'], mol_info['QED'], smi))
+        self.mol_fps.append(mol_fp)
+        self.mols.append((mol, mol_info['reward'], mol_info['qed'], smi, mol_fp))
         self.sumtree.set(len(self.mols)-1, np.exp(mol_info['reward'] / self.temperature))
         self.smiles.add(smi)
 
@@ -76,18 +84,21 @@ class PersistentSearchBuffer:
         new_mols_idx = np.argsort([i[1] for i in self.mols])[int(self.prune_factor * len(self.mols)):]
         new_sum_tree = SumTree(self.max_size)
         new_mols = []
+        new_mol_fps = []
         new_smiles = set()
         for i, j in enumerate(new_mols_idx):
             new_mols.append(self.mols[j])
             new_sum_tree.set(i, self.mols[j][1])
             new_smiles.add(self.mols[j][3])
+            new_mol_fps.append(self.mol_fps[j][4])
         self.mols = new_mols
         self.sumtree = new_sum_tree
         self.smiles = new_smiles
+        self.mol_fps = new_mol_fps
 
 
 class BlockMolEnv_PersistentBuffer(BlockMolEnv_v3):
-    mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems", "blockidxs"]
+    mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems"]
 
     def __init__(self, config=None):
         super().__init__(config)
@@ -105,9 +116,11 @@ class BlockMolEnv_PersistentBuffer(BlockMolEnv_v3):
             last_reward = 0
         else:
             self.molMDP.molecule.blocks = None
-            ray.get(self.searchbuf.add.remote(self.molMDP.molecule, self.last_reward_info))
+            if len(self.last_reward_info.keys()) != 0:
+                ray.get(self.searchbuf.add.remote(self.molMDP.molecule, self.last_reward_info, self.get_fps(self.molMDP.molecule)[0]))
             self.molMDP.reset()
             self.molMDP.molecule, last_reward = ray.get(self.searchbuf.sample.remote())
+            import pdb; pdb.set_trace
             self.molMDP.molecule.blocks = [self.molMDP.block_mols[idx]
                                            for idx in self.molMDP.molecule.blockidxs]
             self.molMDP.molecule._mol = None
@@ -145,10 +158,14 @@ class BlockMolEnv_PersistentBuffer(BlockMolEnv_v3):
         self.num_steps += 1
         obs = self._make_obs()
         done = self._if_terminate()
-        reward, info = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
-        self.last_reward_info = copy(info)
-        info["molecule"] = self.molMDP.molecule
+        reward, log_vals = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
+        self.last_reward_info = copy(log_vals)
+        info = {"molecule" : self.molMDP.molecule, "log_vals": log_vals}
+        # import pdb;pdb.set_trace();
+        done = any((simulate, done))
+        exp_reward = ray.get(self.searchbuf.distance.remote(obs['mol_fp']))
+        # info["molecule"] = self.molMDP.molecule
         if self.penalize_repeat and reward != 0:
             if ray.get(self.searchbuf.contains.remote(self.molMDP.molecule)):
                 reward = 0 # exploration penalty
-        return obs, reward, done, info
+        return obs, reward + 1 * exp_reward, done, info
