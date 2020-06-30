@@ -6,6 +6,7 @@ from ray.rllib.models.catalog import ModelCatalog
 from LambdaZero.examples.AlphaZero.core.alpha_zero_trainer import AlphaZeroTrainer
 
 from ray.rllib.utils import merge_dicts
+from ray.rllib.agents.callbacks import DefaultCallbacks
 
 from LambdaZero.models.torch_models import MolActorCritic_thv1
 from LambdaZero.models.tf_models import MolActorCritic_tfv1
@@ -20,11 +21,22 @@ config = getattr(config,config_name)
 _, _, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
+class AZCallbacks(DefaultCallbacks):
+    def on_episode_start(self, worker, base_env, policies, episode):
+        # print("episode {} started".format(episode.episode_id))
+        episode.user_data["initial_state"] = base_env.get_unwrapped()[0].get_state()
+
+    def on_episode_end(self, worker, base_env, policies, episode):
+        env_info = list(episode._agent_to_last_info.values())[0]
+
+        for key, value in env_info["log_vals"].items():
+            episode.custom_metrics[key] = value
+
 DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 2,
+        "num_workers": 15,
         "sample_batch_size": 200,
         "train_batch_size": 4000,
         "sgd_minibatch_size": 128,
@@ -60,10 +72,10 @@ DEFAULT_CONFIG = {
         "num_cpus_per_worker": 1,
         "num_gpus": 0.4,
         "num_gpus_per_worker": 0.075,
-        "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},
+        "callbacks": AZCallbacks # {"on_episode_end": LambdaZero.utils.dock_metrics},
     },
     "summaries_dir": summaries_dir,
-    "memory": 100 * 10 ** 9,
+    "memory": 60 * 10 ** 9,
     "trainer": AlphaZeroTrainer,
     "checkpoint_freq": 5,
     "stop":{"training_iteration": 2000000},

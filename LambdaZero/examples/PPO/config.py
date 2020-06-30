@@ -66,7 +66,53 @@ ppo023 = {
     }
 }
 
+ppo023_multi = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_cutoff": [0, 4],
+                "ebind_cutoff": [42.5, 109.1], #8.5 std away
+                "synth_config": synth_config,
+                "binding_config": binding_config,
+            }
+
+        },
+        "model": {
+            "custom_model_config": {
+                "rnd_weight": 1
+            }
+        }
+    }
+}
+
 ppo024 = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_cutoff": [0, 4],
+                "ebind_cutoff": [42.5, 109.1], #8.5 std away
+                "synth_config": synth_config,
+                "binding_config": binding_config,
+            }
+
+        },
+        "model": {
+            "custom_options": {
+                "rnd_weight": 0.5
+            }
+        }
+    }
+}
+
+ppo024_multi = {
     # 3.2-3.3
     "rllib_config":{
         "env": BlockMolEnv_v3,

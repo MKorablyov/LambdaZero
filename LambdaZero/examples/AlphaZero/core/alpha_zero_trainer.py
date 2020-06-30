@@ -17,7 +17,6 @@ tf = try_import_tf()
 torch, nn = try_import_torch()
 logger = logging.getLogger(__name__)
 
-
 def on_episode_start(info):
     # save env state when an episode starts
     env = info["env"].get_unwrapped()[0]
@@ -29,7 +28,7 @@ def on_episode_start(info):
 # __sphinx_doc_begin__
 DEFAULT_CONFIG = with_common_config({
     # Use pytorch
-    "use_pytorch": True,
+    "framework": "torch",
     # Size of batches collected from each worker
     "rollout_fragment_length": 200,
     # Number of timesteps collected for each SGD round

@@ -100,15 +100,20 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         else: 
             self.rnd_weight = 0
 
+        if "rnd_output_dim" in model_config['custom_model_config'].keys():
+            rnd_output_dim = model_config['custom_model_config']["rnd_output_dim"]
+        else: 
+            rnd_output_dim = 1
+
         if self.rnd_weight > 0:
             self.rnd_target = nn.Sequential(
                 nn.Linear(in_features=7619, out_features=256),nn.ReLU(),
                 nn.Linear(in_features=256, out_features=256), nn.ReLU(),
-                nn.Linear(in_features=256, out_features=1))
+                nn.Linear(in_features=256, out_features=rnd_output_dim))
             self.rnd_predictor = nn.Sequential(
                 nn.Linear(in_features=7619, out_features=256),nn.ReLU(),
                 nn.Linear(in_features=256, out_features=256), nn.ReLU(),
-                nn.Linear(in_features=256, out_features=1))
+                nn.Linear(in_features=256, out_features=rnd_output_dim))
             self.rnd_obs_stats = RunningMeanStd(shape=(7619))
             self.rnd_rew_stats = RunningMeanStd(shape=())
             # Freeze target network
