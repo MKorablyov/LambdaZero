@@ -70,7 +70,7 @@ DEFAULT_CONFIG = {
         # Number of episodes to run per evaluation period.
         "evaluation_num_episodes": 1,
         "num_cpus_per_worker": 1,
-        "num_gpus": 0.4,
+        "num_gpus": 2,
         "num_gpus_per_worker": 0.075,
         "callbacks": AZCallbacks # {"on_episode_end": LambdaZero.utils.dock_metrics},
     },
