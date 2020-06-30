@@ -153,7 +153,12 @@ class BlockMolEnv_v3:
         obs = self._make_obs()
         env_stop = self._if_terminate()
         reward, log_vals = self.reward(self.molMDP.molecule, agent_stop, env_stop, self.num_steps)
-        info = {"molecule" : self.molMDP.molecule, "log_vals": log_vals}
+        if (self.molMDP.molecule.mol is not None):
+            smiles = Chem.MolToSmiles(self.molMDP.molecule.mol)
+        else:
+            smiles = None
+        info = {"molecule": smiles, "log_vals": log_vals}
+        #info = {"molecule": self.molMDP.molecule, "log_vals": log_vals}
         done = any((agent_stop, env_stop))
         return obs, reward, done, info
 
