@@ -30,13 +30,15 @@ class cfg:
 	device = "cuda"  # TODO: change to "cuda"
 	
 	db_name = "actor_dock"
+	
 	db_path = osp.join(datasets_dir, db_name)
 	if not osp.exists(db_path):
 		os.mkdir(db_path)
+		
 	results_dir = osp.join(datasets_dir, db_name, "raw")
 	if not osp.exists(results_dir):
 		os.mkdir(results_dir)
-	out_dir = osp.join(datasets_dir, db_name, "dock")
+	# out_dir = osp.join(datasets_dir, db_name, "dock")
 	
 	# env parameters
 	blocks_file = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
