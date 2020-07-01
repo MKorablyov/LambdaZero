@@ -7,9 +7,6 @@ import torch
 
 FP_N_BITS = 1024
 
-@ray.remote
-def _process_drug_subgraph()
-
 def get_fingerprint(smile, radius, n_bits):
     if smile == 'none':
         return np.array([-1]*n_bits)
@@ -33,37 +30,46 @@ def to_drug_induced_subgraphs(data_list):
         _, idx_start = np.unique(re_index[0,:], return_index=True)
         drug_to_prot_sorted = [re_index[:, split] for split in np.split(all_idxs, idx_start[1:])]
 
-        drug_graphs = []
-        for drug_subgraph_idx in drug_to_prot_sorted:
-            protein_ftrs = data.x[np.sort(drug_subgraph_idx[1,:])]
-            drug_ftr = data.x[drug_subgraph_idx[0,0]]
+        # split[0,0] is a tensor, so call item() on it to get the int out
+        drug_idx_to_split = {split[0,0].item(): split for split in drug_to_prot_sorted}
 
-            ftrs = np.vstack([drug_ftr, protein_ftrs])
-
-            # Convert edge index to format for small graph
-
-            # Use np.unique + 1 to create bins for use in np.digitize
-            bins = np.unique(drug_subgraph_idx[1,:]) + 1
-
-            # Add 1 here so the 0th index of edges will refer to the drug node
-            drug_subgraph_idx[1,:] = torch.from_numpy(np.digitize(drug_subgraph_idx[1,:], bins) + 1)
-            drug_subgraph_idx[0,:] = 0
-
-            drug_graphs.append(Data(x=ftrs, edge_index=drug_subgraph_idx))
-
-        import pdb; pdb.set_trace()
         ddi_edge_idx_range = data.graph_type_idx_ranges['ddi']
         ddi_edge_idx = all_edge_idx[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
+        unique_drugs = np.unique(np.hstack([ddi_edge_idx.flatten(), re_index[0,:]]))
 
-        num_drugs = np.unique(ddi_edge_idx.flatten()).shape[0]
+        drug_graphs = []
+        for drug in unique_drugs:
+            new_graph = None
+            if drug not in drug_idx_to_split:
+                new_graph = Data(x=data.x[drug], edge_index=torch.tensor([], dtype=torch.long))
+            else:
+                drug_subgraph_idx = drug_idx_to_split[drug]
+                protein_ftrs = data.x[np.sort(drug_subgraph_idx[1,:])]
+                drug_ftr = data.x[drug_subgraph_idx[0,0]]
+
+                ftrs = np.vstack([drug_ftr, protein_ftrs])
+
+                # Convert edge index to format for small graph
+
+                # Use np.unique + 1 to create bins for use in np.digitize
+                bins = np.unique(drug_subgraph_idx[1,:]) + 1
+
+                # Add 1 here so the 0th index of edges will refer to the drug node
+                drug_subgraph_idx[1,:] = torch.from_numpy(np.digitize(drug_subgraph_idx[1,:], bins) + 1)
+                drug_subgraph_idx[0,:] = 0
+
+                new_graph = Data(x=ftrs, edge_index=drug_subgraph_idx)
+
+            drug_graphs.append(new_graph)
+
         super_graph = Data(
-            x=data.x[:num_drugs],
+            x=data.x[:len(unique_drugs)],
             edge_index=data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
             edge_attr=data.edge_attr[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
         )
 
         super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
-        super_graph.drug_graphs = drug_graphs
+        super_graph.drug_idx_to_graph = {unique_drugs[i]: i for i, drug_graph in enumerate(drug_graphs)}
 
         new_data_list.append(super_graph)
 
@@ -168,7 +174,6 @@ class DrugCombDb(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
 
     def _get_node_ftrs(self, nodes):
-        import pdb; pdb.set_trace()
         node_ftrs = nodes.fillna(-1)
         node_ftrs = node_ftrs.drop(['cIds', 'drugNameOfficial', 'molecularWeight',
                                     'smilesString', 'name', 'has_fp', 'is_drug'], axis=1)
@@ -221,7 +226,6 @@ class DrugCombDb(InMemoryDataset):
         protein_nodes['is_drug'] = 0
         protein_nodes['has_fp'] = False
 
-        import pdb; pdb.set_trace()
         one_hot = pd.get_dummies(protein_nodes['name'])
         protein_nodes = protein_nodes.join(one_hot)
 
