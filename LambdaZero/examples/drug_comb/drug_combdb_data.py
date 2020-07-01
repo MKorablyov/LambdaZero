@@ -5,6 +5,11 @@ import numpy as np
 import pandas as pd
 import torch
 
+FP_N_BITS = 1024
+
+@ray.remote
+def _process_drug_subgraph()
+
 def get_fingerprint(smile, radius, n_bits):
     if smile == 'none':
         return np.array([-1]*n_bits)
@@ -13,7 +18,59 @@ def get_fingerprint(smile, radius, n_bits):
     except:
         return np.array([-1]*n_bits)
 
-def transform_to_bipartite_drug_protein_graph(data_list):
+def to_drug_induced_subgraphs(data_list):
+    new_data_list = []
+    for data in data_list:
+        all_edge_idx = data.edge_index
+
+        dpi_edge_idx_range = data.graph_type_idx_ranges['dpi']
+        dpi_edge_idx = all_edge_idx[:, dpi_edge_idx_range[0]:dpi_edge_idx_range[1]]
+
+        idx_sorts = dpi_edge_idx[0,:].argsort()
+        re_index = dpi_edge_idx[:, idx_sorts]
+
+        all_idxs = np.arange(re_index.shape[1])
+        _, idx_start = np.unique(re_index[0,:], return_index=True)
+        drug_to_prot_sorted = [re_index[:, split] for split in np.split(all_idxs, idx_start[1:])]
+
+        drug_graphs = []
+        for drug_subgraph_idx in drug_to_prot_sorted:
+            protein_ftrs = data.x[np.sort(drug_subgraph_idx[1,:])]
+            drug_ftr = data.x[drug_subgraph_idx[0,0]]
+
+            ftrs = np.vstack([drug_ftr, protein_ftrs])
+
+            # Convert edge index to format for small graph
+
+            # Use np.unique + 1 to create bins for use in np.digitize
+            bins = np.unique(drug_subgraph_idx[1,:]) + 1
+
+            # Add 1 here so the 0th index of edges will refer to the drug node
+            drug_subgraph_idx[1,:] = torch.from_numpy(np.digitize(drug_subgraph_idx[1,:], bins) + 1)
+            drug_subgraph_idx[0,:] = 0
+
+            drug_graphs.append(Data(x=ftrs, edge_index=drug_subgraph_idx))
+
+        import pdb; pdb.set_trace()
+        ddi_edge_idx_range = data.graph_type_idx_ranges['ddi']
+        ddi_edge_idx = all_edge_idx[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
+
+        num_drugs = np.unique(ddi_edge_idx.flatten()).shape[0]
+        super_graph = Data(
+            x=data.x[:num_drugs],
+            edge_index=data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
+            edge_attr=data.edge_attr[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
+        )
+
+        super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
+        super_graph.drug_graphs = drug_graphs
+
+        new_data_list.append(super_graph)
+
+    return new_data_list
+
+
+def to_bipartite_drug_protein_graph(data_list):
     new_data_list = []
     for data in data_list:
         dpi_edge_idx_range = data.graph_type_idx_ranges['dpi']
@@ -111,9 +168,10 @@ class DrugCombDb(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
 
     def _get_node_ftrs(self, nodes):
+        import pdb; pdb.set_trace()
         node_ftrs = nodes.fillna(-1)
-        node_ftrs = node_ftrs.drop(
-            ['cIds', 'drugNameOfficial', 'molecularWeight', 'smilesString', 'name'], axis=1)
+        node_ftrs = node_ftrs.drop(['cIds', 'drugNameOfficial', 'molecularWeight',
+                                    'smilesString', 'name', 'has_fp', 'is_drug'], axis=1)
 
         return node_ftrs.to_numpy().astype(np.int)
 
@@ -139,17 +197,16 @@ class DrugCombDb(InMemoryDataset):
         return drug_nodes
 
     def _augment_drug_info_with_fp(self, drug_chem_info_no_fp):
-        n_bits = 1024
         radius = 4
 
         all_fp = drug_chem_info_no_fp['smilesString'].apply(
-            lambda s: get_fingerprint(s, radius=radius, n_bits=n_bits)
+            lambda s: get_fingerprint(s, radius=radius, n_bits=FP_N_BITS)
         )
 
         # Convert to dataframe
         all_fp = list(all_fp)
         all_fp = [list(fp) for fp in all_fp]
-        all_fp = pd.DataFrame(all_fp, columns=["fp" + str(i) for i in range(n_bits)])
+        all_fp = pd.DataFrame(all_fp, columns=["fp" + str(i) for i in range(FP_N_BITS)])
 
         return pd.concat((drug_chem_info_no_fp, all_fp), axis=1)
 
@@ -163,6 +220,10 @@ class DrugCombDb(InMemoryDataset):
         protein_nodes = pd.DataFrame(all_proteins, columns=['name'])
         protein_nodes['is_drug'] = 0
         protein_nodes['has_fp'] = False
+
+        import pdb; pdb.set_trace()
+        one_hot = pd.get_dummies(protein_nodes['name'])
+        protein_nodes = protein_nodes.join(one_hot)
 
         return protein_nodes
 
@@ -263,6 +324,5 @@ class DrugCombDb(InMemoryDataset):
         return graph_type_idx_ranges
 
 if __name__ == '__main__':
-    dataset = DrugCombDb(pre_transform=transform_to_bipartite_drug_protein_graph)
-    import pdb; pdb.set_trace()
+    dataset = DrugCombDb(pre_transform=to_drug_induced_subgraphs)
 
