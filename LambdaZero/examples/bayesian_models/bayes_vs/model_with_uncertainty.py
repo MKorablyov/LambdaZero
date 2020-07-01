@@ -14,12 +14,7 @@ from sklearn.model_selection import train_test_split
 from blitz.modules import BayesianLinear
 import ray
 from ray import tune
-#from ray.tune.logger import UnifiedLogger
 from torch.utils.tensorboard import SummaryWriter
-
-#from LambdaZero.utils import get_external_dirs
-
-
 
 class FingerprintDataset:
     def __init__(self, config, device, filename='d4_250k_clust.parquet',x_name='fingerprint', y_name='dockscore'):
@@ -40,17 +35,17 @@ class FingerprintDataset:
  
     def train_set(self):
         train_dataset = TensorDataset(self.x_train, self.y_train)
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size)#, collate_fn=collate_wrapper)
         return train_dataset, train_loader
  
     def test_set(self):
         test_dataset = TensorDataset(self.x_test, self.y_test)
-        test_loader = DataLoader(test_dataset, batch_size=self.batch_size)
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size)#, collate_fn=collate_wrapper)
         return test_dataset, test_loader
  
     def val_set(self):
         val_dataset = TensorDataset(self.x_val, self.y_val)
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size)#, collate_fn=collate_wrapper)
         return val_dataset, val_loader
  
 class main(tune.Trainable):
@@ -71,8 +66,15 @@ class main(tune.Trainable):
         self.top_mol_dict = {}
         self.top_batch_dict = {}
 
-        self.aq_fxns = {'random': self.acquirer.random_aq, 'greedy': self.acquirer.egreedy_aq, 'egreedy': self.acquirer.egreedy_aq, 'ucb': 
-self.acquirer.ucb_aq, 'thompson': self.acquirer.thompson_aq}
+        self.regressor = ModelWithUncertainty(1024, 1)
+        self.regressor = self.regressor.to(self.device)
+
+        self.trainer = Trainer(self.config, torch.nn.MSELoss(), torch.optim.Adam(self.regressor.parameters(), lr=self.config["lr"]))
+
+        self.is_aquired = np.zeros(len(self.train_set),dtype=np.bool)
+        self.is_aquired[np.random.choice(np.arange(len(self.train_set)), self.config['aq_batch_size'])] = True
+
+        self.aq_fxns = {'random': self.acquirer.random_aq, 'greedy': self.acquirer.egreedy_aq, 'egreedy': self.acquirer.egreedy_aq, 'ucb': self.acquirer.ucb_aq, 'thompson': self.acquirer.thompson_aq}
         self.aq_fxn = self.aq_fxns[config['aq_function']]
         # make epochs
         self.train_epoch = config["train_epoch"]
@@ -89,61 +91,40 @@ self.acquirer.ucb_aq, 'thompson': self.acquirer.thompson_aq}
 
         top_mol = []
         top_batch = []
-
-        self.regressor = ModelWithUncertainty(1024, 1)
-        self.regressor = self.regressor.to(self.device)
-
-        trainer = Trainer(self.config, torch.nn.MSELoss(), torch.optim.Adam(self.regressor.parameters(), lr=self.config["lr"]))
-
-        is_aquired = np.zeros(len(self.train_set),dtype=np.bool)
-        is_aquired[np.random.choice(np.arange(len(self.train_set)), self.config['aq_batch_size'])] = True
     
         test_losses = []
         train_losses = []
 
-        while np.count_nonzero(is_aquired) < len(self.train_set) and np.count_nonzero(is_aquired) < self.config['sample_size']:
-            aq_set = Subset(self.train_set, np.where(is_aquired)[0])
-            aq_loader = torch.utils.data.DataLoader(aq_set, batch_size=self.config['aq_batch_size'])
-            
-            # train model
-            for i in range(self.train_epoch):
-                trn_loss = trainer.train(self.regressor, aq_loader)
-    
-            tst_loss = trainer.evalu(self.test_loader, self.regressor)
-            test_losses.append(tst_loss)
-            train_losses.append(trn_loss)
-    
-            # acquire more data
-            rest_set = Subset(self.train_set, np.where(~is_aquired)[0])
-            rest_loader = DataLoader(rest_set, batch_size=self.config['aq_batch_size'])
-
-            ys, output = trainer.rest_evalu(aq_loader, self.regressor) 
-            output_indices = np.argsort(ys) 
-            ys = ys[output_indices]
-            top_pred = ys[0]
-            top_mol.append(top_pred)
-
-            # writer.add_scalar('Values {}'.format(name), top_pred)
-    
-            aq_indices = self.aq_fxn(rest_loader, self.regressor)
-            is_aquired[aq_indices] = True
-
-            batch_set = Subset(self.train_set, aq_indices)      
-            batch_ys = [y.detach().cpu().numpy() for (_, y) in batch_set]
-            top_batch.append(np.amin(np.array(batch_ys)))
-            #self.writer.add_scalar('top_mol', np.array(top_pred))
-            #self.writer.add_scalar('top_batch', np.amin(np.array(batch_ys)))
-            #self.logger.on_result(np.amin(np.array(batch_ys)))
-
-        self.top_mol_dict[name] = top_mol
-        self.top_batch_dict[name] = top_batch
+        # while np.count_nonzero(is_aquired) < len(self.train_set) and np.count_nonzero(is_aquired) < self.config['sample_size']:
+        aq_set = Subset(self.train_set, np.where(self.is_aquired)[0])
+        aq_loader = torch.utils.data.DataLoader(aq_set, batch_size=self.config['aq_batch_size'])
         
-        return {'top_mol_{}'.format(name) : top_mol, 'top_batch_{}'.format(name) : top_batch}
-        for i, j in enumerate(top_mol):
-            self.writer.add_scalar('top_mol', j, i * self.config['aq_batch_size'])
-        for i, j in enumerate(top_batch):
-            self.writer.add_scalar('top_batch', j, i * self.conf['aq_batch_size'])
-        self.writer.close()
+        # train model
+        for i in range(self.train_epoch):
+            trn_loss = self.trainer.train(self.regressor, aq_loader)
+
+        tst_loss = self.trainer.evalu(self.test_loader, self.regressor)
+        test_losses.append(tst_loss)
+        train_losses.append(trn_loss)
+
+        # acquire more data
+        rest_set = Subset(self.train_set, np.where(~self.is_aquired)[0])
+        rest_loader = DataLoader(rest_set, batch_size=self.config['aq_batch_size'])
+
+        ys, output = self.trainer.rest_evalu(aq_loader, self.regressor) 
+        output_indices = np.argsort(ys) 
+        ys = ys[output_indices]
+        top_pred = ys[0]
+        top_mol.append(top_pred)
+
+        aq_indices = self.aq_fxn(rest_loader, self.regressor)
+        self.is_aquired[aq_indices] = True
+
+        batch_set = Subset(self.train_set, aq_indices)      
+        batch_ys = [y.detach().cpu().numpy() for (_, y) in batch_set]
+        top_batch.append(np.amin(np.array(batch_ys)))
+
+        return {'train_top_mol_{}'.format(name) : top_pred, 'train_top_batch_{}'.format(name) : np.amin(np.array(batch_ys))}
 
         #for name, vals in self.top_mol_dict.items():
         #    plt.scatter(np.linspace(self.config['aq_batch_size'], self.config['sample_size'], len(vals)), vals, label = name)
@@ -314,7 +295,7 @@ class Acquirer:
       aq_order = np.argsort(np.concatenate(preds.detach().cpu().numpy(), axis=0))
 
       return aq_order[:self.batch_aq_num]
-      
+
   
   def thompson_aq(self, loader, model):
       if self.config['mcdrop']:
@@ -365,12 +346,12 @@ aq_functions = ['random', 'greedy', 'egreedy', 'ucb', 'thompson']
 cfg = {
   "trainer": main,
    "trainer_config": {
-        "aq_function": aq_functions[1],
+        "aq_function": aq_functions[0],
         "lr": 0.001,
         "train_epoch": 3,
-        "sample_size": 2000,
+        "sample_size": 20000,
         "aq_batch_size": 512,
-        "mcdrop": True,
+        "mcdrop": False,
 	"summaries_dir": '/home/jchen1/joanna-temp/summaries'
         },
   
@@ -387,7 +368,7 @@ if __name__ == '__main__':
                         config=config["trainer_config"],
                         stop=config["stop"], #EarlyStop(),
                         resources_per_trial={
-                           "cpu": 2, # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
+                           "cpu": 2, 
                            "gpu": 1.0
                         },
                         num_samples=100,
