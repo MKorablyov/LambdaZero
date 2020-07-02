@@ -1,6 +1,5 @@
 import socket, os, time
 import numpy as np
-import os.path as osp
 import math
 
 import torch
@@ -170,7 +169,7 @@ class BasicRegressor(tune.Trainable):
         return checkpoint_path
 
     def _restore(self, checkpoint_path):
-        self.model.load_state_dict(th.load(checkpoint_path))
+        self.model.load_state_dict(torch.load(checkpoint_path))
 
 
 if len(sys.argv) == 2: 
