@@ -47,6 +47,7 @@ dependencies:
   - rdflib
   - scikit-learn
   - threadpoolctl
+  - line_profiler==2.1.2
   - pip:
     - -f https://pytorch-geometric.com/whl/torch-1.5.0.html
     - torch-scatter==latest+cu101

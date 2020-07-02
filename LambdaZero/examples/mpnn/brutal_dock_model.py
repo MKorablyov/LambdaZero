@@ -1,24 +1,11 @@
-import argparse
-import json
 import os
 import socket
-import sys
+from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import torch
-import torch.nn.functional as F
-import torch_geometric.transforms as T
-from torch_geometric.data import DataLoader
-from torch_geometric.utils import remove_self_loops
-from tqdm import tqdm
 
-from LambdaZero import inputs
-from LambdaZero.datasets.brutal_dock import ROOT_DIR, RESULTS_DIR
-from LambdaZero.models import MPNNet
-
-model_summary_dir = RESULTS_DIR.joinpath("model_summaries")
-model_summary_dir.mkdir(parents=True, exist_ok=True)
+from LambdaZero.utils import get_external_dirs
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -29,9 +16,7 @@ class cfg:
         programs_dir = "/home/maksym/Programs"
         summaries_dir = "/home/maksym/Desktop/model_summaries"
     else:
-        datasets_dir = str(ROOT_DIR.joinpath("Datasets"))
-        programs_dir = str(ROOT_DIR.joinpath("Programs"))
-        summaries_dir = str(model_summary_dir)
+        datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
     load_model = None  # os.path.join(datasets_dir, "brutal_dock/d4/d4_100k_mine_model_001")
     db_root = os.path.join(datasets_dir, "brutal_dock/d4")
@@ -45,10 +30,8 @@ class cfg:
     b_size = 16
     dim = 64
     num_epochs = 120
-    outpath = str(model_summary_dir.joinpath("brutal_dock"))
+    outpath = str(Path(summaries_dir).joinpath("brutal_dock"))
     model_name = db_name + "model002"
-
-
 
 
 def random_split(dataset, test_prob, valid_prob,

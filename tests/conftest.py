@@ -11,7 +11,7 @@ import pytest
 import torch
 from torch_geometric.data import Batch
 
-from LambdaZero.datasets.temp_brunos_work.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
+
 from tests.fake_molecule_dataset import FakeMoleculeDataset
 from tests.fake_molecules import get_random_molecule_data
 from tests.testing_utils import generate_random_string
@@ -19,7 +19,10 @@ from tests.testing_utils import generate_random_string
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--external_program", action="store_true", default=False, help="run external program integration tests"
+        "--external_program",
+        action="store_true",
+        default=False,
+        help="run external program integration tests",
     )
 
 
@@ -27,12 +30,12 @@ def pytest_collection_modifyitems(config, items):
     if config.getoption("--external_program"):
         # if --external_program is given in cli, then do not skip external program integration smoke tests
         return
-    skip_external_program_integration = pytest.mark.skip(reason="need --external_program option to run")
+    skip_external_program_integration = pytest.mark.skip(
+        reason="need --external_program option to run"
+    )
     for item in items:
         if "external_program" in item.keywords:
             item.add_marker(skip_external_program_integration)
-
-
 
 
 @pytest.fixture
@@ -93,18 +96,27 @@ def number_of_edge_features():
 
 
 @pytest.fixture
-def list_random_molecules(list_of_node_count, number_of_node_features, list_positions,
-                          number_of_edge_features, list_gridscores, list_klabels):
+def list_random_molecules(
+    list_of_node_count,
+    number_of_node_features,
+    list_positions,
+    number_of_edge_features,
+    list_gridscores,
+    list_klabels,
+):
 
     list_molecules = []
-    for number_of_nodes, positions, gridscore, klabel in \
-            zip(list_of_node_count, list_positions, list_gridscores, list_klabels):
-        fake_molecule_data = get_random_molecule_data(number_of_nodes,
-                                                      number_of_node_features,
-                                                      positions,
-                                                      number_of_edge_features,
-                                                      gridscore,
-                                                      klabel)
+    for number_of_nodes, positions, gridscore, klabel in zip(
+        list_of_node_count, list_positions, list_gridscores, list_klabels
+    ):
+        fake_molecule_data = get_random_molecule_data(
+            number_of_nodes,
+            number_of_node_features,
+            positions,
+            number_of_edge_features,
+            gridscore,
+            klabel,
+        )
         list_molecules.append(fake_molecule_data)
     return list_molecules
 
@@ -137,42 +149,45 @@ def tracking_uri():
 
 @pytest.fixture
 def experiment_name():
-    return 'some-fake-experiment-name'
+    return "some-fake-experiment-name"
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def easy_smiles():
-    list_smiles = ['CC(C)=CC(C)(C)O',
-                   'CC(C)=CC(=O)NC(C#N)P(=O)(O)O',
-                   'O=[SH](=O)S(=O)(=O)O',
-                   'CC(C)=CN1CCN(P(=O)(O)O)CC1',
-                   'CC(C)(O)C(F)(F)F',
-                   'c1ccc2cc(N3CCOCC3)ccc2c1',
-                   'CC(C)(O)Br',
-                   'CC(=O)N[SH](=O)=O',
-                   'CC(C)=CC1CC(C(NC(=O)C(C)O)NC(=O)S(=O)(=O)O)N(c2ccc3ccccc3c2)C1C(C)C',
-                   'C1=C(c2ccc[nH]2)CCCC1',
-                   'O=C(NCF)C1=CCCCC1',
-                   'CC(=Cc1cc[nH]c1)CCCl',
-                   'CC(=O)NC(=O)NC1=CN(I)C=CC1']
+    list_smiles = [
+        "CC(C)=CC(C)(C)O",
+        "CC(C)=CC(=O)NC(C#N)P(=O)(O)O",
+        "O=[SH](=O)S(=O)(=O)O",
+        "CC(C)=CN1CCN(P(=O)(O)O)CC1",
+        "CC(C)(O)C(F)(F)F",
+        "c1ccc2cc(N3CCOCC3)ccc2c1",
+        "CC(C)(O)Br",
+        "CC(=O)N[SH](=O)=O",
+        "CC(C)=CC1CC(C(NC(=O)C(C)O)NC(=O)S(=O)(=O)O)N(c2ccc3ccccc3c2)C1C(C)C",
+        "C1=C(c2ccc[nH]2)CCCC1",
+        "O=C(NCF)C1=CCCCC1",
+        "CC(=Cc1cc[nH]c1)CCCl",
+        "CC(=O)NC(=O)NC1=CN(I)C=CC1",
+    ]
 
     return list_smiles
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def hard_smiles():
-    list_smiles = ['Nn1cnc2c([PH](=O)[O-])ncnc21',
-                   'N=C[n+]1cccc(-[n+]2cccc(C(NC(=O)c3csc(N4C=CCC(S)=C4)n3)[NH+]3CCOCC3)c2)c1',
-                   'O=C(NC([NH+]1CCOCC1)[PH](=O)O)n1ccc(S(=O)(=O)O)nc1=O',
-                   'CC(O)c1cn(C(C)O)c(=O)[nH]c1=O',
-                   'CC(=O)NCc1ccn(C2CNc3nc(-c4ccc[nH]4)[nH]c(=O)c3N2)c(=O)n1',
-                   'C[SH+]c1cc[nH]c1',
-                   'O=c1[nH]cc(-n2cnc3c(C4C(C5CNc6nc(C(F)(F)F)[nH]c(=O)c6N5)CCOC4[n+]4ccccc4)ncnc32)c(=O)[nH]1',
-                   ]
+    list_smiles = [
+        "Nn1cnc2c([PH](=O)[O-])ncnc21",
+        "N=C[n+]1cccc(-[n+]2cccc(C(NC(=O)c3csc(N4C=CCC(S)=C4)n3)[NH+]3CCOCC3)c2)c1",
+        "O=C(NC([NH+]1CCOCC1)[PH](=O)O)n1ccc(S(=O)(=O)O)nc1=O",
+        "CC(O)c1cn(C(C)O)c(=O)[nH]c1=O",
+        "CC(=O)NCc1ccn(C2CNc3nc(-c4ccc[nH]4)[nH]c(=O)c3N2)c(=O)n1",
+        "C[SH+]c1cc[nH]c1",
+        "O=c1[nH]cc(-n2cnc3c(C4C(C5CNc6nc(C(F)(F)F)[nH]c(=O)c6N5)CCOC4[n+]4ccccc4)ncnc32)c(=O)[nH]1",
+    ]
     return list_smiles
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def realistic_smiles(easy_smiles, hard_smiles):
     list_smiles = []
     list_smiles.extend(easy_smiles)
@@ -180,7 +195,7 @@ def realistic_smiles(easy_smiles, hard_smiles):
     return list_smiles
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def smiles_and_scores_dataframe(realistic_smiles):
 
     np.random.seed(213421)
@@ -189,21 +204,19 @@ def smiles_and_scores_dataframe(realistic_smiles):
     gridscores = np.random.rand(number_of_smiles)
     mol_names = [generate_random_string(15) for _ in range(number_of_smiles)]
 
-    df = pd.DataFrame(data={'smiles': realistic_smiles,
-                            'mol_name': mol_names,
-                            'gridscore': gridscores,
-                            'klabel': klabels})
+    df = pd.DataFrame(
+        data={
+            "smiles": realistic_smiles,
+            "mol_name": mol_names,
+            "gridscore": gridscores,
+            "klabel": klabels,
+        }
+    )
 
     return df
 
 
-@pytest.fixture
-def list_real_molecules(smiles_and_scores_dataframe):
-    list_graphs = get_molecule_graphs_from_raw_data_dataframe(smiles_and_scores_dataframe)
-    return list_graphs
-
-
-@pytest.fixture
+@pytest.fixture(scope="session")
 def real_molecule_batch(list_real_molecules):
     return Batch.from_data_list(list_real_molecules)
 
