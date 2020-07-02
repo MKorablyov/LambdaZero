@@ -2,7 +2,8 @@ import socket, os, time
 import numpy as np
 import os.path as osp
 import math
-import torch as th
+
+import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data import Subset
@@ -69,8 +70,8 @@ def eval_epoch(loader, model, device, config):
 
     metrics = {"loss": 0, "mse": 0, "mae": 0, "mae_regret": 0, "mse_regret": 0}
 
-    running_preds = th.tensor([],requires_grad=False)
-    running_gc = th.tensor([],requires_grad=False)
+    running_preds = torch.tensor([],requires_grad=False)
+    running_gc = torch.tensor([],requires_grad=False)
 
     for bidx, data in enumerate(loader):
 
@@ -81,13 +82,13 @@ def eval_epoch(loader, model, device, config):
         pred = (logit * target_norm[1]) + target_norm[0]
         y = getattr(data, target)
     
-        highest_ys = th.topk(y.cpu(), config['num_rank'])
-        running_gc = th.cat((running_gc, highest_ys[0]), 0)
-        running_gc = th.topk(running_gc, config['num_rank'])[0]
+        highest_ys = torch.topk(y.cpu(), config['num_rank'])
+        running_gc = torch.cat((running_gc, highest_ys[0]), 0)
+        running_gc = torch.topk(running_gc, config['num_rank'])[0]
 
-        highest_preds = th.topk(pred.cpu(), config['num_rank'])
-        running_preds = th.cat((running_preds, highest_preds[0]), 0)
-        running_preds = (th.topk(running_preds, config['num_rank'])[0]).detach()
+        highest_preds = torch.topk(pred.cpu(), config['num_rank'])
+        running_preds = torch.cat((running_preds, highest_preds[0]), 0)
+        running_preds = (torch.topk(running_preds, config['num_rank'])[0]).detach()
         
         loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
         metrics["loss"] += loss.item() * data.num_graphs
@@ -107,12 +108,12 @@ class BasicRegressor(tune.Trainable):
     def _setup(self, config):
 
         self.config = config
-        self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # make model
         self.model = LambdaZero.models.MPNNet()
         self.model.to(self.device)
-        self.optim = th.optim.Adam(self.model.parameters(), lr=config["lr"])
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
 
         # load dataset
         dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
@@ -131,16 +132,16 @@ class BasicRegressor(tune.Trainable):
         train_idxs = train_idxs[:-1]
         
         if config['use_sampler']:
-            train_dataset = dataset[th.tensor(train_idxs)]
+            train_dataset = dataset[torch.tensor(train_idxs)]
 
             energies = [abs(energy.gridscore) for energy in train_dataset]
             sum_energies = sum(energies)
             self.max_val = max(energies)/sum_energies
             energies_prob = [math.pow((x/sum_energies),config['pow']) for x in energies]
         
-            energies = th.tensor(energies_prob).double()
+            energies = torch.tensor(energies_prob).double()
         
-            sampler = th.utils.data.sampler.WeightedRandomSampler(energies, bsize, replacement=True)
+            sampler = torch.utils.data.sampler.WeightedRandomSampler(energies, bsize, replacement=True)
         
         train_subset = Subset(dataset, train_idxs.tolist())
         val_subset = Subset(dataset, val_idxs.tolist())
@@ -165,7 +166,7 @@ class BasicRegressor(tune.Trainable):
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
-        th.save(self.model.state_dict(), checkpoint_path)
+        torch.save(self.model.state_dict(), checkpoint_path)
         return checkpoint_path
 
     def _restore(self, checkpoint_path):
