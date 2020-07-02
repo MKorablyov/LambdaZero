@@ -66,7 +66,7 @@ class BasicRegressor(tune.Trainable):
         self.val_set = dataset[torch.tensor(val_idxs)]
         self.test_set = dataset[torch.tensor(test_idxs)]
 
-        self.model = SubgraphEmbeddingRegressorModel()
+        self.model = SubgraphEmbeddingRegressorModel(config)
         self.model.to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters, lr=config["lr"])
 
