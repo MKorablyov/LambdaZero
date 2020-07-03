@@ -4,8 +4,9 @@ from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Batch
 from torch.utils.data import TensorDataset, DataLoader
 from ray import tune
-import ray
 import numpy as np
+import torch.nn.functional as F
+import ray
 import torch
 
 def random_split(num_examples, test_prob, valid_prob):
@@ -47,16 +48,19 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
         metrics["mse"] += ((y - preds) ** 2).sum().item()
         metrics["mae"] += ((y - preds).abs()).sum().item()
 
+        print('MSE: %f' % loss.item())
+
     metrics["loss"] = metrics["loss"] / len(dataset)
     metrics["mse"] = metrics["mse"] / len(dataset)
     metrics["mae"] = metrics["mae"] / len(dataset)
     return metrics
 
 def eval_epoch(dataset, eval_idxs,  model, device, config):
-    subgraph_dataset = TensorDataset(dataset.edge_index[:, eval_idxs],
-                                     dataset.edge_classes[eval_idxs], dataset.y[eval_idxs])
+    subgraph_dataset = TensorDataset(dataset.edge_index[:, eval_idxs].T,
+                                     dataset.edge_classes[eval_idxs],
+                                     dataset.y[eval_idxs])
     loader = DataLoader(dataset, batch_size=config["batch_size"])
-    model.eval()()
+    model.eval()
 
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for drug_drug_batch in loader:
