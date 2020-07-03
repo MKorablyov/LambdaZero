@@ -1,5 +1,7 @@
 # LambdaZero: search in the space of small molecules
 
+Note: Instructions on how to access, set up, and manage slurm jobs on the MILA Cluster and Compute Canada (Beluga) can be found on the [MILA Docs](https://docs.mila.quebec/). 
+
 ## Install
 Install anaconda: [miniconda](https://docs.conda.io/en/latest/miniconda.html)
 
