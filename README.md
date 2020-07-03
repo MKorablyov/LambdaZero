@@ -37,10 +37,10 @@ pip install numpy
 pip install tensorflow_gpu --no-index
 pip install torch==1.5.0+cu101 torchvision==0.6.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
 pip install torch-cluster==1.5.5+cu101 torch-scatter==2.0.4+cu101 torch-sparse==0.6.5+cu101 torch-spline-conv==1.2.0+cu101 -f https://pytorch-geometric.com/whl/torch-1.5.0.html
-pip install torch-geometric
+pip install torch-geometric==1.5.0
 # install ray
-wget -O ray-0.9.0.dev0-cp36-cp36m-linux_x86_64.whl https://ray-wheels.s3-us-west-2.amazonaws.com/master/11c2b500b86e1a02a97f65708796e1605eb91808/ray-0.9.0.dev0-cp36-cp36m-manylinux1_x86_64.whl
-pip install ray-0.9.0.dev0-cp36-cp36m-linux_x86_64.whl
+wget -O ray-0.8.6-cp36-cp36m-linux_x86_64.whl https://files.pythonhosted.org/packages/ea/0b/f253e92aee1225d9d0ef21dd15514352ce87f6dbc55de70707bc9d52477f/ray-0.8.6-cp36-cp36m-manylinux1_x86_64.whl
+pip install ray-0.8.6-cp36-cp36m-linux_x86_64.whl
 cd ~/LambdaZero
 pip install -r requirements.txt
 # install LambdaZero
