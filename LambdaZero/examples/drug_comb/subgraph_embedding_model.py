@@ -1,17 +1,15 @@
-from LambdaZero.examples.drug_comb.drug_comb_data import DrugCombDb, transform_to_bipartite_drug_protein_graph
 from torch_geometric.data import DataLoader
 from torch.utils.data import random_split
 from torch_geometric.nn import GCNConv
 import torch.nn.functional as F
+import torch
 
 class SubgraphEmbeddingRegressorModel(torch.nn.Module):
     def __init__(self, config):
-        self.embedder = torch.nn.Sequential(
-            GCNConv(config["in_channels"], config["embed_channels"]),
-            torch.nn.ReLU(),
-            GCNConv(config["embed_channels"], config["embed_channels"]),
-            torch.nn.ReLU(),
-        )
+        super().__init__()
+
+        self.conv1 = GCNConv(config["in_channels"], config["embed_channels"])
+        self.conv2 = GCNConv(config["embed_channels"], config["embed_channels"])
 
         # The input to the regressor will be the concatenation of two graph
         # embeddings, so take the in channels here to be 2 times the embedding size
@@ -22,7 +20,14 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         )
 
     def forward(self, drug_drug_batch, subgraph_batch):
-        node_embeds = self.embedder(subgraph_batch)
+        import pdb; pdb.set_trace()
+        x =  subgraph_batch.x
+        for conv in [self.conv1, self.conv2]:
+            x = conv(x, subgraph_batch.edge_index)
+            x = F.relu(x)
+            x = F.dropout(x, self.training)
+
+        node_embeds = x
         graph_embeds = scatter_mean(node_embeds)
 
         # Quantize drug drug batch so indices match graph_embeds

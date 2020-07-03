@@ -41,13 +41,14 @@ def to_drug_induced_subgraphs(data_list):
         for drug in unique_drugs:
             new_graph = None
             if drug not in drug_idx_to_split:
-                new_graph = Data(x=data.x[drug], edge_index=torch.tensor([], dtype=torch.long))
+                new_graph = Data(x=data.x[drug].reshape(1, -1),
+                                 edge_index=torch.tensor([], dtype=torch.long))
             else:
                 drug_subgraph_idx = drug_idx_to_split[drug]
                 protein_ftrs = data.x[np.sort(drug_subgraph_idx[1,:])]
-                drug_ftr = data.x[drug_subgraph_idx[0,0]]
+                drug_ftr = data.x[drug_subgraph_idx[0,0]].reshape(1, -1)
 
-                ftrs = np.vstack([drug_ftr, protein_ftrs])
+                ftrs = torch.cat((drug_ftr, protein_ftrs), dim=0)
 
                 # Convert edge index to format for small graph
 
@@ -65,11 +66,11 @@ def to_drug_induced_subgraphs(data_list):
         super_graph = Data(
             x=data.x[:len(unique_drugs)],
             edge_index=data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
-            edge_attr=data.edge_attr[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
+            y=data.y[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
         )
 
         super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
-        super_graph.drug_idx_to_graph = {unique_drugs[i]: i for i, drug_graph in enumerate(drug_graphs)}
+        super_graph.drug_idx_to_graph = {unique_drugs[i]: drug_graph for i, drug_graph in enumerate(drug_graphs)}
 
         new_data_list.append(super_graph)
 
@@ -155,15 +156,15 @@ class DrugCombDb(InMemoryDataset):
 
     def process(self):
         nodes = self._get_nodes()
-        edge_idxs, edge_attr, edge_classes, graph_type_idx_ranges = self._get_edges_information(nodes)
+        edge_idxs, edge_trgt, edge_classes, graph_type_idx_ranges = self._get_edges_information(nodes)
 
         data = Data(
             x=torch.tensor(self._get_node_ftrs(nodes), dtype=torch.float),
             edge_index=torch.tensor(edge_idxs, dtype=torch.long),
-            edge_attr=edge_attr,
+            y=torch.tensor(edge_trgt, dtype=torch.long),
         )
 
-        data.edge_classes = edge_classes
+        data.edge_classes = torch.tensor(edge_classes, dtype=torch.long)
         data.graph_type_idx_ranges = graph_type_idx_ranges
 
         data_list = [data]
@@ -237,22 +238,22 @@ class DrugCombDb(InMemoryDataset):
         cid_to_idx_dict = {nodes.at[i, 'cIds']: i for i in range(len(nodes))}
         name_to_idx_dict = {nodes.at[i, 'name']: i for i in range(len(nodes))}
 
-        ppi_edge_idx, ppi_edge_attr, ppi_edge_classes = self._get_ppi_edges(name_to_idx_dict)
-        dpi_edge_idx, dpi_edge_attr, dpi_edge_classes = self._get_dpi_edges(cid_to_idx_dict, name_to_idx_dict)
-        ddi_edge_idx, ddi_edge_attr, ddi_edge_classes = self._get_ddi_edges(name_to_idx_dict)
+        ppi_edge_idx, ppi_edge_trgt, ppi_edge_classes = self._get_ppi_edges(name_to_idx_dict)
+        dpi_edge_idx, dpi_edge_trgt, dpi_edge_classes = self._get_dpi_edges(cid_to_idx_dict, name_to_idx_dict)
+        ddi_edge_idx, ddi_edge_trgt, ddi_edge_classes = self._get_ddi_edges(name_to_idx_dict)
 
         all_edge_idxs = np.concatenate((ppi_edge_idx, dpi_edge_idx, ddi_edge_idx), axis=1)
-        all_edge_attr = np.concatenate((ppi_edge_attr, dpi_edge_attr, ddi_edge_attr), axis=0)
+        all_edge_trgt = np.concatenate((ppi_edge_trgt, dpi_edge_trgt, ddi_edge_trgt), axis=0)
         all_edge_classes = np.concatenate((ppi_edge_classes, dpi_edge_classes, ddi_edge_classes))
 
         # Edges are directed, we need to feed them both ways
         all_edge_idxs = np.concatenate((all_edge_idxs, all_edge_idxs[::-1, :]), axis=1)
-        all_edge_attr = np.concatenate((all_edge_attr, all_edge_attr), axis=0)
+        all_edge_trgt = np.concatenate((all_edge_trgt, all_edge_trgt), axis=0)
         all_edge_classes = np.concatenate((all_edge_classes, all_edge_classes))
 
         graph_type_idx_ranges = self._get_graph_type_idx_ranges(ppi_edge_idx, dpi_edge_idx, ddi_edge_idx)
 
-        return all_edge_idxs, all_edge_attr, all_edge_classes, graph_type_idx_ranges
+        return all_edge_idxs, all_edge_trgt, all_edge_classes, graph_type_idx_ranges
 
     def _get_ddi_edges(self, name_to_idx_dict):
         print('Processing drug drug interaction edges..')
