@@ -121,7 +121,7 @@ class BasicRegressor(tune.Trainable):
                                                file_names=config["file_names"])
         
         # split dataset
-        split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
+        split_path = os.path.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
         train_idxs, val_idxs, test_idxs = np.load(split_path, allow_pickle=True)
 
         bsize = config["b_size"]
