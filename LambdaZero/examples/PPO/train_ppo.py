@@ -27,7 +27,7 @@ DEFAULT_CONFIG = {
         "num_gpus_per_worker": 0.075,
         "num_gpus": 0.4,
         "model": {"custom_model": "MolActorCritic_tfv1"},
-        "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics} # fixme (report all)
+        "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}
         },
     "summaries_dir": summaries_dir,
     "memory": 60 * 10 ** 9,

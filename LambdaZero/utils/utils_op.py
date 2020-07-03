@@ -5,6 +5,10 @@ import numpy as np
 import torch
 from torch_geometric.utils import remove_self_loops
 
+from rdkit.Chem import AllChem
+from sklearn.decomposition import PCA
+import pickle as pk
+
 
 def get_external_dirs():
     """Locate in the filesystem external programs/folders essensial for LambdaZero execution
@@ -50,11 +54,10 @@ def dock_metrics(info):
     """
     env_info = list(info["episode"]._agent_to_last_info.values())[0]
     episode = info["episode"]
-
+    episode.user_data["molecule"] = env_info["molecule"]
+    #print(episode.hist_data)
     for key, value in env_info["log_vals"].items():
         episode.custom_metrics[key] = value
-
-
 
 
 # class Normalize(object):
@@ -125,3 +128,21 @@ def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
     # print(np.sum(data_probs))
     # idx = np.random.choice(ndata,nsamples,replace=True,p=data_probs)
     return sele_idxs
+
+
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
+
+def molecule_pca(mol):
+    fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
+    mat = []
+    for fp in fps:
+        bits = fp.ToBitString()
+        bitsvec = [int(bit) for bit in bits]
+        mat.append(bitsvec)
+    mat = np.array(mat)
+
+    pca = pk.load(open(pca_path, 'rb'))
+    scaled_data = pca.transform(mat)
+    log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
+    return (log_vals)

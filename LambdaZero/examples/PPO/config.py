@@ -1,13 +1,18 @@
 import socket
 from copy import deepcopy
+import os
 import os.path as osp
 from LambdaZero.environments import BlockMolEnv_v3
 from LambdaZero.utils import get_external_dirs
-from LambdaZero.environments import PredDockReward_v2
+from LambdaZero.environments import PredDockReward_v3
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
 
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+binding_config = deepcopy(chemprop_cfg)
+binding_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
+synth_config = deepcopy(chemprop_cfg)
+synth_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 
 
 ppo001 = {
@@ -20,35 +25,37 @@ ppo001 = {
     }
 }
 
-
 ppo022 = {
-    # 3.2-3.3
+    # ???
     "rllib_config":{
         "env": BlockMolEnv_v3,
         "env_config": {
             "allow_removal": True,
-            "reward": PredDockReward_v2,
-            "reward_config":{
-                "synth_cutoff":[0, 5],
-                "synth_config": chemprop_cfg}
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_cutoff": [0, 4],
+                "ebind_cutoff": [42.5, 109.1], #8.5 std away
+                "synth_config": synth_config,
+                "binding_config": binding_config,
+            }
 
         }
     }
 }
 
-ppo023 = {
-    # 3.2-3.3
-    "rllib_config":{
-        "env": BlockMolEnv_v3,
-        "env_config": {
-            "molMDP_config": {
-                "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_210.json"),
-            },
-            "allow_removal": True,
-        }
-    }
-}
-
+# ppo023 = {
+#     # 3.2-3.3
+#     "rllib_config":{
+#         "env": BlockMolEnv_v3,
+#         "env_config": {
+#             "molMDP_config": {
+#                 "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_210.json"),
+#             },
+#             "allow_removal": True,
+#         }
+#     }
+# }
+#
 
 # "reward_config": {
 #     "soft_stop": True,
@@ -226,15 +233,7 @@ ppo023 = {
 #     }
 # }
 #
-# ppo018 = {
-#     # 3.23 instead of 2.68 mean; 3.3 instead of 3.2 final huge improvement !!
-#     "base_env_config": mol_blocks_v4_config,
-#     "base_trainer_config": ppo_config,
-#     "env_config": {
-#         "random_blocks": 5,
-#         "max_steps": 10,
-#     }
-# }
+
 #
 # ppo019 = {
 #     # 3.05 mean, 3.08 max
