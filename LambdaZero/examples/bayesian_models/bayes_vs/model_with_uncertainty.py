@@ -9,23 +9,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
 import sklearn
 from sklearn.model_selection import train_test_split
 from blitz.modules import BayesianLinear
-
-writer = SummaryWriter()
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print('using device: {}'.format(device))
-
-class cfg:
-  sample_size = 20000
-  batch_size = 500
-  mcdrop = True
+import ray
+from ray import tune
+from torch.utils.tensorboard import SummaryWriter
 
 class FingerprintDataset:
-    def __init__(self, filename='d4_250k_clust.parquet', batch_size=cfg.batch_size, x_name='fingerprint', y_name='dockscore'):
-        data = pd.read_parquet(filename, engine='pyarrow')
+    def __init__(self, config, device, filename='d4_250k_clust.parquet',x_name='fingerprint', y_name='dockscore'):
+        self.batch_size = config['aq_batch_size']
+
+        with open(osp.join('/home/jchen1/joanna-temp',filename), 'rb') as f:
+          data = pd.read_parquet(f, engine='pyarrow')
  
         # takes the value from fingerprint column, stack vertically and turn to a tensor
         x_data = torch.from_numpy(np.vstack(data[x_name].values).astype(np.float32))
@@ -39,111 +35,130 @@ class FingerprintDataset:
  
     def train_set(self):
         train_dataset = TensorDataset(self.x_train, self.y_train)
-        train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size)#, collate_fn=collate_wrapper)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size)#, collate_fn=collate_wrapper)
         return train_dataset, train_loader
  
     def test_set(self):
         test_dataset = TensorDataset(self.x_test, self.y_test)
-        test_loader = DataLoader(test_dataset, batch_size=cfg.batch_size)#, collate_fn=collate_wrapper)
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size)#, collate_fn=collate_wrapper)
         return test_dataset, test_loader
  
     def val_set(self):
         val_dataset = TensorDataset(self.x_val, self.y_val)
-        val_loader = DataLoader(val_dataset, batch_size=cfg.batch_size)#, collate_fn=collate_wrapper)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size)#, collate_fn=collate_wrapper)
         return val_dataset, val_loader
  
-def main():
+class main(tune.Trainable):
+    def _setup(self, config):
+        self.config = config
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = self.device
 
-    acquirer = Acquirer(cfg.batch_size, device)
-    dataset = FingerprintDataset()
-    train_set, train_loader = dataset.train_set()
-    test_set, test_loader = dataset.test_set()
+        # acquisition function class
+        self.acquirer = Acquirer(config, device)
+        self.writer = SummaryWriter('logs/')
 
-    top_mol_dict = {}
-    top_batch_dict = {}
+        # load and spilt the data
+        dataset = FingerprintDataset(config, device)
+        self.train_set, _ = dataset.train_set()
+        _, self.test_loader = dataset.test_set()
 
-    aq_fxns = {'random': acquirer.random_aq, 'greedy': acquirer.egreedy_aq, 'egreedy': acquirer.egreedy_aq, 'ucb': acquirer.ucb_aq, 'thompson': acquirer.thompson_aq}
+        self.top_mol_dict = {}
+        self.top_batch_dict = {}
 
-    for name, aq_fxn in aq_fxns.items():
+        self.regressor = ModelWithUncertainty(1024, 1)
+        self.regressor = self.regressor.to(self.device)
+
+        self.trainer = Trainer(self.config, torch.nn.MSELoss(), torch.optim.Adam(self.regressor.parameters(), lr=self.config["lr"]))
+
+        self.is_aquired = np.zeros(len(self.train_set),dtype=np.bool)
+        self.is_aquired[np.random.choice(np.arange(len(self.train_set)), self.config['aq_batch_size'])] = True
+
+        self.aq_fxns = {'random': self.acquirer.random_aq, 'greedy': self.acquirer.egreedy_aq, 'egreedy': self.acquirer.egreedy_aq, 'ucb': self.acquirer.ucb_aq, 'thompson': self.acquirer.thompson_aq}
+        self.aq_fxn = self.aq_fxns[config['aq_function']]
+        # make epochs
+        self.train_epoch = config["train_epoch"]
+
+    def _train(self):
+        name = self.config['aq_function']
 
         if name == 'egreedy':
-            acquirer.noise_std = 5
-            acquirer.noise_mean = 2.5
+            self.acquirer.noise_std = 5
+            self.acquirer.noise_mean = 2.5
+        else:
+            self.acquirer.noise_std = 1
+            self.acquirer.noise_mean = 0
 
         top_mol = []
         top_batch = []
-
-        regressor = ModelWithUncertainty(1024, 1)
-        regressor = regressor.to(device)
-
-        trainer = Trainer(torch.nn.MSELoss(), torch.optim.Adam(regressor.parameters(), lr=0.001))
-
-        is_aquired = np.zeros(len(train_set),dtype=np.bool)
-        is_aquired[np.random.choice(np.arange(len(train_set)), cfg.batch_size)] = True
     
         test_losses = []
         train_losses = []
 
-        while np.count_nonzero(is_aquired) < len(train_set) and np.count_nonzero(is_aquired) < cfg.sample_size:
-            aq_set = Subset(train_set, np.where(is_aquired)[0])
-            aq_loader = torch.utils.data.DataLoader(aq_set, batch_size=cfg.batch_size)
-            
-            # train model
-            for i in range(3):
-                trn_loss = trainer.train(regressor, aq_loader)
-    
-            tst_loss = trainer.evalu(test_loader, regressor)
-            test_losses.append(tst_loss)
-            train_losses.append(trn_loss)
-    
-            # acquire more data
-            rest_set = Subset(train_set, np.where(~is_aquired)[0])
-            rest_loader = DataLoader(rest_set, batch_size=cfg.batch_size)
-
-            ys, output = trainer.rest_evalu(aq_loader, regressor) 
-            output_indices = np.argsort(ys) 
-            ys = ys[output_indices]
-            top_pred = ys[0]
-            top_mol.append(top_pred)
-
-            writer.add_scalar('Values {}'.format(name), top_pred)
-    
-            aq_indices = aq_fxn(rest_loader, regressor)
-            is_aquired[aq_indices] = True
-
-            batch_set = Subset(train_set, aq_indices)      
-            batch_ys = [y.detach().cpu().numpy() for (_, y) in batch_set]
-            top_batch.append(np.amin(np.array(batch_ys)))
-
-        top_mol_dict[name] = top_mol
-        top_batch_dict[name] = top_batch
+        # while np.count_nonzero(is_aquired) < len(self.train_set) and np.count_nonzero(is_aquired) < self.config['sample_size']:
+        aq_set = Subset(self.train_set, np.where(self.is_aquired)[0])
+        aq_loader = torch.utils.data.DataLoader(aq_set, batch_size=self.config['aq_batch_size'])
         
-    writer.close()
+        # train model
+        for i in range(self.train_epoch):
+            trn_loss = self.trainer.train(self.regressor, aq_loader)
 
-    for name, vals in top_mol_dict.items():
-        plt.scatter(np.linspace(cfg.batch_size, cfg.sample_size, len(vals)), vals, label = name)
-    
-    plt.title('Best Molecules So Far')
-    plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-    plt.xlabel("num_samples ")
-    plt.ylabel("best_energy_found")
-    plt.savefig('best_so_far.png')
-    plt.show()
+        tst_loss = self.trainer.evalu(self.test_loader, self.regressor)
+        test_losses.append(tst_loss)
+        train_losses.append(trn_loss)
 
-    for name, vals in top_batch_dict.items():
-        plt.scatter(np.linspace(cfg.batch_size, cfg.sample_size, len(vals)), vals, label = name)
+        # acquire more data
+        rest_set = Subset(self.train_set, np.where(~self.is_aquired)[0])
+        rest_loader = DataLoader(rest_set, batch_size=self.config['aq_batch_size'])
 
-    plt.title('Best Molecules on Current Batch')
-    plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
-    plt.xlabel("num_samples ")
-    plt.ylabel("best_energy_found")
-    plt.savefig('best_on_batch.png')
-    plt.show()
+        ys, output = self.trainer.rest_evalu(aq_loader, self.regressor) 
+        output_indices = np.argsort(ys) 
+        ys = ys[output_indices]
+        top_pred = ys[0]
+        top_mol.append(top_pred)
+
+        aq_indices = self.aq_fxn(rest_loader, self.regressor)
+        self.is_aquired[aq_indices] = True
+
+        batch_set = Subset(self.train_set, aq_indices)      
+        batch_ys = [y.detach().cpu().numpy() for (_, y) in batch_set]
+        top_batch.append(np.amin(np.array(batch_ys)))
+
+        return {'train_top_mol_{}'.format(name) : top_pred, 'train_top_batch_{}'.format(name) : np.amin(np.array(batch_ys))}
+
+        #for name, vals in self.top_mol_dict.items():
+        #    plt.scatter(np.linspace(self.config['aq_batch_size'], self.config['sample_size'], len(vals)), vals, label = name)
+        
+        #plt.title('Best Molecules So Far')
+        #plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
+        #plt.xlabel("num_samples ")
+        #plt.ylabel("best_energy_found")
+        #plt.savefig('best_so_far.png')
+        #plt.show()
+
+        #for name, vals in self.top_batch_dict.items():
+        #    plt.scatter(np.linspace(self.config['aq_batch_size'], self.config['sample_size'], len(vals)), vals, label = name)
+
+        #plt.title('Best Molecules on Current Batch')
+        #plt.legend(loc='upper left', bbox_to_anchor=(0.2, 0.95))
+        #plt.xlabel("num_samples ")
+        #plt.ylabel("best_energy_found")
+        #plt.savefig('best_on_batch.png')
+        #plt.show()
+
+    def _save(self, checkpoint_dir):
+        checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
+        torch.save(self.regressor.state_dict(), checkpoint_path)
+        return checkpoint_path
+
+    def _restore(self, checkpoint_path):
+        self.regressor.load_state_dict(torch.load(checkpoint_path))
 
 class Trainer:
-  def __init__(self, criterion, optimizer):
+  def __init__(self, config, criterion, optimizer):
     self.criterion = criterion
     self.optimizer = optimizer
+    self.config = config
 
   def train(self, regressor, train_loader):
   
@@ -158,7 +173,7 @@ class Trainer:
       return loss
   
   def rest_evalu(self, rest_loader, regressor):
-      if cfg.mcdrop:
+      if self.config['mcdrop']:
           regressor.train()
       else:
           regressor.eval()
@@ -254,15 +269,16 @@ class ModelWithUncertainty(nn.Module):
         return evaluator
 
 class Acquirer:
-  def __init__(self, batch_aq_num, device, noise_std = 1, noise_mean = 0):
-    self.batch_aq_num = batch_aq_num
+  def __init__(self, config, device, noise_std = 1, noise_mean = 0):
+    self.batch_aq_num = config['aq_batch_size']
     self.device = device
     self.kappa = 0.8
     self.noise_std = noise_std
     self.noise_mean = noise_mean
+    self.config = config
 
   def egreedy_aq(self,loader, model):
-      if cfg.mcdrop:
+      if self.config['mcdrop']:
           model.train()
       else:
           model.eval()
@@ -279,10 +295,10 @@ class Acquirer:
       aq_order = np.argsort(np.concatenate(preds.detach().cpu().numpy(), axis=0))
 
       return aq_order[:self.batch_aq_num]
-      
+
   
   def thompson_aq(self, loader, model):
-      if cfg.mcdrop:
+      if self.config['mcdrop']:
           model.train()
       else:
           model.eval()
@@ -324,6 +340,38 @@ class Acquirer:
   def random_aq(self, loader, model):
     random_indices = random.sample(range(len(loader.dataset)), self.batch_aq_num)
     return random_indices
+
+aq_functions = ['random', 'greedy', 'egreedy', 'ucb', 'thompson']
+
+cfg = {
+  "trainer": main,
+   "trainer_config": {
+        "aq_function": aq_functions[0],
+        "lr": 0.001,
+        "train_epoch": 3,
+        "sample_size": 20000,
+        "aq_batch_size": 512,
+        "mcdrop": False,
+	"summaries_dir": '/home/jchen1/joanna-temp/summaries'
+        },
+  
+  "memory": 20 * 10 ** 9,
+  "stop": {"training_iteration": 100},
+  }
+
+config = cfg
   
 if __name__ == '__main__':
-    main()
+    ray.init()
+
+    analysis = tune.run(config["trainer"],
+                        config=config["trainer_config"],
+                        stop=config["stop"], #EarlyStop(),
+                        resources_per_trial={
+                           "cpu": 2, 
+                           "gpu": 1.0
+                        },
+                        num_samples=100,
+                        checkpoint_at_end=False,
+			local_dir='/home/jchen1/joanna-temp/summaries',
+                        checkpoint_freq=100000)
