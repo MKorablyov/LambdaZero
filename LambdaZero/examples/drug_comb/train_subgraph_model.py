@@ -28,7 +28,7 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
     model.train()
 
     metrics = {"loss": 0, "mse": 0, "mae": 0}
-    for drug_drug_batch in loader:
+    for i, drug_drug_batch in enumerate(loader):
         optimizer.zero_grad()
 
         drug_drug_index, edge_classes, y = drug_drug_batch
@@ -38,7 +38,7 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
         subgraph_data_list = [dataset[0].drug_idx_to_graph[drug] for drug in batch_drugs]
         subgraph_batch = Batch.from_data_list(subgraph_data_list)
 
-        preds = model(drug_drug_index, subgraph_batch)
+        preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
 
         loss.backward()
@@ -48,37 +48,40 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
         metrics["mse"] += ((y - preds) ** 2).sum().item()
         metrics["mae"] += ((y - preds).abs()).sum().item()
 
-        print('MSE: %f' % loss.item())
+        if i % 20 == 0:
+            print('MSE: %f' % loss.item())
 
-    metrics["loss"] = metrics["loss"] / len(dataset)
-    metrics["mse"] = metrics["mse"] / len(dataset)
-    metrics["mae"] = metrics["mae"] / len(dataset)
+    metrics["loss"] = metrics["loss"] / len(subgraph_dataset)
+    metrics["mse"] = metrics["mse"] / len(subgraph_dataset)
+    metrics["mae"] = metrics["mae"] / len(subgraph_dataset)
     return metrics
 
 def eval_epoch(dataset, eval_idxs,  model, device, config):
-    subgraph_dataset = TensorDataset(dataset.edge_index[:, eval_idxs].T,
-                                     dataset.edge_classes[eval_idxs],
-                                     dataset.y[eval_idxs])
-    loader = DataLoader(dataset, batch_size=config["batch_size"])
+    subgraph_dataset = TensorDataset(dataset[0].edge_index[:, eval_idxs].T,
+                                     dataset[0].edge_classes[eval_idxs], dataset[0].y[eval_idxs])
+
+    loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"])
     model.eval()
 
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for drug_drug_batch in loader:
         drug_drug_index, edge_classes, y = drug_drug_batch
+        drug_drug_index = drug_drug_index.T
 
-        subgraph_data_list = _get_batch_graph_data_list(dataset, drug_drug_index)
+        batch_drugs = np.unique(drug_drug_index.flatten())
+        subgraph_data_list = [dataset[0].drug_idx_to_graph[drug] for drug in batch_drugs]
         subgraph_batch = Batch.from_data_list(subgraph_data_list)
 
-        preds = model(drug_drug_index, subgraph_batch)
+        preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
 
         metrics["loss"] += loss.item()
         metrics["mse"] += ((y - preds) ** 2).sum().item()
         metrics["mae"] += ((y - preds).abs()).sum().item()
 
-    metrics["loss"] = metrics["loss"] / len(dataset)
-    metrics["mse"] = metrics["mse"] / len(dataset)
-    metrics["mae"] = metrics["mae"] / len(dataset)
+    metrics["loss"] = metrics["loss"] / len(subgraph_dataset)
+    metrics["mse"] = metrics["mse"] / len(subgraph_dataset)
+    metrics["mae"] = metrics["mae"] / len(subgraph_dataset)
     return metrics
 
 class SubgraphRegressor(tune.Trainable):
@@ -95,6 +98,7 @@ class SubgraphRegressor(tune.Trainable):
 
         config["in_channels"] = self.dataset[0].x.shape[1]
         config["out_channels"] = self.dataset[0].y.shape[1]
+        config["num_cell_lines"] = len(np.unique(self.dataset[0].edge_classes))
 
         self.model = SubgraphEmbeddingRegressorModel(config)
         self.model.to(self.device)
@@ -128,7 +132,7 @@ config = {
         "pre_transform": to_drug_induced_subgraphs,
         "val_set_prop": 0.1,
         "test_set_prop": 0.1,
-        "lr": 0.001,
+        "lr": 0.01,
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
         "embed_channels": 256,
@@ -139,7 +143,7 @@ config = {
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 10000,
-    "stop": {"training_iteration": 2},
+    "stop": {"training_iteration": 120},
     "checkpoint_at_end": False,
     "resources_per_trial": {"cpu": 6}
 }
