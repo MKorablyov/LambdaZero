@@ -41,7 +41,7 @@ class ModelWithUncertainty(nn.Module):
 class Acquirer:
     def __init__(self, available_points, model: BOModel, acquistion_function):
         """
-        :param aquistion_function: The reason why this is a function is because you may want to
+        :param acquistion_function: The reason why this is a function is because you may want to
         change it as you gather points (ie start random and then switch to batch BALD etc...)
         """
         ...
