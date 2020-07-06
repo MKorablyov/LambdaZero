@@ -15,7 +15,7 @@ import LambdaZero.utils
 from LambdaZero.examples.PPO import config
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo022"
+else: config_name = "ppo001"
 config = getattr(config,config_name)
 
 _, _, summaries_dir = LambdaZero.utils.get_external_dirs()
