@@ -1,5 +1,7 @@
 # LambdaZero: search in the space of small molecules
 
+Note: Instructions on how to access, set up, and manage slurm jobs on the MILA Cluster and Compute Canada (Beluga) can be found on the [MILA Docs](https://docs.mila.quebec/). 
+
 ## Install
 Install anaconda: [miniconda](https://docs.conda.io/en/latest/miniconda.html)
 
@@ -25,6 +27,23 @@ Finally, install LambdaZero with the following command:
 pip install -e .
 ```
 
+### Setup on Beluga
+To setup the environment for Beluga, create a virtual environment and install dependencies.
+# Create virtual environments and install dependencies
+```bash
+module load python/3.6 cuda/10.1 cudnn/7.6.5
+virtualenv --no-download ~/env
+source ~/env/bin/activate
+cd ~/LambdaZero
+pip install -r requirements.txt
+```
+
+Add the following line to your slurm job file to load the required modules.
+```bash
+bash setup_beluga.sh
+```
+
+This will load the required modules and install the dependencies.
 
 ## Getting started
 
