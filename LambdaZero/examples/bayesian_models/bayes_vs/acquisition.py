@@ -4,6 +4,8 @@ import typing
 
 import torch
 from torch import distributions
+import numpy as np
+from tqdm import tqdm
 
 from . import greedy_models
 from . import bayes_models
@@ -59,8 +61,11 @@ class BestFromPreviousOracleAcq(AcquisitionFunc):
 
 
 class ThompsonSamplingAcq(AcquisitionFunc):
+    ITERATION_SIZE = 20000
+
     def __init__(self, bayesian_model, available_molecules: typing.Set[str], seen_molecule2value: dict):
         self.available_molecules = available_molecules
+        self.available_molecules.difference_update(set(seen_molecule2value.keys()))
         self.seen_molecule2value = seen_molecule2value
         self.bayesian_model = bayesian_model
         self._train_model()
@@ -73,16 +78,24 @@ class ThompsonSamplingAcq(AcquisitionFunc):
     def get_batch(self, batch_size=500):
         # Thompson sampling!
         all_smiles = list(self.available_molecules)
-        mvn: distributions.MultivariateNormal = self.bayesian_model.predict_on_smiles(all_smiles)
 
-        indices_available = torch.arange(mvn.loc.shape[0])
+        indices_available = torch.arange(len(self.available_molecules))
+        # ^ we're gonna use this to record which indices we have not picked from yet -- so hence at the beginning we
+        # have all of them
+        #todo: avoid sampling on unecessary ones. although have to change anyway when parallelize.
         out_smiles = []
-        for _ in range(batch_size):
-            sample = mvn.sample_n(1)[0]
+        for _ in tqdm(range(batch_size), desc="Thompson inner loop"):
+            sampler = self.bayesian_model.get_sampler_func_for_smiles()
+            all_samples = []
+            for i in range(int(np.ceil(len(all_smiles) / self.ITERATION_SIZE))):
+                smiles_to_use = all_smiles[int(i*self.ITERATION_SIZE):int((i+1)*self.ITERATION_SIZE)]
+                all_samples.append(sampler(smiles_to_use)[:, 0])
+            sample = torch.cat(all_samples)
             samples_of_interest = sample[indices_available]
             indx = torch.argmin(samples_of_interest)
             out_smiles.append(all_smiles[indices_available[indx].item()])
             indices_available = indices_available[torch.arange(indices_available.shape[0]) != indx]
+            #print("batch item done")
         return out_smiles
 
     def _train_model(self):
@@ -93,38 +106,48 @@ class ThompsonSamplingAcq(AcquisitionFunc):
         self.bayesian_model.fit_on_smiles(list(seen_smiles), seen_values_tensor)
 
     @classmethod
-    def create_acquisition_function(cls, queried_results_so_far: typing.List[querier.QueriedHeap], **params):
+    def create_acquisition_function(cls, queried_results_so_far: typing.List[querier.QueriedHeap],
+                                    **params):
 
         available_molecules = queried_results_so_far[-2].all_smiles_set
         # ^ the available molecules are given by all the molecules seen by the previous oracle
 
         seen_molecule2value = queried_results_so_far[-1].smi_to_value_dict
         # ^ the values seen so far are those given by the querier that this acquisition function will suggest molecules
-        # tp
+        # to
 
         if "feature_dim" not in params:
             params["feature_dim"] = 100
+
+        prev_oracle_as_feats_flag = params['prev_oracle_as_feats_flag'] if 'prev_oracle_as_feats_flag' in params else True
 
         previous_molecule_to_result_dicts = [q.smi_to_value_dict for q in queried_results_so_far[:-1]]
 
         #todo: probably should make the embedding func a seperate class elsewhere
         def embedding_func(list_of_smiles):
 
-            previous_oracle_results = [[d[smi] for d in previous_molecule_to_result_dicts] for smi in list_of_smiles]
-            previous_oracle_results = torch.tensor(previous_oracle_results, dtype=torch.float32)
-
-            fingerprints = [torch.tensor(chem_ops.morgan_fp_from_smiles(smi, radius=2, number_bits=params["feature_dim"]),
+            #print("computing fingerprints...")
+            fingerprints = torch.tensor([chem_ops.morgan_fp_from_smiles(smi, radius=2, number_bits=params["feature_dim"])
+                            for smi in list_of_smiles],
                                          dtype=torch.float32)
-                            for smi in list_of_smiles]
+            #print("...computed fingerprints!")
             #todo: representations.
-            fingerprints = torch.stack(fingerprints)
 
-            feats = torch.cat([previous_oracle_results, fingerprints], dim=1)
+
+            if prev_oracle_as_feats_flag:
+                previous_oracle_results = [[d[smi] for d in previous_molecule_to_result_dicts] for smi in list_of_smiles]
+                previous_oracle_results = torch.tensor(previous_oracle_results, dtype=torch.float32)
+                feats = torch.cat([previous_oracle_results, fingerprints], dim=1)
+            else:
+                feats = fingerprints
             #todo: maybe NN on top
 
             return feats
 
-        embedding_func.fp_dim = params["feature_dim"] + len(previous_molecule_to_result_dicts)
+        if prev_oracle_as_feats_flag:
+            embedding_func.fp_dim = params["feature_dim"] + len(previous_molecule_to_result_dicts)
+        else:
+            embedding_func.fp_dim = params["feature_dim"]
 
         bayes_regress = bayes_models.BayesianRegression(embedding_func)
         return cls(bayes_regress, available_molecules, seen_molecule2value)

@@ -17,6 +17,8 @@ dependencies:
   - rdkit=2020.03.1.0
   - scipy=1.1.0
   - scikit-learn=0.22
+  - jupyterlab
+  - pytest
   - pip:
     - corner
     - lazy

@@ -57,12 +57,14 @@ that step 1 worked correctly.)
 #### Running the Screening.
 
 1. Run `scripts/run_vs.py` to run the virtual screening code -- this is still work in progress as the Bayesian model 
-does not use as features previous query results which I think should improve results considerably.
+is only a single layer.
 
 2. Analyze the results using JupyterNotebooks/VS.ipynb. 
 Again I don't think it is fully decided on what is the best benchmark to check.
 
-### Todos
+
+
+## Todos
 
 **todo:** please add to this!
 
@@ -92,7 +94,7 @@ This means that randomly we may find a good point with more chance than the orig
 
 
 
-##### 🩹 1.5 Explore prior tuning/hyperpriors for Bayes Regression
+##### ✅ 1.5 Explore prior tuning/hyperpriors for Bayes Regression
 On Bayes Learning call 13.May we discussed tuning the parameters over the noise and weights distribution to learn them
 or potentially using hyperpriors.
 This is important as in low data regimes the model is not performing well.
@@ -100,13 +102,13 @@ The notebooks `JupyterNotebooks/BayesModelFP.ipynb` and `JupyterNotebooks/Bayesi
 for this task. Would be good to add log likelihood to the first notebook.
 <br />
 
-**Update 19 May** _put in a hack to use Sklearn precisions for now but should fix at some point!_
+**Update 19 May** _done using Sklearn Bayesian regression for now but could do it fully in Pytorch later on_
 
 
 
-##### 1.6 Change the Bayesian Regression sampling so that can sample first from weights then batch.
+##### ✅ 1.6 Change the Bayesian Regression sampling so that can sample first from weights then batch.
 At the moment the Gaussian posterior uncertainty over weights is propagated through predictions which return a MVN distribution
-over the predicted points. This will not be amenable to larger datasets 
+over the predicted points. This will not be amenable to larger datasets.
 <br />
 
 
@@ -116,7 +118,7 @@ over the predicted points. This will not be amenable to larger datasets
 
 
 
-##### 1.8 Explore different  likelihoods
+##### 1.8 Explore different likelihoods
 eg the likelihood suggested by Bianca 13.May http://web.mit.edu/dubeya/www/files/alphats_ijcai19.pdf
 If the model becomes intractable we can always use Pyro for sampling or VI.
 <br />
@@ -153,7 +155,6 @@ How do we communicate with an oracle to set off a batch of expensive docking sim
 <br />
 
 
-
 ##### 2.2 Parallelising
 On the large dataset when running the acquisition function we may want to run it in parallel if querying over a large
 number of candidate molecules.
@@ -169,6 +170,7 @@ has already seen.
 
 <br />
 <br />
+
 #### 3 Feature Representation
 
 ##### 3.1 Talk to feature representation team so that they understand our problem

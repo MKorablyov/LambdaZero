@@ -108,7 +108,7 @@ def main(params: Params):
             for i, acq_strategy in enumerate(experiment.acquisition_strategies[stage_name]):
                 acq_func = acq_strategy.acquistion.create_acquisition_function(experiment_queriers)
 
-                # Finally for each acquisiton strategy we may have a series of batches to run through.
+                # Finally for each acquisition strategy we may have a series of batches to run through.
                 for i in tqdm(range(acq_strategy.num_batches), desc=f"{stage_name}, acq{i}"):
                     smiles_to_query = acq_func.get_batch(acq_strategy.batch_size)
                     results = oracle_.query(smiles_to_query)
@@ -121,7 +121,6 @@ def main(params: Params):
         )
 
     # todo: all these nested for loops are very messy so break out
-
 
     with open(params.op_name, 'wb') as fo:
         pickle.dump(
