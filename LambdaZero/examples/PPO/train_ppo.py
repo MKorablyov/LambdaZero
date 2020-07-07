@@ -34,7 +34,7 @@ DEFAULT_CONFIG = {
 
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
-        "use_pytorch": True
+        "use_pytorch": True,
     },
     "summaries_dir": summaries_dir,
     "memory": 60 * 10 ** 9,
@@ -53,10 +53,10 @@ if machine == "Ikarus":
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
-    # time.sleep(60)
+    time.sleep(120)
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
-    # time.sleep(60)
+    time.sleep(120)
     tune.run(config["trainer"],
         stop=config["stop"],
         max_failures=0,

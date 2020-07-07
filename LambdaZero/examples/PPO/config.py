@@ -83,7 +83,8 @@ ppo023_multi = {
         },
         "model": {
             "custom_model_config": {
-                "rnd_weight": 1
+                "rnd_weight": 1,
+                "rnd_output_dim": 5
             }
         }
     }
@@ -129,7 +130,8 @@ ppo024_multi = {
         },
         "model": {
             "custom_options": {
-                "rnd_weight": 0.5
+                "rnd_weight": 0.5,
+                "rnd_output_dim": 5
             }
         }
     }
