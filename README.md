@@ -1,9 +1,10 @@
 # LambdaZero: search in the space of small molecules
 
-Note: Instructions on how to access, set up, and manage slurm jobs on the MILA Cluster and Compute Canada (Beluga) can be found on the [MILA Docs](https://docs.mila.quebec/). 
+Note: Instructions on how to access, set up, and manage slurm jobs on the MILA Cluster and Compute Canada (Beluga) can be found on the [MILA Docs]
 
-## Install
-Install anaconda: [miniconda](https://docs.conda.io/en/latest/miniconda.html)
+## Install 
+# Install using Anaconda (good for local machine) 
+Install [anaconda](https://www.anaconda.com/products/individual)
 
 Create the conda environment, based on your os:
 ```
@@ -27,7 +28,7 @@ Finally, install LambdaZero with the following command:
 pip install -e .
 ```
 
-### Setup on Beluga
+### Install on Compute Canada Beluga
 To setup the environment for Beluga, create a virtual environment and install dependencies. Replace `<username>` with your username.
 # Create virtual environments and install dependencies
 ```bash
@@ -97,6 +98,9 @@ Use environment, make random walks, call oracles:
 cd ~/LambdaZero/LambdaZero/examples/oracles
 python oracle_examples.py
 ```
+
+## Useful Resources
+MILA cluster docs(https://docs.mila.quebec/). 
 
 ## Getting Involved
 [Calendar](https://calendar.google.com/calendar?cid=bnNncTk1NjVobWozY3Z2czUyZHI5anNuZThAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ)  
