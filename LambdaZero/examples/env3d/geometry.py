@@ -25,27 +25,64 @@ def get_quadratic_position_tensor(list_positions: np.array) -> np.array:
 
 
 def diagonalize_quadratic_position_tensor(quadratic_position_tensor: np.array):
-    eigenvalues, u_matrix = np.linalg.eigh(quadratic_position_tensor)
-    # ensure that the eigenvector matrix is a proper rotation
-    u_matrix[:, 2] = np.cross(u_matrix[:, 0], u_matrix[:, 1])
-    return eigenvalues, u_matrix
+    eigenvalues, raw_u_matrix = np.linalg.eigh(quadratic_position_tensor)
+    return eigenvalues, raw_u_matrix
 
 
-def get_relative_positions_in_quadratic_tensor_basis(
-    list_positions: np.array
+def get_direction(x2: np.float, tol=1e-8) -> np.float:
+    if np.abs(x2) < tol:
+        return 1.0
+    else:
+        return np.sign(x2)
+
+
+def get_quadratic_position_tensor_basis(
+    list_relative_positions: np.array, raw_u_matrix: np.array
 ) -> np.array:
     """
-    This method computes the relative quadratic position tensor and expresses positions relative
-    to their center in the natural basis of the tensor.
+    The quadratic position tensor T^{alpha,beta} can be used to define the principal axes of the
+    molecule. However, there remains arbitrariness in the direction of the eigenvectors; +v or -v
+    will work equally well. This function removes this arbitrariness by choosing eigenvectors that point
+    in the direction of maximum molecular weight.
+
+    Args:
+        list_relative_positions (np.array): positions of the atoms relative to its center
+        raw_u_matrix (np.array): matrix containing eigenvectors of the quadratic position tensor
+
+    Returns:
+        u_matrix (np.array): eigenvectors with arbitrariness lifted.
+    """
+
+    projected_positions = np.dot(list_relative_positions, raw_u_matrix)
+
+    signed_projected_positions_squared = (
+        np.sign(projected_positions) * projected_positions ** 2
+    )
+
+    list_summed_projected_positions_squared = signed_projected_positions_squared.sum(
+        axis=0
+    )
+
+    v1 = get_direction(list_summed_projected_positions_squared[0]) * raw_u_matrix[:, 0]
+    v2 = get_direction(list_summed_projected_positions_squared[1]) * raw_u_matrix[:, 1]
+    v3 = np.cross(v1, v2)
+
+    normalized_u_matrix = np.stack([v1, v2, v3], axis=1)
+    return normalized_u_matrix
+
+
+def get_normalized_u_matrix(list_positions: np.array) -> np.array:
+    """
+    This method computes the quadratic position tensor and fixes the
+    orientation arbitrariness.
     """
 
     quadratic_position_tensor = get_quadratic_position_tensor(list_positions)
 
-    _, u_matrix = diagonalize_quadratic_position_tensor(quadratic_position_tensor)
+    _, raw_u_matrix = diagonalize_quadratic_position_tensor(quadratic_position_tensor)
 
     relative_positions = get_positions_relative_to_center(list_positions)
 
-    # the u_matrix contains the tensor's eigenvectors as columns
-    relative_positions_in_tensor_basis = np.dot(relative_positions, u_matrix)
+    u_matrix = get_quadratic_position_tensor_basis(relative_positions, raw_u_matrix)
 
-    return relative_positions_in_tensor_basis
+    return u_matrix

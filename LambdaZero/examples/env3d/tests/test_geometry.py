@@ -7,6 +7,7 @@ from LambdaZero.examples.env3d.geometry import (
     get_positions_relative_to_center,
     get_quadratic_position_tensor,
     diagonalize_quadratic_position_tensor,
+    get_quadratic_position_tensor_basis,
 )
 
 
@@ -114,3 +115,18 @@ def test_diagonalize_quadratic_position_tensor(
 
     np.testing.assert_almost_equal(computed_eigenvalues, random_eigenvalues)
     np.testing.assert_almost_equal(computed_u_matrix, random_rotation)
+
+
+def test_get_quadratic_position_tensor_basis(positions):
+    computed_tensor = get_quadratic_position_tensor(positions)
+
+    eigenvalues, raw_u_matrix = diagonalize_quadratic_position_tensor(computed_tensor)
+
+    relative_positions = get_positions_relative_to_center(positions)
+    u_matrix = get_quadratic_position_tensor_basis(relative_positions, raw_u_matrix)
+
+    np.testing.assert_almost_equal(np.linalg.det(u_matrix), 1.0)
+
+    uu = np.dot(u_matrix.T, raw_u_matrix)
+    np.testing.assert_allclose(np.abs(np.diag(uu)), np.ones(3))
+    np.testing.assert_almost_equal(np.linalg.norm(uu - np.diag(np.diag(uu))), 0.0)
