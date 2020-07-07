@@ -28,17 +28,28 @@ pip install -e .
 ```
 
 ### Setup on Beluga
-To setup the environment for Beluga, create a virtual environment and install dependencies.
+To setup the environment for Beluga, create a virtual environment and install dependencies. Replace `<username>` with your username.
 # Create virtual environments and install dependencies
 ```bash
 module load python/3.6 cuda/10.1 cudnn/7.6.5
-virtualenv --no-download ~/env
-source ~/env/bin/activate
+virtualenv --no-download /scratch/<username>/env
+source /scratch/<username>/env/bin/activate
+# torch and tensorflow need be installed separately
+pip install numpy
+pip install tensorflow_gpu --no-index
+pip install torch==1.5.0+cu101 torchvision==0.6.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch-cluster==1.5.5+cu101 torch-scatter==2.0.4+cu101 torch-sparse==0.6.5+cu101 torch-spline-conv==1.2.0+cu101 -f https://pytorch-geometric.com/whl/torch-1.5.0.html
+pip install torch-geometric==1.5.0
+# install ray
+wget -O ray-0.8.6-cp36-cp36m-linux_x86_64.whl https://files.pythonhosted.org/packages/ea/0b/f253e92aee1225d9d0ef21dd15514352ce87f6dbc55de70707bc9d52477f/ray-0.8.6-cp36-cp36m-manylinux1_x86_64.whl
+pip install ray-0.8.6-cp36-cp36m-linux_x86_64.whl
 cd ~/LambdaZero
 pip install -r requirements.txt
+# install LambdaZero
+pip install -e .
 ```
 
-Add the following line to your slurm job file to load the required modules.
+Add the following line to your slurm job file to load the required modules. Replace `<username>` with your username.
 ```bash
 bash setup_beluga.sh
 ```
