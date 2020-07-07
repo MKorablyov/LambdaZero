@@ -24,8 +24,8 @@ DEFAULT_CONFIG = {
     },
     "reward_config": {
         "soft_stop": True,
-        #"load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
-        #"natm_cutoff": [45, 50],
+        "load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
+        "natm_cutoff": [45, 50],
         "qed_cutoff": [0.2, 0.7],
         "exp": None,
         "delta": False,

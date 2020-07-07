@@ -6,7 +6,7 @@ from ray import tune
 import torch
 from torch_geometric.data import DataLoader
 
-from LambdaZero.examples.mpnn.train_mpnn import DEFAULT_CONFIG
+from LambdaZero.examples.mpnn.train_mpnn_tmpv2 import DEFAULT_CONFIG
 import LambdaZero.inputs
 import LambdaZero.models
 import LambdaZero.utils
