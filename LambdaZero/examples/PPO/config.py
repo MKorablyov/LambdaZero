@@ -32,7 +32,6 @@ ppo001 = {
 
 
 
-<<<<<<< HEAD
 ppo023 = {
     # 3.2-3.3
     "rllib_config":{
@@ -127,7 +126,6 @@ ppo024_multi = {
     }
 }
 
-=======
 # ppo022 = {
 #     # ???
 #     "rllib_config":{
@@ -146,7 +144,6 @@ ppo024_multi = {
 #     }
 # }
 #
->>>>>>> 035ca32dcdf37cac4ef19ebbfb491ab10da96cd9
 # ppo023 = {
 #     # 3.2-3.3
 #     "rllib_config":{
@@ -159,8 +156,6 @@ ppo024_multi = {
 #         }
 #     }
 # }
-<<<<<<< HEAD
-=======
 
 
 #
@@ -187,7 +182,6 @@ ppo024_multi = {
 #     "checkpoint_freq": 25,
 # }
 
->>>>>>> 035ca32dcdf37cac4ef19ebbfb491ab10da96cd9
 
 # "reward_config": {
 #     "soft_stop": True,
