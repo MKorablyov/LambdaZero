@@ -2,8 +2,12 @@ import pytest
 import numpy as np
 import scipy.spatial
 
-from LambdaZero.examples.env3d.geometry import get_geometric_center, get_positions_relative_to_center, \
-    get_quadratic_position_tensor, diagonalize_quadratic_position_tensor
+from LambdaZero.examples.env3d.geometry import (
+    get_geometric_center,
+    get_positions_relative_to_center,
+    get_quadratic_position_tensor,
+    diagonalize_quadratic_position_tensor,
+)
 
 
 @pytest.fixture
@@ -43,7 +47,7 @@ def expected_tensor(expected_relative_positions):
     for p in expected_relative_positions:
         for alpha in range(3):
             for beta in range(3):
-                t[alpha, beta] += p[alpha]*p[beta]
+                t[alpha, beta] += p[alpha] * p[beta]
 
     t /= number_of_positions
     return t
@@ -60,9 +64,11 @@ def random_rotation():
     np.random.seed(231412)
 
     vector = np.random.rand(3)
-    vector = vector/np.linalg.norm(vector)
-    angle = 2*np.pi*np.random.rand()
-    rotation_matrix = scipy.spatial.transform.Rotation.from_rotvec(angle*vector).as_matrix()
+    vector = vector / np.linalg.norm(vector)
+    angle = 2 * np.pi * np.random.rand()
+    rotation_matrix = scipy.spatial.transform.Rotation.from_rotvec(
+        angle * vector
+    ).as_matrix()
     return rotation_matrix
 
 
@@ -71,7 +77,6 @@ def random_quadratic_tensor(random_eigenvalues, random_rotation):
     lbda = np.diag(random_eigenvalues)
     t = np.dot(np.dot(random_rotation, lbda), random_rotation.T)
     return t
-
 
 
 def test_get_geometric_center(positions, expected_center):
@@ -89,7 +94,9 @@ def test_get_geometric_center_assert():
 def test_get_positions_relative_to_center(positions, expected_relative_positions):
     computed_relative_positions = get_positions_relative_to_center(positions)
 
-    np.testing.assert_almost_equal(computed_relative_positions, expected_relative_positions)
+    np.testing.assert_almost_equal(
+        computed_relative_positions, expected_relative_positions
+    )
 
 
 def test_get_quadratic_position_tensor(positions, expected_tensor):
@@ -98,8 +105,12 @@ def test_get_quadratic_position_tensor(positions, expected_tensor):
     np.testing.assert_almost_equal(computed_tensor, expected_tensor)
 
 
-def test_diagonalize_quadratic_position_tensor(random_eigenvalues, random_rotation, random_quadratic_tensor):
-    computed_eigenvalues, computed_u_matrix = diagonalize_quadratic_position_tensor(random_quadratic_tensor)
+def test_diagonalize_quadratic_position_tensor(
+    random_eigenvalues, random_rotation, random_quadratic_tensor
+):
+    computed_eigenvalues, computed_u_matrix = diagonalize_quadratic_position_tensor(
+        random_quadratic_tensor
+    )
 
     np.testing.assert_almost_equal(computed_eigenvalues, random_eigenvalues)
     np.testing.assert_almost_equal(computed_u_matrix, random_rotation)
