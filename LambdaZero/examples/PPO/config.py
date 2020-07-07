@@ -2,17 +2,22 @@ import socket
 from copy import deepcopy
 import os
 import os.path as osp
-from LambdaZero.environments import BlockMolEnv_v3
+from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnvGraph_v1
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v3
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
 
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-binding_config = deepcopy(chemprop_cfg)
-binding_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
-synth_config = deepcopy(chemprop_cfg)
-synth_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
+
+# fixme
+# binding_config = deepcopy(chemprop_cfg)
+# binding_config["predict_config"]["checkpoint_path"] = \
+#     os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
+
+# synth_config = deepcopy(chemprop_cfg)
+# synth_config["predict_config"]["checkpoint_path"] = \
+#     os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 
 
 ppo001 = {
@@ -25,24 +30,9 @@ ppo001 = {
     }
 }
 
-ppo022 = {
-    # ???
-    "rllib_config":{
-        "env": BlockMolEnv_v3,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v3,
-            "reward_config": {
-                "synth_cutoff": [0, 4],
-                "ebind_cutoff": [42.5, 109.1], #8.5 std away
-                "synth_config": synth_config,
-                "binding_config": binding_config,
-            }
 
-        }
-    }
-}
 
+<<<<<<< HEAD
 ppo023 = {
     # 3.2-3.3
     "rllib_config":{
@@ -137,6 +127,26 @@ ppo024_multi = {
     }
 }
 
+=======
+# ppo022 = {
+#     # ???
+#     "rllib_config":{
+#         "env": BlockMolEnv_v3,
+#         "env_config": {
+#             "allow_removal": True,
+#             "reward": PredDockReward_v3,
+#             "reward_config": {
+#                 "synth_cutoff": [0, 4],
+#                 "ebind_cutoff": [42.5, 109.1], #8.5 std away
+#                 "synth_config": synth_config,
+#                 "binding_config": binding_config,
+#             }
+#
+#         },
+#     }
+# }
+#
+>>>>>>> 035ca32dcdf37cac4ef19ebbfb491ab10da96cd9
 # ppo023 = {
 #     # 3.2-3.3
 #     "rllib_config":{
@@ -149,6 +159,35 @@ ppo024_multi = {
 #         }
 #     }
 # }
+<<<<<<< HEAD
+=======
+
+
+#
+# ppo_graph_001 = {
+#     "rllib_config":{
+#         "env": BlockMolEnvGraph_v1,
+#         "env_config": {
+#             "allow_removal": True,
+#             "reward": PredDockReward_v3,
+#             "reward_config": {
+#                 "synth_cutoff": [0, 4],
+#                 "ebind_cutoff": [42.5, 109.1], #8.5 std away
+#                 "synth_config": synth_config,
+#                 "binding_config": binding_config,
+#             }
+#         },
+#         "model": {"custom_model": "GraphMolActorCritic_thv1",
+#                   "custom_options":{"num_hidden": 64} # does a **kw to __init__
+#         },
+#         "lr": 5e-5,
+#         #"entropy_coeff": 1e-5,
+#         "use_pytorch": True,
+#     },
+#     "checkpoint_freq": 25,
+# }
+
+>>>>>>> 035ca32dcdf37cac4ef19ebbfb491ab10da96cd9
 
 # "reward_config": {
 #     "soft_stop": True,
@@ -360,4 +399,3 @@ ppo024_multi = {
 #     }
 # }
 #
-
