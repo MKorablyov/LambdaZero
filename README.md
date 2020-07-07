@@ -3,7 +3,7 @@
 Note: Instructions on how to access, set up, and manage slurm jobs on the MILA Cluster and Compute Canada (Beluga) can be found on the [MILA Docs]
 
 ## Install 
-# Install using Anaconda (good for local machine) 
+### Install using Anaconda (usual way for a personal laptop) 
 Install [anaconda](https://www.anaconda.com/products/individual)
 
 Create the conda environment, based on your os:
