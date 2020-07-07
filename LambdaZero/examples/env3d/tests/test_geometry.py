@@ -22,8 +22,14 @@ def expected_center(positions):
     return center
 
 
-def test_get_geometric_center(positions, expected_center) -> np.array:
+def test_get_geometric_center(positions, expected_center):
     computed_center = get_geometric_center(positions)
 
     np.testing.assert_almost_equal(computed_center, expected_center)
+
+
+def test_get_geometric_center_assert():
+    bad_positions = np.random.rand(3, 8)
+    with pytest.raises(AssertionError):
+        _ = get_geometric_center(bad_positions)
 
