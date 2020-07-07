@@ -29,5 +29,20 @@ def diagonalize_quadratic_position_tensor(quadratic_position_tensor: np.array):
     return eigenvalues, u_matrix
 
 
+def get_relative_positions_in_quadratic_tensor_basis(list_positions: np.array) -> np.array:
+    """
+    This method computes the relative quadratic position tensor and expresses positions relative
+    to their center in the natural basis of the tensor.
+    """
 
+    quadratic_position_tensor = get_quadratic_position_tensor(list_positions)
+
+    _, u_matrix = diagonalize_quadratic_position_tensor(quadratic_position_tensor)
+
+    relative_positions = get_positions_relative_to_center(list_positions)
+
+    # the u_matrix contains the tensor's eigenvectors as columns
+    relative_positions_in_tensor_basis = np.dot(relative_positions, u_matrix)
+
+    return relative_positions_in_tensor_basis
 
