@@ -48,8 +48,7 @@ class DL(torch.utils.data.DataLoader):
             vectors for each key in the list. (default: :obj:`[]`)
     """
 
-    def __init__(self, dataset, batch_size=1, shuffle=False, follow_batch=[], samp=None,
-                 **kwargs):
+    def __init__(self, dataset, batch_size=1, shuffle=False, follow_batch=[], samp=None,**kwargs):
         super(DL,
               self).__init__(dataset, batch_size, shuffle,
                              collate_fn=Collater(follow_batch), sampler=samp, **kwargs)
