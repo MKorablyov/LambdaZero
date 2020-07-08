@@ -1,5 +1,7 @@
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Data, InMemoryDataset, download_url
+from rdkit import Chem
+from rdkit.Chem import AllChem
 from unrar import rarfile
 import numpy as np
 import pandas as pd
@@ -12,7 +14,7 @@ def get_fingerprint(smile, radius, n_bits):
         return np.array([-1]*n_bits)
     try:
         return np.array(AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(smile), radius, n_bits))
-    except:
+    except Exception as ex:
         return np.array([-1]*n_bits)
 
 def to_drug_induced_subgraphs(data_list):
@@ -269,6 +271,14 @@ class DrugCombDb(InMemoryDataset):
         # Remove measures for which there is no information about one of the drugs
         drug_drug_edges = drug_comb_scored[drug_comb_scored['idx_Drug1'] != -1]
         drug_drug_edges = drug_drug_edges[drug_drug_edges['idx_Drug2'] != -1]
+
+        # Keep the first score for each (drug, drug, cell line) tuple that exists
+        drug_drug_edges = drug_drug_edges.drop_duplicates(['idx_Drug1', 'idx_Drug2', 'Cell line'])
+
+        # Remove edges with invalid scores
+        scores = drug_drug_edges[['ZIP', 'Bliss', 'Loewe', 'HSA']]
+        bad_scores_arr = ((scores.notna()) & (-100 <= scores) & (scores <= 100)).all(axis=1)
+        drug_drug_edges = drug_drug_edges[bad_scores_arr]
 
         cell_lines = drug_drug_edges['Cell line'].unique()
         mapping = {cell_line: i for i, cell_line in enumerate(cell_lines)}

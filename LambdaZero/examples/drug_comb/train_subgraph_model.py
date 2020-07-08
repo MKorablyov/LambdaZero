@@ -8,6 +8,10 @@ import numpy as np
 import torch.nn.functional as F
 import ray
 import torch
+import os
+import math
+
+num_iters = 0
 
 def random_split(num_examples, test_prob, valid_prob):
     nvalid = int(num_examples * valid_prob)
@@ -48,8 +52,10 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
         metrics["mse"] += ((y - preds) ** 2).sum().item()
         metrics["mae"] += ((y - preds).abs()).sum().item()
 
-        if i % 20 == 0:
-            print('MSE: %f' % loss.item())
+        global num_iters
+        num_iters += 1
+        if num_iters % 20 == 0:
+            print('Train MSE: %f' % loss.item())
 
     metrics["loss"] = metrics["loss"] / len(subgraph_dataset)
     metrics["mse"] = metrics["mse"] / len(subgraph_dataset)
@@ -74,6 +80,10 @@ def eval_epoch(dataset, eval_idxs,  model, device, config):
 
         preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
+
+        global num_iters
+        if num_iters % 20 == 0:
+            print('Eval MSE: %f' % loss.item())
 
         metrics["loss"] += loss.item()
         metrics["mse"] += ((y - preds) ** 2).sum().item()
@@ -137,13 +147,13 @@ config = {
         "eval_epoch": eval_epoch,
         "embed_channels": 256,
         "regressor_hidden_channels": 64,
-        "num_epochs": 120,
+        "num_epochs": 256,
         "batch_size": 64,
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
-    "checkpoint_freq": 10000,
-    "stop": {"training_iteration": 120},
+    "checkpoint_freq": 500,
+    "stop": {"training_iteration": 1024 * 4},
     "checkpoint_at_end": False,
     "resources_per_trial": {"cpu": 6}
 }
@@ -156,7 +166,7 @@ if __name__ == "__main__":
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=1,
+        num_samples=6,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"]
