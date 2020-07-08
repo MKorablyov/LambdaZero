@@ -60,7 +60,6 @@ DEFAULT_CONFIG = {
         },
     "predict_config": {
         "dataset_type": "regression",
-        #"checkpoint_path": os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt"),
         "features_generator": None,
         "features_path": None,  # Path(s) to features to use in FNN (instead of features_generator)
         "no_features_scaling": False,  # Turn off scaling of features
@@ -71,13 +70,12 @@ DEFAULT_CONFIG = {
 }
 
 synth_config = deepcopy(DEFAULT_CONFIG)
-binding_config = deepcopy(DEFAULT_CONFIG)
 synth_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 synth_config["synth_cutoff"] = [0, 4]
 
+binding_config = deepcopy(DEFAULT_CONFIG)
 binding_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
 binding_config["dockscore_std"] = [49.411, 7.057]
-
 
 
 if __name__ == '__main__':
