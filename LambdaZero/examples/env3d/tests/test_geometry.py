@@ -1,57 +1,70 @@
-import pytest
+import itertools
+
 import numpy as np
+import pytest
 import scipy.spatial
 
-from LambdaZero.examples.env3d.geometry import (
-    get_geometric_center,
-    get_positions_relative_to_center,
-    get_quadratic_position_tensor,
-    diagonalize_quadratic_position_tensor,
-    get_quadratic_position_tensor_basis,
-)
+from LambdaZero.examples.env3d.geometry import get_center_of_mass, get_inertia_tensor
+
+
+def get_epsilon():
+    """
+    The Levi-Civita fully anti-symmetric tensor
+    """
+    epsilon = np.zeros([3, 3, 3])
+    for i, j, k in itertools.permutations([0, 1, 2], 3):
+        m = np.zeros([3, 3])
+        m[0, i] = 1
+        m[1, j] = 1
+        m[2, k] = 1
+        sign = np.sign(np.linalg.det(m))
+        epsilon[i, j, k] = sign
+
+    return epsilon
+
+
+def get_skew_symmetric_matrix(vector):
+    epsilon = get_epsilon()
+    matrix = np.einsum("ijk,j", epsilon, vector)
+    return matrix
 
 
 @pytest.fixture
-def positions():
+def number_of_atoms():
+    return 10
+
+
+@pytest.fixture
+def positions(number_of_atoms):
     np.random.seed(12312)
-    return np.random.rand(10, 3)
+    return np.random.rand(number_of_atoms, 3)
 
 
 @pytest.fixture
-def expected_center(positions):
+def masses(number_of_atoms):
+    np.random.seed(34534)
+    return 12 * np.random.rand(number_of_atoms)
+
+
+@pytest.fixture
+def expected_moment_of_inertia(masses, positions):
+    inertia = np.zeros([3, 3])
+    for mass, p in zip(masses, positions):
+        matrix = get_skew_symmetric_matrix(p)
+        inertia -= mass * np.dot(matrix, matrix)
+    return inertia
+
+
+@pytest.fixture
+def expected_center_of_mass(masses, positions):
     center = np.zeros(3)
 
-    number_of_positions = len(positions)
-
-    for p in positions:
-        center += p
-    center /= number_of_positions
+    total_mass = 0.0
+    for m, p in zip(masses, positions):
+        total_mass += m
+        center += m * p
+    center /= total_mass
     return center
-
-
-@pytest.fixture
-def expected_relative_positions(positions, expected_center):
-
-    list_relative_positions = []
-    for p in positions:
-        list_relative_positions.append(p - expected_center)
-
-    return np.array(list_relative_positions)
-
-
-@pytest.fixture
-def expected_tensor(expected_relative_positions):
-    number_of_positions = len(expected_relative_positions)
-
-    t = np.zeros([3, 3])
-
-    for p in expected_relative_positions:
-        for alpha in range(3):
-            for beta in range(3):
-                t[alpha, beta] += p[alpha] * p[beta]
-
-    t /= number_of_positions
-    return t
 
 
 @pytest.fixture
@@ -80,53 +93,22 @@ def random_quadratic_tensor(random_eigenvalues, random_rotation):
     return t
 
 
-def test_get_geometric_center(positions, expected_center):
-    computed_center = get_geometric_center(positions)
+def test_get_center_of_mass(masses, positions, expected_center_of_mass):
+    computed_center = get_center_of_mass(masses, positions)
 
-    np.testing.assert_almost_equal(computed_center, expected_center)
+    np.testing.assert_almost_equal(computed_center, expected_center_of_mass)
 
 
-def test_get_geometric_center_assert():
-    bad_positions = np.random.rand(3, 8)
+@pytest.mark.parametrize("list_masses, list_positions", [(np.random.rand(3, 2), np.random.rand(3, 3)),
+                                                         (np.random.rand(3), np.random.rand(3, 4, 5)),
+                                                         (np.random.rand(3), np.random.rand(5, 3)),
+                                                         (np.random.rand(3), np.random.rand(3, 2))])
+def test_get_center_of_mass_assert(list_masses, list_positions):
+
     with pytest.raises(AssertionError):
-        _ = get_geometric_center(bad_positions)
+        _ = get_center_of_mass(list_masses, list_positions)
 
 
-def test_get_positions_relative_to_center(positions, expected_relative_positions):
-    computed_relative_positions = get_positions_relative_to_center(positions)
-
-    np.testing.assert_almost_equal(
-        computed_relative_positions, expected_relative_positions
-    )
-
-
-def test_get_quadratic_position_tensor(positions, expected_tensor):
-
-    computed_tensor = get_quadratic_position_tensor(positions)
-    np.testing.assert_almost_equal(computed_tensor, expected_tensor)
-
-
-def test_diagonalize_quadratic_position_tensor(
-    random_eigenvalues, random_rotation, random_quadratic_tensor
-):
-    computed_eigenvalues, computed_u_matrix = diagonalize_quadratic_position_tensor(
-        random_quadratic_tensor
-    )
-
-    np.testing.assert_almost_equal(computed_eigenvalues, random_eigenvalues)
-    np.testing.assert_almost_equal(computed_u_matrix, random_rotation)
-
-
-def test_get_quadratic_position_tensor_basis(positions):
-    computed_tensor = get_quadratic_position_tensor(positions)
-
-    eigenvalues, raw_u_matrix = diagonalize_quadratic_position_tensor(computed_tensor)
-
-    relative_positions = get_positions_relative_to_center(positions)
-    u_matrix = get_quadratic_position_tensor_basis(relative_positions, raw_u_matrix)
-
-    np.testing.assert_almost_equal(np.linalg.det(u_matrix), 1.0)
-
-    uu = np.dot(u_matrix.T, raw_u_matrix)
-    np.testing.assert_allclose(np.abs(np.diag(uu)), np.ones(3))
-    np.testing.assert_almost_equal(np.linalg.norm(uu - np.diag(np.diag(uu))), 0.0)
+def test_get_inertia_tensor(masses, positions, expected_moment_of_inertia):
+    computed_moment_of_inertia = get_inertia_tensor(masses, positions)
+    np.testing.assert_allclose(expected_moment_of_inertia, computed_moment_of_inertia)
