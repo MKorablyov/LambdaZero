@@ -1,7 +1,7 @@
 import os,time
 import numpy as np
 import pandas as pd
-import torch as th
+import torch
 from torch_sparse import coalesce
 
 import rdkit
@@ -17,7 +17,7 @@ rdBase.DisableLog('rdApp.error')
 
 
 from torch.utils.data import Dataset as th_Dataset
-#th.multiprocessing.set_sharing_strategy('file_system') # bug https://github.com/pytorch/pytorch/issues/973
+#torch.multiprocessing.set_sharing_strategy('file_system') # bug https://github.com/pytorch/pytorch/issues/973
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -33,7 +33,7 @@ from sklearn.decomposition import PCA as sk_PCA
 #from ..py_tools import chem
 #from ..py_tools import multithread as mtr
 
-from LambdaZero import chem
+import LambdaZero.chem
 
 # def mtable_featurizer(elem, charge=None,organic=False):
 #     """
@@ -50,7 +50,7 @@ from LambdaZero import chem
 #         elem_feat.append(charge)
 #     return np.stack(elem_feat,axis=1)
 #
-# class Sampler(th.utils.data.Sampler):
+# class Sampler(torch.utils.data.Sampler):
 #     def __init__(self, idxs, probs=None, num_samples=None):
 #         self.idxs = idxs
 #         self.probs = probs
@@ -66,7 +66,7 @@ from LambdaZero import chem
 #     def __len__(self):
 #         return self.num_samples
 #
-# class ImgGen(th.nn.Module):
+# class ImgGen(torch.nn.Module):
 #     def __init__(self, grid_pix, pix_size, sigmas, input_d, pairwise=False):
 #         """
 #
@@ -88,12 +88,12 @@ from LambdaZero import chem
 #             img_depth = input_d * len(self._sigmas)
 #             pairwise_idx = np.tile(np.arange(img_depth)[:, None], [1, img_depth]).reshape(-1)[:, None]
 #             pairwise_idx = np.concatenate([pairwise_idx, np.tile(np.arange(img_depth), [img_depth])[:, None]], 1)
-#             self._pairwise_idx = th.tensor(pairwise_idx)
+#             self._pairwise_idx = torch.tensor(pairwise_idx)
 #         grid_dim = np.asarray([grid_pix, grid_pix, grid_pix])
 #         grid = np.stack([-grid_dim // 2, grid_dim - grid_dim // 2], 1)
 #         grid = np.mgrid[grid[0, 0]:grid[0, 1], grid[1, 0]:grid[1, 1], grid[2, 0]:grid[2, 1]]
-#         grid = th.tensor(np.asarray(grid, dtype=np.float32))
-#         self._grid = th.nn.Parameter(grid, requires_grad=False)
+#         grid = torch.tensor(np.asarray(grid, dtype=np.float32))
+#         self._grid = torch.nn.Parameter(grid, requires_grad=False)
 #
 #     def forward(self, coord, feat):
 #         """
@@ -110,14 +110,14 @@ from LambdaZero import chem
 #
 #         # explicitly compute distances
 #         scaled_coord = coord / self._pix_size
-#         dist_sq = th.sum(((self._grid[None, :, :, :] - scaled_coord[:, :, None, None, None]) ** 2), 1)
+#         dist_sq = torch.sum(((self._grid[None, :, :, :] - scaled_coord[:, :, None, None, None]) ** 2), 1)
 #         # generate images for each possible sigma
 #         gauss_imgs = []
 #         for sigma in self._sigmas:
-#             gauss_dist = th.exp(-dist_sq / (2 * (float(sigma) ** 2)))
+#             gauss_dist = torch.exp(-dist_sq / (2 * (float(sigma) ** 2)))
 #             gauss_img = (gauss_dist[:, None, :, :, :] * feat[:, :, None, None, None]).sum([0])
 #             gauss_imgs.append(gauss_img)
-#         gauss_img = th.cat(gauss_imgs, dim=0)
+#         gauss_img = torch.cat(gauss_imgs, dim=0)
 #
 #         # generate pairsies combinations when needed
 #         if self._pairwise:
@@ -260,7 +260,7 @@ from LambdaZero import chem
 #             feat = mtable_featurizer(elem, organic=organic)
 #         else:
 #             raise NotImplementedError("can't featurize")
-#         coord, feat = th.from_numpy(coord), th.from_numpy(feat)
+#         coord, feat = torch.from_numpy(coord), torch.from_numpy(feat)
 #         if self.oncuda: coord, feat = coord.cuda(), feat.cuda()
 #         return imgGen(coord, feat)
 #
@@ -270,7 +270,7 @@ from LambdaZero import chem
 #     def __getitem__(self, idx):
 #         #name, ufrag_num, ufrag_idx, frag_elem, frag_coord, root_elem, root_coord, rec_elem, rec_coord\
 #         sam = self.datasetFrag[idx]
-#         ufrag_idx = th.from_numpy(np.asarray(sam["ufrag_idx"], dtype=np.int64)) # convert to torch tensor
+#         ufrag_idx = torch.from_numpy(np.asarray(sam["ufrag_idx"], dtype=np.int64)) # convert to torch tensor
 #         out = {"idx": idx, "ufrag_idx":ufrag_idx}
 #         if self.rootImgGen is not None:
 #             out["root_img"] = self._gen_img(self.rootImgGen, sam["root_elem"], sam["root_coord"], organic=False)
@@ -316,7 +316,7 @@ from LambdaZero import chem
 #         #print("parameters in instance:", list(self.pr.parameters()))
 #         return (idx,) + self.pr(**pr_input)
 #
-# class PreprocVS(th.nn.Module):
+# class PreprocVS(torch.nn.Module):
 #     def __init__(self, rot_complex=True, rot_lig=False, rot_rec=False, rot_binder=True, shrange=3.0, featurize=None):
 #         """
 #
@@ -382,7 +382,7 @@ from LambdaZero import chem
 #         return lig_elem, lig_coord, rec_elem, rec_coord, binder_elem, binder_coord
 #
 #
-# class PreprocVSimg(th.nn.Module):
+# class PreprocVSimg(torch.nn.Module):
 #     def __init__(self,preprocVS_par,ligImgGen_par=None,recImgGen_par=None,binderImgGen_par=None):
 #         super(PreprocVSimg, self).__init__()
 #         # read coordinates and elements from the disk
@@ -408,17 +408,17 @@ from LambdaZero import chem
 #         # generate images
 #         imgs = []
 #         if self.ligImgGen is not None:
-#             lig_coord, lig_feat = th.from_numpy(lig_coord), th.from_numpy(lig_feat)
+#             lig_coord, lig_feat = torch.from_numpy(lig_coord), torch.from_numpy(lig_feat)
 #             if any([p.is_cuda for p in self.parameters()]):
 #                 lig_coord, lig_feat = lig_coord.cuda(), lig_feat.cuda()
 #             imgs.append(self.ligImgGen(lig_coord,lig_feat))
 #         if self.recImgGen is not None:
-#             rec_coord, rec_feat = th.from_numpy(rec_coord), th.from_numpy(rec_feat)
+#             rec_coord, rec_feat = torch.from_numpy(rec_coord), torch.from_numpy(rec_feat)
 #             if any([p.is_cuda for p in self.parameters()]):
 #                 rec_coord, rec_feat = rec_coord.cuda(), rec_feat.cuda()
 #             imgs.append(self.recImgGen(rec_coord,rec_feat))
 #         if self.binderImgGen is not None:
-#             binder_coord, binder_feat = th.from_numpy(binder_coord), th.from_numpy(binder_feat)
+#             binder_coord, binder_feat = torch.from_numpy(binder_coord), torch.from_numpy(binder_feat)
 #             if any([p.is_cuda for p in self.parameters()]):
 #                 binder_coord, binder_feat = binder_coord.cuda(), binder_feat.cuda()
 #             imgs.append(self.binderImgGen(binder_coord,binder_feat))
@@ -461,9 +461,9 @@ from LambdaZero import chem
 #     dataset = DatasetQM7(data_dir,rotate,shiftrange)
 #     ntest = int(len(dataset) * test_prob)
 #     ntrain = int(len(dataset) - (len(dataset) * test_prob))
-#     train_set, test_set = th.utils.data.random_split(dataset, [ntrain, ntest])
-#     train_set = th.utils.data.DataLoader(train_set, batch_size=1, shuffle=shuffle)
-#     test_set = th.utils.data.DataLoader(test_set, batch_size=1, shuffle=shuffle)
+#     train_set, test_set = torch.utils.data.random_split(dataset, [ntrain, ntest])
+#     train_set = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=shuffle)
+#     test_set = torch.utils.data.DataLoader(test_set, batch_size=1, shuffle=shuffle)
 #     return train_set, test_set
 #
 #
@@ -502,9 +502,9 @@ from LambdaZero import chem
 #     dataset = Embedding_qm_dataset(data_dir)
 #     ntest = int(len(dataset) * test_prob)
 #     ntrain = int(len(dataset) - (len(dataset) * test_prob))
-#     train_set, test_set = th.utils.data.random_split(dataset, [ntrain, ntest])
-#     train_set = th.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
-#     test_set = th.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
+#     train_set, test_set = torch.utils.data.random_split(dataset, [ntrain, ntest])
+#     train_set = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
+#     test_set = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
 #     return train_set, test_set
 
 
@@ -577,23 +577,52 @@ from LambdaZero import chem
 #
 #         gauss_imgs = []
 #         for i in range(self.nframes):
-#             coord = th.tensor(self.coords[idx][i], dtype=th.float32)
-#             feat = th.tensor(feat,dtype=th.float32)
+#             coord = torch.tensor(self.coords[idx][i], dtype=torch.float32)
+#             feat = torch.tensor(feat,dtype=torch.float32)
 #             if self.oncuda:
 #                 coord = coord.cuda()
 #                 feat = feat.cuda()
 #             gauss_img = self.imgGen(coord,feat)
 #             gauss_imgs.append(gauss_img)
-#         gauss_imgs = th.stack(gauss_imgs,dim=0)
+#         gauss_imgs = torch.stack(gauss_imgs,dim=0)
 #
 #         return gauss_imgs,self.props[idx]
 
+N_GROUPS = 18
+N_PERIODS = 5
 
-def onehot(arr,num_classes,dtype=np.int):
-    arr = np.asarray(arr,dtype=np.int)
-    assert len(arr.shape) ==1, "dims other than 1 not implemented"
-    onehot_arr = np.zeros(arr.shape + (num_classes,),dtype=dtype)
-    onehot_arr[np.arange(arr.shape[0]), arr] = 1
+atomic_num_to_group = dict.fromkeys([1, 3, 11, 19, 37], 1)
+atomic_num_to_group.update(dict.fromkeys([4, 12, 20, 38], 2))
+atomic_num_to_group.update(dict.fromkeys([21, 39], 3))
+atomic_num_to_group.update(dict.fromkeys([22, 40], 4))
+atomic_num_to_group.update(dict.fromkeys([23, 41], 5))
+atomic_num_to_group.update(dict.fromkeys([24, 42], 6))
+atomic_num_to_group.update(dict.fromkeys([25, 43], 7))
+atomic_num_to_group.update(dict.fromkeys([26, 44], 8))
+atomic_num_to_group.update(dict.fromkeys([27, 45], 9))
+atomic_num_to_group.update(dict.fromkeys([28, 46], 10))
+atomic_num_to_group.update(dict.fromkeys([29, 47], 11))
+atomic_num_to_group.update(dict.fromkeys([30, 48], 12))
+atomic_num_to_group.update(dict.fromkeys([5, 13, 31, 49], 13))
+atomic_num_to_group.update(dict.fromkeys([6, 14, 32, 50], 14))
+atomic_num_to_group.update(dict.fromkeys([7, 15, 33, 51], 15))
+atomic_num_to_group.update(dict.fromkeys([8, 16, 34, 52], 16))
+atomic_num_to_group.update(dict.fromkeys([9, 17, 35, 53], 17))
+atomic_num_to_group.update(dict.fromkeys([10, 18, 36, 54], 18))
+
+atomic_num_to_period = dict.fromkeys([1, 2], 1)
+atomic_num_to_period.update(dict.fromkeys(list(range(3, 10+1)), 2))
+atomic_num_to_period.update(dict.fromkeys(list(range(11, 18+1)), 3))
+atomic_num_to_period.update(dict.fromkeys(list(range(19, 36+1)), 4))
+atomic_num_to_period.update(dict.fromkeys(list(range(37, 54+1)), 5))
+
+
+
+def onehot(arr, num_classes, dtype=np.int):
+    arr = np.asarray(arr, dtype=np.int)
+    assert arr.ndim == 1, "dims other than 1 not implemented"
+    onehot_arr = np.zeros((arr.size, num_classes), dtype=dtype)
+    onehot_arr[np.arange(arr.size), arr] = 1
     return onehot_arr
 
 def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
@@ -649,151 +678,115 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
         atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
     return atmfeat, coord, bond, bondfeat
 
-def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
+def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
-    atmfeat = th.tensor(atmfeat, dtype=th.float32)
-    edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
-    edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
+    atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
+    edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=torch.int64)
+    edge_attr = torch.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=torch.float32)
     edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
     # make torch data
     if coord is not None:
-        coord = th.tensor(coord,dtype=th.float32)
+        coord = torch.tensor(coord,dtype=torch.float32)
         data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
-@ray.remote
-def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
+def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     "mol to graph convertor"
-    mol = chem.build_mol(smiles, num_conf=num_conf, noh=noh)["mol"].to_list()[0]
+    mol,_,_ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
     if feat == "mpnn":
         atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
     else:
         raise NotImplementedError(feat)
-    props = {}
-    if dockscore is not None:
-        props["dockscore"] = dockscore
-    if gridscore is not None:
-        props["gridscore"] = gridscore
-    if klabel is not None:
-        props["klabel"] = klabel
-    graph = mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props)
+    graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
     return graph
 
+def create_mol_graph_with_3d_coordinates(smi, props):
+    mol = rdkit.Chem.rdmolfiles.MolFromSmiles(smi)
+        
+    # x (tmp)
+    x = torch.tensor([a.GetAtomicNum() for a in mol.GetAtoms()], dtype=torch.int64)
 
-class QM9(InMemoryDataset):
-    r"""The QM9 dataset from the `"MoleculeNet: A Benchmark for Molecular
-    Machine Learning" <https://arxiv.org/abs/1703.00564>`_ paper, consisting of
-    about 130,000 molecules with 16 regression targets.
-    Each molecule includes complete spatial information for the single low
-    energy conformation of the atoms in the molecule.
-    In addition, we provide the atom features from the `"Neural Message
-    Passing for Quantum Chemistry" <https://arxiv.org/abs/1704.01212>`_ paper.
+    # edge index
+    bonds = np.asarray([[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()] for bond in mol.GetBonds()])
+    bonds = np.vstack((bonds, bonds[:, ::-1]))
+    edge_index = torch.tensor(bonds.T, dtype=torch.int64)
 
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | Target | Property                         | Description                                                                       | Unit                                        |
-    +========+==================================+===================================================================================+=============================================+
-    | 0      | :math:`\mu`                      | Dipole moment                                                                     | :math:`\textrm{D}`                          |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 1      | :math:`\alpha`                   | Isotropic polarizability                                                          | :math:`{a_0}^3`                             |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 2      | :math:`\epsilon_{\textrm{HOMO}}` | Highest occupied molecular orbital energy                                         | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 3      | :math:`\epsilon_{\textrm{LUMO}}` | Lowest unoccupied molecular orbital energy                                        | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 4      | :math:`\Delta \epsilon`          | Gap between :math:`\epsilon_{\textrm{HOMO}}` and :math:`\epsilon_{\textrm{LUMO}}` | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 5      | :math:`\langle R^2 \rangle`      | Electronic spatial extent                                                         | :math:`{a_0}^2`                             |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 6      | :math:`\textrm{ZPVE}`            | Zero point vibrational energy                                                     | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 7      | :math:`U_0`                      | Internal energy at 0K                                                             | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 8      | :math:`U`                        | Internal energy at 298.15K                                                        | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 9      | :math:`H`                        | Enthalpy at 298.15K                                                               | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 10     | :math:`G`                        | Free energy at 298.15K                                                            | :math:`E_{\textrm{h}}`                      |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 11     | :math:`c_{\textrm{v}}`           | Heat capavity at 298.15K                                                          | :math:`\frac{\textrm{cal}}{\textrm{mol K}}` |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 12     | :math:`U_0^{\textrm{ATOM}}`      | Atomization energy at 0K                                                          | :math:`\frac{\textrm{kcal}}{\textrm{mol}}`  |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 13     | :math:`U^{\textrm{ATOM}}`        | Atomization energy at 298.15K                                                     | :math:`\frac{\textrm{kcal}}{\textrm{mol}}`  |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 14     | :math:`H^{\textrm{ATOM}}`        | Atomization enthalpy at 298.15K                                                   | :math:`\frac{\textrm{kcal}}{\textrm{mol}}`  |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
-    | 15     | :math:`G^{\textrm{ATOM}}`        | Atomization free energy at 298.15K                                                | :math:`\frac{\textrm{kcal}}{\textrm{mol}}`  |
-    +--------+----------------------------------+-----------------------------------------------------------------------------------+---------------------------------------------+
+    # edge_attr (tmp)
+    edge_attr = None
 
-    Args:
-        root (string): Root directory where the dataset should be saved.
-        transform (callable, optional): A function/transform that takes in an
-            :obj:`torch_geometric.data.Data` object and returns a transformed
-            version. The data object will be transformed before every access.
-            (default: :obj:`None`)
-        pre_transform (callable, optional): A function/transform that takes in
-            an :obj:`torch_geometric.data.Data` object and returns a
-            transformed version. The data object will be transformed before
-            being saved to disk. (default: :obj:`None`)
-        pre_filter (callable, optional): A function that takes in an
-            :obj:`torch_geometric.data.Data` object and returns a boolean
-            value, indicating whether the data object should be included in the
-            final dataset. (default: :obj:`None`)
-    """
-    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
-        super(QM9, self).__init__(root, transform, pre_transform, pre_filter)
-        self.data, self.slices = th.load(self.processed_paths[0])
+    # y
+    y = torch.tensor([props['gridscore']], dtype=torch.float64)
 
+    # pos
+    pos = torch.tensor(np.vstack(props['coord']), dtype=torch.float64) 
 
-    @property
-    def raw_file_names(self):
-        return ['gdb9.sdf', 'gdb9.sdf.csv']
+    return Data(x, edge_index, edge_attr, y, pos)
 
-    @property
-    def processed_file_names(self):
-        return 'qm9.pt'
+@ray.remote
+def tpnn_proc(smi, props, pre_filter, pre_transform):
+    try:
+        graph = create_mol_graph_with_3d_coordinates(smi, props)
+    except Exception as e:
+        return None
+    if pre_filter is not None and not pre_filter(graph):
+        return None
+    if pre_transform is not None:
+        graph = pre_transform(graph)
+    return graph
 
-    def download(self):
-        pass
+@ray.remote
+def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
+    try:
+        graph = mol_to_graph(smi, props)
+    except Exception as e:
+        return None
+    if pre_filter is not None and not pre_filter(graph):
+        return None
+    if pre_transform is not None:
+        graph = pre_transform(graph)
+    return graph
 
-    def process(self):
-        # read energies in QM9
-        with open(self.raw_paths[1], 'r') as f:
-            target = f.read().split('\n')[1:-1]
-            target = th.tensor([[float(x) for x in line.split(',')[4:20]] for line in target],dtype=th.float)
+def tpnn_transform(data):
+    def _group_period(atomic_numbers):
+        groups = np.array([atomic_num_to_group[atomic_number] for atomic_number in atomic_numbers.numpy()])
+        periods = np.array([atomic_num_to_period[atomic_number] for atomic_number in atomic_numbers.numpy()])
+        return groups, periods
+    
+    def _one_hot_group_period(groups, periods):
+        groups_one_hot = onehot(groups-1, N_GROUPS, dtype=np.float64)
+        periods_one_hot = onehot(periods-1, N_PERIODS, dtype=np.float64)
 
-        # read/embed molecule into graph format
-        suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=False)
-        graphs = []
-        for i,mol in enumerate(suppl):
-            if mol is None: continue
-            atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
-            graph = mol_to_graph(atmfeat, coord, bond, bondfeat, args={"y":target[i].unsqueeze(0)})
-            if self.pre_filter is not None and not self.pre_filter(graph): continue
-            if self.pre_transform is not None: graph = self.pre_transform(graph)
-            graphs.append(graph)
+        return torch.tensor(np.hstack((groups_one_hot, periods_one_hot)), dtype=torch.float64)
+    
+    def _rel_vectors(coordinates, bonds):
+        origin_pos = coordinates[bonds[0]]
+        neighbor_pos = coordinates[bonds[1]]
+        return neighbor_pos - origin_pos
+    
+    data = data.clone()
+    data.x = _one_hot_group_period(*_group_period(data.x))
+    data.edge_attr = _rel_vectors(data.pos, data.edge_index)
 
-        # save to the disk
-        th.save(self.collate(graphs), self.processed_paths[0])
-
+    return data
 
 class BrutalDock(InMemoryDataset):
     # own internal dataset
     def __init__(self, root, transform=None, pre_transform=None, pre_filter=None,
-                 props="gridscore", file_names=['ampc_100k'], chunksize=550):
+                 props=["gridscore"], file_names=['ampc_100k'], proc_func=_brutal_dock_proc):
         self._props = props
         self.file_names = file_names
-        self._chunksize = chunksize
+        self.proc_func = proc_func
+
         super(BrutalDock, self).__init__(root, transform, pre_transform, pre_filter)
 
         #  todo: store a list, but have a custom collate function on batch making
         graphs = []
         for processed_path in self.processed_paths:
-            self.data, self.slices = th.load(processed_path)
+            self.data, self.slices = torch.load(processed_path)
             graphs += [self.get(i) for i in range(len(self))]
         if len(graphs) > 0:
             self.data, self.slices = self.collate(graphs)
@@ -811,29 +804,13 @@ class BrutalDock(InMemoryDataset):
 
     def process(self):       
         print("processing", self.raw_paths)
-        ray.init()
-        for i in range(len(self.raw_file_names)):
-            if not os.path.exists(self.processed_file_names[i]):
-                docked_index = pd.read_feather(self.raw_paths[i])
-                smiles = docked_index["smiles"].tolist()
-                props = {pr:docked_index[pr].tolist() for pr in self._props}
-                graph_ray_funs = []
-                for j in range(len(smiles)):
-                    graph_ray_funs.append(
-                        mol_to_graph.remote(smiles[j], **{pr:props[pr][j] for pr in props})
-                    )
-                
-                graphs = []
-                for graph_ray_function in graph_ray_funs:
-                    graph = ray.get(graph_ray_function)
-                    if self.pre_filter is not None and not self.pre_filter(graph): continue
-                    if self.pre_transform is not None: graph = self.pre_transform(graph)
-                    graphs.append(graph)
-                # save to the disk
-                th.save(self.collate(graphs), self.processed_paths[i])
-        ray.shutdown()
-
-
-if __name__ == "__main__":
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../..', 'data', 'QM9')
-    dataset = QM9(path).shuffle()
+        for raw_path, processed_path in zip(self.raw_paths, self.processed_paths):
+            docked_index = pd.read_feather(raw_path)
+            smis = docked_index["smiles"].tolist()
+            props = {pr:docked_index[pr].tolist() for pr in self._props}
+            tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
+                                           self.pre_filter, self.pre_transform) for j in range(len(smis))]
+            graphs = ray.get(tasks)
+            graphs = [g for g in graphs if g is not None]
+            # save to the disk
+            torch.save(self.collate(graphs), processed_path)

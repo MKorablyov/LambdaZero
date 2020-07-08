@@ -1,21 +1,21 @@
 script_name="$0"
-DATASET_PATH=Datasets
-PROGRAMS_PATH=Programs
-DATASET_DEFAULT=1
+DATASETS_DEFAULT=1
 PROGRAMS_DEFAULT=1
+SUMMARIES_DEFAULT=1
+THIS_SCRIPT_DIR=`pwd`
+
 
 function help() {
 cat <<EOF
 Usage:
 
-    $script_name [ -d <path> | --dataset_path=<path> ]
-        [ -p <path> | --programs_path=<path> ]
+    $script_name [ -d <path> | --datasets_dir=<path> ]
+        [ -p <path> | --programs_dir=<path> ]
+        [ -s <path> | --summaries_dir=<path> ]
 
-    -d NO will skip installing the datasets
-    -p NO will skip installing the programs
-
-    If you don't use the default values for dataset and program paths
-    you will have to adjust the paths in the code to match.
+    -d where to install datasets
+    -p where to install programs
+    -s where to install summaries
 
 EOF
 }
@@ -31,13 +31,13 @@ while [[ $# -gt 0 ]]; do
                 help
                 exit 1
             fi
-	    PROGRAMS_PATH="$2"
+	    PROGRAMS_DIR="$2"
 	    PROGRAMS_DEFAULT=0
 	    shift
 	    shift
 	    ;;
-	--program_path=*)
-	    PROGRAMS_PATH="${key#*=}"
+	--programs_dir=*)
+	    PROGRAMS_DIR="${key#*=}"
 	    PROGRAMS_DEFAULT=0
 	    shift
 	    ;;
@@ -48,14 +48,31 @@ while [[ $# -gt 0 ]]; do
                 help
                 exit 1
             fi
-	    DATASET_PATH="$2"
-	    DATASET_DEFAULT=0
+	    DATASETS_DIR="$2"
+	    DATASETS_DEFAULT=0
 	    shift
 	    shift
 	    ;;
-	--dataset_path=*)
-	    DATASET_PATH="${key#*=}"
-	    DATASET_DEFAULT=0
+	--datasets_dir=*)
+	    DATASETS_DIR="${key#*=}"
+	    DATASETS_DEFAULT=0
+	    shift
+	    ;;
+	-s)
+            if [ -z "${2+x}" ]; then
+                echo "-s requires an argument"
+                echo ""
+                help
+                exit 1
+            fi
+	    SUMMARIES_DIR="$2"
+	    SUMMARIES_DEFAULT=0
+	    shift
+	    shift
+	    ;;
+	--programs_dir=*)
+	    SUMMARIES_DIR="${key#*=}"
+	    SUMMARIES_DEFAULT=0
 	    shift
 	    ;;
         -h|--help)
@@ -71,39 +88,84 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ $DATASET_DEFAULT -eq 1 ]; then
-    read -p "Install directory for datasets (NO to skip) [$DATASET_PATH]:" dpath
+if [ $DATASETS_DEFAULT -eq 1 ]; then
+    read -p "Install directory for datasets [$DATASETS_DIR]:" dpath
     if [ ! -z "$dpath" ]; then
-        DATASET_PATH="$dpath"
+        DATASETS_DIR="$dpath"
     fi
 fi
-
-if [ "$DATASET_PATH" != "NO" ]; then
-    mkdir -p "$DATASET_PATH"
-    cd $DATASET_PATH
-    git clone --depth 1 https://github.com/MKorablyov/fragdb
-    git clone --depth 1 https://github.com/MKorablyov/brutal_dock
-    cd ..
-fi
-
 
 if [ $PROGRAMS_DEFAULT -eq 1 ]; then
-    read -p "Install directory for programs (NO to skip) [$PROGRAMS_PATH]:" ppath
+    read -p "Install directory for programs [$PROGRAMS_DIR]:" ppath
     if [ ! -z "$ppath" ]; then
-        PROGRAMS_PATH="$ppath"
+        PROGRAMS_DIR="$ppath"
     fi
 fi
 
-if [ "$PROGRAMS_PATH" != "NO" ]; then
-    mkdir -p "$PROGRAMS_PATH"
-    cd $PROGRAMS_PATH
-    git clone --depth 1 https://github.com/MKorablyov/dock6
-    git clone --depth 1 https://github.com/MKorablyov/chimera tmp
-    cd tmp
-    cat xaa xab > chimera.bin
-    chmod 755 chimera.bin
-    echo '../chimera' | ./chimera.bin
-    cd ..
-    rm -rf tmp
-    cd ..
+if [ $SUMMARIES_DEFAULT -eq 1 ]; then
+    read -p "Install directory for summaries [$SUMMARIES_DIR]:" ppath
+    if [ ! -z "$ppath" ]; then
+        SUMMARIES_DIR="$ppath"
+    fi
 fi
+
+
+
+# make external_dirs.cfg
+#[dir]
+#datasets = /home/maksym/Datasets
+#programs = /home/maksym/Programs
+#summaries = /home/maksym/Summaries
+echo -en "[dir]\ndatasets=$DATASETS_DIR\nprograms=$PROGRAMS_DIR\nsummaries=$SUMMARIES_DIR" > external_dirs.cfg
+
+
+mkdir -p "$DATASETS_DIR"
+cd $DATASETS_DIR
+echo $DATASETS_DIR
+git clone --depth 1 https://github.com/MKorablyov/fragdb
+git clone --depth 1 https://github.com/MKorablyov/brutal_dock
+git clone --depth 1 https://github.com/pchliu/Synthesizability
+cd ..
+
+mkdir -p "$PROGRAMS_DIR"
+cd $PROGRAMS_DIR
+git clone --depth 1 https://github.com/MKorablyov/dock6
+
+# install chimera
+ARCH=`uname`
+echo "The architecture is $ARCH"
+if [ $ARCH == 'Darwin' ]; then
+
+      CHIMERA_BIN=$PROGRAMS_DIR/chimera/bin
+      mkdir -p $CHIMERA_BIN
+
+      DMG=chimera-1.14-mac64.dmg
+      echo "Download dmg"
+      $THIS_SCRIPT_DIR/misc/chimera_installer.py
+
+      echo "attach dmg"
+      hdiutil attach $THIS_SCRIPT_DIR/misc/$DMG
+      echo "copy content of dmg to chimera folder"
+      cp -rf /Volumes/ChimeraInstaller/Chimera.app $CHIMERA_ROOT_DIR
+      echo "detach dmg"
+      hdiutil detach /Volumes/ChimeraInstaller/
+      echo "delete dmg"
+      rm $THIS_SCRIPT_DIR/misc/$DMG
+
+      SRC=$CHIMERA_ROOT_DIR/Chimera.app/Contents/Resources/bin/chimera
+      DST=$CHIMERA_BIN/chimera
+      echo "create symbolic link with source $SRC and destination $DST"
+      ln -s $SRC $DST
+
+    elif [ $ARCH == 'Linux' ]; then
+      git clone --depth 1 https://github.com/MKorablyov/chimera tmp
+      cd tmp
+      cat xaa xab > chimera.bin
+      chmod 755 chimera.bin
+      echo '../chimera' | ./chimera.bin
+      cd ..
+      rm -rf tmp
+      cd ..
+fi
+    
+mkdir -p "$SUMMARIES_DIR"
