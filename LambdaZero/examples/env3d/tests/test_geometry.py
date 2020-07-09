@@ -8,6 +8,9 @@ from LambdaZero.examples.env3d.geometry import (
     get_center_of_mass,
     get_inertia_tensor,
     project_direction_out_of_tensor,
+    multiply_scalars_and_vectors,
+    rotate_single_point_about_axis,
+    rotate_points_about_axis,
 )
 
 
@@ -126,8 +129,22 @@ def test_get_center_of_mass(masses, positions, expected_center_of_mass):
     np.testing.assert_almost_equal(computed_center, expected_center_of_mass)
 
 
+def test_multiply_scalars_and_vectors():
+    np.random.seed(6342)
+    list_scalars = np.random.rand(10)
+    list_vectors = np.random.rand(10, 3)
+
+    expected_products = []
+    for s, v in zip(list_scalars, list_vectors):
+        expected_products.append(s * v)
+
+    expected_products = np.array(expected_products)
+    computed_products = multiply_scalars_and_vectors(list_scalars, list_vectors)
+    np.testing.assert_allclose(expected_products, computed_products)
+
+
 @pytest.mark.parametrize(
-    "list_masses, list_positions",
+    "list_scalars, list_vectors",
     [
         (np.random.rand(3, 2), np.random.rand(3, 3)),
         (np.random.rand(3), np.random.rand(3, 4, 5)),
@@ -135,10 +152,9 @@ def test_get_center_of_mass(masses, positions, expected_center_of_mass):
         (np.random.rand(3), np.random.rand(3, 2)),
     ],
 )
-def test_get_center_of_mass_assert(list_masses, list_positions):
-
+def test_multiply_scalars_and_vectors_assert(list_scalars, list_vectors):
     with pytest.raises(AssertionError):
-        _ = get_center_of_mass(list_masses, list_positions)
+        _ = multiply_scalars_and_vectors(list_scalars, list_vectors)
 
 
 def test_get_inertia_tensor(masses, positions, expected_moment_of_inertia):
@@ -155,3 +171,37 @@ def test_project_direction_out_of_tensor(
     np.testing.assert_allclose(
         computed_projected_random_tensor, expected_projected_random_tensor
     )
+
+
+def test_rotate_single_point_about_axis():
+    fixed_point = np.array([0.0, 0.0, 0.0])
+    n_axis = np.array([0.0, 0.0, 1.0])
+    point = np.array([1.0, 0.0, 5.0])
+    rotation_angle = np.pi / 2
+
+    expected_rotated_point = np.array([0.0, 1.0, 5.0])
+    computed_rotated_point = rotate_single_point_about_axis(
+        fixed_point, n_axis, rotation_angle, point
+    )
+
+    np.testing.assert_almost_equal(expected_rotated_point, computed_rotated_point)
+
+
+def test_rotate_points_about_axis(random_axis_direction, positions):
+    np.random.seed(243523)
+    rotation_angle = 2 * np.pi * np.random.rand()
+    fixed_point = np.random.rand(3)
+
+    computed_rotated_points = rotate_points_about_axis(
+        positions, fixed_point, random_axis_direction, rotation_angle
+    )
+
+    expected_rotated_points = []
+    for point in positions:
+        p = rotate_single_point_about_axis(
+            fixed_point, random_axis_direction, rotation_angle, point
+        )
+        expected_rotated_points.append(p)
+
+    expected_rotated_points = np.array(expected_rotated_points)
+    np.testing.assert_almost_equal(computed_rotated_points, expected_rotated_points)
