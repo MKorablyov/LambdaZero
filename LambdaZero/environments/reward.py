@@ -40,14 +40,15 @@ class PredDockReward:
         qed = QED.qed(mol)
         qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
         qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
-        disc_reward = min(reward, reward * natm_discount * qed_discount) # don't appy to negative rewards
+        discount = natm_discount * qed_discount
+        disc_reward = min(reward, reward * discount) # don't appy to negative rewards
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, qed
+        return disc_reward, qed, discount
 
     def _simulation(self, molecule):
         mol = molecule.mol
@@ -68,15 +69,16 @@ class PredDockReward:
         else:
             simulate = simulate
 
+        discount = 0
         if simulate:
             reward = self._simulation(molecule)
             if reward is not None:
-                discounted_reward, qed = self._discount(molecule.mol, reward)
+                discounted_reward, qed, discount = self._discount(molecule.mol, reward)
             else:
                 reward, discounted_reward, qed = -0.5, -0.5, -0.5
         else:
             reward, discounted_reward, qed = 0.0, 0.0, 0.0
-        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed}
+        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed, "discount": discount}
 
 class PredDockReward_v2:
     def __init__(self, load_model, natm_cutoff, qed_cutoff, synth_cutoff, synth_config,
