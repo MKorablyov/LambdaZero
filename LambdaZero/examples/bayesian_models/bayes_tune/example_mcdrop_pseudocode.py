@@ -1,30 +1,25 @@
 
 
 
-
-# class NormalizeScalar(th.Module):
-    # init(values, mean=None, var=None)
-    # normalize(batch)
-    # unnormalize(batch)
-
-
-# class MCdropout:
+# class MCdropoutRegressor(tune.Trainable):
     # _(config)
     # self.model
 
-#   fit(dataset):
-        # do 3 epochs
-
-#   predict_mean_variance(dataset)
-        # do 10 epochs; compute mean and variance
 
 #   def _train():
 #
 
 
 
+# class MCDropoutModel:
+#   get_predict_samples():
+        # do 10 epochs
 
+#   fit(dataset):
+        # do 3 epochs
 
+#   predict_mean_variance(dataset)
+        # get_samples(); compute mean and variance
 
 
 
