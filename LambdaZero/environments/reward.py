@@ -178,7 +178,7 @@ class PredDockReward_v3:
     def reset(self, previous_reward=0.0):
         self.previous_reward = previous_reward
 
-    def _discount(self, mol, reward):
+    def _discount(self, mol):
         # QED constraint
         qed = QED.qed(mol)
         qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
@@ -189,15 +189,19 @@ class PredDockReward_v3:
         synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
         synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
 
+        # Binding energy prediction
+        dockscore = self.binding_net(mol=mol)
+        dockscore_discount = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
+
         # combine rewards
-        disc_reward = reward * qed_discount * synth_discount
+        disc_reward = dockscore_discount * qed_discount * synth_discount
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"reward": reward, "qed": qed, "synth": synth}
+        return disc_reward, {"dockscore": dockscore_discount, "qed": qed, "synth": synth}
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:
@@ -207,11 +211,7 @@ class PredDockReward_v3:
 
         if simulate:
             if (molecule.mol is not None) and (len(molecule.jbonds) > 0):
-                # Binding energy
-                reward = abs(self.binding_net(mol=molecule.mol))
-                reward = (reward - self.dockscore_std[0]) / (self.dockscore_std[1]) # normalize against std dev
-                # Other constraints
-                discounted_reward, log_vals = self._discount(molecule.mol, reward)
+                discounted_reward, log_vals = self._discount(molecule.mol)
                 pca = LambdaZero.utils.molecule_pca(molecule.mol)
                 log_vals = {**pca, **log_vals}
             else:
