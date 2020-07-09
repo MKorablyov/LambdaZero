@@ -100,7 +100,7 @@ class SubgraphRegressor(tune.Trainable):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.dataset = DrugCombDb(transform=config["transform"],
-                             pre_transform=config["pre_transform"])
+                                  pre_transform=config["pre_transform"])
 
         self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.dataset[0].edge_index.shape[1],
                                                                       config["test_set_prop"],

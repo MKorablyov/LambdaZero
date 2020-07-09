@@ -7,8 +7,6 @@ import numpy as np
 import pandas as pd
 import torch
 
-FP_N_BITS = 1024
-
 def get_fingerprint(smile, radius, n_bits):
     if smile == 'none':
         return np.array([-1]*n_bits)
@@ -120,7 +118,10 @@ def to_bipartite_drug_protein_graph(data_list):
     return new_data_list
 
 class DrugCombDb(InMemoryDataset):
-    def __init__(self, transform=None, pre_transform=None):
+    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4):
+        self.fp_bits = fp_bits
+        self.fp_radius = fp_radius
+
         self._drug_protein_link_holder = None
         self._protein_protein_interactions_holder = None
 
@@ -223,16 +224,14 @@ class DrugCombDb(InMemoryDataset):
         return drug_nodes
 
     def _augment_drug_info_with_fp(self, drug_chem_info_no_fp):
-        radius = 4
-
         all_fp = drug_chem_info_no_fp['smilesString'].apply(
-            lambda s: get_fingerprint(s, radius=radius, n_bits=FP_N_BITS)
+            lambda s: get_fingerprint(s, radius=self.fp_radius, n_bits=self.fp_bits)
         )
 
         # Convert to dataframe
         all_fp = list(all_fp)
         all_fp = [list(fp) for fp in all_fp]
-        all_fp = pd.DataFrame(all_fp, columns=["fp" + str(i) for i in range(FP_N_BITS)])
+        all_fp = pd.DataFrame(all_fp, columns=["fp" + str(i) for i in range(self.fp_bits)])
 
         return pd.concat((drug_chem_info_no_fp, all_fp), axis=1)
 
