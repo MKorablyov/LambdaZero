@@ -12,7 +12,7 @@ synthesizability.train()
 
 import os
 from rdkit import Chem
-
+from copy import deepcopy
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.models import ChempropWrapper_v1
 
@@ -60,7 +60,6 @@ DEFAULT_CONFIG = {
         },
     "predict_config": {
         "dataset_type": "regression",
-        "checkpoint_path": os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt"),
         "features_generator": None,
         "features_path": None,  # Path(s) to features to use in FNN (instead of features_generator)
         "no_features_scaling": False,  # Turn off scaling of features
@@ -70,12 +69,18 @@ DEFAULT_CONFIG = {
     },
 }
 
-config = DEFAULT_CONFIG
+synth_config = deepcopy(DEFAULT_CONFIG)
+synth_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
+synth_config["synth_cutoff"] = [0, 4]
+
+binding_config = deepcopy(DEFAULT_CONFIG)
+binding_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
+binding_config["dockscore_std"] = [-49.411, 7.057]
+
 
 if __name__ == '__main__':
 
-    synthesizability = ChempropWrapper_v1(config=config)
-                                     #"Synthesizability/MPNN_model/Binary_corrected/model_0/model.pt"))
+    synthesizability = ChempropWrapper_v1(config=synth_config)
     mol = Chem.MolFromSmiles("Clc1cc(N2CCN(CC2)CCCN2c3c(c(OC)ccc3)CCC2=O)ccc1")
     # 6 is average for zinc
     print(synthesizability(mol=mol))
