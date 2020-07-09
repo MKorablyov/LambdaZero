@@ -25,7 +25,7 @@ def get_center_of_mass(list_masses: np.array, list_positions: np.array) -> np.ar
     return list_mr.sum(axis=0) / np.sum(list_masses)
 
 
-def get_inertia_contribution(mass: float, relative_position: np.array) -> np.array:
+def get_inertia_contribution(mass: np.float, relative_position: np.array) -> np.array:
     """
     Contribution of a single (mass, position) to an inertia tensor.
     
