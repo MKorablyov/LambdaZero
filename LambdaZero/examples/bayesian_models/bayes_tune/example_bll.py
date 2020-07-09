@@ -41,7 +41,7 @@ class ModelWithUncertainty(nn.Module):
 class Acquirer:
     def __init__(self, available_points, model: BOModel, acquistion_function):
         """
-        :param aquistion_function: The reason why this is a function is because you may want to
+        :param acquistion_function: The reason why this is a function is because you may want to
         change it as you gather points (ie start random and then switch to batch BALD etc...)
         """
         ...
@@ -75,6 +75,8 @@ class Querier:
     def query_properties(points_to_query: list) -> list:
         ...
 
+
+
 # Then UCB looks like (very roughly...)
 # eval_func = model.get_predict_mean_and_variance_func()
 # all_scores = []
@@ -86,6 +88,8 @@ class Querier:
 # all_scores = concatenate(all_scores)
 # next_point_to_query = np.argmax(all_scores)
 
+
+
 # # And Thompson Sampling looks like (very roughly...)
 # eval_func = model.get_predict_sample()
 # all_scores = []
@@ -95,6 +99,8 @@ class Querier:
 # 	all_scores.append(score_on_batch)
 # all_scores = concatenate(all_scores)
 # next_point_to_query = np.argmax(all_scores)
+
+
 
 # # And Batch BALD looks something like (very very roughly...! eg a_batch_bold needs the xs  )
 # eval_funcs = [model.get_predict_sample() for _ in range(k)]

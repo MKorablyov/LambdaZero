@@ -60,17 +60,18 @@ def dock_metrics(info):
         episode.custom_metrics[key] = value
 
 
-# class Normalize(object):
-#     def __init__(self, target, target_norm):
-#         self.target = target
-#         self.target_norm = target_norm
-#
-#     def __call__(self, data):
-#         # Specify target.
-#         y = getattr(data, self.target)
-#         y = (y - self.target_norm[0]) / self.target_norm[1]
-#         data.y = y
-#         return data
+class MeanVarianceNormalizer:
+    def __init__(self, mean_and_variance):
+        self.mean = mean_and_variance[0]
+        self.variance = mean_and_variance[1]
+
+    def normalize(self, x):
+        x_norm = (x - self.mean) / self.variance
+        return x_norm
+
+    def unnormalize(self, x_norm):
+        x = (x_norm * self.variance) + self.mean
+        return x
 
 
 class Complete(object):

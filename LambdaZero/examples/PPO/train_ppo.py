@@ -8,13 +8,14 @@ from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.utils import merge_dicts
 
 from LambdaZero.models.torch_models import MolActorCritic_thv1
+from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 from LambdaZero.models.tf_models import MolActorCritic_tfv1
 import LambdaZero.utils
 
 from LambdaZero.examples.PPO import config
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo022"
+else: config_name = "ppo001"
 config = getattr(config,config_name)
 
 _, _, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -48,6 +49,7 @@ if __name__ == "__main__":
     ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
+    ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     tune.run(config["trainer"],
         stop=config["stop"],
         max_failures=0,
