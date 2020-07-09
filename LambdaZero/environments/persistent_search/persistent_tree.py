@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import ray
 from rdkit import Chem
-from rdkit.Chem import QED
+from ray.rllib.utils import merge_dicts
 import torch
 from torch_geometric.data import Data, Batch
 
@@ -26,7 +26,11 @@ import LambdaZero.models
 from LambdaZero import chem
 from LambdaZero.environments.molMDP import BlockMoleculeData
 from LambdaZero.environments.reward import PredDockReward
-from LambdaZero.utils import Complete, get_external_dirs
+
+from LambdaZero.utils import get_external_dirs
+from LambdaZero.environments.reward import PredDockReward_v3 as PredReward
+from LambdaZero.environments.block_mol_v3 import DEFAULT_CONFIG as env_v3_cfg, BlockMolEnv_v3
+from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -63,8 +67,8 @@ class Node:
         self.mol = mol
         self.value = 0
         self.fast_reward = -0.5
-        self.qed = None
-        self.synth = None
+        self.mol_info = {}
+        self.discount = 0
         self.pred_dock_reward = None
         self.sim_dock_reward = None
         self.children = {}
@@ -80,9 +84,7 @@ class Node:
         return self.total_return / self.total_leaves
 
     def discounted_reward(self, reward):
-        qed = self.qed[1] if self.qed is not None else 1
-        synth = self.synth[1] if self.synth is not None else 1
-        return min(reward, reward * qed * synth)
+        return min(reward, reward * self.discount)
 
     @property
     def reward(self):
@@ -392,7 +394,7 @@ class PersistentSearchTree:
         for i, n in self.nodes.items():
             if i == 0:
                 continue
-            if pred_dock and n.pred_dock_reward is not None and n.qed is not None:
+            if pred_dock and n.pred_dock_reward is not None:
                 continue
             if sim_dock and n.sim_dock_reward is not None:
                 continue
@@ -402,7 +404,7 @@ class PersistentSearchTree:
                 top_k = sorted(top_k, key=lambda x:x[0])[-k:]
         self.nodes_lock.release() # Todo code version without lock
         t1 = time.time()
-        if t1-t0 > 0.1:
+        if t1-t0 > 1.:
             print(f'get_top_k_nodes took {t1-t0:.2f}s', k, sim_dock, pred_dock)
         return top_k
 
@@ -412,12 +414,12 @@ class PersistentSearchTree:
                 self.nodes[i].sim_dock_reward = float(r)
                 self.sumtree.set(i, self.score_fn(self.nodes[i]))
 
-    def set_pred_dock_reward(self, idx, rewards, qeds, synths):
-        for i, r, qed, synth in zip(idx, rewards, qeds, synths):
+    def set_pred_dock_reward(self, idx, rewards, mol_infos):
+        for i, r, info in zip(idx, rewards, mol_infos):
             if i in self.nodes:
                 self.nodes[i].pred_dock_reward = float(r)
-                self.nodes[i].qed = qed
-                self.nodes[i].synth = synth
+                self.nodes[i].discount = info.get('discount', 0)
+                self.nodes[i].mol_info = info
                 self.sumtree.set(i, self.score_fn(self.nodes[i]))
 
     def is_full(self):
@@ -464,7 +466,9 @@ class PersistentSearchTree:
         new_node = Node(0, new_mol, len(legal_actions), idx)
         if precomputed is not None:
             (new_node.fast_reward,
-             new_node.pred_dock_reward, new_node.qed,
+             new_node.pred_dock_reward,
+             new_node.info,
+             new_node.discount,
              new_node.sim_dock_reward) = precomputed
 
         self.nodes_lock.acquire()
@@ -518,7 +522,7 @@ class PersistentSearchTree:
         return np.arange(len(add_mask))[add_mask]
 
     def refresh(self, new_idx):
-        if not new_idx % 1000:
+        if not new_idx % 5000:
             gc.collect()
             process = psutil.Process(os.getpid())
             print('mem', process.memory_info().rss // (1024 * 1024),
@@ -538,15 +542,14 @@ class PersistentSearchTree:
             pickle.dump(self.nodes, f, 4)
 
 @ray.remote(num_gpus=0.1)
-class PredDockRewardActor(PredDockReward):
+class PredDockRewardActor:
 
-    def __init__(self, *a, **k):
-        synth_config = k.pop('synth_config')
-        self.synth_cutoff = k.pop('synth_cutoff')
-        super().__init__(*a, **k)
+    def __init__(self):
+        reward_config = merge_dicts(
+            env_v3_cfg['reward_config'],
+            {"synth_config": synth_config, "dockscore_config": binding_config})
+        self.pred = PredReward(**reward_config)
         self.running = True
-        self.complete = Complete()
-        self.synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
 
     def run(self, tree, n):
         while self.running:
@@ -561,39 +564,26 @@ class PredDockRewardActor(PredDockReward):
             time.sleep(1)
             return
         rewards = []
-        qeds = []
-        synths = []
+        mol_infos = []
         idxs = []
         #t0 = time.time()
         for _, i, mol_ in mols:
             if mol_ is None: continue
             mol = mol_.mol
             if mol.GetNumAtoms() == 1:
-                rewards.append(-0.5); idxs.append(i); qeds.append((0, 0))
+                rewards.append(-0.5); idxs.append(i); mol_infos.append({})
                 continue
-            atmfeat, _, bond, bondfeat = chem.mpnn_feat(mol, ifcoord=False)
-            graph = chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
-            graph = self.complete(graph)
-            batch = Batch.from_data_list([graph]).to(self.device)
-            with torch.no_grad():
-                pred = self.net(batch)
-            qed = QED.qed(mol)
-            qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
-            qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
-
-            # Synthesizability constraint
-            synth = self.synth_net(mol=mol)
-            synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
-            synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
-
-            r = -pred.detach().cpu().numpy().item()
-            rewards.append(r)
+            self.pred.reset(0)
+            reward, mol_info = self.pred(mol_, True, True, 0)
+            rewards.append(reward)
+            mol_infos.append(mol_info)
             idxs.append(i)
-            qeds.append((qed, qed_discount))
-            synths.append((synth, synth_discount))
-        tree.set_pred_dock_reward.remote(idxs, rewards, qeds, synths)
+        if not len(rewards):
+            time.sleep(1)
+            return
+        tree.set_pred_dock_reward.remote(idxs, rewards, mol_infos)
         #t1 = time.time()
-        #print(f"Ran {n} docking preds in {t1-t0:.2f}s ({(t1-t0)/n:.2f}s/mol)")
+        #print(f"Ran {len(rewards)} docking preds in {t1-t0:.2f}s ({(t1-t0)/n:.2f}s/mol)")
         return
 
 @ray.remote
@@ -603,8 +593,10 @@ class SimDockRewardActor:
         self.dock = chem.Dock_smi(tmp_dir,
                                   osp.join(programs_dir, 'chimera'),
                                   osp.join(programs_dir, 'dock6'),
-                                  osp.join(datasets_dir, 'brutal_dock/d4/docksetup/'))
-        self.target_norm = [-26.3, 12.3]
+                                  osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
+                                  gas_charge=True)
+        #osp.join(datasets_dir, 'brutal_dock/d4/docksetup/'))
+        self.target_norm = binding_config['dockscore_std'] #[-26.3, 12.3]
         self.running = True
         self.num_threads = num_threads
 
@@ -641,7 +633,7 @@ class SimDockRewardActor:
             if sum([i.is_alive() for i in threads]) < self.num_threads and thread_at < n:
                 threads[thread_at].start()
                 thread_at += 1
-            time.sleep(0.5)
+            time.sleep(0.1)
         t1 = time.time()
         print(f"Ran {n} docking simulations in {t1-t0:.2f}s ({(t1-t0)/n:.2f}s/mol)")
         tree.set_sim_dock_reward.remote(idxs, rewards)
@@ -789,3 +781,53 @@ class RandomRLActor:
 
     def get_pol(self, idxs, update_r=True):
         return np.ones((len(idxs), self.nact)) / self.nact
+
+
+def create_seeding_list_from_exps(root, num_top_k=50_000):
+    def get_act_seq(nodes, n):
+        s = []
+        rs = []
+        while n.id != 0:
+            if type(n.parent) == int:
+                parent = nodes[n.parent]
+            else:
+                parent = n.parent
+            if type(parent.children) == dict:
+                action = [a for a, c in parent.children.items() if c == n.id]
+            elif type(parent.children) == list:
+                action = [a for a, c in parent.children if c == n.id]
+
+            if not len(action):
+                return None, None
+            s.append(action[0])
+            #qed = n.qed
+            rs.append((n.fast_reward, n.pred_dock_reward, n.info, n.discount, n.sim_dock_reward))
+            n = parent
+        return s[::-1], rs[::-1]
+
+    top_k_molecules = [(-10,)]
+    for path in os.listdir(root):
+        p = f'{root}/{path}/final_tree.pkl.gz'
+        if not os.path.exists(p):
+            continue
+        print(path)
+        try:
+            nodes = pickle.load(gzip.open(p,'rb'))
+        except Exception as e:
+            print(e)
+            continue
+        print('loaded', len(nodes), 'nodes')
+        for i, n in nodes.items():
+            if n.reward > top_k_molecules[0][0]:
+                seq, rseq = get_act_seq(nodes, n)
+                if seq is None:
+                    continue
+                top_k_molecules.append((n.reward, n.mol, seq, rseq))
+                total += len(rseq) - 1
+        top_k_molecules = sorted(top_k_molecules, key=lambda x:x[0])[-num_top_k:]
+
+
+if __name__ == "__main__":
+    if sys.argv[1] == 'create_seeds':
+        create_seeding_list_from_exps('/network/home/bengioe/tmp/lz/',
+                                      50_000)

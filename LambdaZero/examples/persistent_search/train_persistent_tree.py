@@ -118,7 +118,6 @@ def guided_search(exp_hps):
                   "stem_fp_radiis": [4, 3, 2],
     }
 
-    from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
 
     reward_config = {
         "soft_stop": True,
@@ -130,7 +129,6 @@ def guided_search(exp_hps):
         "delta": False,
         "simulation_cost": 0.00,
         "device": device,
-        "synth_config": chemprop_cfg,
     }
 
     score_temperature = hyperparameters['score_temperature']
@@ -182,7 +180,7 @@ def guided_search(exp_hps):
     obs_config['max_branches'] = env_config['max_branches']
     mbsize = 64
 
-    pred_dock_actor = PredDockRewardActor.options(max_concurrency=2).remote(**reward_config)
+    pred_dock_actor = PredDockRewardActor.options(max_concurrency=2).remote()
     sim_dock_actor = SimDockRewardActor.options(max_concurrency=2).remote(
         os.environ['SLURM_TMPDIR'],
         programs_dir, datasets_dir,
@@ -300,7 +298,9 @@ def guided_search(exp_hps):
     ray.get(save)
 
 if __name__ == '__main__':
-    ray.init(num_cpus=12)
+    ray.init(num_cpus=4)
+    time.sleep(5)
+    print("Starting search")
 
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
         for priority_pred in ['greedy_q', 'boltzmann']:
@@ -357,6 +357,6 @@ if __name__ == '__main__':
                        'save_path': os.path.join(summaries_dir, 'persistent_search_tree'),
                        'num_molecules': int(10e6),
                        'prune_at': int(200e3),
-                       'num_rollout_actors': 1,
-                       'num_docking_threads': 1,
+                       'num_rollout_actors': 2,
+                       'num_docking_threads': 4,
                        'score_temperature': 1.5})
