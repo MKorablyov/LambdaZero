@@ -192,7 +192,7 @@ class PredDockReward_v3:
         # Binding energy constraint
         dockscore = abs(self.binding_net(mol=mol))
         dockscore_discount = (dockscore - self.ebind_cutoff[0]) / (self.ebind_cutoff[1] - self.ebind_cutoff[0])
-        dockscore_discount = 10.*min(max(0.0, dockscore_discount), 1.0)
+        dockscore_discount = min(max(0.0, dockscore_discount), 1.0)
         # combine rewards
         disc_reward = qed_discount * synth_discount * dockscore
         if self.exp is not None: disc_reward = self.exp ** disc_reward
@@ -212,6 +212,8 @@ class PredDockReward_v3:
         if simulate:
             if (molecule.mol is not None) and (len(molecule.jbonds) > 0):
                 discounted_reward, log_vals = self._discount(molecule.mol)
+                pca = LambdaZero.utils.molecule_pca(molecule.mol)
+                log_vals = {**pca, **log_vals}
             else:
                 discounted_reward, log_vals = 0.0, {}
         else:

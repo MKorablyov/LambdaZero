@@ -6,19 +6,39 @@
 LambdaZero documentation
 ==========================
 
+Some general information about LambdaZero goes here.
+
+* bullet 1
+* bullet 2
+* some other thing
+
+more relevant text. You can create `rst` files in the source folder and link them in the
+table of content (toctree).
+
+Something important
+---------------------------------------
+More text.
+
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
+   :caption: Get Started
 
-   readme
-   LambdaZero.utils
-   LambdaZero.chem
-   LambdaZero.environments
-   LambdaZero.inputs
-   LambdaZero.models
-   LambdaZero.datasets
-   LambdaZero.examples
-   LambdaZero.loggers
+   readme_link
+   example
+
+.. toctree::
+   :maxdepth: 1
+   :caption: API Reference
+   :hidden:
+   :glob:
+
+   ./generated/LambdaZero.chem
+   ./generated/LambdaZero.environments
+   ./generated/LambdaZero.examples
+   ./generated/LambdaZero.datasets
+   ./generated/LambdaZero.inputs
+   ./generated/LambdaZero.models
+   ./generated/LambdaZero.utils
 
 
 Indices and tables
