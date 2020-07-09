@@ -1,6 +1,6 @@
 """
-The goal of this script is to verify that atoms are in the same order as multiple blocks are added to
-the molecule.
+The goal of this script is to manipulate the orientation of the added block and to compute the
+energy vs. angle of block.
 """
 import os
 from pathlib import Path
