@@ -26,19 +26,16 @@ class cfg:
 	datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 	
 	num_cpus = 4
-	num_gpus = 4
-	device = "cuda"  # TODO: change to "cuda"
+	num_gpus = 1
+	device = "cuda"
 	
 	db_name = "actor_dock"
-	
 	db_path = osp.join(datasets_dir, db_name)
 	if not osp.exists(db_path):
 		os.mkdir(db_path)
-		
 	results_dir = osp.join(datasets_dir, db_name, "raw")
 	if not osp.exists(results_dir):
 		os.mkdir(results_dir)
-	# out_dir = osp.join(datasets_dir, db_name, "dock")
 	
 	# env parameters
 	blocks_file = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
@@ -116,7 +113,7 @@ def generate_dataset():
 	:return: stores the generated dataset to disk
 	'''
 	ray.init()
-	time.sleep(60)
+	# time.sleep(60)
 	
 	workers = [Worker.remote() for i in range(cfg.num_workers)]
 	tasks = [worker._sample.remote() for worker in workers]
@@ -125,6 +122,7 @@ def generate_dataset():
 	
 	samples = []
 	for i in range(cfg.dataset_len):
+		print('creating data ',i)
 		done_task, tasks = ray.wait(tasks)
 		done_worker = task2worker.pop(done_task[0])
 		samples.extend(ray.get(done_task))
@@ -133,7 +131,7 @@ def generate_dataset():
 		task2worker[new_task] = done_worker
 		tasks.append(new_task)
 		
-		if (i % 500) == 0:
+		if (i % 10) == 0:
 			df = pd.DataFrame(samples, columns=('smile', 'initial_energry', 'stem_idxs', 'docking_energies'))
 			df.to_parquet(osp.join(cfg.results_dir, cfg.db_name) + ".feather")
 	
