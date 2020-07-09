@@ -193,17 +193,19 @@ class PredDockReward_v3:
 
         # Binding energy prediction
         dockscore = self.binding_net(mol=mol)
-        dockscore_discount = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
+        dockscore_normalized = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
 
         # combine rewards
-        disc_reward = dockscore_discount * qed_discount * synth_discount
+        discount = qed_discount * synth_discount
+        disc_reward = dockscore_normalized * discount
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"dockscore": dockscore_discount, "qed": qed, "synth": synth}
+        return disc_reward, {"dockscore": dockscore_normalized, "qed": qed, "synth": synth,
+                             "discount": discount}
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:
