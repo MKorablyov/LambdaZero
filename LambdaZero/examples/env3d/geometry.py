@@ -56,8 +56,3 @@ def project_direction_out_of_tensor(tensor: np.array, direction: np.array) -> np
         + o * np.outer(direction, direction)
     )
     return projected_tensor
-
-
-def diagonalize_quadratic_position_tensor(quadratic_position_tensor: np.array):
-    eigenvalues, raw_u_matrix = np.linalg.eigh(quadratic_position_tensor)
-    return eigenvalues, raw_u_matrix
