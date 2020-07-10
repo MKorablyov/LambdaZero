@@ -11,7 +11,7 @@
 
 
 
-# class MCDropoutModel:
+# class MCDropout(ModelWithUncertainty):
 #   get_predict_samples():
         # do 10 epochs
 
@@ -19,7 +19,7 @@
         # do 3 epochs
 
 #   predict_mean_variance(dataset)
-        # get_samples(); compute mean and variance
+        # get_precit_samples(); compute mean and variance
 
 
 

@@ -77,16 +77,16 @@ DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
         "target": "gridscore",
-        "target_norm": [-26.3, 12.3],
+        "target_norm": [-43.042, 10.409],
         "dataset_split_path": osp.join(datasets_dir, "brutal_dock/d4/raw/randsplit_dock_blocks105_walk40_clust.npy"),
         "b_size": 64,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
-            "root": os.path.join(datasets_dir, "brutal_dock/d4"),
-            "props": ["gridscore", "klabel"],
+            "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
+            "props": ["gridscore"],
             "transform": transform,
-            "file_names": ["dock_blocks105_walk40_clust"],
+            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
         },
 
         "model": LambdaZero.models.MPNNet,
@@ -104,9 +104,9 @@ DEFAULT_CONFIG = {
     "summaries_dir": summaries_dir,
     "memory": 10 * 10 ** 9,
 
-    "stop": {"training_iteration": 3},
+    "stop": {"training_iteration": 20},
     "resources_per_trial": {
-        "cpu": 4,  # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
+        "cpu": 1,  # fixme - calling ray.remote would request resources outside of tune allocation
         "gpu": 1.0
     },
     "num_samples":1,
