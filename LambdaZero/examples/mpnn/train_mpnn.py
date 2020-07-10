@@ -191,7 +191,15 @@ class BasicRegressor(tune.Trainable):
         train_dataset = dataset[th.tensor(train_idxs)]
 
         train_grid = np.array([graph.gridscore.item() for graph in train_dataset])
-        
+        energies = th.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=th.float64)
+
+        vals = {i:energies.count(i) for i in set(energies)}
+
+        plt.title('Energies Distribution')
+        plt.xlabel('Gridscore')
+        plt.ylabel('Num Examples')
+        plt.bar(vals.keys(), vals.values())
+
         if config['use_sampler']:
             train_dataset = dataset[th.tensor(train_idxs)]
 
