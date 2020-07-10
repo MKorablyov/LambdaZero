@@ -29,7 +29,7 @@ class cfg:
 	num_gpus = 1
 	device = "cuda"
 	
-	db_name = "actor_dock"
+	db_name = "actor_dock_100k"
 	db_path = osp.join(datasets_dir, db_name)
 	if not osp.exists(db_path):
 		os.mkdir(db_path)
@@ -136,7 +136,7 @@ def generate_dataset():
 			df.to_parquet(osp.join(cfg.results_dir, cfg.db_name) + ".feather")
 	
 	df = pd.DataFrame(samples, columns=('smile', 'initial_energry', 'stem_idxs', 'docking_energies'))
-	df.to_feather(osp.join(cfg.results_dir, cfg.db_name) + ".feather")
+	df.to_parquet(osp.join(cfg.results_dir, cfg.db_name) + ".feather")
 	
 
 def split_dataset():
@@ -144,6 +144,7 @@ def split_dataset():
 	splits the dataset int train, validation and test sets
 	:return: stores the indices of each set as a list of [train_idx, valid_idx, test_idx]
 	'''
+	print('Splitting :', osp.join(cfg.results_dir, cfg.db_name) + ".feather")
 	data = pd.read_parquet(osp.join(cfg.results_dir, cfg.db_name) + ".feather")
 	splits = LambdaZero.inputs.random_split(len(data), cfg.split_probs)
 
@@ -153,6 +154,7 @@ def split_dataset():
 	
 if __name__ == "__main__":
 	generate_dataset()
+	# time.sleep(120)
 	split_dataset()
 
 
