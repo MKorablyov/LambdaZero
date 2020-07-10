@@ -171,7 +171,19 @@ class BasicRegressor(tune.Trainable):
         self.max_val = 0
 
         train_idxs = train_idxs[:-1]
-        
+
+        train_dataset = dataset[th.tensor(train_idxs)]
+        energies = th.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=th.float64)
+
+        vals = {i:energies.count(i) for i in set(energies)}
+
+        plt.title('Energies Distribution')
+        plt.xlabel('Gridscore')
+        plt.ylabel('Num Examples')
+        plt.bar(vals.keys(), vals.values())
+
+        raise ValueError
+
         if config['use_sampler']:
             train_dataset = dataset[th.tensor(train_idxs)]
 
