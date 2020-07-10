@@ -91,7 +91,8 @@ def eval_epoch(loader, model, device, config):
 
         # compute y_hat and y
         data = data.to(device)
-        logit = model(data)
+        with th.no_grad():
+            logit = model(data)
 
         pred = (logit * target_norm[1]) + target_norm[0]
         y = getattr(data, target)
@@ -117,10 +118,25 @@ def eval_epoch(loader, model, device, config):
         metrics["loss"] += loss.item() * data.num_graphs
         metrics["mse"] += ((y - pred) ** 2).sum().item()
         metrics["mae"] += ((y - pred).abs()).sum().item()    
+        
+        """
+        print("------------------------")
+        print("------------------------")
+
+        print(running_preds_true_energy)
+
+        print("!!!!!!!!!!!!!!!!!!!!!!!!")
+
+        print(running_gc)
+
+        print("------------------------")
+        print("------------------------")
+        """
 
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
+
     metrics["median_regret"] = abs(np.median(running_preds_true_energy) - np.median(running_gc)).item()
     metrics["mae_regret"] = F.l1_loss(running_preds_true_energy, running_gc).item()
     metrics["mse_regret"] = F.mse_loss(running_preds_true_energy, running_gc).item()
@@ -171,6 +187,10 @@ class BasicRegressor(tune.Trainable):
         self.max_val = 0
 
         train_idxs = train_idxs[:-1]
+
+        train_dataset = dataset[th.tensor(train_idxs)]
+
+        train_grid = np.array([graph.gridscore.item() for graph in train_dataset])
         
         if config['use_sampler']:
             train_dataset = dataset[th.tensor(train_idxs)]

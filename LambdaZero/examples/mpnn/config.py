@@ -117,6 +117,14 @@ mpnn005_L1 = {
     }
 }
 
+mpnn020_L2 = {
+    "trainer_config": {
+        "pow":20,
+        "use_sampler":True,
+        "loss": "L2"
+    }
+}
+
 vanilla_dime_L2 = {
     "trainer_config": {
         "model": "dime",
