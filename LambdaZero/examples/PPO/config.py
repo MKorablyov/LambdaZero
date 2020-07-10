@@ -4,7 +4,7 @@ import os
 import os.path as osp
 from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnvGraph_v1
 from LambdaZero.utils import get_external_dirs
-from LambdaZero.environments import PredDockReward_v3
+from LambdaZero.environments import PredDockReward_v2
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
 
 
@@ -20,111 +20,193 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 #     os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 
 
+ppo000 = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "allow_removal": True,
+        }
+    }
+}
+
 ppo001 = {
     # 3.2-3.3
     "rllib_config":{
         "env": BlockMolEnv_v3,
         "env_config": {
             "allow_removal": True,
+            "reward": PredDockReward_v2,
+            "reward_config": {
+                "synth_cutoff": [0, 5],
+                "synth_config": chemprop_cfg,
+            }
         }
     }
 }
 
-
-
-ppo023 = {
+ppo002 = {
     # 3.2-3.3
     "rllib_config":{
         "env": BlockMolEnv_v3,
         "env_config": {
             "allow_removal": True,
-            "reward": PredDockReward_v3,
+            "reward": PredDockReward_v2,
             "reward_config": {
-                "synth_cutoff": [0, 4],
-                "ebind_cutoff": [42.5, 109.1], #8.5 std away
-                "synth_config": synth_config,
-                "binding_config": binding_config,
+                "synth_cutoff": [0, 5],
+                "synth_config": chemprop_cfg,
             }
-
         },
-        "model": {
-            "custom_model_config": {
-                "rnd_weight": 1
-            }
-        }
+        "lr": 1e-4,
     }
 }
 
-ppo023_multi = {
+ppo003 = {
     # 3.2-3.3
     "rllib_config":{
         "env": BlockMolEnv_v3,
         "env_config": {
             "allow_removal": True,
-            "reward": PredDockReward_v3,
+            "reward": PredDockReward_v2,
             "reward_config": {
-                "synth_cutoff": [0, 4],
-                "ebind_cutoff": [42.5, 109.1], #8.5 std away
-                "synth_config": synth_config,
-                "binding_config": binding_config,
+                "synth_cutoff": [0, 5],
+                "synth_config": chemprop_cfg,
             }
 
         },
-        "model": {
-            "custom_model_config": {
-                "rnd_weight": 1,
-                "rnd_output_dim": 5
-            }
-        }
+        "entropy_coeff": 1e-3
     }
 }
 
-ppo024 = {
+ppo004 = {
     # 3.2-3.3
     "rllib_config":{
         "env": BlockMolEnv_v3,
         "env_config": {
             "allow_removal": True,
-            "reward": PredDockReward_v3,
+            "reward": PredDockReward_v2,
             "reward_config": {
-                "synth_cutoff": [0, 4],
-                "ebind_cutoff": [42.5, 109.1], #8.5 std away
-                "synth_config": synth_config,
-                "binding_config": binding_config,
+                "synth_cutoff": [0, 5],
+                "synth_config": chemprop_cfg,
             }
-
         },
-        "model": {
-            "custom_options": {
-                "rnd_weight": 0.5
-            }
-        }
+        "lr": 1e-4,
+        "entropy_coeff": 1e-3
     }
 }
 
-ppo024_multi = {
+
+ppo005 = {
     # 3.2-3.3
     "rllib_config":{
         "env": BlockMolEnv_v3,
         "env_config": {
             "allow_removal": True,
-            "reward": PredDockReward_v3,
+            "reward": PredDockReward_v2,
             "reward_config": {
-                "synth_cutoff": [0, 4],
-                "ebind_cutoff": [42.5, 109.1], #8.5 std away
-                "synth_config": synth_config,
-                "binding_config": binding_config,
+                "synth_cutoff": [0, 5],
+                "synth_config": chemprop_cfg,
             }
-
         },
-        "model": {
-            "custom_options": {
-                "rnd_weight": 0.5,
-                "rnd_output_dim": 5
-            }
-        }
+        "lr": 3e-4,
     }
 }
+
+
+
+# ppo023 = {
+#     # 3.2-3.3
+#     "rllib_config":{
+#         "env": BlockMolEnv_v3,
+#         "env_config": {
+#             "allow_removal": True,
+#             "reward": PredDockReward_v3,
+#             "reward_config": {
+#                 "synth_cutoff": [0, 4],
+#                 "ebind_cutoff": [42.5, 109.1], #8.5 std away
+#                 "synth_config": synth_config,
+#                 "binding_config": binding_config,
+#             }
+
+#         },
+#         "model": {
+#             "custom_model_config": {
+#                 "rnd_weight": 1
+#             }
+#         }
+#     }
+# }
+
+# ppo023_multi = {
+#     # 3.2-3.3
+#     "rllib_config":{
+#         "env": BlockMolEnv_v3,
+#         "env_config": {
+#             "allow_removal": True,
+#             "reward": PredDockReward_v3,
+#             "reward_config": {
+#                 "synth_cutoff": [0, 4],
+#                 "ebind_cutoff": [42.5, 109.1], #8.5 std away
+#                 "synth_config": synth_config,
+#                 "binding_config": binding_config,
+#             }
+
+#         },
+#         "model": {
+#             "custom_model_config": {
+#                 "rnd_weight": 1,
+#                 "rnd_output_dim": 5
+#             }
+#         }
+#     }
+# }
+
+# ppo024 = {
+#     # 3.2-3.3
+#     "rllib_config":{
+#         "env": BlockMolEnv_v3,
+#         "env_config": {
+#             "allow_removal": True,
+#             "reward": PredDockReward_v3,
+#             "reward_config": {
+#                 "synth_cutoff": [0, 4],
+#                 "ebind_cutoff": [42.5, 109.1], #8.5 std away
+#                 "synth_config": synth_config,
+#                 "binding_config": binding_config,
+#             }
+
+#         },
+#         "model": {
+#             "custom_options": {
+#                 "rnd_weight": 0.5
+#             }
+#         }
+#     }
+# }
+
+# ppo024_multi = {
+#     # 3.2-3.3
+#     "rllib_config":{
+#         "env": BlockMolEnv_v3,
+#         "env_config": {
+#             "allow_removal": True,
+#             "reward": PredDockReward_v3,
+#             "reward_config": {
+#                 "synth_cutoff": [0, 4],
+#                 "ebind_cutoff": [42.5, 109.1], #8.5 std away
+#                 "synth_config": synth_config,
+#                 "binding_config": binding_config,
+#             }
+
+#         },
+#         "model": {
+#             "custom_options": {
+#                 "rnd_weight": 0.5,
+#                 "rnd_output_dim": 5
+#             }
+#         }
+#     }
+# }
 
 # ppo022 = {
 #     # ???

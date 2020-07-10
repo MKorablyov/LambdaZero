@@ -29,13 +29,9 @@ DEFAULT_CONFIG = {
         "num_gpus": 3,
         "model": {
             "custom_model": "MolActorCritic_thv1",
-            "custom_model_config": {
-                "rnd_weight": 0
-            }
-
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
-        "use_pytorch": True,
+        "framework": "torch",
     },
     "summaries_dir": summaries_dir,
     "memory": 60 * 10 ** 9,
