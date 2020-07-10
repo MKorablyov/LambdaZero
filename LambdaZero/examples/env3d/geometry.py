@@ -5,6 +5,20 @@ from scipy.spatial.transform import Rotation
 def multiply_scalars_and_vectors(
     list_scalars: np.array, list_vectors: np.array
 ) -> np.array:
+    """
+    Multiply an array of scalar by an array of vector. For example:
+    list_scalar = [1, 2, 3]
+    list_vectors = [v1, v2, v3]
+    then the product is list_new_vectors = [1*v1, 2*v2, 3*v3].
+
+    Args:
+        list_scalars (np.array): array of floats representing the scalars
+        list_vectors (np.array): array of 3D vectors
+
+    Returns:
+        list_new_vectors (np.array): product of scalars and vectors
+
+    """
     assert len(list_scalars.shape) == 1, "error: list_scalars should be a 1D array."
 
     assert len(list_vectors.shape) == 2, "error: list_vectors should be a 2D array."
@@ -21,6 +35,15 @@ def multiply_scalars_and_vectors(
 
 
 def get_center_of_mass(list_masses: np.array, list_positions: np.array) -> np.array:
+    """
+    Computes the center of mass of a set of points with masses and positions
+    Args:
+        list_masses (np.array): scalar masses
+        list_positions (np.array): positions, as 3D vectors
+
+    Returns:
+        center_of_mass (np.array): a 3D vector
+    """
     list_mr = multiply_scalars_and_vectors(list_masses, list_positions)
     return list_mr.sum(axis=0) / np.sum(list_masses)
 
@@ -28,8 +51,16 @@ def get_center_of_mass(list_masses: np.array, list_positions: np.array) -> np.ar
 def get_inertia_contribution(mass: np.float, relative_position: np.array) -> np.array:
     """
     Contribution of a single (mass, position) to an inertia tensor.
-    
+
     I^{alpha beta} = - m (r^alpha r^beta - |r|^2 delta^{alpha beta})
+    where "r" is the relative position, and "alpha, beta" are space coordinates.
+
+    Args:
+        mass (np.float): mass of a point
+        relative_position (np.array): relative position of point
+
+    Returns:
+        inertia_tensor (np.array): inertia tensor, a 3 x 3 matrix
     """
 
     inertia_contribution = (
@@ -40,6 +71,16 @@ def get_inertia_contribution(mass: np.float, relative_position: np.array) -> np.
 
 
 def get_inertia_tensor(list_masses, list_relative_positions) -> np.array:
+    """
+    Compute the full inertia tensor of a group of positions with corresponding masses.
+    The inertia tensor is computed relative to the point to which the points are relative to.
+    Args:
+        list_masses (np.array): masses
+        list_relative_positions (np.array): positions relative to a reference point
+
+    Returns:
+        inertia_tensor (np.array): inertia tensor, a 3 x 3 matrix
+    """
     inertia_tensor = np.zeros([3, 3])
     for m, p in zip(list_masses, list_relative_positions):
         inertia_tensor += get_inertia_contribution(m, p)
@@ -47,6 +88,19 @@ def get_inertia_tensor(list_masses, list_relative_positions) -> np.array:
 
 
 def project_direction_out_of_tensor(tensor: np.array, direction: np.array) -> np.array:
+    """
+    This method projects out the direction from the tensor. That is to say that
+        - direction . projected_tensor = 0
+        - projected_tensor . tensor = 0
+
+    Args:
+        tensor (np.array): a 3x3 matrix
+        direction (np.array): a unit 3D vector defining a direction
+
+    Returns:
+        projected_tensor (np.array): a 3x3 matrix
+
+    """
     assert np.isclose(
         np.linalg.norm(direction), 1.0
     ), "direction should be a unit vector"
@@ -67,6 +121,21 @@ def project_direction_out_of_tensor(tensor: np.array, direction: np.array) -> np
 def rotate_single_point_about_axis(
     fixed_point: np.array, n_axis: np.array, rotation_angle: np.float, point: np.array
 ):
+    """
+
+    Rotates a point around an axis pointing in the direction n_axis and going through fixed_point.
+
+    Args:
+        fixed_point (np.array): point on the rotation axis, which is held fixed by the rotation.
+        n_axis (np.array): unit vector parallel to the axis of rotation, defining the direction of rotation
+                           according to the right-hand rule.
+        rotation_angle (np.float):  angle of rotation
+        point (np.array): point to be rotated
+
+    Returns:
+        rotated_point (np.array): point after the rotation about the axis.
+
+    """
 
     relative_position = point - fixed_point
     axis_projection = np.dot(relative_position, n_axis)
@@ -91,6 +160,18 @@ def rotate_points_about_axis(
     n_axis: np.array,
     rotation_angle: np.float,
 ) -> np.array:
+    """
+
+    Args:
+        positions (np.array): points to be rotated
+        fixed_point (np.array): point on the rotation axis, which is held fixed by the rotation.
+        n_axis (np.array): unit vector parallel to the axis of rotation, defining the direction of rotation
+                           according to the right-hand rule.
+        rotation_angle (np.float):  angle of rotation
+
+    Returns:
+        rotated_points (np.array): points after the rotation about the axis.
+    """
 
     rotation_matrix = Rotation.from_rotvec(rotation_angle * n_axis).as_matrix()
 
