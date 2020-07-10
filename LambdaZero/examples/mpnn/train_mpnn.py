@@ -200,6 +200,10 @@ class BasicRegressor(tune.Trainable):
         plt.ylabel('Num Examples')
         plt.bar(vals.keys(), vals.values())
 
+        plt.savefig("gridscore_dist.png")
+
+        raise ValueError
+
         if config['use_sampler']:
             train_dataset = dataset[th.tensor(train_idxs)]
 
