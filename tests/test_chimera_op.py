@@ -6,7 +6,6 @@ import pytest
 from rdkit import Chem
 
 from LambdaZero.chem.chimera_op import _add_hydrogens_and_compute_gasteiger_charges_with_chimera
-from LambdaZero.utils import get_external_dirs
 
 
 @pytest.fixture
@@ -46,6 +45,7 @@ def output_mol2_file_path():
 
 @pytest.fixture
 def chimera_bin():
+    from LambdaZero.utils import get_external_dirs
     _, programs_dir, _ = get_external_dirs()
     return str(Path(programs_dir).joinpath("chimera/bin/chimera"))
 
