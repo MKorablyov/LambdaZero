@@ -34,7 +34,7 @@ def train_epoch(loader, model, optimizer, device, config):
         target = getattr(data, config["target"])
 
         optimizer.zero_grad()
-        logit = model(data)
+        logit = model(data, do_dropout=True)
         loss = F.mse_loss(logit, normalizer.normalize(target))
         loss.backward()
         optimizer.step()
@@ -55,11 +55,21 @@ def eval_epoch(loader, model, device, config):
     model.eval()
 
     metrics = {"loss": 0, "mse": 0, "mae": 0}
+
+    # todo: take a bunch of samples here
+    # todo: concatenate a lot of stuff
+    # todo: compute mean/variance per sample
+    # todo: compute error per sample
+
+
+    # todo: estimate correlation of stochastic variable
+
+
     for bidx, data in enumerate(loader):
         data = data.to(device)
         target = getattr(data, config["target"])
 
-        logit = model(data)
+        logit = model(data,do_dropout=True)
         loss = F.mse_loss(logit, normalizer.normalize(target))
 
         metrics["loss"] += loss.item() * data.num_graphs
@@ -70,6 +80,9 @@ def eval_epoch(loader, model, device, config):
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
+
+
+
     return metrics
 
 
@@ -77,19 +90,19 @@ DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
         "target": "gridscore",
-        "target_norm": [-43.042, 10.409],
+        "target_norm": [-26.3, 12.3],
         "dataset_split_path": osp.join(datasets_dir, "brutal_dock/d4/raw/randsplit_dock_blocks105_walk40_clust.npy"),
         "b_size": 64,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
-            "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-            "props": ["gridscore"],
+            "root": os.path.join(datasets_dir, "brutal_dock/d4"),
+            "props": ["gridscore", "klabel"],
             "transform": transform,
-            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+            "file_names": ["dock_blocks105_walk40_clust"],
         },
 
-        "model": LambdaZero.models.MPNNet,
+        "model": LambdaZero.models.MPNNetDrop,
         "model_config": {},
 
         "optimizer": torch.optim.Adam,
@@ -104,9 +117,9 @@ DEFAULT_CONFIG = {
     "summaries_dir": summaries_dir,
     "memory": 10 * 10 ** 9,
 
-    "stop": {"training_iteration": 20},
+    "stop": {"training_iteration": 3},
     "resources_per_trial": {
-        "cpu": 1,  # fixme - calling ray.remote would request resources outside of tune allocation
+        "cpu": 4,  # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
         "gpu": 1.0
     },
     "num_samples":1,

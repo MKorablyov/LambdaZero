@@ -99,7 +99,6 @@ def eval_epoch(loader, model, device, config):
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
     metrics["mae_regret"] = F.l1_loss(running_preds, running_gc).item()
     metrics["mse_regret"] = F.mse_loss(running_preds, running_gc).item()
-
     return metrics
 
 
