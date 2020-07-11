@@ -26,12 +26,12 @@ def random_split(num_examples, test_prob, valid_prob):
 
     return train_idx, val_idx, test_idx
 
-def train_epoch(dataset, train_idxs, model, optimizer, device, config):
-    subgraph_dataset = TensorDataset(dataset[0].edge_index[:, train_idxs].T,
-                                     dataset[0].edge_classes[train_idxs], dataset[0].y[train_idxs])
+def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
+    subgraph_dataset = TensorDataset(ddi_graph.edge_index[:, train_idxs].T,
+                                     ddi_graph.edge_classes[train_idxs], ddi_graph.y[train_idxs])
 
-    loader = DataLoader(subgraph_dataset, 
-                        batch_size=config["batch_size"], 
+    loader = DataLoader(subgraph_dataset,
+                        batch_size=config["batch_size"],
                         pin_memory=device == 'cuda')
     model.train()
 
@@ -42,24 +42,7 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
         drug_drug_index, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
-        batch_drugs = np.unique(drug_drug_index.flatten())
-        subgraph_data_list = [dataset[0].drug_idx_to_graph[drug] for drug in batch_drugs]
-        subgraph_batch_pre = Batch.from_data_list(subgraph_data_list)
-        print('GB size of batch: %f, edge index: %f, x: %f' % (
-            sys.getsizeof(subgraph_batch_pre.batch.storage()) / 1073741824, 
-            sys.getsizeof(subgraph_batch_pre.edge_index.storage()) / 1073741824, 
-            sys.getsizeof(subgraph_batch_pre.x.storage()) / 1073741824, 
-        ))
-        subgraph_batch = subgraph_batch_pre.to(device)
-        #subgraph_batch = Batch.from_data_list(subgraph_data_list).to(device)
-        print('Allocated memory GB after adding batch: %f' % (torch.cuda.memory_allocated(device) / 1073741824))
-        print()
-
-        drug_drug_index = drug_drug_index.to(device)
-        edge_classes = edge_classes.to(device)
-        y = y.to(device)
-        
-        preds = model(drug_drug_index, subgraph_batch, edge_classes)
+        preds = model(drug_drug_index, ddi_graph.drug_protein_graph, edge_classes)
         loss = F.mse_loss(y, preds)
 
         loss.backward()
@@ -80,8 +63,8 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
     return metrics
 
 def eval_epoch(dataset, eval_idxs,  model, device, config):
-    subgraph_dataset = TensorDataset(dataset[0].edge_index[:, eval_idxs].T,
-                                     dataset[0].edge_classes[eval_idxs], dataset[0].y[eval_idxs])
+    subgraph_dataset = TensorDataset(ddi_graph.edge_index[:, eval_idxs].T,
+                                     ddi_graph.edge_classes[eval_idxs], ddi_graph.y[eval_idxs])
 
     loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"], pin_memory=True)
     model.eval()
@@ -92,14 +75,14 @@ def eval_epoch(dataset, eval_idxs,  model, device, config):
         drug_drug_index = drug_drug_index.T
 
         batch_drugs = np.unique(drug_drug_index.flatten())
-        subgraph_data_list = [dataset[0].drug_idx_to_graph[drug].to(device) for drug in batch_drugs]
+        subgraph_data_list = [ddi_graph.drug_idx_to_graph[drug].to(device) for drug in batch_drugs]
         subgraph_batch = Batch.from_data_list(subgraph_data_list)
         subgraph_batch.batch = subgraph_batch.batch.to(device)
 
         drug_drug_index = drug_drug_index.to(device)
         edge_classes = edge_classes.to(device)
         y = y.to(device)
-        
+
         preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
 
@@ -118,16 +101,16 @@ class SubgraphRegressor(tune.Trainable):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"]) 
-        self.dataset[0].drug_protein_graph.to(self.device)
+        dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"])
+        self.ddi_graph = dataset[0].to(self.device)
 
-        self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.dataset[0].edge_index.shape[1],
+        self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.ddi_graph.edge_index.shape[1],
                                                                       config["test_set_prop"],
                                                                       config["val_set_prop"])
 
-        config["in_channels"] = self.dataset[0].x.shape[1]
-        config["out_channels"] = self.dataset[0].y.shape[1]
-        config["num_cell_lines"] = len(np.unique(self.dataset[0].edge_classes))
+        config["in_channels"] = self.ddi_graph.x.shape[1]
+        config["out_channels"] = self.ddi_graph.y.shape[1]
+        config["num_cell_lines"] = len(np.unique(self.ddi_graph.edge_classes))
 
         self.model = SubgraphEmbeddingRegressorModel(config).to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])

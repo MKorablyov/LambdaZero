@@ -101,21 +101,17 @@ def to_bipartite_drug_protein_graph(data_list):
         dpi_edge_idx_range = data.graph_type_idx_ranges['dpi']
 
         new_edge_idx_first = data.edge_index[:, dpi_edge_idx_range[0]:dpi_edge_idx_range[1]]
-        new_edge_attr_first = data.edge_attr[dpi_edge_idx_range[0]:dpi_edge_idx_range[1]]
-
         new_edge_idx_scnd = data.edge_index[:, dpi_edge_idx_range[0] * 2:dpi_edge_idx_range[1] * 2]
-        new_edge_attr_scnd = data.edge_attr[dpi_edge_idx_range[0] * 2:dpi_edge_idx_range[1] * 2]
 
-        new_edge_idx = np.concatenate((new_edge_idx_first, new_edge_idx_scnd), axis=1)
-        new_edge_attr = np.concatenate((new_edge_attr_first, new_edge_attr_scnd), axis=0)
+        new_edge_idx = torch.cat((new_edge_idx_first, new_edge_idx_scnd), dim=1)
 
         data.drug_protein_graph = Data(
             x=data.x,
             edge_index=torch.tensor(new_edge_idx, dtype=torch.long),
-            edge_attr=new_edge_attr
         )
 
         new_data_list.append(data)
+
     return new_data_list
 
 class DrugCombDb(InMemoryDataset):

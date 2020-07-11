@@ -43,22 +43,25 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
 
         return new_model
 
-    def forward(self, drug_drug_batch, subgraph_batch, edge_cell_lines):
-        x = subgraph_batch.x
+    def forward(self, drug_drug_batch, drug_protein_graph, edge_cell_lines):
+        x = drug_protein_graph.x
         for conv in [self.conv1, self.conv2]:
-            x = conv(x, subgraph_batch.edge_index)
+            x = conv(x, drug_protein_graph.edge_index)
             x = F.relu(x)
 
-        node_embeds = x
-        graph_embeds = scatter_mean(node_embeds, subgraph_batch.batch, dim=0)
+        # drug_protein_graph has drug -> protein and protein -> drug edges, but for
+        # graph averaging we only want the proteins for the drug -> protein edges.
+        # Since the first half of edges in drug_protein_graph are drug -> protein
+        # edges by construction, we take the first half here priorr to calling scatter_mean.
+        num_dpi_edges = drug_protein_graph.edge_index.shape[1] // 2
+        averaging_index = drug_protein_graph.edge_index[:, num_dpi_edges]
+        averaging_index = torch.sort(averaging_index, dim=0)[0]
 
-        # Quantize drug drug batch so indices match graph_embeds
-        drug_drug_batch_cpu = drug_drug_batch.cpu()
-        drug_bins = torch.unique(drug_drug_batch_cpu.flatten()) + 1
-        drug_drug_batch_qtzd = torch.from_numpy(np.digitize(drug_drug_batch_cpu, drug_bins))
+        node_embeds = x[averaging_index[1,:]]
+        graph_embeds = scatter_mean(node_embeds, averaging_index[0,:], dim=0)
 
-        from_drug_embeds = graph_embeds[drug_drug_batch_qtzd[0,:]]
-        to_drug_embeds = graph_embeds[drug_drug_batch_qtzd[1,:]]
+        from_drug_embeds = graph_embeds[drug_drug_batch[0,:]]
+        to_drug_embeds = graph_embeds[drug_drug_batch[1,:]]
 
         concatenated_embed_pairs = torch.cat((from_drug_embeds, to_drug_embeds), dim=1)
 
@@ -66,7 +69,7 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         for i, cell_line in enumerate(edge_cell_lines):
             cell_line_to_idx[cell_line.item()].append(i)
 
-        preds = torch.empty((drug_drug_batch.shape[1], self.out_channels), 
+        preds = torch.empty((drug_drug_batch.shape[1], self.out_channels),
                             device=concatenated_embed_pairs.device)
         for cell_line, cell_line_idxs in cell_line_to_idx.items():
             regressor = self.cell_line_to_regressor[cell_line]
