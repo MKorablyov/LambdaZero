@@ -7,8 +7,6 @@ import numpy as np
 import pandas as pd
 import torch
 
-FP_N_BITS = 1024
-
 def get_fingerprint(smile, radius, n_bits):
     if smile == 'none':
         return np.array([-1]*n_bits)
@@ -25,9 +23,16 @@ def to_drug_induced_subgraphs(data_list):
         dpi_edge_idx_range = data.graph_type_idx_ranges['dpi']
         dpi_edge_idx = all_edge_idx[:, dpi_edge_idx_range[0]:dpi_edge_idx_range[1]]
 
+        # Get the edges in order so that edges for the same drug are all
+        # grouped next to each other
         idx_sorts = dpi_edge_idx[0,:].argsort()
         re_index = dpi_edge_idx[:, idx_sorts]
 
+        # np.unique returns the index that each unique drug (i.e., value of re_index[0,:])
+        # occurs at. Since the edges were ordered with argsort above, consecutive items of
+        # idx_start represent begin and end ranges for a particular drug's edges.  Then,
+        # use these begin and end ranges to split the original edge index into a separate
+        # one for each drug with np.split
         all_idxs = np.arange(re_index.shape[1])
         _, idx_start = np.unique(re_index[0,:], return_index=True)
         drug_to_prot_sorted = [re_index[:, split] for split in np.split(all_idxs, idx_start[1:])]
@@ -35,10 +40,13 @@ def to_drug_induced_subgraphs(data_list):
         # split[0,0] is a tensor, so call item() on it to get the int out
         drug_idx_to_split = {split[0,0].item(): split for split in drug_to_prot_sorted}
 
+        # Get all drugs by taking union of drugs in ddi_edge_idx and re_index
+        # (that is, the dpi graph drugs)
         ddi_edge_idx_range = data.graph_type_idx_ranges['ddi']
         ddi_edge_idx = all_edge_idx[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
         unique_drugs = np.unique(np.hstack([ddi_edge_idx.flatten(), re_index[0,:]]))
 
+        # Create a new graph for each drug...
         drug_graphs = []
         for drug in unique_drugs:
             new_graph = None
@@ -52,7 +60,12 @@ def to_drug_induced_subgraphs(data_list):
 
                 ftrs = torch.cat((drug_ftr, protein_ftrs), dim=0)
 
-                # Convert edge index to format for small graph
+                # Convert edge index to format for small graph. If we did this,
+                # the edge index for each drug graph would have the indices for the
+                # original large graph which could create unnecessarily large adjacency
+                # matrices later in execution.  Because of this, here we change the
+                # indices for the small graph's edge index to start at 0 (using
+                # np.unique and np.digitize).
 
                 # Use np.unique + 1 to create bins for use in np.digitize
                 bins = np.unique(drug_subgraph_idx[1,:]) + 1
@@ -65,6 +78,9 @@ def to_drug_induced_subgraphs(data_list):
 
             drug_graphs.append(new_graph)
 
+        # Create one graph object whose edges are simply the ddi edges, but augment
+        # the graph object with the attribute drug_idx_to_graph which maps a drug
+        # to its subgraph which can subsequently be used to compute a subgraph embedding.
         super_graph = Data(
             x=data.x[:len(unique_drugs)],
             edge_index=data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
@@ -103,7 +119,10 @@ def to_bipartite_drug_protein_graph(data_list):
     return new_data_list
 
 class DrugCombDb(InMemoryDataset):
-    def __init__(self, transform=None, pre_transform=None):
+    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4):
+        self.fp_bits = fp_bits
+        self.fp_radius = fp_radius
+
         self._drug_protein_link_holder = None
         self._protein_protein_interactions_holder = None
 
@@ -206,16 +225,14 @@ class DrugCombDb(InMemoryDataset):
         return drug_nodes
 
     def _augment_drug_info_with_fp(self, drug_chem_info_no_fp):
-        radius = 4
-
         all_fp = drug_chem_info_no_fp['smilesString'].apply(
-            lambda s: get_fingerprint(s, radius=radius, n_bits=FP_N_BITS)
+            lambda s: get_fingerprint(s, radius=self.fp_radius, n_bits=self.fp_bits)
         )
 
         # Convert to dataframe
         all_fp = list(all_fp)
         all_fp = [list(fp) for fp in all_fp]
-        all_fp = pd.DataFrame(all_fp, columns=["fp" + str(i) for i in range(FP_N_BITS)])
+        all_fp = pd.DataFrame(all_fp, columns=["fp" + str(i) for i in range(self.fp_bits)])
 
         return pd.concat((drug_chem_info_no_fp, all_fp), axis=1)
 
