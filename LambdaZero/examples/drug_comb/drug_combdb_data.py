@@ -2,7 +2,7 @@ from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from unrar import rarfile
+#from unrar import rarfile
 import numpy as np
 import pandas as pd
 import torch
@@ -93,12 +93,13 @@ def to_bipartite_drug_protein_graph(data_list):
         new_edge_idx = np.concatenate((new_edge_idx_first, new_edge_idx_scnd), axis=1)
         new_edge_attr = np.concatenate((new_edge_attr_first, new_edge_attr_scnd), axis=0)
 
-        new_data_list.append(Data(
+        data.drug_protein_graph = Data(
             x=data.x,
             edge_index=torch.tensor(new_edge_idx, dtype=torch.long),
             edge_attr=new_edge_attr
-        ))
+        )
 
+        new_data_list.append(data)
     return new_data_list
 
 class DrugCombDb(InMemoryDataset):

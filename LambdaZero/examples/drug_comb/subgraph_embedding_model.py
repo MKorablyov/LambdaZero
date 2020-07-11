@@ -35,6 +35,14 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         for layer in [self.conv1, self.conv2] + lin_layers:
             torch.nn.init.xavier_uniform_(layer.weight)
 
+    def to(self, device):
+        new_model = super().to(device)
+
+        for cell_line, regressor in new_model.cell_line_to_regressor.items():
+            new_model.cell_line_to_regressor[cell_line] = regressor.to(device)
+
+        return new_model
+
     def forward(self, drug_drug_batch, subgraph_batch, edge_cell_lines):
         x = subgraph_batch.x
         for conv in [self.conv1, self.conv2]:
@@ -45,8 +53,9 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         graph_embeds = scatter_mean(node_embeds, subgraph_batch.batch, dim=0)
 
         # Quantize drug drug batch so indices match graph_embeds
-        drug_bins = np.unique(drug_drug_batch.flatten()) + 1
-        drug_drug_batch_qtzd = torch.from_numpy(np.digitize(drug_drug_batch, drug_bins))
+        drug_drug_batch_cpu = drug_drug_batch.cpu()
+        drug_bins = torch.unique(drug_drug_batch_cpu.flatten()) + 1
+        drug_drug_batch_qtzd = torch.from_numpy(np.digitize(drug_drug_batch_cpu, drug_bins))
 
         from_drug_embeds = graph_embeds[drug_drug_batch_qtzd[0,:]]
         to_drug_embeds = graph_embeds[drug_drug_batch_qtzd[1,:]]
@@ -57,7 +66,8 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         for i, cell_line in enumerate(edge_cell_lines):
             cell_line_to_idx[cell_line.item()].append(i)
 
-        preds = torch.empty((drug_drug_batch.shape[1], self.out_channels))
+        preds = torch.empty((drug_drug_batch.shape[1], self.out_channels), 
+                            device=concatenated_embed_pairs.device)
         for cell_line, cell_line_idxs in cell_line_to_idx.items():
             regressor = self.cell_line_to_regressor[cell_line]
             preds[cell_line_idxs] = regressor(concatenated_embed_pairs[cell_line_idxs])

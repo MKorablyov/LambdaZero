@@ -1,4 +1,4 @@
-from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs
+from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_bipartite_drug_protein_graph
 from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Batch
@@ -10,6 +10,8 @@ import ray
 import torch
 import os
 import math
+import sys
+import time
 
 num_iters = 0
 
@@ -28,7 +30,9 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
     subgraph_dataset = TensorDataset(dataset[0].edge_index[:, train_idxs].T,
                                      dataset[0].edge_classes[train_idxs], dataset[0].y[train_idxs])
 
-    loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"])
+    loader = DataLoader(subgraph_dataset, 
+                        batch_size=config["batch_size"], 
+                        pin_memory=device == 'cuda')
     model.train()
 
     metrics = {"loss": 0, "mse": 0, "mae": 0}
@@ -40,8 +44,21 @@ def train_epoch(dataset, train_idxs, model, optimizer, device, config):
 
         batch_drugs = np.unique(drug_drug_index.flatten())
         subgraph_data_list = [dataset[0].drug_idx_to_graph[drug] for drug in batch_drugs]
-        subgraph_batch = Batch.from_data_list(subgraph_data_list)
+        subgraph_batch_pre = Batch.from_data_list(subgraph_data_list)
+        print('GB size of batch: %f, edge index: %f, x: %f' % (
+            sys.getsizeof(subgraph_batch_pre.batch.storage()) / 1073741824, 
+            sys.getsizeof(subgraph_batch_pre.edge_index.storage()) / 1073741824, 
+            sys.getsizeof(subgraph_batch_pre.x.storage()) / 1073741824, 
+        ))
+        subgraph_batch = subgraph_batch_pre.to(device)
+        #subgraph_batch = Batch.from_data_list(subgraph_data_list).to(device)
+        print('Allocated memory GB after adding batch: %f' % (torch.cuda.memory_allocated(device) / 1073741824))
+        print()
 
+        drug_drug_index = drug_drug_index.to(device)
+        edge_classes = edge_classes.to(device)
+        y = y.to(device)
+        
         preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
 
@@ -66,7 +83,7 @@ def eval_epoch(dataset, eval_idxs,  model, device, config):
     subgraph_dataset = TensorDataset(dataset[0].edge_index[:, eval_idxs].T,
                                      dataset[0].edge_classes[eval_idxs], dataset[0].y[eval_idxs])
 
-    loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"])
+    loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"], pin_memory=True)
     model.eval()
 
     metrics = {"loss": 0, "mse": 0, "mae": 0}
@@ -75,15 +92,16 @@ def eval_epoch(dataset, eval_idxs,  model, device, config):
         drug_drug_index = drug_drug_index.T
 
         batch_drugs = np.unique(drug_drug_index.flatten())
-        subgraph_data_list = [dataset[0].drug_idx_to_graph[drug] for drug in batch_drugs]
+        subgraph_data_list = [dataset[0].drug_idx_to_graph[drug].to(device) for drug in batch_drugs]
         subgraph_batch = Batch.from_data_list(subgraph_data_list)
+        subgraph_batch.batch = subgraph_batch.batch.to(device)
 
+        drug_drug_index = drug_drug_index.to(device)
+        edge_classes = edge_classes.to(device)
+        y = y.to(device)
+        
         preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
-
-        global num_iters
-        if num_iters % 20 == 0:
-            print('Eval MSE: %f' % loss.item())
 
         metrics["loss"] += loss.item()
         metrics["mse"] += ((y - preds) ** 2).sum().item()
@@ -92,6 +110,7 @@ def eval_epoch(dataset, eval_idxs,  model, device, config):
     metrics["loss"] = metrics["loss"] / len(subgraph_dataset)
     metrics["mse"] = metrics["mse"] / len(subgraph_dataset)
     metrics["mae"] = metrics["mae"] / len(subgraph_dataset)
+    print("Eval MSE: %f" % metrics["mse"])
     return metrics
 
 class SubgraphRegressor(tune.Trainable):
@@ -99,8 +118,8 @@ class SubgraphRegressor(tune.Trainable):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.dataset = DrugCombDb(transform=config["transform"],
-                             pre_transform=config["pre_transform"])
+        self.dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"]) 
+        self.dataset[0].drug_protein_graph.to(self.device)
 
         self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.dataset[0].edge_index.shape[1],
                                                                       config["test_set_prop"],
@@ -110,8 +129,7 @@ class SubgraphRegressor(tune.Trainable):
         config["out_channels"] = self.dataset[0].y.shape[1]
         config["num_cell_lines"] = len(np.unique(self.dataset[0].edge_classes))
 
-        self.model = SubgraphEmbeddingRegressorModel(config)
-        self.model.to(self.device)
+        self.model = SubgraphEmbeddingRegressorModel(config).to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
 
         self.train_epoch = config["train_epoch"]
@@ -139,7 +157,7 @@ config = {
     "trainer": SubgraphRegressor,
     "trainer_config": {
         "transform": None,
-        "pre_transform": to_drug_induced_subgraphs,
+        "pre_transform": to_bipartite_drug_protein_graph,
         "val_set_prop": 0.1,
         "test_set_prop": 0.1,
         "lr": 0.01,
@@ -152,21 +170,26 @@ config = {
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
-    "checkpoint_freq": 500,
-    "stop": {"training_iteration": 1024 * 4},
+    "checkpoint_freq": 50,
+    "stop": {"training_iteration": 1024},
     "checkpoint_at_end": False,
-    "resources_per_trial": {"cpu": 6}
+    "resources_per_trial": {"gpu": 1}
 }
 
 if __name__ == "__main__":
     ray.init()
+
+    time_to_sleep = 30
+    print("Sleeping for %d seconds" % time_to_sleep)
+    time.sleep(time_to_sleep)
+    print("Woke up.. Scheduling")
 
     analysis = tune.run(
         config["trainer"],
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=6,
+        num_samples=1,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"]
