@@ -1,16 +1,15 @@
-import time
-import ray
-import numpy as np
+# import time
+# import ray
+# import numpy as np
 import pandas as pd
-#import LambdaZero
-from rdkit.Chem import QED
 import os.path as osp
 from rdkit import Chem
 
 import LambdaZero.chem
 import LambdaZero.utils
 import LambdaZero.environments
-
+import LambdaZero.models
+from LambdaZero.examples.synthesizability.vanilla_chemprop import binding_config
 
 class cfg:
     datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -33,47 +32,74 @@ class cfg:
     docksetup_dir = osp.join(datasets_dir, "brutal_dock/d4/docksetup")
 
 
-# # generate random molecules
-molMDP = LambdaZero.environments.molMDP.MolMDP(blocks_file=cfg.blocks_file)
-for i in range(10):
-    molMDP.reset()
-    molMDP.random_walk(5)
-    print(Chem.MolToSmiles(molMDP.molecule.mol))
+
+# create the chemprop binding net
+binding_net = LambdaZero.models.ChempropWrapper_v1(binding_config)
+
+def evaluate(mol):
+    print("smiles:", mol)
+
+    # evaluate random molecules docking with chemprop
+    dock_smi_mpnn = binding_net(mol=mol)
+    print("predicted dock energy:", dock_smi_mpnn)
+
+    # evaluate random molecules with docking
+    try:
+        dock_smi = LambdaZero.chem.Dock_smi(outpath=cfg.out_dir,
+                                 chimera_dir=cfg.chimera_dir,
+                                 dock6_dir=cfg.dock6_dir,
+                                 docksetup_dir=osp.join(cfg.datasets_dir, "brutal_dock/mpro_6lze/docksetup"))
+        name, energy, coord = dock_smi.dock(mol)
+        print("dock energy:", energy)
+    except Exception:
+        print ("dock energy: failed")
+        pass
 
 
+def random_molecules():
+    # generate random molecules
+    molMDP = LambdaZero.environments.molMDP.MolMDP(blocks_file=cfg.blocks_file)
+
+    for i in range(1000):
+        molMDP.reset()
+        molMDP.random_walk(5)
+        smi = Chem.MolToSmiles(molMDP.molecule.mol)
+        evaluate(smi)
+
+def zinc_molecules():
+    # retrieve zinc molecules
+    df = pd.read_feather(osp.join(cfg.datasets_dir, "brutal_dock/mpro_6lze/raw/Zinc15_260k_0.feather"))
+    df = df['smi']
+    print(df)
+
+    #evaluate zinc molecules
+    for smi in df:
+        evaluate(smi)
+
+if __name__ == "__main__":
+    zinc_molecules()
+# # example: docking a molecule on COVID19 docking data
+# dock_smi = LambdaZero.chem.Dock_smi(outpath=cfg.out_dir,
+#                          chimera_dir=cfg.chimera_dir,
+#                          dock6_dir=cfg.dock6_dir,
+#                          docksetup_dir= osp.join(cfg.datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
+#                         gas_charge=True)
+# smi = "[O-]C(=O)[C@H](C[C@@H]1CCNC1=O)NC(=O)[C@H](CC2CCCCC2)NC(=O)c3[nH]c4ccccc4c3"
+# name, energy, coord = dock_smi.dock(smi)
+# print("dock energy:", energy)
+#
+#
 # # evaluate random molecules with predicted dock reward
-reward = LambdaZero.environments.reward.PredDockReward(load_model=cfg.dockscore_model,
-                        natm_cutoff=[45, 50],
-                        qed_cutoff=[0.2, 0.7],
-                        soft_stop=False,
-                        exp=None,
-                        delta=False,
-                        simulation_cost=0.0,
-                        device="cuda")
-reward.reset()
-print("predicted reward:", reward(molMDP.molecule,env_stop=False,simulate=True,num_steps=1))
-
-
-# # evaluate random molecules with docking
-dock_smi = LambdaZero.chem.Dock_smi(outpath=cfg.out_dir,
-                         chimera_dir=cfg.chimera_dir,
-                         dock6_dir=cfg.dock6_dir,
-                         docksetup_dir=cfg.docksetup_dir)
-
-name, energy, coord = dock_smi.dock(Chem.MolToSmiles(molMDP.molecule.mol))
-print("dock energy:", energy)
-
-
-# example: docking a molecule on COVID19 docking data
-dock_smi = LambdaZero.chem.Dock_smi(outpath=cfg.out_dir,
-                         chimera_dir=cfg.chimera_dir,
-                         dock6_dir=cfg.dock6_dir,
-                         docksetup_dir= osp.join(cfg.datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
-                         gas_charge=True)
-smi = "[O-]C(=O)[C@H](C[C@@H]1CCNC1=O)NC(=O)[C@H](CC2CCCCC2)NC(=O)c3[nH]c4ccccc4c3"
-name, energy, coord = dock_smi.dock(smi)
-print("dock energy:", energy)
-
+# reward = LambdaZero.environments.reward.PredDockReward(load_model=cfg.dockscore_model,
+#                        natm_cutoff=[45, 50],
+#                        qed_cutoff=[0.2, 0.7],
+#                        soft_stop=False,
+#                        exp=None,
+#                        delta=False,
+#                         simulation_cost=0.0,
+#                         device="cpu")
+# reward.reset()
+# print("predicted reward:", reward(molMDP.molecule,env_stop=False,simulate=True,num_steps=1))
 
 # ray remote function
 # @ray.remote
