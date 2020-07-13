@@ -23,8 +23,6 @@ import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
 
-from dime_net import DimeNet
-
 from ray.rllib.utils import merge_dicts
 
 from custom_dataloader import DL
@@ -48,7 +46,8 @@ def train_epoch(loader, model, optimizer, device, config, max_val):
         optimizer.zero_grad()
         
         if config['model'] == "dime":
-            logit = model(data.x, data.pos, data.edge_index)
+            raise ValueError("Dime not working")
+            #logit = model(data.x, data.pos, data.edge_index)
         else:
             logit = model(data)
 
@@ -153,10 +152,12 @@ class BasicRegressor(tune.Trainable):
         # make model
         if not config['model'] == "dime":
             self.model = LambdaZero.models.MPNNet()
+        """
         else:
             self.model = DimeNet(in_channels=14, hidden_channels=128,
                                 out_channels=1, num_blocks=6, num_bilinear=8, num_spherical=7,
                                 num_radial=6, cutoff=5)
+        """
 
         print("Hit here")
 
@@ -169,13 +170,14 @@ class BasicRegressor(tune.Trainable):
                                                     props=config["molprops"],
                                                     transform=config["transform"],
                                                     file_names=config["file_names"])
+        """
         else:
             dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
                                                     props=config["molprops"],
                                                     transform=config["transform"],
                                                     file_names=config["file_names"],
                                                     proc_func=LambdaZero.inputs.tpnn_proc)
-
+        """
         
         # split dataset
         split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
@@ -188,30 +190,37 @@ class BasicRegressor(tune.Trainable):
 
         train_idxs = train_idxs[:-1]
 
-        train_dataset = dataset[th.tensor(train_idxs)]
-
-        train_grid = np.array([graph.gridscore.item() for graph in train_dataset])
-        energies = th.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=th.float64)
-
-        vals = {i:energies.count(i) for i in set(energies)}
-
-        plt.title('Energies Distribution')
-        plt.xlabel('Gridscore')
-        plt.ylabel('Num Examples')
-        plt.bar(vals.keys(), vals.values())
-
-        plt.savefig("gridscore_dist.png")
-
-        raise ValueError
-
         if config['use_sampler']:
             train_dataset = dataset[th.tensor(train_idxs)]
 
             energies = th.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=th.float64)
             energies = energies + energies.min() + 1
+            
+            if config['mode'] == 'pow':
+                energies = energies.pow(config['pow'])
+            elif config['mode'] == 'log':
+                energies = energies.log()
+            else:
+                raise ValueError("Sampling scheme not implemented")
 
-            energies = energies.pow(config['pow'])
             energies_prob = energies/energies.sum()
+            
+            """
+            e_list = energies_prob.tolist()
+            vals = {i:e_list.count(i) for i in set(e_list)}
+
+            plt.title('Energies Distribution')
+            plt.xlabel('Gridscore')
+            plt.ylabel('Num Examples')
+
+            print(vals)
+            plt.bar(vals.keys(), vals.values())
+
+            plt.savefig("/home/vbutoi/LambdaZero/LambdaZero/examples/mpnn/gridscore_dist.png")
+
+            raise ValueError
+            """
+
 
             sampler = th.utils.data.sampler.WeightedRandomSampler(energies_prob, len(train_dataset))
 
@@ -308,7 +317,7 @@ if __name__ == "__main__":
                         },
                         num_samples=1,
                         checkpoint_at_end=True,
-                        local_dir=config['summaries_dir']+"/final/",
+                        local_dir=config['summaries_dir']+"/log_exp/",
                         loggers=None,
                         name=config_name,
                         checkpoint_freq=100000)
