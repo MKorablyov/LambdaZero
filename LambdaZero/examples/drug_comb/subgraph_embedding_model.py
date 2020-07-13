@@ -54,7 +54,7 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         # Since the first half of edges in drug_protein_graph are drug -> protein
         # edges by construction, we take the first half here priorr to calling scatter_mean.
         num_dpi_edges = drug_protein_graph.edge_index.shape[1] // 2
-        averaging_index = drug_protein_graph.edge_index[:, num_dpi_edges]
+        averaging_index = drug_protein_graph.edge_index[:, :num_dpi_edges]
         averaging_index = torch.sort(averaging_index, dim=0)[0]
 
         node_embeds = x[averaging_index[1,:]]

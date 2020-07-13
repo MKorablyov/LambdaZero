@@ -96,21 +96,34 @@ def to_drug_induced_subgraphs(data_list):
 
 
 def to_bipartite_drug_protein_graph(data_list):
+    import pdb; pdb.set_trace()
     new_data_list = []
     for data in data_list:
+        ddi_edge_idx_range = data.graph_type_idx_ranges['ddi']
         dpi_edge_idx_range = data.graph_type_idx_ranges['dpi']
 
+        pdi_offset = ddi_edge_idx_range[1]
+        pdi_edge_idx_range = [idx + pdi_offset for idx in dpi_edge_idx_range]
+
         new_edge_idx_first = data.edge_index[:, dpi_edge_idx_range[0]:dpi_edge_idx_range[1]]
-        new_edge_idx_scnd = data.edge_index[:, dpi_edge_idx_range[0] * 2:dpi_edge_idx_range[1] * 2]
+        new_edge_idx_scnd = data.edge_index[:, pdi_edge_idx_range[0]:pdi_edge_idx_range[1]]
 
         new_edge_idx = torch.cat((new_edge_idx_first, new_edge_idx_scnd), dim=1)
 
-        data.drug_protein_graph = Data(
+        ddi_edges = data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
+        super_graph = Data(
+            x=data.x[:len(torch.unique(ddi_edges.flatten()))],
+            edge_index=ddi_edges,
+            y=data.y[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
+        )
+
+        super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
+        super_graph.drug_protein_graph = Data(
             x=data.x,
             edge_index=torch.tensor(new_edge_idx, dtype=torch.long),
         )
 
-        new_data_list.append(data)
+        new_data_list.append(super_graph)
 
     return new_data_list
 
@@ -353,5 +366,5 @@ class DrugCombDb(InMemoryDataset):
         return graph_type_idx_ranges
 
 if __name__ == '__main__':
-    dataset = DrugCombDb(pre_transform=to_drug_induced_subgraphs)
+    dataset = DrugCombDb(pre_transform=to_bipartite_drug_protein_graph)
 
