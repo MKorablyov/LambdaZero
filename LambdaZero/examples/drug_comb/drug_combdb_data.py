@@ -47,36 +47,7 @@ def to_drug_induced_subgraphs(data_list):
         unique_drugs = np.unique(np.hstack([ddi_edge_idx.flatten(), re_index[0,:]]))
 
         # Create a new graph for each drug...
-        drug_graphs = []
-        for drug in unique_drugs:
-            new_graph = None
-            if drug not in drug_idx_to_split:
-                new_graph = Data(x=data.x[drug].reshape(1, -1),
-                                 edge_index=torch.tensor([], dtype=torch.long))
-            else:
-                drug_subgraph_idx = drug_idx_to_split[drug]
-                protein_ftrs = data.x[np.sort(drug_subgraph_idx[1,:])]
-                drug_ftr = data.x[drug_subgraph_idx[0,0]].reshape(1, -1)
-
-                ftrs = torch.cat((drug_ftr, protein_ftrs), dim=0)
-
-                # Convert edge index to format for small graph. If we did this,
-                # the edge index for each drug graph would have the indices for the
-                # original large graph which could create unnecessarily large adjacency
-                # matrices later in execution.  Because of this, here we change the
-                # indices for the small graph's edge index to start at 0 (using
-                # np.unique and np.digitize).
-
-                # Use np.unique + 1 to create bins for use in np.digitize
-                bins = np.unique(drug_subgraph_idx[1,:]) + 1
-
-                # Add 1 here so the 0th index of edges will refer to the drug node
-                drug_subgraph_idx[1,:] = torch.from_numpy(np.digitize(drug_subgraph_idx[1,:], bins) + 1)
-                drug_subgraph_idx[0,:] = 0
-
-                new_graph = Data(x=ftrs, edge_index=drug_subgraph_idx)
-
-            drug_graphs.append(new_graph)
+        drug_graphs = [_build_subgraph(data, drug_idx_to_split, drug) for drug in unique_drugs]
 
         # Create one graph object whose edges are simply the ddi edges, but augment
         # the graph object with the attribute drug_idx_to_graph which maps a drug
@@ -94,9 +65,50 @@ def to_drug_induced_subgraphs(data_list):
 
     return new_data_list
 
+def _build_subgraph(parent_graph, drug_idx_to_split, drug):
+    if drug not in drug_idx_to_split:
+        return Data(x=data.x[drug].reshape(1, -1),
+                    edge_index=torch.tensor([], dtype=torch.long))
+
+    drug_subgraph_idx = drug_idx_to_split[drug]
+    nodes_in_subgraph = np.unique(drug_subgraph_idx)
+
+    n_mask = np.zeros(parent_graph.num_nodes)
+    n_mask[nodes_in_subgraph] = 1
+
+    n_idx = np.zeros(parent_graph.num_nodes)
+    n_idx[nodes_in_subgraph] = np.arange(nodes_in_subgraph)
+
+    mask = n_mask[parent_graph.edge_index[0]] & n_mask[parent_graph.edge_index[1]]
+    subgraph_edge_index = parent_graph.edge_index[:, mask]
+
+    # remove drug node from the subgraph here.  edges_without_drug is a bool array
+    # wherein an item is True if the edge does not contain the drug node, and
+    # False if it does contain the drug edge
+    edges_without_drug = ~(subgraph_edge_index[:, np.newaxis] == np.array([drug])).any(-1)
+    subgraph_edge_index = subgraph_edge_index[edges_without_drug]
+
+    ftrs = parent_graph.x[nodes_in_subgraph]
+
+    # re-index so that the index starts at 0 (and matches the indexing of ftrs)
+    subgraph_edge_index = n_idx[subgraph_edge_index]
+    return Data(x=ftrs, edge_index=subgraph_edge_index)
+
+def subgraph_protein_features_to_embedding(embedding_size):
+    def _subgraph_protein_features_to_embedding(data):
+        if not hasattr(data, 'drug_idx_to_graph'):
+            raise RuntimeError(
+                'Data object does not have an attribute drug_idx_to_graph. ' +
+                'It must have this to use the transform subgraph_protein_features_to_embedding.'
+            )
+
+        for drug, subgraph in data.drug_idx_to_graph.items():
+            embedding = torch.nn.Embedding(x.shape[0], embedding_size)
+            subgraph.x = embedding[torch.arange(subgraph.x.shape[0])]
+
+    return _subgraph_protein_features_to_embedding
 
 def to_bipartite_drug_protein_graph(data_list):
-    import pdb; pdb.set_trace()
     new_data_list = []
     for data in data_list:
         ddi_edge_idx_range = data.graph_type_idx_ranges['ddi']
