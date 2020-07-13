@@ -116,21 +116,7 @@ def eval_epoch(loader, model, device, config):
         loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
         metrics["loss"] += loss.item() * data.num_graphs
         metrics["mse"] += ((y - pred) ** 2).sum().item()
-        metrics["mae"] += ((y - pred).abs()).sum().item()    
-        
-        """
-        print("------------------------")
-        print("------------------------")
-
-        print(running_preds_true_energy)
-
-        print("!!!!!!!!!!!!!!!!!!!!!!!!")
-
-        print(running_gc)
-
-        print("------------------------")
-        print("------------------------")
-        """
+        metrics["mae"] += ((y - pred).abs()).sum().item()
 
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
@@ -152,32 +138,16 @@ class BasicRegressor(tune.Trainable):
         # make model
         if not config['model'] == "dime":
             self.model = LambdaZero.models.MPNNet()
-        """
-        else:
-            self.model = DimeNet(in_channels=14, hidden_channels=128,
-                                out_channels=1, num_blocks=6, num_bilinear=8, num_spherical=7,
-                                num_radial=6, cutoff=5)
-        """
 
         print("Hit here")
 
         self.model.to(self.device)
         self.optim = th.optim.Adam(self.model.parameters(), lr=config["lr"])
 
-        # load dataset
-        if not config['model'] == "dime":
-            dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
+        dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
                                                     props=config["molprops"],
                                                     transform=config["transform"],
                                                     file_names=config["file_names"])
-        """
-        else:
-            dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
-                                                    props=config["molprops"],
-                                                    transform=config["transform"],
-                                                    file_names=config["file_names"],
-                                                    proc_func=LambdaZero.inputs.tpnn_proc)
-        """
         
         # split dataset
         split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
@@ -193,8 +163,13 @@ class BasicRegressor(tune.Trainable):
         if config['use_sampler']:
             train_dataset = dataset[th.tensor(train_idxs)]
 
-            energies = th.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=th.float64)
-            energies = energies + energies.min() + 1
+            if config['without_tail']:
+                energies = th.tensor([-graph.gridscore.item() if abs(graph.gridscore.item()) < 62 else 0
+                                      for graph in train_dataset], dtype=th.float64)
+            else:
+                energies = th.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=th.float64)
+
+            energies = energies + energies.min()
             
             if config['mode'] == 'pow':
                 energies = energies.pow(config['pow'])
