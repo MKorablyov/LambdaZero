@@ -11,10 +11,14 @@ import LambdaZero.models
 
 from custom_dataloader import DL
 
+from matplotlib import pyplot as plt
+
 transform = LambdaZero.utils.Complete()
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+
 config = {
     "trainer_config": {
-        "dataset_root": os.path.join(datasets_dir, "brutal_dock/sars-cov-2"),
+        "dataset_root": os.path.join(datasets_dir, "brutal_dock/sars-cov-2/sars-cov-2"),
         "targets": ["gridscore"],
         "target_norms": [[-26.3, 12.3]],
         "file_names": ["Zinc15_260k_0","Zinc15_260k_1","Zinc15_260k_2","Zinc15_260k_3"],
@@ -33,7 +37,7 @@ config = {
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 model = LambdaZero.models.MPNNet()
-model.load_state_dict(th.load('/home/vbutoi/LambdaZero/summaries/default/BasicRegressor_0ac899ba_0_2020-06-30_02-29-25_ckc0r6g/checkpoint_75/model.pth'))
+model.load_state_dict(th.load('/home/nova/vanilla_mpnn/BasicRegressor_85ff6e04_0_2020-07-14_00-14-34rwsgu2d5/checkpoint_80/model.pth'))
 model.to(device)
 model.eval()
 
@@ -47,7 +51,7 @@ dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
                                         transform=config["transform"],
                                         file_names=config["file_names"])
 # split dataset
-bsize = 64
+bsize = 1
 
 split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
 _ , val_idxs, _ = np.load(split_path, allow_pickle=True)
@@ -63,6 +67,9 @@ running_gc = th.tensor([],requires_grad=False)
 
 num_mol_seen = 0
 
+real_energies = []
+predictions = []
+
 for bidx, data in enumerate(loader):
 
     data = data.to(device)
@@ -70,6 +77,18 @@ for bidx, data in enumerate(loader):
     with th.no_grad():
         logit = model(data)
 
+    pred = (logit * target_norm[1]) + target_norm[0]
+
+    real_energies.append(data.gridscore.item())
+    predictions.append(pred.item())
+
+plt.title("Predictions vs Real")
+plt.xlabel("Real Energies")
+plt.ylabel("Predictions")
+plt.scatter(real_energies, predictions)
+plt.savefig("/home/nova/LambdaZero/LambdaZero/examples/mpnn/pred_fig_1.png")
+
+"""
     num_mol_seen += bsize
 
     pred = (logit * target_norm[1]) + target_norm[0]
@@ -98,3 +117,4 @@ for bidx, data in enumerate(loader):
 
     regrets.append(regret)
     mol_checkpoints.append(num_mol_seen)
+"""
