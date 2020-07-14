@@ -7,6 +7,7 @@ The anaconda environment and datasets are already available in a shared folder
 ```
 # Clone this repo
 git clone https://github.com/MKorablyov/LambdaZero
+
 # LambdaZero needs the following folders: 
 # (1) Third-party softwares. These are already installed on beluga to /lustre03/project/6004852/mkkr/Programs
 # (2) Datasets not included in this repo. These are already installed on beluga to /lustre03/project/6004852/mkkr/Datasets
@@ -18,10 +19,13 @@ vi external_dirs.cfg # change the name of your Summaries folder
 # Test if the setup is working on one of the most basic scripts
 cd ../LambdaZero/examples/mpnn
 salloc --time=1:0:0 --cpus-per-task=4 --gres=gpu:1 --mem=32G --account=rrg-bengioy-ad
+
 # Load environment variables (this would load the python environment modules with everything installed
 bash /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
+
 # run mpnn training script
 python train_mpnn.py
+
 # for batch submisisons check LambdaZero/misc
 # and for the beluga documentation refer to docs.mila.quebec
 
