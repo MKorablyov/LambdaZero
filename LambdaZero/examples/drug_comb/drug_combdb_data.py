@@ -108,6 +108,23 @@ def subgraph_protein_features_to_embedding(embedding_size):
 
     return _subgraph_protein_features_to_embedding
 
+def use_score_type_as_target(score_type):
+    # Index in final tensors of targets for each score type
+    score_type_to_idx = {
+        'zip':   0,
+        'bliss': 1,
+        'loewe': 2,
+        'hsa':   3,
+    }
+
+    score_type = score_type.lower()
+    score_idx = score_type_to_idx[score_type]
+
+    def _use_score_type_as_target(data):
+        data.y = data.y[:, score_idx]
+
+    return _use_score_type_as_target
+
 def to_bipartite_drug_protein_graph(data_list):
     new_data_list = []
     for data in data_list:

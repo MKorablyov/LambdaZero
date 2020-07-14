@@ -2,6 +2,7 @@ from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_bipart
 from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Batch
+from torchvision.transforms import Compose
 from torch.utils.data import TensorDataset, DataLoader
 from ray import tune
 import numpy as np
@@ -59,7 +60,7 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         if num_iters % 20 == 0:
             print('Train MSE: %f' % loss.item())
 
-    metrics["loss"] = metrics["loss"] / num_batches 
+    metrics["loss"] = metrics["loss"] / num_batches
     metrics["mse"] = metrics["mse"] / num_batches
     metrics["mae"] = metrics["mae"] / num_batches
     return metrics
@@ -85,7 +86,7 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
         metrics["mse"] += F.mse_loss(y, preds).item()
         metrics["mae"] += F.l1_loss(y, preds).item()
 
-    metrics["loss"] = metrics["loss"] / num_batches 
+    metrics["loss"] = metrics["loss"] / num_batches
     metrics["mse"] = metrics["mse"] / num_batches
     metrics["mae"] = metrics["mae"] / num_batches
     print("Eval MSE: %f" % metrics["mse"])
@@ -96,7 +97,16 @@ class SubgraphRegressor(tune.Trainable):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"])
+        transform = None
+        if config['use_one_hot'] == True:
+            transform = use_score_type_as_target('ZIP')
+        else:
+            transform = Compose([
+                subgraph_features_to_embedding(config['protein_embedding_size']),
+                use_score_type_as_target('ZIP'),
+            ])
+
+        dataset = DrugCombDb(transform=transform, pre_transform=config["pre_transform"])
         self.ddi_graph = dataset[0].to(self.device)
         self.ddi_graph.drug_protein_graph = self.ddi_graph.drug_protein_graph.to(self.device)
 
@@ -139,7 +149,10 @@ config = {
         "pre_transform": to_bipartite_drug_protein_graph,
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
-        "lr": tune.grid_search([1e-3, 7.5e-4, 5e-4]),
+        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
+        "lr": tune.grid_search([1e-4, 3e-4, 1e-3]),
+        "use_one_hot": tune.grid_search([True, False]),
+        "protein_embedding_size": 256,
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
         "embed_channels": 256,
