@@ -1,7 +1,5 @@
 # LambdaZero: search in the space of small molecules
 
-Note: Instructions on how to access, set up, and manage slurm jobs on the MILA Cluster and Compute Canada (Beluga) can be found on the [MILA Docs]
-
 ## Install 
 ### On Beluga/ComputeCanada
 The anaconda environment and datasets are already available in a shared folder
@@ -25,7 +23,7 @@ bash /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
 # run mpnn training script
 python train_mpnn.py
 # for batch submisisons check LambdaZero/misc
-# and for the beluga documentation go to docs.mila.quebec
+# and for the beluga documentation refer to docs.mila.quebec
 
 ```
 
