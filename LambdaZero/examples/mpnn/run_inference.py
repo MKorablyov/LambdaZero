@@ -46,7 +46,6 @@ dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
                                         props=config["molprops"],
                                         transform=config["transform"],
                                         file_names=config["file_names"])
-
 # split dataset
 bsize = 64
 

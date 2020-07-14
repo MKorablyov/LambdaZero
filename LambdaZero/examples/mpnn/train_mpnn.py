@@ -35,7 +35,11 @@ def train_epoch(loader, model, optimizer, device, config, max_val):
     target_norm = config["target_norms"][0]
     model.train()
 
-    metrics = {"loss":0, "mse": 0, "mae":0}
+    metrics = {"loss": 0, "mse": 0, "mae": 0, "mae_regret": 0, "mse_regret": 0, "median_regret": 0}
+
+    running_preds_true_energy = th.tensor([], requires_grad=False)
+    running_preds = th.tensor([], requires_grad=False)
+    running_gc = th.tensor([], requires_grad=False)
 
     i = 0
     for bidx,data in enumerate(loader):
@@ -45,14 +49,27 @@ def train_epoch(loader, model, optimizer, device, config, max_val):
 
         optimizer.zero_grad()
         
-        if config['model'] == "dime":
-            raise ValueError("Dime not working")
-            #logit = model(data.x, data.pos, data.edge_index)
-        else:
-            logit = model(data)
+        logit = model(data)
 
         pred = (logit * target_norm[1]) + target_norm[0]
         y = getattr(data, target)
+
+        cpu_y = y.cpu()
+        cpu_pred = pred.cpu()
+
+        highest_ys = th.topk(y.cpu(), config['num_rank'])
+        running_gc = th.cat((running_gc, highest_ys[0]), 0)
+        running_gc = th.topk(running_gc, config['num_rank'])[0]
+
+        highest_preds = th.topk(cpu_pred, config['num_rank'])
+
+        running_preds = th.cat((running_preds, highest_preds[0]), 0)
+        running_preds_true_energy = th.cat((running_preds_true_energy, cpu_y[highest_preds[1]]), 0)
+
+        running_preds = th.topk(running_preds, config['num_rank'])
+
+        running_preds_true_energy = running_preds_true_energy[running_preds[1]].detach()
+        running_preds = running_preds[0].detach()
         
         if config['loss'] == "L2":
             loss = F.mse_loss(logit, (y - target_norm[0]) / target_norm[1])
@@ -71,6 +88,10 @@ def train_epoch(loader, model, optimizer, device, config, max_val):
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
+
+    metrics["median_regret"] = abs(np.median(running_preds_true_energy) - np.median(running_gc)).item()
+    metrics["mae_regret"] = F.l1_loss(running_preds_true_energy, running_gc).item()
+    metrics["mse_regret"] = F.mse_loss(running_preds_true_energy, running_gc).item()
 
     return metrics
 
