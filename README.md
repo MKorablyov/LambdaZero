@@ -3,7 +3,35 @@
 Note: Instructions on how to access, set up, and manage slurm jobs on the MILA Cluster and Compute Canada (Beluga) can be found on the [MILA Docs]
 
 ## Install 
-### Install using Anaconda (usual way for a personal laptop) 
+### On Beluga/Computecanada
+The anaconda environment and datasets are already available in a shared folder
+
+```
+# Clone this repo
+git clone https://github.com/MKorablyov/LambdaZero
+# LambdaZero needs the following folders: 
+# (1) Third-party softwares. These are already installed on beluga to /lustre03/project/6004852/mkkr/Programs
+# (2) Datasets not included in this repo. These are already installed on beluga to /lustre03/project/6004852/mkkr/Datasets
+# (3) Summaries where the program will write output. Please, indicate your own location for this
+cd LamdaZero
+cp ./misc/external_dirs.cfg . 
+vi external_dirs.cfg # change the name of your Summaries folder
+
+# Test if the setup is working on one of the most basic scripts
+cd ../LambdaZero/examples/mpnn
+salloc --time=1:0:0 --cpus-per-task=4 --gres=gpu:1 --mem=32G --account=rrg-bengioy-ad
+# Load environment variables (this would load the python environment modules with everything installed
+bash /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
+# run mpnn training script
+python train_mpnn.py
+# for batch submisisons check LambdaZero/misc
+# and for the beluga documentation go to docs.mila.quebec
+
+```
+
+
+
+### Install using Anaconda 
 Install [anaconda](https://www.anaconda.com/products/individual)
 
 Create the conda environment, based on your os:
@@ -28,34 +56,6 @@ Finally, install LambdaZero with the following command:
 pip install -e .
 ```
 
-### Install on Compute Canada Beluga
-To setup the environment for Beluga, create a virtual environment and install dependencies. Replace `<username>` with your username.
-# Create virtual environments and install dependencies
-```bash
-module load python/3.6 cuda/10.1 cudnn/7.6.5
-virtualenv --no-download /scratch/<username>/env
-source /scratch/<username>/env/bin/activate
-# torch and tensorflow need be installed separately
-pip install numpy
-pip install tensorflow_gpu --no-index
-pip install torch==1.5.0+cu101 torchvision==0.6.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
-pip install torch-cluster==1.5.5+cu101 torch-scatter==2.0.4+cu101 torch-sparse==0.6.5+cu101 torch-spline-conv==1.2.0+cu101 -f https://pytorch-geometric.com/whl/torch-1.5.0.html
-pip install torch-geometric==1.5.0
-# install ray
-wget -O ray-0.8.6-cp36-cp36m-linux_x86_64.whl https://files.pythonhosted.org/packages/ea/0b/f253e92aee1225d9d0ef21dd15514352ce87f6dbc55de70707bc9d52477f/ray-0.8.6-cp36-cp36m-manylinux1_x86_64.whl
-pip install ray-0.8.6-cp36-cp36m-linux_x86_64.whl
-cd ~/LambdaZero
-pip install -r requirements.txt
-# install LambdaZero
-pip install -e .
-```
-
-Add the following line to your slurm job file to load the required modules. Replace `<username>` with your username.
-```bash
-bash setup_beluga.sh
-```
-
-This will load the required modules and install the dependencies.
 
 ## Getting started
 
