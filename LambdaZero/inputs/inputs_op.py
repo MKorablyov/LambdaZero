@@ -805,7 +805,7 @@ class BrutalDock(InMemoryDataset):
         print("processing", self.raw_paths)
         for raw_path, processed_path in zip(self.raw_paths, self.processed_paths):
             docked_index = pd.read_feather(raw_path)
-            smis = docked_index["smiles"].tolist()
+            smis = docked_index["smi"].tolist()
             props = {pr:docked_index[pr].tolist() for pr in self._props}
             tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
                                            self.pre_filter, self.pre_transform) for j in range(len(smis))]
