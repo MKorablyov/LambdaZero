@@ -129,7 +129,7 @@ class PredDockReward_v2:
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"reward": reward, "natm": natm, "qed" : qed, "synth" : synth}
+        return disc_reward, {"dock_reward": reward, "natm": natm, "qed" : qed, "synth" : synth}
 
     def _simulation(self, molecule):
         mol = molecule.mol
@@ -155,7 +155,7 @@ class PredDockReward_v2:
             if reward is not None:
                 discounted_reward, log_vals = self._discount(molecule.mol, reward)
             else:
-                discounted_reward, log_vals = -0.5, {"reward": -0.5, "natm": 0.0, "qed" : -0.5, "synth" : -0.5}
+                discounted_reward, log_vals = -0.5, {"dock_reward": -0.5, "natm": 0.0, "qed" : -0.5, "synth" : -0.5}
         else:
             discounted_reward, log_vals = 0.0, {}
         return discounted_reward, log_vals
@@ -193,17 +193,17 @@ class PredDockReward_v3:
 
         # Binding energy prediction
         dockscore = self.binding_net(mol=mol)
-        dockscore_discount = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
+        dockscore_reward = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
 
         # combine rewards
-        disc_reward = dockscore_discount * qed_discount * synth_discount
+        disc_reward = dockscore_reward * qed_discount * synth_discount
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"dockscore": dockscore_discount, "qed": qed, "synth": synth}
+        return disc_reward, {"dockscore_reward": dockscore_reward, "qed": qed, "synth": synth}
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:

@@ -99,7 +99,6 @@ DEFAULT_CONFIG = {
     #     "device": "cuda",
     # },
 
-
     "reward": PredDockReward_v2,
     "num_blocks": 105,
     "max_steps": 7,

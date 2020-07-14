@@ -36,7 +36,7 @@ ppo_mpro_v001 = {
 }
 
 ppo_mpro_v002 = {
-    "rllib_config":{
+    "rllib_config": {
         "env": BlockMolEnv_v4,
         },
 }
