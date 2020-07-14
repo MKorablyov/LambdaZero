@@ -67,17 +67,17 @@ def to_drug_induced_subgraphs(data_list):
 
 def _build_subgraph(parent_graph, drug_idx_to_split, drug):
     if drug not in drug_idx_to_split:
-        return Data(x=data.x[drug].reshape(1, -1),
+        return Data(x=parent_graph.x[drug].reshape(1, -1),
                     edge_index=torch.tensor([], dtype=torch.long))
 
     drug_subgraph_idx = drug_idx_to_split[drug]
     nodes_in_subgraph = np.unique(drug_subgraph_idx)
 
-    n_mask = np.zeros(parent_graph.num_nodes)
+    n_mask = np.zeros(parent_graph.num_nodes, dtype=np.bool_)
     n_mask[nodes_in_subgraph] = 1
 
-    n_idx = np.zeros(parent_graph.num_nodes)
-    n_idx[nodes_in_subgraph] = np.arange(nodes_in_subgraph)
+    n_idx = np.zeros(parent_graph.num_nodes, dtype=np.int64)
+    n_idx[nodes_in_subgraph] = np.arange(nodes_in_subgraph.shape[0])
 
     mask = n_mask[parent_graph.edge_index[0]] & n_mask[parent_graph.edge_index[1]]
     subgraph_edge_index = parent_graph.edge_index[:, mask]
@@ -85,14 +85,14 @@ def _build_subgraph(parent_graph, drug_idx_to_split, drug):
     # remove drug node from the subgraph here.  edges_without_drug is a bool array
     # wherein an item is True if the edge does not contain the drug node, and
     # False if it does contain the drug edge
-    edges_without_drug = ~(subgraph_edge_index[:, np.newaxis] == np.array([drug])).any(-1)
-    subgraph_edge_index = subgraph_edge_index[edges_without_drug]
+    edges_without_drug = ~(subgraph_edge_index.T == drug).any(-1)
+    subgraph_edge_index = subgraph_edge_index[:,edges_without_drug]
 
     ftrs = parent_graph.x[nodes_in_subgraph]
 
     # re-index so that the index starts at 0 (and matches the indexing of ftrs)
     subgraph_edge_index = n_idx[subgraph_edge_index]
-    return Data(x=ftrs, edge_index=subgraph_edge_index)
+    return Data(x=ftrs, edge_index=torch.tensor(subgraph_edge_index, dtype=torch.long))
 
 def subgraph_protein_features_to_embedding(embedding_size):
     def _subgraph_protein_features_to_embedding(data):
@@ -395,5 +395,5 @@ class DrugCombDb(InMemoryDataset):
         return graph_type_idx_ranges
 
 if __name__ == '__main__':
-    dataset = DrugCombDb(pre_transform=to_bipartite_drug_protein_graph)
+    dataset = DrugCombDb(pre_transform=to_drug_induced_subgraphs)
 

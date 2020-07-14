@@ -1,4 +1,4 @@
-from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_bipartite_drug_protein_graph
+from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs
 from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Batch
@@ -44,7 +44,11 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         drug_drug_index, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
-        preds = model(drug_drug_index, ddi_graph.drug_protein_graph, edge_classes)
+        batch_drugs = np.unique(drug_drug_index.flatten())
+        subgraph_data_list = [dataset[0].drug_idx_to_graph[drug] for drug in batch_drugs]
+        subgraph_batch = Batch.from_data_list(subgraph_data_list)
+
+        preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
 
         loss.backward()
@@ -149,9 +153,9 @@ config = {
         "pre_transform": to_bipartite_drug_protein_graph,
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
-        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
-        "lr": tune.grid_search([1e-4, 3e-4, 1e-3]),
-        "use_one_hot": tune.grid_search([True, False]),
+        "prediction_type": "mlp", #tune.grid_search(["dot_product", "mlp"]),
+        "lr": 3e-4,#tune.grid_search([1e-4, 3e-4, 1e-3]),
+        "use_one_hot": False,#tune.grid_search([True, False]),
         "protein_embedding_size": 256,
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
