@@ -3,7 +3,7 @@
 Note: Instructions on how to access, set up, and manage slurm jobs on the MILA Cluster and Compute Canada (Beluga) can be found on the [MILA Docs]
 
 ## Install 
-### On Beluga/Computecanada
+### On Beluga/ComputeCanada
 The anaconda environment and datasets are already available in a shared folder
 
 ```
