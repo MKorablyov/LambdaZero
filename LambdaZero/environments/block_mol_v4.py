@@ -9,8 +9,9 @@ from .molMDP import MolMDP
 from rdkit import Chem
 
 import LambdaZero.utils
-from .reward import PredDockReward
+from .reward import PredDockReward, PredDockReward_v2, PredDockReward_v3
 
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 class FPObs_v1:
     def __init__(self, config, molMDP):
@@ -72,7 +73,57 @@ class FPObs_v1:
                }
         return obs
 
-datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+
+synth_config = {
+    "trainer_config": {
+        "dataset_type": "regression",
+        "train_dataset": None,
+        "save_dir": None,
+
+        "features_generator": None,  # Method(s) of generating additional features
+        "features_path": None,  # Path(s) to features to use in FNN (instead of features_generator)
+        "no_features_scaling": False,  # Turn off scaling of features
+        "num_workers": 8,  # Number of workers for the parallel data loading (0 means sequential)
+        "batch_size": 50,  # Batch size
+        "separate_val_path": None,  # Path to separate val set, optional
+        "separate_test_path": None,  # Path to separate test set, optional
+        "split_type": "random",
+        "split_sizes": (0.8, 0.1, 0.1),
+        "num_folds": 1,
+        "seed": 0,
+        "pytorch_seed": 0,
+        "log_frequency": 10,
+        "cache_cutoff": 10000,
+        "save_smiles_splits": False,
+
+        "hidden_size": 300,
+        "depth": 3,
+        "dropout": 0.0,
+        "activation": "ReLu",
+        "ffn_num_layers": 2,
+        "ensemble_size": 1,
+        "atom_messages": False,  # Centers messages on atoms instead of on bonds
+        "undirected": False,
+
+        "epochs": 150,
+        "warmup_epochs": 2.0,  # epochs for which lr increases linearly; afterwards decreases exponentially
+        "init_lr": 1e-4,  # Initial learning rate
+        "max_lr": 1e-3,  # Maximum learning rate
+        "final_lr":  1e-4,  # Final learning rate
+        "class_balance": False,
+        },
+    "predict_config": {
+        "dataset_type": "regression",
+        "features_generator": None,
+        "features_path": None,  # Path(s) to features to use in FNN (instead of features_generator)
+        "no_features_scaling": False,  # Turn off scaling of features
+        "num_workers": 8,  # Number of workers for the parallel data loading (0 means sequential)
+        "batch_size": 50,  # Batch size
+        "disable_progress_bar": True,
+        "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
+    },
+
+}
 
 DEFAULT_CONFIG = {
     "obs_config": {"mol_fp_len": 512,
@@ -84,18 +135,28 @@ DEFAULT_CONFIG = {
     "molMDP_config": {
         "blocks_file": osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"),
     },
-
-    "reward_config" : {
-        "soft_stop": True,
-        "load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
-        "natm_cutoff": [45, 50],
+    "reward_config":{
+        "binding_model": osp.join(datasets_dir,"brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth"),
         "qed_cutoff": [0.2, 0.7],
+        "synth_cutoff": [0, 4],
+        "synth_config": synth_config,
+        "soft_stop": True,
         "exp": None,
         "delta": False,
-        "simulation_cost": 0.00,
-        "device": "cuda",
+        "simulation_cost": 0.0,
+        "device":"cuda",
     },
-    "reward": PredDockReward,
+    #"reward_config" : {
+    #    "soft_stop": True,
+    #    "load_model": osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002"),
+    #    "natm_cutoff": [45, 50],
+    #    "qed_cutoff": [0.2, 0.7],
+    #    "exp": None,
+    #    "delta": False,
+    #    "simulation_cost": 0.00,
+    #    "device": "cuda",
+    #},
+    "reward": PredDockReward_v2,
     "num_blocks": 105,
     "max_steps": 7,
     "max_blocks": 7,

@@ -9,7 +9,6 @@ x = []
 for i in range(10000):
     sample_mu = np.random.normal(20)
     sample_sigma = np.random.uniform(low=0.0, high=3.0)
-
     sample_x = sample_mu + np.random.normal(scale=sample_sigma)
 
     mu.append(sample_mu)
@@ -32,10 +31,24 @@ def logP(mu, sigma, x):
     :param x: ground truth
     :return:
     """
-
     return (-np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) **2))
-
+#
 print(logP(mu, sigma,x).mean())
 print(logP(mu, sigma * 10, x).mean())
 print(logP(mu, sigma * 0.1,x).mean())
 print(logP(mu, np.random.permutation(sigma),x).mean())
+
+
+
+
+#
+#print(np.random.normal(size=10000).var())
+# #import pyarrow
+# #p#rint(pyarrow.__version__)
+#
+# #a = list(np.eye(10,dtype=np.fltion frooat64).reshape(-1))
+# #a = ([1.,2.],[3.,4.],)
+# df = pd.DataFrame({"a":a})
+# df.to_feather("a.feather")
+# print(pd.read_feather("a.feather"))
+
