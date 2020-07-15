@@ -6,7 +6,7 @@ from torch.utils.data import Subset
 
 from ray import tune
 
-
+from custom_dataloader import DL
 
 class BasicRegressor(tune.Trainable):
     def _setup(self, config):
@@ -20,9 +20,24 @@ class BasicRegressor(tune.Trainable):
         # split dataset
         train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
 
-        self.train_set = DataLoader(Subset(dataset, train_idxs.tolist()), shuffle=True, batch_size=config["b_size"])
-        self.val_set = DataLoader(Subset(dataset, val_idxs.tolist()), batch_size=config["b_size"])
-        self.test_set = DataLoader(Subset(dataset, test_idxs.tolist()), batch_size=config["b_size"])
+        sampler = None
+
+        if config['use_sampler']:
+            train_dataset = dataset[torch.tensor(train_idxs)]
+
+            energies = torch.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=torch.float64)
+
+            energies = energies + energies.min()
+
+            energies = energies.pow(config['pow'])
+
+            energies_prob = energies / energies.sum()
+            sampler = torch.utils.data.sampler.WeightedRandomSampler(energies_prob, len(train_dataset))
+
+
+        self.train_set = DL(Subset(dataset, train_idxs.tolist()), shuffle=True, batch_size=config["b_size"], sampl=sampler)
+        self.val_set = DL(Subset(dataset, val_idxs.tolist()), batch_size=config["b_size"])
+        self.test_set = DL(Subset(dataset, test_idxs.tolist()), batch_size=config["b_size"])
 
         # make model
         self.model = config["model"](**config["model_config"])
