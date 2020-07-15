@@ -19,10 +19,10 @@ vi external_dirs.cfg # change the name of your Summaries folder
 # Test if the setup is working on one of the most basic scripts
 cd LambdaZero/examples/mpnn
 salloc --time=1:0:0 --cpus-per-task=4 --gres=gpu:1 --mem=32G --account=rrg-bengioy-ad
-export PYTHONPATH="${PYTHONPATH}:/path-to-where-you-have-current-repo/LambdaZero"
 
 # Load environment variables (this would load the python environment modules with everything installed
 source /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
+export PYTHONPATH="${PYTHONPATH}:/path-to-where-you-have-current-work-repo/LambdaZero" 
 
 # run mpnn training script
 python train_mpnn.py
