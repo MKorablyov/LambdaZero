@@ -2,7 +2,7 @@ from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from rdkit import Chem
 from rdkit.Chem import AllChem
-#from unrar import rarfile
+from unrar import rarfile
 import numpy as np
 import pandas as pd
 import torch
@@ -127,6 +127,7 @@ def to_bipartite_drug_protein_graph(data_list):
 
     return new_data_list
 
+
 class DrugCombDb(InMemoryDataset):
     def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4):
         self.fp_bits = fp_bits
@@ -186,17 +187,18 @@ class DrugCombDb(InMemoryDataset):
             rar.extractall(path=self.raw_dir)
 
     def process(self):
-        nodes = self._get_nodes()
+        nodes, number_of_drugs = self._get_nodes()
         edge_idxs, edge_trgt, edge_classes, graph_type_idx_ranges = self._get_edges_information(nodes)
 
         data = Data(
             x=torch.tensor(self._get_node_ftrs(nodes), dtype=torch.float),
             edge_index=torch.tensor(edge_idxs, dtype=torch.long),
-            y=torch.tensor(edge_trgt, dtype=torch.long),
+            y=torch.tensor(edge_trgt, dtype=torch.float),
         )
 
         data.edge_classes = torch.tensor(edge_classes, dtype=torch.long)
         data.graph_type_idx_ranges = graph_type_idx_ranges
+        data.number_of_drugs = number_of_drugs
 
         data_list = [data]
         if self.pre_transform is not None:
@@ -208,7 +210,12 @@ class DrugCombDb(InMemoryDataset):
     def _get_node_ftrs(self, nodes):
         node_ftrs = nodes.fillna(-1)
         node_ftrs = node_ftrs.drop(['cIds', 'drugNameOfficial', 'molecularWeight',
-                                    'smilesString', 'name', 'has_fp', 'is_drug'], axis=1)
+                                    'smilesString', 'name', 'has_fp'], axis=1)
+
+        # Move 'is_drug' column to front
+        is_drug = node_ftrs['is_drug']
+        node_ftrs.drop(labels=['is_drug'], axis=1, inplace=True)
+        node_ftrs.insert(0, 'is_drug', is_drug)
 
         return node_ftrs.to_numpy().astype(np.int)
 
@@ -218,7 +225,9 @@ class DrugCombDb(InMemoryDataset):
 
         nodes = pd.concat((drug_nodes, protein_nodes), ignore_index=True, sort=False)
 
-        return nodes
+        number_of_drugs = drug_nodes.shape[0]
+
+        return nodes, number_of_drugs
 
     def _get_drug_nodes(self):
         print('Processing drug nodes..')
@@ -365,6 +374,10 @@ class DrugCombDb(InMemoryDataset):
 
         return graph_type_idx_ranges
 
+
 if __name__ == '__main__':
+
     dataset = DrugCombDb(pre_transform=to_bipartite_drug_protein_graph)
+
+    dataset.get_edge_type('ddi')
 
