@@ -2,9 +2,9 @@ import socket
 from copy import deepcopy
 import os
 import os.path as osp
-from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnvGraph_v1
+from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnvGraph_v1
 from LambdaZero.utils import get_external_dirs
-from LambdaZero.environments import PredDockReward_v3
+from LambdaZero.environments import PredDockReward_v2, PredDockReward_v3
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
 
 
@@ -31,7 +31,6 @@ ppo000 = {
 }
 
 ppo001 = {
-    # 3.2-3.3
     "rllib_config":{
         "env": BlockMolEnv_v3,
         "env_config": {
@@ -45,20 +44,48 @@ ppo001 = {
     }
 }
 
-ppo024 = {
-     "rllib_config":{
-         "env": BlockMolEnv_v3,
-         "env_config": {
-             "allow_removal": True,
-             "reward": PredDockReward_v3,
-             "reward_config": {
-                 "synth_config": synth_config,
-                 "binding_config": binding_config,
-             }
-
-         },
-     }
+ppo002 = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolEnv_v4,
+        "env_config": {
+            "allow_removal": True,
+        }
+    }
 }
+
+ppo_mpro_v001 = {
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        },
+}
+
+ppo_mpro_v002 = {
+    "rllib_config": {
+        "env": BlockMolEnv_v4,
+        },
+}
+
+
+
+
+
+# ppo024 = {
+#      "rllib_config":{
+#          "env": BlockMolEnv_v3,
+#          "env_config": {
+#              "allow_removal": True,
+#              "reward": PredDockReward_v3,
+#              "reward_config": {
+#                  "synth_config": synth_config,
+#                  "binding_config": binding_config,
+#              }
+#
+#          },
+#      }
+# }
+
+
 
 # ppo022 = {
 #     # ???
@@ -115,7 +142,6 @@ ppo024 = {
 #     },
 #     "checkpoint_freq": 25,
 # }
-
 
 # "reward_config": {
 #     "soft_stop": True,
