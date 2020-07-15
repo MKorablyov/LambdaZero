@@ -20,8 +20,10 @@ vi external_dirs.cfg # change the name of your Summaries folder
 cd LambdaZero/examples/mpnn
 salloc --time=1:0:0 --cpus-per-task=4 --gres=gpu:1 --mem=32G --account=rrg-bengioy-ad
 
-# Load environment variables (this would load the python environment modules with everything installed
+# Load environment variables (this would load the python environment modules with gcc/cuda modules)
 source /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
+
+# add current working repo to python path to allow global imports IE: import LambdaZero.some_module
 export PYTHONPATH="${PYTHONPATH}:/path-to-where-you-have-current-work-repo/LambdaZero" 
 
 # run mpnn training script
