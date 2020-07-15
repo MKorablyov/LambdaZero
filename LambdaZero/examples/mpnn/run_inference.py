@@ -37,6 +37,8 @@ config = {
         }
 }
 
+ray.init()
+
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 model = LambdaZero.models.MPNNet()
