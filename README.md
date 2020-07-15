@@ -21,7 +21,7 @@ cd ../LambdaZero/examples/mpnn
 salloc --time=1:0:0 --cpus-per-task=4 --gres=gpu:1 --mem=32G --account=rrg-bengioy-ad
 
 # Load environment variables (this would load the python environment modules with everything installed
-bash /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
+source /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
 
 # run mpnn training script
 python train_mpnn.py
