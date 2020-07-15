@@ -294,7 +294,7 @@ DEFAULT_CONFIG = {
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 250000000,
-    "stop": {"training_iteration": 100},
+    "stop": {"training_iteration": 80},
 }
 
 config = merge_dicts(DEFAULT_CONFIG, config)
@@ -306,14 +306,14 @@ if __name__ == "__main__":
 
         analysis = tune.run(config["trainer"],
                         config=config["trainer_config"],
-                        stop={"training_iteration":100}, #EarlyStop(),
+                        stop={"training_iteration":80}, #EarlyStop(),
                         resources_per_trial={
                            "cpu": 12,
                            "gpu": 1.0
                         },
                         num_samples=1,
                         checkpoint_at_end=True,
-                        local_dir=config['summaries_dir']+"/log_exp/",
+                        local_dir=config['summaries_dir']+"/predictions/",
                         loggers=None,
                         name=config_name,
                         checkpoint_freq=100000)

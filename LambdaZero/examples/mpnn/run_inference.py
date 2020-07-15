@@ -4,6 +4,7 @@ import os.path as osp
 import torch as th
 import torch.nn.functional as F
 from torch.utils.data import Subset
+import ray
 
 from LambdaZero.utils import get_external_dirs
 import LambdaZero.inputs
