@@ -124,7 +124,7 @@ DEFAULT_CONFIG = {
     "summaries_dir": summaries_dir,
     "memory": 10 * 10 ** 9,
 
-    "stop": {"training_iteration": 200},
+    "stop": {"training_iteration": 100},
     "resources_per_trial": {
         "cpu": 4,  # fixme - calling ray.remote would request resources outside of tune allocation
         "gpu": 1.0
@@ -132,8 +132,8 @@ DEFAULT_CONFIG = {
     "keep_checkpoint_num": 2,
     "checkpoint_score_attr":"train_loss",
     "num_samples":1,
-    "checkpoint_at_end": False,
-    #"checkpoint_freq": 1,
+    "checkpoint_at_end": True,
+    "checkpoint_freq": 100000,
 }
 
 
@@ -150,4 +150,5 @@ if __name__ == "__main__":
                         num_samples=config["num_samples"],
                         checkpoint_at_end=config["checkpoint_at_end"],
                         local_dir=summaries_dir,
+                        name=config_name,
                         checkpoint_freq=config["checkpoint_freq"])

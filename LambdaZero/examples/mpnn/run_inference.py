@@ -20,7 +20,7 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 config = {
     "trainer_config": {
-        "dataset_root": "/home/vbutoi/scratch/zinc_data",
+        "dataset_root": "/home/mila/v/victor.butoi/scratch/zinc_data",
         "targets": ["gridscore"],
         "target_norms": [[-26.3, 12.3]],
         "file_names": ["zinc15_full_2", "zinc15_full_46", "zinc15_full_13",
@@ -44,8 +44,7 @@ ray.init()
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 model = LambdaZero.models.MPNNet()
-model.load_state_dict(th.load('/home/vbutoi/LambdaZero/summaries/predictions/vanilla_mpnn_L2/'
-                              'BasicRegressor_85ff6e04_0_2020-07-14_00-14-34rwsgu2d5/checkpoint_80/model.pth'))
+model.load_state_dict(th.load('/home/mila/v/victor.butoi/scratch/old_summaries/vanilla_mpnn/BasicRegressor_85ff6e04_0_2020-07-14_00-14-34rwsgu2d5/checkpoint_80/model.pth'))
 model.to(device)
 model.eval()
 
@@ -121,14 +120,14 @@ plt.title("Predictions vs Real")
 plt.xlabel("Real Energies")
 plt.ylabel("Predictions")
 plt.scatter(real_energies, predictions)
-plt.savefig("/home/vbutoi/LambdaZero/summaries/predictions/vanilla_mpnn_L2/pred_fig_1.png")
+plt.savefig("/home/mila/v/victor.butoi/scratch/old_summaries/vanilla_mpnn/pred_vs_real.png")
 
 plt.title("Regret Over Time")
 plt.xlabel("Num Mols Seen")
 plt.ylabel("MSE Regret")
 plt.plot(num_mol_seen, regrets, label="mae regret")
 plt.plot(num_mol_seen, med_regrets, label="median regret")
-plt.savefig("/home/vbutoi/LambdaZero/summaries/predictions/vanilla_mpnn_L2/pred_fig_1.png")
+plt.savefig("/home/mila/v/victor.butoi/scratch/old_summaries/vanilla_mpnn/regret_over_time.png")
 
 """
     num_mol_seen += bsize
