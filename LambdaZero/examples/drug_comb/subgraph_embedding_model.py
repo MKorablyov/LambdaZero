@@ -15,32 +15,26 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         self.conv1 = GCNConv(config["in_channels"], config["embed_channels"])
         self.conv2 = GCNConv(config["embed_channels"], config["embed_channels"])
 
-        self.prediction_type = config['prediction_type']
-        if not self.prediction_type in ['dot_product', 'mlp']:
-            raise ValueError('prediction_type must be one of \'dot_product\' or \'mlp\'')
+        self.conv_dropout = torch.nn.Dropout(config['conv_dropout_rate'])
+        self.linear_dropout = torch.nn.Dropout(config['linear_dropout_rate'])
 
-        # The input to the regressor will be the concatenation of two graph
-        # embeddings, so take the in channels here to be 2 times the embedding size
-        self.cell_line_to_regressor = {}
-        if self.prediction_type == 'mlp': 
+        if config['prediction_type'] == 'mlp':
+            self.shared_lin_lyr = torch.nn.Linear(2 * config["embed_channels"],
+                                                  config["regressor_hidden_channels"])
+
+            # The input to the regressor will be the concatenation of two graph
+            # embeddings, so take the in channels here to be 2 times the embedding size
             self.cell_line_to_regressor = {
-                cell_line: torch.nn.Sequential(
-                    torch.nn.Linear(2 * config["embed_channels"], config["regressor_hidden_channels"]),
-                    torch.nn.ReLU(),
-                    torch.nn.Linear(config["regressor_hidden_channels"], config["out_channels"])
-                )
+                torch.nn.Linear(config["regressor_hidden_channels"], config["out_channels"])
                 for cell_line in range(config["num_cell_lines"])
             }
 
-        if config['weight_initialization_type'] == 'xavier':
-            lin_layers = [
-                lyr
-                for regressor in self.cell_line_to_regressor.values()
-                for lyr in regressor.modules() if isinstance(lyr, torch.nn.Linear)
-            ]
+        final_predictors = {
+            'mlp': self._pred_mlp,
+            'dot_product': self._pred_dot_product,
+        }
 
-            for layer in [self.conv1, self.conv2] + lin_layers:
-                torch.nn.init.xavier_uniform_(layer.weight)
+        self._predict_with_edge_embeds = final_predictors[config['prediction_type']]
 
     def to(self, device):
         new_model = super().to(device)
@@ -52,13 +46,16 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
 
     def forward(self, drug_drug_batch, subgraph_batch, edge_cell_lines):
         x = subgraph_batch.x
-        for conv in [self.conv1, self.conv2]:
-            x = conv(x, subgraph_batch.edge_index)
-            x = F.relu(x)
+        x = F.relu(self.conv1(x, subgraph_batch.edge_index))
+        x = self.conv_dropout(x)
+        x = F.relu(self.conv2(x, subgraph_batch.edge_index))
 
         node_embeds = x
         graph_embeds = scatter_mean(node_embeds, subgraph_batch.batch, dim=0)
 
+        return self._pred_with_graph_embeds(graph_embeds, drug_drug_batch, edge_cell_lines)
+
+    def _pred_with_graph_embeds(self, graph_embeds, drug_drug_batch, edge_cell_lines):
         # Quantize drug drug batch so indices match graph_embeds
         drug_bins = np.unique(drug_drug_batch.cpu().flatten()) + 1
         drug_drug_batch = torch.from_numpy(np.digitize(drug_drug_batch.cpu(), drug_bins))
@@ -66,22 +63,30 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         from_drug_embeds = graph_embeds[drug_drug_batch[0,:]]
         to_drug_embeds = graph_embeds[drug_drug_batch[1,:]]
 
-        preds = None
-        if self.prediction_type == 'mlp':
-            concatenated_embed_pairs = torch.cat((from_drug_embeds, to_drug_embeds), dim=1)
+        return self._predict_with_edge_embeds(from_drug_embeds, to_drug_embeds, edge_cell_lines)
 
-            cell_line_to_idx = defaultdict(list)
-            for i, cell_line in enumerate(edge_cell_lines):
-                cell_line_to_idx[cell_line.item()].append(i)
-
-            preds = torch.empty((drug_drug_batch.shape[1], self.out_channels),
-                                device=concatenated_embed_pairs.device)
-            for cell_line, cell_line_idxs in cell_line_to_idx.items():
-                regressor = self.cell_line_to_regressor[cell_line]
-                preds[cell_line_idxs] = regressor(concatenated_embed_pairs[cell_line_idxs])
-
+    def _pred_mlp(self, from_drug_embeds, to_drug_embeds, edge_cell_lines):
+        x = None
+        if bool(random.getrandbits(1)):
+            x = torch.cat((from_drug_embeds, to_drug_embeds), dim=1)
         else:
-            preds = torch.sum(from_drug_embeds * to_drug_embeds, dim=1)
+            x = torch.cat((to_drug_embeds, from_drug_embeds), dim=1)
+
+        x = self.shared_lin_lyr(x)
+        x = self.linear_dropout(x)
+
+        cell_line_to_idx = defaultdict(list)
+        for i, cell_line in enumerate(edge_cell_lines):
+            cell_line_to_idx[cell_line.item()].append(i)
+
+        preds = torch.empty((drug_drug_batch.shape[1], self.out_channels),
+                            device=concatenated_embed_pairs.device)
+        for cell_line, cell_line_idxs in cell_line_to_idx.items():
+            regressor = self.cell_line_to_regressor[cell_line]
+            preds[cell_line_idxs] = regressor(x[cell_line_idxs])
 
         return preds
+
+    def _pred_dot_product(self, from_drug_embeds, to_drug_embeds, edge_cell_lines):
+        return torch.sum(from_drug_embeds * to_drug_embeds, dim=1)
 
