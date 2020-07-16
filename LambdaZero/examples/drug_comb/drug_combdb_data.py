@@ -94,7 +94,7 @@ def _build_subgraph(parent_graph, drug_idx_to_split, drug):
     subgraph_edge_index = n_idx[subgraph_edge_index]
     return Data(x=ftrs, edge_index=torch.tensor(subgraph_edge_index, dtype=torch.long))
 
-def subgraph_protein_features_to_embedding(embedding_size):
+def subgraph_protein_features_to_embedding(embedding_size, device):
     def _subgraph_protein_features_to_embedding(data):
         if not hasattr(data, 'drug_idx_to_graph'):
             raise RuntimeError(
@@ -103,8 +103,11 @@ def subgraph_protein_features_to_embedding(embedding_size):
             )
 
         for drug, subgraph in data.drug_idx_to_graph.items():
-            embedding = torch.nn.Embedding(x.shape[0], embedding_size)
-            subgraph.x = embedding[torch.arange(subgraph.x.shape[0])]
+            data.drug_idx_to_graph[drug].x = torch.rand((subgraph.x.shape[0], embedding_size), 
+                                                        requires_grad=True, dtype=torch.float,
+                                                        device=device)
+
+        return data
 
     return _subgraph_protein_features_to_embedding
 
@@ -122,6 +125,7 @@ def use_score_type_as_target(score_type):
 
     def _use_score_type_as_target(data):
         data.y = data.y[:, score_idx]
+        return data
 
     return _use_score_type_as_target
 

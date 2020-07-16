@@ -15,20 +15,22 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         self.conv1 = GCNConv(config["in_channels"], config["embed_channels"])
         self.conv2 = GCNConv(config["embed_channels"], config["embed_channels"])
 
-        # The input to the regressor will be the concatenation of two graph
-        # embeddings, so take the in channels here to be 2 times the embedding size
-        self.cell_line_to_regressor = {
-            cell_line: torch.nn.Sequential(
-                torch.nn.Linear(2 * config["embed_channels"], config["regressor_hidden_channels"]),
-                torch.nn.ReLU(),
-                torch.nn.Linear(config["regressor_hidden_channels"], config["out_channels"])
-            )
-            for cell_line in range(config["num_cell_lines"])
-        }
-
         self.prediction_type = config['prediction_type']
         if not self.prediction_type in ['dot_product', 'mlp']:
             raise ValueError('prediction_type must be one of \'dot_product\' or \'mlp\'')
+
+        # The input to the regressor will be the concatenation of two graph
+        # embeddings, so take the in channels here to be 2 times the embedding size
+        self.cell_line_to_regressor = {}
+        if self.prediction_type == 'mlp': 
+            self.cell_line_to_regressor = {
+                cell_line: torch.nn.Sequential(
+                    torch.nn.Linear(2 * config["embed_channels"], config["regressor_hidden_channels"]),
+                    torch.nn.ReLU(),
+                    torch.nn.Linear(config["regressor_hidden_channels"], config["out_channels"])
+                )
+                for cell_line in range(config["num_cell_lines"])
+            }
 
         if config['weight_initialization_type'] == 'xavier':
             lin_layers = [
@@ -54,20 +56,12 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
             x = conv(x, subgraph_batch.edge_index)
             x = F.relu(x)
 
-        # drug_protein_graph has drug -> protein and protein -> drug edges, but for
-        # graph averaging we only want the proteins for the drug -> protein edges.
-        # Since the first half of edges in drug_protein_graph are drug -> protein
-        # edges by construction, we take the first half here priorr to calling scatter_mean.
-        num_dpi_edges = drug_protein_graph.edge_index.shape[1] // 2
-        averaging_index = drug_protein_graph.edge_index[:, :num_dpi_edges]
-        averaging_index = torch.sort(averaging_index, dim=0)[0]
-
         node_embeds = x
         graph_embeds = scatter_mean(node_embeds, subgraph_batch.batch, dim=0)
 
         # Quantize drug drug batch so indices match graph_embeds
         drug_bins = np.unique(drug_drug_batch.cpu().flatten()) + 1
-        drug_drug_batch_qtzd = torch.from_numpy(np.digitize(drug_drug_batch, drug_bins))
+        drug_drug_batch = torch.from_numpy(np.digitize(drug_drug_batch.cpu(), drug_bins))
 
         from_drug_embeds = graph_embeds[drug_drug_batch[0,:]]
         to_drug_embeds = graph_embeds[drug_drug_batch[1,:]]
@@ -87,7 +81,7 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
                 preds[cell_line_idxs] = regressor(concatenated_embed_pairs[cell_line_idxs])
 
         else:
-            preds = torch.dot(from_drug_embeds, to_drug_embeds)
+            preds = torch.sum(from_drug_embeds * to_drug_embeds, dim=1)
 
         return preds
 

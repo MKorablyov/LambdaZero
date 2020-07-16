@@ -1,4 +1,4 @@
-from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs
+from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs, subgraph_protein_features_to_embedding, use_score_type_as_target
 from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Batch
@@ -44,9 +44,10 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         drug_drug_index, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
-        batch_drugs = np.unique(drug_drug_index.flatten())
-        subgraph_data_list = [dataset[0].drug_idx_to_graph[drug] for drug in batch_drugs]
+        batch_drugs = np.unique(drug_drug_index.flatten().cpu())
+        subgraph_data_list = [ddi_graph.drug_idx_to_graph[drug] for drug in batch_drugs]
         subgraph_batch = Batch.from_data_list(subgraph_data_list)
+        subgraph_batch.batch = subgraph_batch.batch.to(device)
 
         preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
@@ -57,11 +58,11 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         metrics["loss"] += loss.item()
         metrics["mse"] += loss.item()
         metrics["mae"] += F.l1_loss(y, preds).item()
-
+    
         num_batches += 1
         global num_iters
         num_iters += 1
-        if num_iters % 20 == 0:
+        if num_iters % 40 == 0:
             print('Train MSE: %f' % loss.item())
 
     metrics["loss"] = metrics["loss"] / num_batches
@@ -82,7 +83,12 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
         drug_drug_index, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
-        preds = model(drug_drug_index, ddi_graph.drug_protein_graph, edge_classes)
+        batch_drugs = np.unique(drug_drug_index.flatten().cpu())
+        subgraph_data_list = [ddi_graph.drug_idx_to_graph[drug] for drug in batch_drugs]
+        subgraph_batch = Batch.from_data_list(subgraph_data_list).to(device)
+        subgraph_batch.batch = subgraph_batch.batch.to(device)
+
+        preds = model(drug_drug_index, subgraph_batch, edge_classes)
         loss = F.mse_loss(y, preds)
 
         num_batches += 1
@@ -103,27 +109,33 @@ class SubgraphRegressor(tune.Trainable):
 
         transform = None
         if config['use_one_hot'] == True:
-            transform = use_score_type_as_target('ZIP')
+            transform = use_score_type_as_target(config['score_type'])
         else:
             transform = Compose([
-                subgraph_features_to_embedding(config['protein_embedding_size']),
-                use_score_type_as_target('ZIP'),
+                subgraph_protein_features_to_embedding(config['protein_embedding_size'], self.device),
+                use_score_type_as_target(config['score_type']),
             ])
 
         dataset = DrugCombDb(transform=transform, pre_transform=config["pre_transform"])
         self.ddi_graph = dataset[0].to(self.device)
-        self.ddi_graph.drug_protein_graph = self.ddi_graph.drug_protein_graph.to(self.device)
+        for drug, subgraph in self.ddi_graph.drug_idx_to_graph.items():
+            self.ddi_graph.drug_idx_to_graph[drug] = subgraph.to(self.device)
 
         self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.ddi_graph.edge_index.shape[1],
                                                                       config["test_set_prop"],
                                                                       config["val_set_prop"])
 
-        config["in_channels"] = self.ddi_graph.x.shape[1]
-        config["out_channels"] = self.ddi_graph.y.shape[1]
+        config["in_channels"] = self.ddi_graph.x.shape[1] if config['use_one_hot'] else config["protein_embedding_size"]
+        config["out_channels"] = self.ddi_graph.y.shape[1] if len(self.ddi_graph.y.shape) > 1 else 1
         config["num_cell_lines"] = len(torch.unique(self.ddi_graph.edge_classes))
 
         self.model = SubgraphEmbeddingRegressorModel(config).to(self.device)
-        self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
+
+        to_optimize = list(self.model.parameters())
+        if config['use_one_hot'] == False:
+            to_optimize += [subgraph.x for subgraph in self.ddi_graph.drug_idx_to_graph.values()]
+
+        self.optim = torch.optim.Adam(to_optimize, lr=config["lr"])
 
         self.train_epoch = config["train_epoch"]
         self.eval_epoch = config["eval_epoch"]
@@ -150,25 +162,27 @@ config = {
     "trainer": SubgraphRegressor,
     "trainer_config": {
         "transform": None,
-        "pre_transform": to_bipartite_drug_protein_graph,
+        "pre_transform": to_drug_induced_subgraphs,
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
-        "prediction_type": "mlp", #tune.grid_search(["dot_product", "mlp"]),
-        "lr": 3e-4,#tune.grid_search([1e-4, 3e-4, 1e-3]),
+        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
+        "lr": tune.grid_search([1e-4, 5e-4]),
         "use_one_hot": False,#tune.grid_search([True, False]),
-        "protein_embedding_size": 256,
+        "score_type": tune.grid_search(['zip', 'loewe', 'hsa', 'bliss']),
+        "weight_initialization_type": "torch_base",
+        "protein_embedding_size": 128,
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
-        "embed_channels": 256,
+        "embed_channels": 128,
         "regressor_hidden_channels": 64,
         "num_epochs": 256,
-        "batch_size": 128,
+        "batch_size": 16,
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
-    "stop": {"training_iteration": 1024},
-    "checkpoint_at_end": False,
+    "stop": {"training_iteration": 50},
+    "checkpoint_at_end": True,
     "resources_per_trial": {"gpu": 1},
     "name": None
 }
@@ -181,7 +195,7 @@ if __name__ == "__main__":
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
 
-    config["name"] = "FullDataThreePossLRsSmaller"
+    config["name"] = "FullDataTwoLRsTwoExtractorsAllScoreTypes"
     analysis = tune.run(
         config["trainer"],
         name=config["name"],
