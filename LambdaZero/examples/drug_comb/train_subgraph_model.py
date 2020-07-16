@@ -33,7 +33,8 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
 
     loader = DataLoader(subgraph_dataset,
                         batch_size=config["batch_size"],
-                        pin_memory=device == 'cpu')
+                        pin_memory=device == 'cpu',
+                        shuffle=True)
     model.train()
 
     num_batches = 0
