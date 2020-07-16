@@ -2,7 +2,7 @@ from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from unrar import rarfile
+# from unrar import rarfile
 import numpy as np
 import pandas as pd
 import torch

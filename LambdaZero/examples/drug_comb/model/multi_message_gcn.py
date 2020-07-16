@@ -56,6 +56,8 @@ class GiantGraphMPNN(torch.nn.Module):
     def __init__(self, config):
         super(GiantGraphMPNN, self).__init__()
 
+        self.device = config["device"]
+
         self.conv1 = MultiMessageGraphConv(config["in_channels"], 16)
         self.conv2 = MultiMessageGraphConv(16, 16)
 
@@ -75,13 +77,13 @@ class GiantGraphMPNN(torch.nn.Module):
     def loss(self, output, drug_drug_batch, number_of_drugs):
         # Keep only relevant predictions
         mask = torch.sparse.FloatTensor(drug_drug_batch[0].T,
-                                        torch.ones(drug_drug_batch[0].shape[0]),
-                                        torch.Size([number_of_drugs, number_of_drugs])).to_dense()
+                                        torch.ones(drug_drug_batch[0].shape[0]).to(self.device),
+                                        torch.Size([number_of_drugs, number_of_drugs])).to_dense().to(self.device)
 
         # Using Zip scores for now
         scores = torch.sparse.FloatTensor(drug_drug_batch[0].T,
                                           drug_drug_batch[2][:, 3],
-                                          torch.Size([number_of_drugs, number_of_drugs])).to_dense()
+                                          torch.Size([number_of_drugs, number_of_drugs])).to_dense().to(self.device)
 
         output *= mask
 

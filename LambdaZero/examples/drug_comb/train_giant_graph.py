@@ -28,7 +28,7 @@ def train_epoch(data, loader, model, optim):
         optim.step()
 
         epoch_loss += loss.item()
-        print('batch train loss: {:.4f}'.format(loss.item()))
+        # print('batch train loss: {:.4f}'.format(loss.item()))
 
     print('Mean train loss: {:.4f}'.format(epoch_loss / num_batches))
 
@@ -49,7 +49,7 @@ def eval_epoch(data, loader, model):
 
             loss = model.loss(out, drug_drug_batch, data.number_of_drugs)
             epoch_loss += loss.item()
-            print('batch valid loss: {:.4f}'.format(loss.item()))
+            # print('batch valid loss: {:.4f}'.format(loss.item()))
 
     print('Mean valid loss: {:.4f}'.format(epoch_loss / num_batches))
 
@@ -99,6 +99,7 @@ class GiantGraphTrainer(tune.Trainable):
         config["in_channels"] = self.data.x.shape[1]
         config["out_channels"] = self.data.y.shape[1]
         config["num_cell_lines"] = len(torch.unique(ddi_edge_classes))
+        config["device"] = self.device
 
         # Initialize model and optimizer
         self.model = GiantGraphMPNN(config).to(self.device)
