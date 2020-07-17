@@ -4,9 +4,6 @@ import os.path as osp
 import torch
 import torch.nn.functional as F
 
-from torch_geometric.utils import remove_self_loops
-import torch_geometric.transforms as T
-
 import ray
 from ray import tune
 from ray.rllib.utils import merge_dicts
