@@ -77,9 +77,9 @@ DEFAULT_CONFIG = {
     },
 
     "reward_config": {
-        "binding_model": osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth"),
+        # "binding_model": osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth"),
         "qed_cutoff": [0.2, 0.7],
-        "synth_cutoff": [0, 4],
+        # "synth_cutoff": [0, 4],
         "synth_config": synth_config,
         "soft_stop": True,
         "exp": None,
@@ -111,7 +111,6 @@ DEFAULT_CONFIG = {
 
 class BlockMolEnv_v3:
     mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems"]
-
     def __init__(self, config=None):
         warnings.warn("BlockMolEnv_v3 is deprecated for BlockMolEnv_v4")
 
