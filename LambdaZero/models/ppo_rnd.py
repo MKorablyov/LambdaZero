@@ -84,7 +84,7 @@ class PPORNDLoss:
             def reduce_mean_valid(t):
                 return torch.mean(t)
 
-        advantages = 0.75 * advantages_ext + 0.25 * advantages_int
+        advantages = 1 * advantages_ext + 1e-4 * advantages_int
 
         prev_dist = dist_class(prev_logits, model)
         # Make loss functions.
@@ -114,7 +114,7 @@ class PPORNDLoss:
             vf_int_clipped = vf_preds + torch.clamp(int_value_fn - vf_int_preds,
                                                 -vf_clip_param, vf_clip_param)
             vf_int_loss2 = torch.pow(vf_int_clipped - value_int_targets, 2.0)
-            vf_int_loss = torch.max(vf_int_loss1, vf_int_loss2)
+            vf_int_loss = 1e-7 * torch.max(vf_int_loss1, vf_int_loss2)
             
             self.mean_vf_loss = reduce_mean_valid(vf_loss)
             self.mean_vf_int_loss = reduce_mean_valid(vf_int_loss)
@@ -192,7 +192,6 @@ def ppo_rnd_surrogate_loss(policy, model, dist_class, train_batch):
         b_coeff = torch.tensor([1.0, - policy.config['gamma'] * policy.config['lambda']]).to(delta_t[:-1].device)
         train_batch["int_adv"] = lfilter(delta_t, a_coeff, b_coeff)
         train_batch["vf_int_target"] = (train_batch["int_adv"] + train_batch["vf_int_pred"])
-
 
     else:
         int_rewards_plus_v = np.concatenate(

@@ -12,17 +12,16 @@ from torch_geometric.nn import Set2Set
 from torch_geometric.data import Data, Batch
 import torch.nn.functional as F
 
+from LambdaZero.utils import RunningMeanStd
+
 # import torch and torch.nn using ray utils
 torch, nn = try_import_torch()
-
 
 def convert_to_tensor(arr):
     tensor = torch.from_numpy(np.asarray(arr))
     if tensor.dtype == torch.double:
         tensor = tensor.float()
     return tensor
-
-
 
 
 class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
@@ -35,12 +34,33 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         self.max_branches = action_space.max_branches
         self.num_blocks = action_space.num_blocks
 
+        self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
+        self.rnd = (self.rnd_weight != 0)
+        rnd_output_dim = model_config['custom_model_config'].get("rnd_output_dim", 1)
+
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
                                        kw.get('num_hidden', 64),
-                                       self.num_blocks)
-
+                                       self.num_blocks,
+                                       self.rnd)
         self._value_out = None
+        if self.rnd: 
+            self._value_int = None
+            self.rnd_target = RND_MPNNet(self.space.num_node_feat,
+                                        32,
+                                        self.num_blocks,
+                                        rnd_output_dim)
+            self.rnd_predictor = RND_MPNNet(self.space.num_node_feat,
+                                        32,
+                                        self.num_blocks,
+                                        rnd_output_dim)
+            
+            self.rnd_obs_stats = RunningMeanStd(shape=(self.space.num_node_feat))
+            self.rnd_rew_stats = RunningMeanStd(shape=())
+            # Freeze target network
+            self.rnd_target.eval()
+            for param in self.rnd_target.parameters():
+                param.requires_grad = False
 
     def forward(self, input_dict, state, seq_lens):
         obs = input_dict['obs']
@@ -79,12 +99,16 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         masked_actions = (1. - action_mask).to(torch.bool)
         actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
 
-
         self._value_out = scalar_outs[:, 0]
+        if self.rnd:
+            self._value_int = scalar_outs[:, 2]
         return actor_logits, state
 
     def value_function(self):
         return self._value_out
+
+    def int_value_function(self):
+        return self._value_int
 
     def compute_priors_and_value(self, obs):
         raise NotImplementedError()
@@ -102,6 +126,33 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
             value = value.cpu().numpy()
             return priors, value
 
+    def compute_intrinsic_rewards(self, train_batch):
+        obs_ = restore_original_dimensions(train_batch['obs'], self.obs_space, "torch")
+        device = obs_["mol_graph"].device
+
+        enc_graphs = obs_["mol_graph"].data.cpu().numpy().astype(np.uint8)
+        graphs = [self.space.unpack(i) for i in enc_graphs]
+
+        data = fast_from_data_list(graphs)
+        data = data.to(device)
+
+        obs_mean = torch.as_tensor(self.rnd_obs_stats.mean, dtype=torch.float32, device=device)
+        obs_var = torch.as_tensor(self.rnd_obs_stats.var, dtype=torch.float32, device=device)
+        data.x = ((data.x - obs_mean) / (torch.sqrt(obs_var))).clamp(-1, 1)
+
+        target_reward = self.rnd_target(data)
+        predictor_reward = self.rnd_predictor(data)
+        rnd_loss_ = ((target_reward - predictor_reward) ** 2).sum(1).mean(0)
+        
+        rew_mean = torch.as_tensor(self.rnd_rew_stats.mean, dtype=torch.float32, device=rnd_loss_.device)
+        rew_var = torch.as_tensor(self.rnd_rew_stats.var, dtype=torch.float32, device=rnd_loss_.device)
+        rnd_loss = (rnd_loss_ - rew_mean) / (torch.sqrt(rew_var))
+        
+        self.rnd_obs_stats.update(data.x.clone().detach().cpu().numpy())
+        self.rnd_rew_stats.update(rnd_loss_.clone().detach().cpu().numpy())
+
+        return rnd_loss
+
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
         torch.save(self.model.state_dict(), checkpoint_path)
@@ -113,7 +164,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
 class MPNNet_Parametric(nn.Module):
 
-    def __init__(self, num_feat=14, dim=64, num_out_per_stem=105):
+    def __init__(self, num_feat=14, dim=64, num_out_per_stem=105, rnd=False):
         super().__init__()
         self.lin0 = nn.Linear(num_feat, dim)
         self.num_ops = num_out_per_stem
@@ -128,8 +179,12 @@ class MPNNet_Parametric(nn.Module):
             nn.Linear(dim, dim), nn.LeakyReLU(), nn.Linear(dim, 1))
 
         self.set2set = Set2Set(dim, processing_steps=1)
-        # 2 = [v, simulate logit]
-        self.lin_out = nn.Linear(dim * 2, 2)
+        if rnd:
+            # 3 = [v, simulate logit, v_int]
+            self.lin_out = nn.Linear(dim * 2, 3)
+        else:
+            # 2 = [v, simulate logit]
+            self.lin_out = nn.Linear(dim * 2, 2)
 
     def forward(self, data):
         out = F.leaky_relu(self.lin0(data.x))
@@ -149,7 +204,31 @@ class MPNNet_Parametric(nn.Module):
         out = self.lin_out(out)
         return out, data
 
+class RND_MPNNet(nn.Module):
+    def __init__(self, num_feat=14, dim=64, num_out_per_stem=105, output_dim=16):
+        super().__init__()
+        self.lin0 = nn.Linear(num_feat, dim)
+        self.num_ops = num_out_per_stem
 
+        net = nn.Sequential(nn.Linear(4, dim), nn.LeakyReLU(), nn.Linear(dim, dim * dim))
+        self.conv = NNConv(dim, dim, net, aggr='mean')
+        self.gru = nn.GRU(dim, dim)
+
+        self.set2set = Set2Set(dim, processing_steps=1)
+        self.lin_out = nn.Linear(dim * 2, output_dim)
+
+    def forward(self, data):
+        out = F.leaky_relu(self.lin0(data.x))
+        h = out.unsqueeze(0)
+
+        for i in range(6):
+            m = F.leaky_relu(self.conv(out, data.edge_index, data.edge_attr))
+            out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
+            out = out.squeeze(0)
+
+        out = self.set2set(out, data.batch)
+        out = self.lin_out(out)
+        return out
 
 
 # This is mostly copied from torch_geometric, but with a few checks
