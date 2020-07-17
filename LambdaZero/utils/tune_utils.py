@@ -27,14 +27,26 @@ class BasicRegressor(tune.Trainable):
         if config['use_sampler']:
             train_dataset = dataset[torch.tensor(train_idxs)]
 
-            energies = torch.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=torch.float64)
+            if config['use_tail']:
+                energies = torch.tensor([-graph.gridscore.item() for graph in train_dataset], dtype=torch.float64)
+            else:
+                energies = torch.tensor([-graph.gridscore.item() if -graph.gridscore.item() < 63 else 0 for graph in
+                                         train_dataset], dtype=torch.float64)
 
             energies = energies + energies.min()
 
-            energies = energies.pow(config['pow'])
+            if config["mode"] == "pow":
+                energies = energies.pow(config['pow'])
+            else:
+                energies = energies.log()
 
             energies_prob = energies / energies.sum()
             sampler = torch.utils.data.sampler.WeightedRandomSampler(energies_prob, len(train_dataset))
+
+        else:
+            if not config['use_tail']:
+                train_idxs = train_idxs[-dataset[torch.tensor(train_idxs)].gridscore<63]
+
 
         if sampler == None:
             self.train_set = DL(Subset(dataset, train_idxs.tolist()), shuffle=True, batch_size=config["b_size"])
