@@ -98,12 +98,12 @@ DEFAULT_CONFIG = {
     "trainer_config": {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/sars-cov-2/raw/randsplit_Zinc15_260k.npy"),
         "b_size": 64,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
-            "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
+            "root": os.path.join(datasets_dir, "brutal_dock/sars-cov-2"),
             "props": ["gridscore"],
             "transform": transform,
             "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
@@ -138,7 +138,6 @@ DEFAULT_CONFIG = {
 
 
 config = merge_dicts(DEFAULT_CONFIG, config)
-
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])

@@ -22,6 +22,8 @@ class BasicRegressor(tune.Trainable):
 
         sampler = None
 
+        train_idxs = train_idxs[:-1]
+
         if config['use_sampler']:
             train_dataset = dataset[torch.tensor(train_idxs)]
 
@@ -34,8 +36,11 @@ class BasicRegressor(tune.Trainable):
             energies_prob = energies / energies.sum()
             sampler = torch.utils.data.sampler.WeightedRandomSampler(energies_prob, len(train_dataset))
 
+        if sampler == None:
+            self.train_set = DL(Subset(dataset, train_idxs.tolist()), shuffle=True, batch_size=config["b_size"])
+        else:
+            self.train_set = DL(Subset(dataset, train_idxs.tolist()), batch_size=config["b_size"], samp=sampler)
 
-        self.train_set = DL(Subset(dataset, train_idxs.tolist()), shuffle=True, batch_size=config["b_size"], sampl=sampler)
         self.val_set = DL(Subset(dataset, val_idxs.tolist()), batch_size=config["b_size"])
         self.test_set = DL(Subset(dataset, test_idxs.tolist()), batch_size=config["b_size"])
 

@@ -3,7 +3,11 @@ from LambdaZero.utils import get_external_dirs
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
-mpnn000 = {}
+mpnn000 = {
+        "trainer_config":{
+            "use_sampler":False
+        }
+}
 
 mpnn001 = {
         "trainer_config": {
