@@ -3,6 +3,7 @@ from copy import deepcopy
 import os
 import os.path as osp
 from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnvGraph_v1
+from LambdaZero.environments.persistent_search import BlockMolGraphEnv_PersistentBuffer
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v3, PredDockReward_v2
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
@@ -50,6 +51,31 @@ ppo_graph_001 = {
         "framework": "torch",
     },
     "checkpoint_freq": 25,
+}
+
+ppo001_buf = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "buffer_size": 100_000,
 }
 
 ppo_rnd_001 = {
