@@ -42,15 +42,42 @@ ppo_graph_001 = {
             "custom_options":{
                 "num_hidden": 64, # does a **kw to __init__
                 "rnd_weight": 1,
-                "rnd_output_dim": 16
+                "rnd_output_dim": 32
             }
         },
-        "lr": 5e-5,
+        "lr": 5e-4,
         #"entropy_coeff": 1e-5,
         "framework": "torch",
     },
     "checkpoint_freq": 25,
 }
+
+ppo_graph_002 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+                "rnd_weight": 1,
+                "rnd_output_dim": 16
+            }
+        },
+        "lr": 5e-4,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "checkpoint_freq": 25,
+}
+
 
 ppo_rnd_001 = {
     # 3.2-3.3
