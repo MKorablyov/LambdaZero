@@ -139,7 +139,6 @@ class MCDropRegressor(BasicRegressor):
         # todo allow ray native stopping
         scores = []
 
-
         for i in range(75):
             scores.append(self._train())
             print(scores[-1]["eval_mae"], scores[-1]["train_mae"])
@@ -166,6 +165,7 @@ class MCDropRegressor(BasicRegressor):
         for bidx, data in enumerate(loader):
             data = data.to(self.device)
             logits = self.model(data, do_dropout=True)
+            # fixme - keep dropout same for the dataset
             epoch_logits.append(logits.detach().cpu().numpy())
         epoch_logits = np.concatenate(epoch_logits, 0)
         return epoch_logits
