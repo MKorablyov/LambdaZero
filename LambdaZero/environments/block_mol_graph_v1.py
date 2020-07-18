@@ -23,6 +23,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 DEFAULT_CONFIG = dict(block_mol_v3_config)
 DEFAULT_CONFIG.update({
     "obs_config": {'one_hot_atom': True},
+    "threshold": 0.7
 })
 
 
