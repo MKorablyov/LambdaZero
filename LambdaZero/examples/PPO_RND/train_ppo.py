@@ -24,15 +24,9 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-<<<<<<< HEAD
-        "num_workers": 8,
-        "num_gpus_per_worker": 0.075,
-        "num_gpus": 3,
-=======
         "num_workers": 7,
         "num_gpus_per_worker": 0.075,
-        "num_gpus": 2,
->>>>>>> 9fd8f6187a8cd58e1178bed34742321bc8c9d65f
+        "num_gpus": 3,
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
         },
