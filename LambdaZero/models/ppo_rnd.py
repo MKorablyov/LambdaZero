@@ -44,7 +44,8 @@ class PPORNDLoss:
                  clip_param=0.1,
                  vf_clip_param=0.1,
                  vf_loss_coeff=1.0,
-                 rnd_weight=1.0,
+                 rnd_adv_weight=1.0,
+                 rnd_vf_loss_weight=1.0,
                  use_gae=True):
         """Constructs the loss for Proximal Policy Objective.
         Arguments:
@@ -84,7 +85,7 @@ class PPORNDLoss:
             def reduce_mean_valid(t):
                 return torch.mean(t)
 
-        advantages = 1 * advantages_ext + 1e-4 * advantages_int
+        advantages = advantages_ext + rnd_adv_weight * advantages_int
 
         prev_dist = dist_class(prev_logits, model)
         # Make loss functions.
@@ -114,7 +115,7 @@ class PPORNDLoss:
             vf_int_clipped = vf_preds + torch.clamp(int_value_fn - vf_int_preds,
                                                 -vf_clip_param, vf_clip_param)
             vf_int_loss2 = torch.pow(vf_int_clipped - value_int_targets, 2.0)
-            vf_int_loss = 1e-7 * torch.max(vf_int_loss1, vf_int_loss2)
+            vf_int_loss = rnd_vf_loss_weight * torch.max(vf_int_loss1, vf_int_loss2)
             
             self.mean_vf_loss = reduce_mean_valid(vf_loss)
             self.mean_vf_int_loss = reduce_mean_valid(vf_int_loss)
@@ -233,7 +234,8 @@ def ppo_rnd_surrogate_loss(policy, model, dist_class, train_batch):
         clip_param=policy.config["clip_param"],
         vf_clip_param=policy.config["vf_clip_param"],
         vf_loss_coeff=policy.config["vf_loss_coeff"],
-        rnd_weight=model.rnd_weight,
+        rnd_adv_weight=model.rnd_adv_weight,
+        rnd_vf_loss_weight=model.rnd_vf_loss_weight,
         use_gae=policy.config["use_gae"],
     )
 

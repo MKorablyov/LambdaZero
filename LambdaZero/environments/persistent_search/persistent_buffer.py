@@ -40,12 +40,13 @@ class BlocksData:
 
 class PersistentSearchBuffer:
     def __init__(self, config):
-        self.mols = [(BlockMoleculeData(), -0.5, 0, None, 0)]
+        self.mols = [(BlockMoleculeData(), -0.5, None, 0)]
         self.blocksd = BlocksData(config)
         self.max_size = config['max_size']
         self.prune_factor = config.get('prune_factor', 0.25)
         self.sumtree = SumTree(self.max_size)
         self.temperature = config.get('temperature', 2)
+        self.threshold = config.get('threshold', 0.7)
         self.smiles = set()
         self.mol_fps = []
 
@@ -57,6 +58,8 @@ class PersistentSearchBuffer:
                 return True
             return False
         else:
+            if len(self.mol_fps) == 0:
+                return False
             mol_fp = mol
             fp_buff = np.asarray(self.mol_fps)
             dist = np.sum(np.abs(fp_buff - mol_fp[None, :]), axis=1)
@@ -68,11 +71,13 @@ class PersistentSearchBuffer:
         if len(self.mols) >= self.max_size:
             self.prune()
         mol.blocks = [self.blocksd.block_mols[i] for i in mol.blockidxs]
+        if self.contains(mol_fp, self.threshold):
+            return
         smi = Chem.MolToSmiles(mol.mol)
         mol.blocks = None
-        if smi in self.smiles:
-            return
-        self.mols.append((mol, mol_info['reward'], mol_info['qed'], smi, mol_fp))
+        # if smi in self.smiles:
+        #     return
+        self.mols.append((mol, mol_info['reward'], smi, mol_fp))
         self.sumtree.set(len(self.mols)-1, np.exp(mol_info['reward'] / self.temperature))
         self.smiles.add(smi)
         self.mol_fps.append(mol_fp)
@@ -90,8 +95,8 @@ class PersistentSearchBuffer:
         for i, j in enumerate(new_mols_idx):
             new_mols.append(self.mols[j])
             new_sum_tree.set(i, self.mols[j][1])
-            new_smiles.add(self.mols[j][3])
-            new_mol_fps.append(self.mols[j][4])
+            new_smiles.add(self.mols[j][2])
+            new_mol_fps.append(self.mols[j][3])
         self.sumtree = new_sum_tree
         self.smiles = new_smiles
         self.mol_fps = new_mol_fps
@@ -266,6 +271,6 @@ class BlockMolGraphEnv_PersistentBuffer(BlockMolEnvGraph_v1):
         info = {"molecule": smiles, "log_vals": log_vals}
         done = any((simulate, done))
         if self.penalize_repeat and reward != 0:
-            if ray.get(self.searchbuf.contains.remote(self.molMDP.molecule, self.threshold)):
+            if ray.get(self.searchbuf.contains.remote(self.get_fps(self.molMDP.molecule)[0], self.threshold)):
                 reward = 0 # exploration penalty
         return obs, reward, done, info

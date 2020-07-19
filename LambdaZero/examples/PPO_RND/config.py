@@ -27,33 +27,7 @@ ppo000 = {
     }
 }
 
-ppo_graph_001 = {
-    "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v3,
-            "reward_config": {
-                "synth_config": synth_config,
-                "dockscore_config": binding_config,
-            }
-        },
-        "model": {
-            "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{
-                "num_hidden": 64, # does a **kw to __init__
-                "rnd_weight": 1,
-                "rnd_output_dim": 32
-            }
-        },
-        "lr": 5e-4,
-        #"entropy_coeff": 1e-5,
-        "framework": "torch",
-    },
-    "checkpoint_freq": 25,
-}
-
-ppo_graph_002 = {
+ppo_graph_rnd_001 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {
@@ -72,14 +46,124 @@ ppo_graph_002 = {
                 "rnd_output_dim": 16
             }
         },
-        "lr": 5e-4,
+        "lr": 5e-5,
         #"entropy_coeff": 1e-5,
         "framework": "torch",
     },
-    "checkpoint_freq": 25,
+    "checkpoint_freq": 50,
 }
 
-ppo001_buf = {
+ppo_graph_rnd_002 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+                "rnd_weight": 1,
+                "rnd_output_dim": 16,
+                "rnd_adv_weight": 0.5,
+                "rnd_vf_loss_weight": 0.5,
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "checkpoint_freq": 50,
+}
+
+ppo_graph_rnd_003 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+                "rnd_weight": 1,
+                "rnd_output_dim": 16,
+                "rnd_adv_weight": 0.1,
+                "rnd_vf_loss_weight": 0.1,
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "checkpoint_freq": 50,
+}
+
+ppo_graph_rnd_004 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+                "rnd_weight": 1,
+                "rnd_output_dim": 32,
+                "rnd_adv_weight": 0.5,
+                "rnd_vf_loss_weight": 0.5,
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "checkpoint_freq": 50,
+}
+
+ppo_graph_rnd_005 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+                "rnd_weight": 1,
+                "rnd_output_dim": 32
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "checkpoint_freq": 50,
+}
+
+ppo001_graph_buf = {
     # 3.2-3.3
     "rllib_config":{
         "env": BlockMolGraphEnv_PersistentBuffer,
@@ -103,6 +187,137 @@ ppo001_buf = {
     },
     "buffer_size": 100_000,
 }
+
+ppo002_graph_buf = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 0.9
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+            }
+        },
+        "lr": 5e-5,
+        # "entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "buffer_size": 100_000,
+}
+
+ppo003_graph_buf = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 0.8
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "buffer_size": 100_000,
+}
+
+ppo004_graph_buf = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 0.6
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "buffer_size": 100_000,
+}
+
+ppo005_graph_buf = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 0.5
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "buffer_size": 100_000,
+}
+
+ppo006_graph_buf = {
+    # 3.2-3.3
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 1.0
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{
+                "num_hidden": 64, # does a **kw to __init__
+            }
+        },
+        "lr": 5e-5,
+        #"entropy_coeff": 1e-5,
+        "framework": "torch",
+    },
+    "buffer_size": 100_000,
+}
+
 
 ppo_rnd_001 = {
     # 3.2-3.3

@@ -37,6 +37,8 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
         self.rnd = (self.rnd_weight != 0)
         rnd_output_dim = model_config['custom_model_config'].get("rnd_output_dim", 1)
+        self.rnd_adv_weight = model_config['custom_model_config'].get("rnd_adv_weight", 1.0)
+        self.rnd_vf_loss_weight = model_config['custom_model_config'].get("rnd_vf_loss_weight", 1.0)
 
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
