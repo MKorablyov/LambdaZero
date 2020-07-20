@@ -1,52 +1,68 @@
+import os,sys, time
+import os.path as osp
+import numpy as np
+import pandas as pd
+
+import LambdaZero.inputs
+import LambdaZero.utils
+
+from LambdaZero.chem import *
 from rdkit import Chem
-from rdkit.Chem import AllChem
-from rdkit.Chem import Descriptors
+
+import time
 from scipy.cluster.vq import kmeans2
-# read smiles
-# make fingerprints
-# make k-means
 
-    # dataset = LambdaZero.inputs.BrutalDock(config["dataset_root"],
-    #                                        props=config["molprops"],
-    #                                        transform=config["transform"],
-    #                                        file_names=config["file_names"])
-    #
-    # print(random_split(len(dataset), config["probs"]))
-    #
-    # print(dataset)
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
-# class cfg:
-#     db_path = "/home/maksym/Datasets/brutal_dock/d4/raw"
-#     docked_index = "dock_blocks105_walk40_2.feather"
-#     docked_index_clust = "dock_blocks105_walk40_2_clust.feather"
-    #docked_index = "d4_0k_mine.parquet"
-    #docked_index_clust = "dock_blocks105_walk40_clust.feather"
+DEFAULT_CONFIG = {
+    "dataset_root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
+    "file_names": ["Zinc15_260k_0",  "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+    "split_name": "ksplit_Zinc15_260k",
+    "probs": [0.8, 0.1, 0.1],
+}
+config = DEFAULT_CONFIG
 
+def get_fingerprint(mol):
+    fp = AllChem.GetMorganFingerprint(mol)
+    return fp
 
-# take smiles
-# make fingerprints
-# split fingerprints based on Kmeans
+f = config["file_names"]
+data = [pd.read_feather(osp.join(config["dataset_root"], "raw", f + ".feather")) for f in config["file_names"]]
+data = pd.concat(data, axis=0)
 
-# k_means
+fps = []
+num_broken = 0
 
+for m in data['smi']:
+    mol = Chem.MolFromSmiles(m)
+    mf = get_fp(mol,1024,[2])
+    fps.append(mf)
 
-# if __name__ == "__main__":
-#     # compute embeddings
-#     docked_idx = pd.read_feather(os.path.join(cfg.db_path, cfg.docked_index))
-#     #args, outs, errs = mtr.run(chem.get_fingerprint, docked_idx, cols={"smiles": "smi"}, debug=True, tabular=True)
-#     #docked_idx = pd.merge(args, outs, left_index=True, right_index=True)
-#     fingerprints = np.stack(docked_idx["fingerprint"].to_list(), 0)
-#
-#     # compute knn
-#     start = time.time()
-#     _, klabel = kmeans2(fingerprints, k=200)
-#     klabel = pd.DataFrame({"klabel": klabel})
-#     docked_idx = pd.merge(docked_idx, klabel, left_index=True, right_index=True)
-#     docked_idx = docked_idx.drop(columns=["fingerprint"]) # drop heavy to save fingerprint
-#
-#     # docked_idx = docked_idx.rename(columns={"smi":"smiles"})
-#     docked_idx.to_feather(os.path.join(cfg.db_path, cfg.docked_index_clust))
-#     docked_idx = pd.read_feather(os.path.join(cfg.db_path, cfg.docked_index_clust))
-#     print(docked_idx)
-#    #print(docked_idx[0])
+fps = np.stack(fps,axis=0)
+
+_, klabel = kmeans2(fps, k=20)
+#print(klabel)
+train_set, val_set, test_set = [],[],[]
+for i in range(20):
+    idx = np.where(klabel==i)[0]
+    measure = np.random.uniform()
+    if measure < 0.1:
+        test_set.append(idx)
+    elif 0.1 <= measure < 0.3:
+        val_set.append(idx)
+    else:
+        train_set.append(idx)
+
+train_set = np.array(np.concatenate(train_set))
+val_set = np.array(np.concatenate(val_set))
+test_set = np.array(np.concatenate(test_set))
+
+splits = [train_set, val_set, test_set]
+
+print(len(train_set))
+print(len(val_set))
+print(len(test_set))
+
+split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
+np.save(split_path, splits)
