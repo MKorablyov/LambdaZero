@@ -272,7 +272,7 @@ if __name__ == "__main__":
     ax.vlines(original_angle_in_degrees, *ylims, color="r", label="original angle")
 
     ax.set_xlabel("angle (degrees)")
-    ax.set_ylabel("energy (units?)")
+    ax.set_ylabel("energy (kcal/mol)")
     ax.set_xlim(0, 360)
     ax.legend(loc=0)
     plt.show()
