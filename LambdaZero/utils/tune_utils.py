@@ -5,9 +5,6 @@ from torch_geometric.data import DataLoader
 from torch.utils.data import Subset
 
 from ray import tune
-
-import sys
-sys.path.append("/home/nova/LambdaZero/LambdaZero/utils")
 from custom_dataloader import DL
 
 class BasicRegressor(tune.Trainable):
