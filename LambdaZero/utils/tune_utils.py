@@ -38,15 +38,10 @@ class BasicRegressor(tune.Trainable):
             if config["mode"] == "pow":
                 energies = energies.pow(config['pow'])
             else:
-                energies = energies.log()
+                energies = torch.where(energies > 0, energies.log(), energies)
 
             energies_prob = energies / energies.sum()
             sampler = torch.utils.data.sampler.WeightedRandomSampler(energies_prob, len(train_dataset))
-
-        else:
-            if not config['use_tail']:
-                train_idxs = train_idxs[-dataset[torch.tensor(train_idxs)].gridscore<63]
-
 
         if sampler == None:
             self.train_set = DL(Subset(dataset, train_idxs.tolist()), shuffle=True, batch_size=config["b_size"])

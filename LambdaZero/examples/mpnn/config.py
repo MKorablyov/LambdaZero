@@ -281,3 +281,12 @@ mpnn005_NT_L1 = {
             }
 }
 
+mpnn020 = {
+                "trainer_config":{
+                                "use_sampler":True,
+                                "use_tail":True,
+                                "mode":"pow",
+                                "loss": "L2",
+                                "pow":20
+                }
+}
