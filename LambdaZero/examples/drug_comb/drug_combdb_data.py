@@ -128,13 +128,15 @@ def to_bipartite_drug_protein_graph(data_list):
     return new_data_list
 
 class DrugCombDb(InMemoryDataset):
-    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4):
+    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4, scores = ['ZIP', 'Bliss', 'Loewe', 'HSA']):
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
-
+        
         self._drug_protein_link_holder = None
         self._protein_protein_interactions_holder = None
 
+        self.scores = scores
+        
         datasets_dir, _, _ = get_external_dirs()
         super().__init__(datasets_dir + '/DrugCombDb/', transform, pre_transform)
 
@@ -303,7 +305,7 @@ class DrugCombDb(InMemoryDataset):
         drug_drug_edges = drug_drug_edges.drop_duplicates(['idx_Drug1', 'idx_Drug2', 'Cell line'])
 
         # Remove edges with invalid scores
-        scores = drug_drug_edges[['ZIP', 'Bliss', 'Loewe', 'HSA']]
+        scores = drug_drug_edges[self.scores]
         bad_scores_arr = ((scores.notna()) & (-100 <= scores) & (scores <= 100)).all(axis=1)
         drug_drug_edges = drug_drug_edges[bad_scores_arr]
 
@@ -313,7 +315,7 @@ class DrugCombDb(InMemoryDataset):
         ddi_edge_classes = ddi_edge_classes.to_numpy()
 
         ddi_edge_idxs = drug_drug_edges[['idx_Drug1', 'idx_Drug2']].to_numpy().T
-        ddi_edge_attr = drug_drug_edges[['ZIP', 'Bliss', 'Loewe', 'HSA']].to_numpy()
+        ddi_edge_attr = drug_drug_edges[self.scores].to_numpy()
 
         return ddi_edge_idxs, ddi_edge_attr, ddi_edge_classes
 
