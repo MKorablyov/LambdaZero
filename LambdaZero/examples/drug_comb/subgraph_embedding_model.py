@@ -6,6 +6,7 @@ from collections import defaultdict
 import torch.nn.functional as F
 import numpy as np
 import torch
+import random
 
 class SubgraphEmbeddingRegressorModel(torch.nn.Module):
     def __init__(self, config):
@@ -25,7 +26,7 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
             # The input to the regressor will be the concatenation of two graph
             # embeddings, so take the in channels here to be 2 times the embedding size
             self.cell_line_to_regressor = {
-                torch.nn.Linear(config["regressor_hidden_channels"], config["out_channels"])
+                cell_line: torch.nn.Linear(config["regressor_hidden_channels"], config["out_channels"])
                 for cell_line in range(config["num_cell_lines"])
             }
 
@@ -39,13 +40,19 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
     def to(self, device):
         new_model = super().to(device)
 
-        for cell_line, regressor in new_model.cell_line_to_regressor.items():
-            new_model.cell_line_to_regressor[cell_line] = regressor.to(device)
+        import pdb; pdb.set_trace()
+        if hasattr(new_model, 'cell_line_to_regressor'):
+            for cell_line, regressor in new_model.cell_line_to_regressor.items():
+                new_model.cell_line_to_regressor[cell_line] = regressor.to(device)
 
         return new_model
 
     def forward(self, drug_drug_batch, subgraph_batch, edge_cell_lines):
         x = subgraph_batch.x
+        print('x shape: %r, edge shape: %r' % (x.shape, subgraph_batch.edge_index.shape))
+        if x.shape[0] > 24750:
+            import pdb; pdb.set_trace()
+
         x = F.relu(self.conv1(x, subgraph_batch.edge_index))
         x = self.conv_dropout(x)
         x = F.relu(self.conv2(x, subgraph_batch.edge_index))
@@ -79,8 +86,8 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         for i, cell_line in enumerate(edge_cell_lines):
             cell_line_to_idx[cell_line.item()].append(i)
 
-        preds = torch.empty((drug_drug_batch.shape[1], self.out_channels),
-                            device=concatenated_embed_pairs.device)
+        preds = torch.empty((from_drug_embeds.shape[1], self.out_channels),
+                            device=from_drug_embeds.device)
         for cell_line, cell_line_idxs in cell_line_to_idx.items():
             regressor = self.cell_line_to_regressor[cell_line]
             preds[cell_line_idxs] = regressor(x[cell_line_idxs])

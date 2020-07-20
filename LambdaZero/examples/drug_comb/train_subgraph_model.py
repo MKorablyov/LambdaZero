@@ -166,18 +166,20 @@ config = {
         "pre_transform": to_drug_induced_subgraphs,
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
-        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
-        "lr": tune.grid_search([1e-4, 5e-4]),
+        "prediction_type": "mlp",#tune.grid_search(["dot_product", "mlp"]),
+        "lr": 5e-4,#tune.grid_search([1e-4, 5e-4]),
         "use_one_hot": False,#tune.grid_search([True, False]),
-        "score_type": tune.grid_search(['zip', 'loewe', 'hsa', 'bliss']),
+        "score_type": 'zip',#tune.grid_search(['zip', 'loewe', 'hsa', 'bliss']),
         "weight_initialization_type": "torch_base",
-        "protein_embedding_size": 128,
+        "protein_embedding_size": 256,
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
-        "embed_channels": 128,
+        "embed_channels": 256,
         "regressor_hidden_channels": 64,
         "num_epochs": 256,
-        "batch_size": 16,
+        "batch_size": 128,
+        "conv_dropout_rate": 0.1,
+        "linear_dropout_rate": 0.5,
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
@@ -191,7 +193,7 @@ config = {
 if __name__ == "__main__":
     ray.init()
 
-    time_to_sleep = 30
+    time_to_sleep = 5
     print("Sleeping for %d seconds" % time_to_sleep)
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
