@@ -15,7 +15,7 @@ import LambdaZero.utils
 from LambdaZero.examples.PPO import config
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo001"
+else: config_name = "ppo_mpro_v001"
 config = getattr(config,config_name)
 
 _, _, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -34,7 +34,7 @@ DEFAULT_CONFIG = {
     "memory": 60 * 10 ** 9,
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
-    "stop":{"training_iteration": 2000000},
+    "stop": {"training_iteration": 2000000},
 }
 
 config = merge_dicts(DEFAULT_CONFIG, config)
@@ -46,6 +46,8 @@ if machine == "Ikarus":
     config["rllib_config"]["memory"] = 25 * 10**9
 
 if __name__ == "__main__":
+
+
     ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
