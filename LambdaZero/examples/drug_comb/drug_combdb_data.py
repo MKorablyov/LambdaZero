@@ -47,37 +47,38 @@ def to_drug_induced_subgraphs(data_list):
         unique_drugs = np.unique(np.hstack([ddi_edge_idx.flatten(), re_index[0,:]]))
 
         # Create a new graph for each drug...
-        drug_graphs = [_build_subgraph(data, drug_idx_to_split, drug) for drug in unique_drugs]
+        drug_graphs = [_build_subgraph(data, drug_idx_to_split, drug, len(unique_drugs)) for drug in unique_drugs]
+
+        drug_idx_to_graph = {unique_drugs[i]: drug_graph for i, drug_graph in enumerate(drug_graphs)}
+        drug_drug_index = data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
+        drug_indexer = _get_drug_indexer(drug_drug_index, drug_idx_to_graph)
 
         # Create one graph object whose edges are simply the ddi edges, but augment
         # the graph object with the attribute drug_idx_to_graph which maps a drug
         # to its subgraph which can subsequently be used to compute a subgraph embedding.
         super_graph = Data(
             x=data.x[:len(unique_drugs)],
-            edge_index=data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
-            y=data.y[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
+            edge_index=drug_drug_index[:, drug_indexer],
+            y=data.y[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]][drug_indexer],
         )
 
-        super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
-        super_graph.drug_idx_to_graph = {unique_drugs[i]: drug_graph for i, drug_graph in enumerate(drug_graphs)}
+        super_graph.protein_ftrs = data.x[len(unique_drugs):]
+        super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]][drug_indexer]
+        super_graph.drug_idx_to_graph = drug_idx_to_graph
 
         new_data_list.append(super_graph)
 
     return new_data_list
 
-def _build_subgraph(parent_graph, drug_idx_to_split, drug):
+def _build_subgraph(parent_graph, drug_idx_to_split, drug, num_drug_nodes):
     if drug not in drug_idx_to_split:
-        return Data(x=parent_graph.x[drug].reshape(1, -1),
-                    edge_index=torch.tensor([], dtype=torch.long))
+        return Data(edge_index=torch.tensor([], dtype=torch.long))
 
     drug_subgraph_idx = drug_idx_to_split[drug]
     nodes_in_subgraph = np.unique(drug_subgraph_idx)
 
     n_mask = np.zeros(parent_graph.num_nodes, dtype=np.bool_)
     n_mask[nodes_in_subgraph] = 1
-
-    n_idx = np.zeros(parent_graph.num_nodes, dtype=np.int64)
-    n_idx[nodes_in_subgraph] = np.arange(nodes_in_subgraph.shape[0])
 
     mask = n_mask[parent_graph.edge_index[0]] & n_mask[parent_graph.edge_index[1]]
     subgraph_edge_index = parent_graph.edge_index[:, mask]
@@ -88,11 +89,34 @@ def _build_subgraph(parent_graph, drug_idx_to_split, drug):
     edges_without_drug = ~(subgraph_edge_index.T == drug).any(-1)
     subgraph_edge_index = subgraph_edge_index[:,edges_without_drug]
 
-    ftrs = parent_graph.x[nodes_in_subgraph]
+    # Make edge index relative to a 0-indexed protein feature matrix
+    subgraph_edge_index -= num_drug_nodes
 
-    # re-index so that the index starts at 0 (and matches the indexing of ftrs)
-    subgraph_edge_index = n_idx[subgraph_edge_index]
-    return Data(x=ftrs, edge_index=torch.tensor(subgraph_edge_index, dtype=torch.long))
+    # Maintain the protein nodes here as well
+    subgraph = Data(edge_index=torch.tensor(subgraph_edge_index, dtype=torch.long))
+    subgraph.nodes = torch.unique(subgraph.edge_index.flatten())
+
+    return subgraph
+
+def _get_drug_indexer(drug_drug_index, drug_idx_to_graph):
+    drugs_without_target = torch.tensor([
+        drug for drug, graph in drug_idx_to_graph.items() if len(graph.edge_index) == 0
+    ])
+
+    # Tried to figure out how to do this vectorized, the below _almost_ works
+    #
+    # (drug_drug_index[:, None].T == drugs_without_targets.T).all(-1).any(-1)
+    #
+    # But it only finds self loops it seems.  There's only 65k drug edges so a one-time
+    # loop isn't too bad.  Just doing this to save time on account of this.
+    bad_drug_indices = torch.zeros(drug_drug_index.shape[1]).to(torch.bool)
+    for i in range(drug_drug_index.shape[1]):
+        if drug_drug_index[0, i] in drugs_without_target or drug_drug_index[1, i] in drugs_without_target:
+            bad_drug_indices[i] = True
+
+    self_loop_indices = drug_drug_index[0] == drug_drug_index[1]
+
+    return ~torch.stack((self_loop_indices, bad_drug_indices)).any(0)
 
 def subgraph_protein_features_to_embedding(embedding_size, device):
     def _subgraph_protein_features_to_embedding(data):
@@ -102,10 +126,8 @@ def subgraph_protein_features_to_embedding(embedding_size, device):
                 'It must have this to use the transform subgraph_protein_features_to_embedding.'
             )
 
-        for drug, subgraph in data.drug_idx_to_graph.items():
-            data.drug_idx_to_graph[drug].x = torch.rand((subgraph.x.shape[0], embedding_size), 
-                                                        requires_grad=True, dtype=torch.float,
-                                                        device=device)
+        data.protein_features = torch.rand((data.protein_features.shape[0], embedding_size),
+                                           requires_grad=True, dtype=torch.float, device=device)
 
         return data
 
@@ -260,7 +282,10 @@ class DrugCombDb(InMemoryDataset):
         drug_chem_info_no_fp = pd.read_csv(drug_info_filename, encoding='ISO-8859-1')
         drug_chem_info_with_fp = self._augment_drug_info_with_fp(drug_chem_info_no_fp)
 
+        # drop drugs without fingerprint
         drug_chem_info_with_fp['has_fp'] = drug_chem_info_with_fp['fp0'].apply(lambda fp: fp != -1)
+        drug_chem_info_with_fp = drug_chem_info_with_fp[drug_chem_info_with_fp.has_fp != -1]
+
         drug_chem_info_with_fp['is_drug'] = 1
         drug_nodes = drug_chem_info_with_fp.rename(columns={'drugName': 'name'})
 

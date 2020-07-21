@@ -45,12 +45,11 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         drug_drug_index, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
-        batch_drugs = np.unique(drug_drug_index.flatten().cpu())
-        subgraph_data_list = [ddi_graph.drug_idx_to_graph[drug] for drug in batch_drugs]
-        subgraph_batch = Batch.from_data_list(subgraph_data_list)
-        subgraph_batch.batch = subgraph_batch.batch.to(device)
+        # Here, sg is shorthand for subgraph
+        sg_edge_index, sg_nodes, sg_avging_idx = get_batch_subgraph_edges(ddi_graph, drug_drug_index)
 
-        preds = model(drug_drug_index, subgraph_batch, edge_classes)
+        preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_classes,
+                      sg_edge_index, sg_nodes, sg_avging_idx)
         loss = F.mse_loss(y, preds)
 
         loss.backward()
@@ -59,7 +58,7 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         metrics["loss"] += loss.item()
         metrics["mse"] += loss.item()
         metrics["mae"] += F.l1_loss(y, preds).item()
-    
+
         num_batches += 1
         global num_iters
         num_iters += 1
@@ -84,12 +83,11 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
         drug_drug_index, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
-        batch_drugs = np.unique(drug_drug_index.flatten().cpu())
-        subgraph_data_list = [ddi_graph.drug_idx_to_graph[drug] for drug in batch_drugs]
-        subgraph_batch = Batch.from_data_list(subgraph_data_list).to(device)
-        subgraph_batch.batch = subgraph_batch.batch.to(device)
+        # Here, sg is shorthand for subgraph
+        sg_edge_index, sg_nodes, sg_avging_idx = get_batch_subgraph_edges(ddi_graph, drug_drug_index)
 
-        preds = model(drug_drug_index, subgraph_batch, edge_classes)
+        preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_classes,
+                      sg_edge_index, sg_nodes, sg_avging_idx)
         loss = F.mse_loss(y, preds)
 
         num_batches += 1
@@ -102,6 +100,23 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
     metrics["mae"] = metrics["mae"] / num_batches
     print("Eval MSE: %f" % metrics["mse"])
     return metrics
+
+def get_batch_subgraph_edges(ddi_graph, batch_drug_drug_index):
+    batch_drugs = np.unique(drug_drug_index.flatten().cpu())
+    subgraph_edge_indices = tuple([ddi_graph.drug_idx_to_graph[drug].edge_index for drug in batch_drugs])
+
+    edge_index = torch.cat(subgraph_edge_indices, dim=1)
+    edge_index = torch.unique(edge_index, dim=1, sorted=False)
+
+    subgraph_nodes = tuple([ddi_graph.drug_idx_to_graph[drug].nodes for drug in batch_drugs])
+    nodes = torch.cat(subgraph_nodes)
+
+    averaging_idx_tensors = tuple(
+        [torch.full(size=len(nodes), fill_value=i) for i, nodes in enumerate(subgraph_nodes)])
+
+    averaging_idx = torch.cat(averaging_idx_tensors)
+
+    return edge_index, nodes, averaging_idx
 
 class SubgraphRegressor(tune.Trainable):
     def _setup(self, config):
@@ -118,9 +133,7 @@ class SubgraphRegressor(tune.Trainable):
             ])
 
         dataset = DrugCombDb(transform=transform, pre_transform=config["pre_transform"])
-        self.ddi_graph = dataset[0].to(self.device)
-        for drug, subgraph in self.ddi_graph.drug_idx_to_graph.items():
-            self.ddi_graph.drug_idx_to_graph[drug] = subgraph.to(self.device)
+        self.ddi_graph = self._extract_ddi_graph(dataset)
 
         self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.ddi_graph.edge_index.shape[1],
                                                                       config["test_set_prop"],
@@ -140,6 +153,17 @@ class SubgraphRegressor(tune.Trainable):
 
         self.train_epoch = config["train_epoch"]
         self.eval_epoch = config["eval_epoch"]
+
+    def _extract_ddi_graph(self, dataset):
+        ddi_graph = dataset[0].to(self.device)
+        ddi_graph.protein_ftrs = ddi_graph.protein_ftrs.to(self.device)
+        for drug, subgraph in ddi_graph.edge_idx_to_graph.items():
+            new_subgraph = subgraph.to(self.device)
+            new_subgraph.nodes = subgraph.nodes.to(self.device)
+
+            ddi_graph.edge_idx_to_graph[drug] = new_subgraph
+
+        return ddi_graph
 
     def _train(self):
         train_scores = self.train_epoch(self.ddi_graph, self.train_idxs, self.model, self.optim, self.device, self.config)

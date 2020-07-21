@@ -47,18 +47,13 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
 
         return new_model
 
-    def forward(self, drug_drug_batch, subgraph_batch, edge_cell_lines):
-        x = subgraph_batch.x
-        print('x shape: %r, edge shape: %r' % (x.shape, subgraph_batch.edge_index.shape))
-        if x.shape[0] > 24750:
-            import pdb; pdb.set_trace()
-
-        x = F.relu(self.conv1(x, subgraph_batch.edge_index))
+    def forward(self, x, drug_drug_batch, edge_cell_lines, sg_edge_index, sg_nodes, sg_avging_idx):
+        x = F.relu(self.conv1(x, sg_edge_index))
         x = self.conv_dropout(x)
-        x = F.relu(self.conv2(x, subgraph_batch.edge_index))
+        x = F.relu(self.conv2(x, sg_edge_index))
 
-        node_embeds = x
-        graph_embeds = scatter_mean(node_embeds, subgraph_batch.batch, dim=0)
+        node_embeds = x[sg_nodes]
+        graph_embeds = scatter_mean(node_embeds, sg_avging_idx, dim=0)
 
         return self._pred_with_graph_embeds(graph_embeds, drug_drug_batch, edge_cell_lines)
 
