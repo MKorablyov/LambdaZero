@@ -36,7 +36,7 @@ def get_mmff_force_field(mol: Mol, confId: int=-1):
     return AllChem.MMFFGetMoleculeForceField(mol, properties, confId)
 
 
-def get_mmff_energy(mol_with_hydrogens: Mol):
+def get_mmff_energy(mol_with_hydrogens: Mol, conf_id: int = 0):
     properties = AllChem.MMFFGetMoleculeProperties(mol_with_hydrogens, mmffVariant='MMFF94')
-    energy = AllChem.MMFFGetMoleculeForceField(mol_with_hydrogens, properties).CalcEnergy()
+    energy = AllChem.MMFFGetMoleculeForceField(mol_with_hydrogens, properties, confId=conf_id).CalcEnergy()
     return energy
