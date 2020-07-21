@@ -3,6 +3,7 @@ from typing import List, Tuple
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem.rdchem import Mol
+from rdkit.Chem.rdmolops import SanitizeMol
 from rdkit.Geometry.rdGeometry import Point3D
 
 import numpy as np
@@ -64,7 +65,52 @@ def find_index_of_lowest_converged_energy(list_tuples_energy_converged: List[Tup
     energies = np.array([t[1] for t in list_tuples_energy_converged])
 
     masked_energies = np.ma.masked_array(energies, mask=mask)
-    lowest_energy_index = np.argmin(masked_energies)
+    lowest_energy_index = int(np.argmin(masked_energies)) # cast to int because RDKIT is PICKY.
 
     return lowest_energy_index
 
+
+def get_lowest_energy_and_mol_with_hydrogen(
+    mol: Mol, num_conf: int, max_iters: int = 500, random_seed: int = 0
+):
+    """
+    Convenience method to add hydrogens, embed num_conf versions, optimize positions and extract lowest
+    energy conformer.
+
+    Args:
+        mol (Mol): a Mol object
+        num_conf (int): number of conformers to embed
+        max_iters (int): maximum number of iterations for the optimizer to converge
+        random_seed (int): random seed for the embedding
+
+    Returns:
+        min_energy (float): lowest converged energy
+        mol_with_hydrogen (Mol):  mol object, with hydrogens and a single conformer corresponding to
+                                  the lowest energy.
+        number_of_successes (int): how many optimizations converged
+
+    """
+    mol_with_hydrogen = Mol(mol)
+    Chem.AddHs(mol_with_hydrogen)
+    SanitizeMol(mol_with_hydrogen)
+    AllChem.EmbedMultipleConfs(
+        mol_with_hydrogen, numConfs=num_conf, randomSeed=random_seed
+    )
+    list_tuples_energy_converged = AllChem.MMFFOptimizeMoleculeConfs(
+        mol_with_hydrogen, mmffVariant="MMFF94", maxIters=max_iters
+    )
+    lowest_energy_index = find_index_of_lowest_converged_energy(
+        list_tuples_energy_converged
+    )
+
+    number_of_successes = np.sum([t[0] == 0 for t in list_tuples_energy_converged])
+    if number_of_successes == 0:
+        raise ValueError("No conformation converged. Review input parameters")
+
+    min_energy = list_tuples_energy_converged[lowest_energy_index][1]
+
+    conformer_indices_to_remove = list(range(num_conf))
+    conformer_indices_to_remove.pop(lowest_energy_index)
+    _ = [mol_with_hydrogen.RemoveConformer(i) for i in conformer_indices_to_remove]
+
+    return min_energy, mol_with_hydrogen, number_of_successes
