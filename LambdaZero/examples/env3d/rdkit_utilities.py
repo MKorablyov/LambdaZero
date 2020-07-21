@@ -90,8 +90,7 @@ def get_lowest_energy_and_mol_with_hydrogen(
         number_of_successes (int): how many optimizations converged
 
     """
-    mol_with_hydrogen = Mol(mol)
-    Chem.AddHs(mol_with_hydrogen)
+    mol_with_hydrogen = Chem.AddHs(mol)
     SanitizeMol(mol_with_hydrogen)
     AllChem.EmbedMultipleConfs(
         mol_with_hydrogen, numConfs=num_conf, randomSeed=random_seed
