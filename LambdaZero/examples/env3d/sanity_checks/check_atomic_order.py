@@ -101,4 +101,4 @@ if __name__ == "__main__":
                 are_consistent
             ), "Parent and Child are not consistent! Atomic orders get scrambled!"
 
-    print(" All parents and children sampled are consistent!")
+    print("All parents and children sampled are consistent!")
