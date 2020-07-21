@@ -62,10 +62,10 @@ blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 results_dir = Path(summaries_dir).joinpath("env3d")
 
 # computation parameters
-number_of_blocks = 2
+number_of_blocks = 10
 random_seed = 12312
-list_num_conf = [1, 10]
-number_of_molecules = 5
+list_num_conf = [1, 10, 25, 50, 100, 150, 200]
+number_of_molecules = 100
 
 results_path = Path(results_dir).joinpath(
     f"num_conf_convergence/conv_{number_of_blocks}_blocks.pkl"
