@@ -40,8 +40,8 @@ def extract_lowest_energy_child(
     random_seed: int,
 ):
 
-    # limit to 10 first blocks
-    list_block_indices = np.arange(reference_molMDP.num_blocks)[:10]
+    # limit to 20 first blocks
+    list_block_indices = np.arange(reference_molMDP.num_blocks)[:20]
 
     list_min_energy = []
     list_relaxed_mol_with_hydrogen = []
@@ -178,7 +178,7 @@ output_path = results_dir.joinpath(
     f"env3d_dataset_{number_of_parent_blocks}_parent_blocks.feather"
 )
 
-num_conf = 25
+num_conf = 100
 max_iters = 200
 random_seed = 12312
 
@@ -199,9 +199,13 @@ if __name__ == "__main__":
 
         attachment_stem_idx = np.random.choice(number_of_stems)
 
-        row = get_data_row(
-            reference_molMDP, attachment_stem_idx, num_conf, max_iters, random_seed
-        )
+        try:
+            row = get_data_row(
+                reference_molMDP, attachment_stem_idx, num_conf, max_iters, random_seed
+            )
+        except:
+            print("Something went wrong. Moving on.")
+            continue
 
         byte_row = process_row_for_writing_to_feather(row)
         create_or_append_feather_file(output_path, byte_row)
