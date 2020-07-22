@@ -40,7 +40,8 @@ def extract_lowest_energy_child(
     random_seed: int,
 ):
 
-    list_block_indices = np.arange(reference_molMDP.num_blocks)
+    # limit to 10 first blocks
+    list_block_indices = np.arange(reference_molMDP.num_blocks)[:10]
 
     list_min_energy = []
     list_relaxed_mol_with_hydrogen = []
@@ -177,7 +178,7 @@ output_path = results_dir.joinpath(
     f"env3d_dataset_{number_of_parent_blocks}_parent_blocks.feather"
 )
 
-num_conf = 100
+num_conf = 25
 max_iters = 200
 random_seed = 12312
 
