@@ -40,8 +40,8 @@ def extract_lowest_energy_child(
     random_seed: int,
 ):
 
-    # limit to 20 first blocks
-    list_block_indices = np.arange(reference_molMDP.num_blocks)[:20]
+    # limit to 10 first blocks
+    list_block_indices = np.arange(reference_molMDP.num_blocks)[:10]
 
     list_min_energy = []
     list_relaxed_mol_with_hydrogen = []
