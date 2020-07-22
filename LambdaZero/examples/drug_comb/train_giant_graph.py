@@ -20,12 +20,23 @@ def train_epoch(data, loader, model, optim):
 
     for i, drug_drug_batch in enumerate(loader):
         optim.zero_grad()
-        out = model.forward(data, ppi_and_dpi_edges)
 
-        loss = model.loss(out, drug_drug_batch, data.number_of_drugs)
+        t = time.time()
+
+        out = model.forward(data, ppi_and_dpi_edges, drug_drug_batch)
+
+        print("time to forward", time.time() - t)
+        t = time.time()
+
+        loss = model.loss(out, drug_drug_batch)
+
+        print("time to compute loss", time.time() - t)
+        t = time.time()
 
         loss.backward()
         optim.step()
+
+        print("time to optimize", time.time() - t)
 
         epoch_loss += loss.item()
         # print('batch train loss: {:.4f}'.format(loss.item()))
@@ -45,9 +56,9 @@ def eval_epoch(data, loader, model):
 
     with torch.no_grad():
         for i, drug_drug_batch in enumerate(loader):
-            out = model.forward(data, ppi_and_dpi_edges)
+            out = model.forward(data, ppi_and_dpi_edges, drug_drug_batch)
 
-            loss = model.loss(out, drug_drug_batch, data.number_of_drugs)
+            loss = model.loss(out, drug_drug_batch)
             epoch_loss += loss.item()
             # print('batch valid loss: {:.4f}'.format(loss.item()))
 
@@ -129,12 +140,12 @@ class GiantGraphTrainer(tune.Trainable):
 
 if __name__ == '__main__':
 
-    ray.init()
-
-    time_to_sleep = 30
-    print("Sleeping for %d seconds" % time_to_sleep)
-    time.sleep(time_to_sleep)
-    print("Woke up.. Scheduling")
+    # ray.init()
+    #
+    # time_to_sleep = 30
+    # print("Sleeping for %d seconds" % time_to_sleep)
+    # time.sleep(time_to_sleep)
+    # print("Woke up.. Scheduling")
 
     _, _, summaries_dir = get_external_dirs()
     configuration = {
@@ -161,14 +172,17 @@ if __name__ == '__main__':
         "name": "TestGiantGraphMultiMessageNetwork"
     }
 
-    analysis = tune.run(
-        configuration["trainer"],
-        name=configuration["name"],
-        config=configuration["trainer_config"],
-        stop=configuration["stop"],
-        resources_per_trial=configuration["resources_per_trial"],
-        num_samples=1,
-        checkpoint_at_end=configuration["checkpoint_at_end"],
-        local_dir=configuration["summaries_dir"],
-        checkpoint_freq=configuration["checkpoint_freq"]
-    )
+    # analysis = tune.run(
+    #     configuration["trainer"],
+    #     name=configuration["name"],
+    #     config=configuration["trainer_config"],
+    #     stop=configuration["stop"],
+    #     resources_per_trial=configuration["resources_per_trial"],
+    #     num_samples=1,
+    #     checkpoint_at_end=configuration["checkpoint_at_end"],
+    #     local_dir=configuration["summaries_dir"],
+    #     checkpoint_freq=configuration["checkpoint_freq"]
+    # )
+
+    trainer = GiantGraphTrainer(configuration["trainer_config"])
+    trainer.train()

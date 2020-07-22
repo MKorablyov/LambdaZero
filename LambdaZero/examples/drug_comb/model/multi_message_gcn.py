@@ -3,6 +3,7 @@ from torch.nn import functional as F
 from torch.nn import Parameter
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
+import time
 
 
 class MultiMessageGraphConv(MessagePassing):
@@ -61,30 +62,41 @@ class GiantGraphMPNN(torch.nn.Module):
         self.conv1 = MultiMessageGraphConv(config["in_channels"], 16)
         self.conv2 = MultiMessageGraphConv(16, 16)
 
-        self.predictor = Parameter(torch.randn((16, 16)))
+        self.num_cell_lines = config["num_cell_lines"]
+
+        self.predictor = Parameter(1/100 * torch.randn((self.num_cell_lines, 16, 16)))
 
         self.criterion = torch.nn.MSELoss()
 
-    def forward(self, data, conv_edges):
+    def forward(self, data, conv_edges, drug_drug_batch):
+
         is_drug = data.x[:, 0]  # The first column of x indicates nodes that are drugs
 
+        ##########################################
+        # GNN forward pass
+        ##########################################
         x = self.conv1(data.x, conv_edges, is_drug)
         x = F.relu(x)
         x = self.conv2(x, conv_edges, is_drug)
 
-        return x[:data.number_of_drugs].mm(self.predictor).mm(x[:data.number_of_drugs].T)
+        ##########################################
+        # Predict score for each pair
+        ##########################################
+        batch_size = drug_drug_batch[0].shape[0]
+        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
 
-    def loss(self, output, drug_drug_batch, number_of_drugs):
-        # Keep only relevant predictions
-        mask = torch.sparse.FloatTensor(drug_drug_batch[0].T,
-                                        torch.ones(drug_drug_batch[0].shape[0]).to(self.device),
-                                        torch.Size([number_of_drugs, number_of_drugs])).to_dense().to(self.device)
+        x_drug_1s = x[drug_1s].reshape(batch_size, 1, -1)  # Trick to allow broadcasting with matmul
+        x_drug_2s = x[drug_2s].reshape(batch_size, -1, 1)  # Trick to allow broadcasting with matmul
 
-        # Using Zip scores for now
-        scores = torch.sparse.FloatTensor(drug_drug_batch[0].T,
-                                          drug_drug_batch[2][:, 3],
-                                          torch.Size([number_of_drugs, number_of_drugs])).to_dense().to(self.device)
+        batch_score_preds = x_drug_1s.matmul(self.predictor[cell_lines]).matmul(x_drug_2s)[:, 0, 0]
 
-        output *= mask
+        return batch_score_preds
 
-        return ((output - scores) ** 2).sum()
+    def loss(self, output, drug_drug_batch):
+
+        # Using HSA scores for now
+        ground_truth_scores = drug_drug_batch[2][:, 3]
+
+        return self.criterion(output, ground_truth_scores)
