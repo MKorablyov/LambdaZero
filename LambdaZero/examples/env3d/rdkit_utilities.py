@@ -9,6 +9,10 @@ from rdkit.Geometry.rdGeometry import Point3D
 import numpy as np
 
 
+def get_atomic_symbols(mol: Mol):
+    return [a.GetSymbol() for a in mol.GetAtoms()]
+
+
 def get_atomic_masses(mol: Mol):
     return np.array([a.GetMass() for a in mol.GetAtoms()])
 
