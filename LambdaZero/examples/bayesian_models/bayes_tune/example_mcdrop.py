@@ -15,6 +15,8 @@ import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
 from LambdaZero.examples.mpnn import config
+import scipy.misc
+
 
 transform = LambdaZero.utils.Complete()
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
@@ -128,6 +130,17 @@ DEFAULT_CONFIG = {
 
 }
 
+
+def _compute_ll(samples, vals):
+    "computes log likelihood"
+    pass
+
+# todo: dropout (p= 0.01, 0.03, 0.09, 0.5)
+# todo: lengthscale (0.01, 0.03, ??? )
+# dropout_hyperparameter (drop_layers=True, drop_mlp=True)
+
+# todo: add BLL (from John's code)
+
 class MCDropRegressor(BasicRegressor):
     def __init__(self, regressor_config):
         super(BasicRegressor, self).__init__(regressor_config["config"])
@@ -143,20 +156,36 @@ class MCDropRegressor(BasicRegressor):
             scores.append(self._train())
             print(scores[-1]["eval_mae"], scores[-1]["train_mae"])
 
-            if i % 5 == 4:
+            if i % 5 == 1:
                 val_targets = [getattr(s, self.config["target"]).cpu().numpy() for s in self.val_set]
                 val_targets_norm = self.config["normalizer"].forward_transform(np.concatenate(val_targets))
 
-                mu_hat, sigma_hat = self.get_mean_and_variance(self.val_loader)
 
-                logp = LambdaZero.utils.logP(mu_hat, sigma_hat, val_targets_norm)
+                sqerr = (self.get_predict_samples(self.val_loader) - val_targets_norm[None,:])**2
+                sqerr = torch.Tensor(sqerr)
+                ll = torch.logsumexp(-.5 * sqerr,0).numpy().mean()
+                print("LL", ll)
 
-                shuffled_targets = sorted(val_targets_norm, key=lambda k: random.random())
-                shuffled_logp = LambdaZero.utils.logP(mu_hat, sigma_hat, shuffled_targets)
 
-                print("MAE", np.abs(mu_hat - val_targets_norm).mean(),
-                      "shuffled MAE", np.abs(mu_hat - shuffled_targets).mean(),
-                      "logp", logp.mean(), "shuffle logP", shuffled_logp.mean())
+                shuffled_targets = np.array(sorted(val_targets_norm, key=lambda k: random.random()))
+
+                sqerr = (self.get_predict_samples(self.val_loader) - shuffled_targets[None,:])**2
+                sqerr = torch.Tensor(sqerr)
+                ll = torch.logsumexp(-.5 * sqerr,0).numpy().mean()
+                print("shuffled LL", ll)
+
+                #print(preds.shape)
+
+                #mu_hat, sigma_hat = self.get_mean_and_variance(self.val_loader)
+
+                #logp = LambdaZero.utils.logP(mu_hat, sigma_hat, val_targets_norm)
+
+                # shuffled_targets = sorted(val_targets_norm, key=lambda k: random.random())
+                # shuffled_logp = LambdaZero.utils.logP(mu_hat, sigma_hat, shuffled_targets)
+                #
+                # print("MAE", np.abs(mu_hat - val_targets_norm).mean(),
+                #       "shuffled MAE", np.abs(mu_hat - shuffled_targets).mean(),
+                #       "logp", logp.mean(), "shuffle logP", shuffled_logp.mean())
 
         return scores
 
