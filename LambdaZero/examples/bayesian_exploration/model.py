@@ -21,7 +21,7 @@ class BayesianVisionNetwork(TorchModelV2, nn.Module):
     """Generic vision network."""
 
     def __init__(self, obs_space, action_space, num_outputs, model_config,
-                 name):
+                 name, **kw):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs,
                               model_config, name)
         nn.Module.__init__(self)
@@ -61,9 +61,17 @@ class BayesianVisionNetwork(TorchModelV2, nn.Module):
                 None,
                 activation_fn=activation))
         self._convs = nn.Sequential(*layers)
+        self.rnd_weight = kw.get("rnd_weight", 0)
+        self.rnd = (self.rnd_weight != 0)
+        rnd_output_dim = kw.get("rnd_output_dim", 1)
+        self.rnd_adv_weight = kw.get("rnd_adv_weight", 1.0)
+        self.rnd_vf_loss_weight = kw.get("rnd_vf_loss_weight", 1.0)
 
-        self.rnd_weight = model_config['custom_model_options'].get("rnd_weight", 0)
-        rnd_output_dim = model_config['custom_model_options'].get("rnd_output_dim", 1)
+        # self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
+        # self.rnd = (self.rnd_weight != 0)
+        # rnd_output_dim = model_config['custom_model_config'].get("rnd_output_dim", 1)
+        # self.rnd_adv_weight = model_config['custom_model_config'].get("rnd_adv_weight", 1.0)
+        # self.rnd_vf_loss_weight = model_config['custom_model_config'].get("rnd_vf_loss_weight", 1.0)
 
         self._logits = SlimFC(
             out_channels, num_outputs, initializer=nn.init.xavier_uniform_)
@@ -72,7 +80,7 @@ class BayesianVisionNetwork(TorchModelV2, nn.Module):
         # Holds the current "base" output (before logits layer).
         self._features = None
 
-        if self.rnd_weight > 0:
+        if self.rnd:
             target_layers = []
             (w, h, in_channels) = obs_space.shape
             in_size = [w, h]
@@ -135,6 +143,11 @@ class BayesianVisionNetwork(TorchModelV2, nn.Module):
                 out_channels, rnd_output_dim, initializer=normc_initializer()))
             self.rnd_pred = nn.Sequential(*pred_layers)
 
+            for m in self.modules():
+                if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+                    init.orthogonal_(m.weight, np.sqrt(2))
+                    m.bias.data.zero_()
+
             for param in self.rnd_target.parameters():
                 param.requires_grad = False
 
@@ -159,21 +172,22 @@ class BayesianVisionNetwork(TorchModelV2, nn.Module):
         return self._value_int(self._features).squeeze(1)
 
     def compute_intrinsic_rewards(self, train_batch):
-        obs_ = train_batch['obs']
+        obs_ = train_batch['new_obs']
+        self.rnd_obs_stats.update(obs_.clone().detach().cpu().numpy())
+        # import pdb; pdb.set_trace();
         obs_mean = torch.as_tensor(self.rnd_obs_stats.mean, dtype=torch.float32, device=train_batch['obs'].device)
         obs_var = torch.as_tensor(self.rnd_obs_stats.var, dtype=torch.float32, device=train_batch['obs'].device)
         obs = ((obs_ - obs_mean) / (torch.sqrt(obs_var))).clamp(-5, 5)
+        
         target_reward = self.rnd_target(obs.permute(0, 3, 1, 2))
         predictor_reward = self.rnd_pred(obs.permute(0, 3, 1, 2))
-        rnd_loss_ = ((target_reward - predictor_reward) ** 2).sum(1).mean(0)
+        rnd_loss_ = ((target_reward - predictor_reward) ** 2).sum(1) / 2
+        self.rnd_rew_stats.update(rnd_loss_.clone().detach().cpu().numpy())
         
         rew_mean = torch.as_tensor(self.rnd_rew_stats.mean, dtype=torch.float32, device=rnd_loss_.device)
         rew_var = torch.as_tensor(self.rnd_rew_stats.var, dtype=torch.float32, device=rnd_loss_.device)
         rnd_loss = (rnd_loss_ - rew_mean) / (torch.sqrt(rew_var))
         
-        self.rnd_obs_stats.update(obs_.clone().detach().cpu().numpy())
-        self.rnd_rew_stats.update(rnd_loss_.clone().detach().cpu().numpy())
-
         return rnd_loss
 
     def _hidden_layers(self, obs):

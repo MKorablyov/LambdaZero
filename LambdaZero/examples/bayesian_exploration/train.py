@@ -15,21 +15,20 @@ parser.add_argument("--num-cpus", type=int, default=0)
 if __name__ == "__main__":
     args = parser.parse_args()
     ray.init()
-    time.sleep(240) 
     tune.run(
         PPORNDTrainer,
         # stop={"training_iteration": args.stop_iters},
         config={
             "env": "MontezumaRevenge-v0",
-            "num_workers": 7,
+            "num_workers": 0,
             "num_gpus_per_worker": 0.075,
-            "num_gpus": 1,
+            "num_gpus": 0,
             "framework": "torch",
             "model": {
                 "custom_model": BayesianVisionNetwork,
-                "custom_model_options": {
+                "custom_model_config": {
                     "rnd_weight": 1,
-                    "rnd_output_dim": 256
+                    "rnd_output_dim": 512
                 }
             },
             "lambda": 0.95,
