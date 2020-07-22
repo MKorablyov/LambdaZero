@@ -1,6 +1,9 @@
 """
 The goal of this script is to manipulate the orientation of the added block and to compute the
 energy vs. angle of block.
+
+The work is somewhat incomplete, and the energy of the original molecule is inconsistent with
+the energy following a ConstrainEmbed.
 """
 import os
 from pathlib import Path
@@ -10,11 +13,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from rdkit.Chem.AllChem import ConstrainedEmbed
 from rdkit.Chem.rdchem import Mol
+from tqdm import tqdm
 
 import LambdaZero.utils
 from LambdaZero.chem import mol_from_frag, Chem
 from LambdaZero.environments.molMDP import MolMDP
-from LambdaZero.examples.env3d.check_atomic_order import MolecularConnection
 from LambdaZero.examples.env3d.geometry import (
     get_center_of_mass,
     get_inertia_tensor,
@@ -23,12 +26,12 @@ from LambdaZero.examples.env3d.geometry import (
     rotate_points_about_axis,
 )
 from LambdaZero.examples.env3d.rdkit_utilities import (
-    optimize_mol_in_place,
     get_atomic_masses,
     set_positions_on_conformer,
     get_mmff_force_field,
-    get_mmff_energy,
+    get_mmff_energy, get_lowest_energy_and_mol_with_hydrogen,
 )
+from LambdaZero.examples.env3d.sanity_checks.check_atomic_order import MolecularConnection
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
@@ -115,7 +118,7 @@ def plot_molecule_and_block_with_rotation_axis(
         child_masses, child_positions, child_anchor, n_axis
     )
 
-    color_dict = {6: "black", 7: "yellow", 8: "blue"}
+    color_dict = {1: 'white', 6: "black", 7: "yellow", 8: "blue"}
     colors = [color_dict[a.GetAtomicNum()] for a in mol.GetAtoms()]
 
     fig = plt.figure()
@@ -167,6 +170,9 @@ def plot_molecule_and_block_with_rotation_axis(
 
 number_of_blocks = 5
 number_of_iterations = 100
+num_conf = 25
+
+random_seed = 1
 
 if __name__ == "__main__":
 
@@ -191,7 +197,11 @@ if __name__ == "__main__":
         frags=molMDP.molecule.blocks[: n + 1],
         optimize=False,
     )
-    optimize_mol_in_place(mol2)
+    #optimize_mol_in_place(mol2)
+
+    min_energy, mol2, _ = get_lowest_energy_and_mol_with_hydrogen(mol2, num_conf, random_seed=random_seed)
+    mol2 = Chem.RemoveHs(mol2)
+
     anchor_indices = (mol_bond2[-1][0], mol_bond2[-1][1])
 
     fig1 = plot_molecule_and_block_with_rotation_axis(mol2, parent_size, anchor_indices)
@@ -237,7 +247,7 @@ if __name__ == "__main__":
 
     list_angles = np.linspace(0, 2.0 * np.pi, 101)
     list_energies = []
-    for angle in list_angles:
+    for angle in tqdm(list_angles):
         rotated_child_positions = rotate_points_about_axis(
             zero_angle_child_positions, child_anchor, n_axis, angle
         )
@@ -269,7 +279,9 @@ if __name__ == "__main__":
     )
 
     ylims = ax.set_ylim()
+    xlims = ax.set_xlim()
     ax.vlines(original_angle_in_degrees, *ylims, color="r", label="original angle")
+    ax.hlines(min_energy, *ylims, color="g", label="original energy")
 
     ax.set_xlabel("angle (degrees)")
     ax.set_ylabel("energy (kcal/mol)")
