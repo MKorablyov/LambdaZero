@@ -49,14 +49,14 @@ Note: we could use concatenation instead of sum between node and neighbour's mes
 ### Short term
 
 - Implementing features based on the eigenvectors of Laplacian operator.
-- Take into account the different cell types (one predictor per cell type)
+- Hyperparam tunning
 - Integrate with Active Learning
 
 ### Future directions
 
 - Use Graph Attention Networks
-- Investigate how to share knowledge between cell types
-- Use percentage of cell death as input
+- Investigate how to share knowledge between cell types in a smart way
+- Use percentage of cell deaths as input
 
 ## SubGraphs pipeline
 
