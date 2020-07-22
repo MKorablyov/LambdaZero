@@ -117,3 +117,8 @@ def get_lowest_energy_and_mol_with_hydrogen(
     _ = [mol_with_hydrogen.RemoveConformer(i) for i in conformer_indices_to_remove]
 
     return min_energy, mol_with_hydrogen, number_of_successes
+
+
+def write_conformer_to_file(filepath, mol, conf_id=0):
+    with open(filepath, 'w') as f:
+        print(Chem.MolToMolBlock(mol, confId=conf_id), file=f)
