@@ -15,7 +15,8 @@ import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
 from LambdaZero.examples.mpnn import config
-import scipy.misc
+
+from scipy.special import logsumexp
 
 
 transform = LambdaZero.utils.Complete()
@@ -47,6 +48,13 @@ def train_epoch(loader, model, optimizer, device, config):
     model.train()
     epoch_targets_norm = []
     epoch_logits = []
+
+
+    # reg = config['length_scale'] ** 2 * (1 - dropout) / (2. * N * config['tau'])
+
+
+
+
 
     for bidx,data in enumerate(loader):
         data = data.to(device)
@@ -127,19 +135,28 @@ DEFAULT_CONFIG = {
         # "checkpoint_at_end": False,
     },
     "memory": 10 * 10 ** 9
-
 }
 
-
-def _compute_ll(samples, vals):
-    "computes log likelihood"
-    pass
 
 # todo: dropout (p= 0.01, 0.03, 0.09, 0.5)
 # todo: lengthscale (0.01, 0.03, ??? )
 # dropout_hyperparameter (drop_layers=True, drop_mlp=True)
-
 # todo: add BLL (from John's code)
+
+
+
+def _log_lik(y, Yt_hat, tau=1.0):
+    "computes log likelihood"
+    ll = logsumexp(-0.5 * tau * (y[None] - Yt_hat) ** 2., 0)
+    ll -= np.log(Yt_hat.shape[0])
+    ll -= 0.5 * np.log(2 * np.pi) + 0.5 * np.log(tau)
+    return ll
+
+
+
+
+
+
 
 class MCDropRegressor(BasicRegressor):
     def __init__(self, regressor_config):
@@ -157,35 +174,17 @@ class MCDropRegressor(BasicRegressor):
             print(scores[-1]["eval_mae"], scores[-1]["train_mae"])
 
             if i % 5 == 1:
-                val_targets = [getattr(s, self.config["target"]).cpu().numpy() for s in self.val_set]
-                val_targets_norm = self.config["normalizer"].forward_transform(np.concatenate(val_targets))
+                y = [getattr(s, self.config["target"]).cpu().numpy() for s in self.val_set]
+                y_norm = self.config["normalizer"].forward_transform(np.concatenate(y))
+                Yt_hat = self.get_predict_samples(self.val_loader)
 
+                y_norm_shuff = np.array(sorted(y_norm, key=lambda k: random.random()))
 
-                sqerr = (self.get_predict_samples(self.val_loader) - val_targets_norm[None,:])**2
-                sqerr = torch.Tensor(sqerr)
-                ll = torch.logsumexp(-.5 * sqerr,0).numpy().mean()
-                print("LL", ll)
+                ll = _log_lik(y_norm, Yt_hat).mean()
+                ll_shuff = _log_lik(y_norm_shuff, Yt_hat).mean()
 
+                print("ll", ll, "ll_shuf", ll_shuff)
 
-                shuffled_targets = np.array(sorted(val_targets_norm, key=lambda k: random.random()))
-
-                sqerr = (self.get_predict_samples(self.val_loader) - shuffled_targets[None,:])**2
-                sqerr = torch.Tensor(sqerr)
-                ll = torch.logsumexp(-.5 * sqerr,0).numpy().mean()
-                print("shuffled LL", ll)
-
-                #print(preds.shape)
-
-                #mu_hat, sigma_hat = self.get_mean_and_variance(self.val_loader)
-
-                #logp = LambdaZero.utils.logP(mu_hat, sigma_hat, val_targets_norm)
-
-                # shuffled_targets = sorted(val_targets_norm, key=lambda k: random.random())
-                # shuffled_logp = LambdaZero.utils.logP(mu_hat, sigma_hat, shuffled_targets)
-                #
-                # print("MAE", np.abs(mu_hat - val_targets_norm).mean(),
-                #       "shuffled MAE", np.abs(mu_hat - shuffled_targets).mean(),
-                #       "logp", logp.mean(), "shuffle logP", shuffled_logp.mean())
 
         return scores
 
@@ -207,9 +206,13 @@ class MCDropRegressor(BasicRegressor):
 
     def get_mean_and_variance(self, data_loader):
         epoch_logits = self.get_predict_samples(data_loader)
-        mean_hat = epoch_logits.mean(axis=0)
-        var_hat = epoch_logits.var(axis=0)
-        return mean_hat, var_hat
+        raise NotImplementedError("todo")
+
+        #mean_hat = epoch_logits.mean(axis=0)
+        #var_hat = epoch_logits.var(axis=0)
+
+        # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
+        #return mean_hat, var_hat
 
 
 
