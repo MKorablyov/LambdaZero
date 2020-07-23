@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-from LambdaZero.examples.env3d.sanity_checks.analyse_energy_vs_angle import get_angles_in_degrees
+from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
 from LambdaZero.utils import get_external_dirs
 
 datasets_dir, _, summaries_dir = get_external_dirs()
