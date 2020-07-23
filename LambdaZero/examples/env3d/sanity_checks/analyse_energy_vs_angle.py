@@ -20,9 +20,8 @@ from LambdaZero.chem import mol_from_frag, Chem
 from LambdaZero.environments.molMDP import MolMDP
 from LambdaZero.examples.env3d.geometry import (
     get_center_of_mass,
-    get_inertia_tensor,
-    get_inertia_contribution,
-    rotate_points_about_axis, get_angle_between_parent_and_child, get_molecular_orientation_vector_from_inertia,
+    rotate_points_about_axis, get_angle_between_parent_and_child,
+    get_molecular_orientation_vector_from_positions_and_masses,
 )
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_atomic_masses,
@@ -38,19 +37,6 @@ blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 chimera_bin = os.path.join(programs_dir, "chimera/bin/chimera")
 
 results_dir = Path(summaries_dir).joinpath("env3d")
-
-
-def get_molecular_orientation_vector_from_positions_and_masses(
-    masses: np.array, positions: np.array, anchor_point: np.array, n_axis: np.array
-) -> np.array:
-    center_of_mass = get_center_of_mass(masses, positions)
-    relative_positions = positions - center_of_mass
-    inertia_cm = get_inertia_tensor(masses, relative_positions)
-    total_mass = np.sum(masses)
-    d = anchor_point - center_of_mass
-    inertia_d = get_inertia_contribution(total_mass, d)
-    total_inertia = inertia_cm + inertia_d
-    return get_molecular_orientation_vector_from_inertia(total_inertia, n_axis)
 
 
 def plot_molecule_and_block_with_rotation_axis(

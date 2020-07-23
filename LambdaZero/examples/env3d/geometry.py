@@ -304,3 +304,11 @@ def get_molecular_orientation_vector_from_inertia(total_inertia, n_axis):
     eigs, u_matrix = np.linalg.eigh(projected_inertia)
     orientation_vector = u_matrix[:, 2]
     return orientation_vector
+
+
+def get_molecular_orientation_vector_from_positions_and_masses(
+    masses: np.array, positions: np.array, anchor_point: np.array, n_axis: np.array
+) -> np.array:
+
+    total_inertia = get_inertia_tensor(masses, positions-anchor_point)
+    return get_molecular_orientation_vector_from_inertia(total_inertia, n_axis)

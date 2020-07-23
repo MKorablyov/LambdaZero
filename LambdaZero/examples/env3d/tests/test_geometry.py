@@ -13,6 +13,7 @@ from LambdaZero.examples.env3d.geometry import (
     rotate_points_about_axis,
     get_positions_aligned_with_parent_inertia_tensor,
     get_angle_between_parent_and_child, get_molecular_orientation_vector_from_inertia,
+    get_molecular_orientation_vector_from_positions_and_masses,
 )
 
 
@@ -301,3 +302,20 @@ def test_get_molecular_orientation_vector_from_inertia(random_eigenvalues, rando
                                                                                 rotated_axis_direction)
 
     np.testing.assert_almost_equal(expected_orientation_vector, computed_orientation_vector)
+
+
+def test_get_molecular_orientation_vector_from_positions_and_masses(normalized_parent_positions_and_masses, random_translation, random_axis_direction):
+    """
+    This is a pretty tautological test, since the same code is used to test the results.
+    The tested method is really just a "convenience" method that assembles methods that are already
+    well tested. This test, consequently, prevents a regression where the content of the method might be
+    scrambled in a refactor.
+    """
+    positions, masses = normalized_parent_positions_and_masses
+
+    total_inertia = get_inertia_tensor(masses, positions-random_translation)
+    expected_orientation = get_molecular_orientation_vector_from_inertia(total_inertia, random_axis_direction)
+
+    computed_orientation = get_molecular_orientation_vector_from_positions_and_masses(masses, positions, random_translation, random_axis_direction)
+
+    np.testing.assert_almost_equal(expected_orientation, computed_orientation)
