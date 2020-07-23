@@ -310,6 +310,35 @@ def get_molecular_perpendicular_ax_direction_from_inertia(total_inertia, n_axis)
     return orientation_vector
 
 
+def fix_orientation_vector(list_masses: np.array, list_positions: np.array, anchor_point: np.array, orientation_vector: np.array):
+    """
+    The orientation vector of a molecule is only determined up to a sign. This method
+    fixes the sign by picking the orientation in the direction of maximum mass. If
+    the molecule is symmetrical, the degeneracy cannot be lifted and the original vector is returned.
+
+    Args:
+        masses (np.array): atomic masses
+        positions (np.array): atomic positions
+        anchor_point (np.array): point left unmoved by rotation
+        orientation_vector (np.array): orientation of the ax perpendicular to the rotational axis; only defined
+                                       up to a sign.
+
+    Returns:
+        fixed_orentation_vector(np.array): orientation vector with the sign degeneracy lifted
+
+    """
+    list_mr = multiply_scalars_and_vectors(list_masses, list_positions-anchor_point)
+
+    projected_mass_distance = np.sum(np.dot(list_mr, orientation_vector))
+
+    if projected_mass_distance < 0.:
+        return -orientation_vector
+    else:
+        return orientation_vector
+
+
+
+
 def get_molecular_orientation_vector_from_positions_and_masses(
     masses: np.array, positions: np.array, anchor_point: np.array, n_axis: np.array
 ) -> np.array:

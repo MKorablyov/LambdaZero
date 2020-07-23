@@ -14,7 +14,7 @@ from LambdaZero.examples.env3d.geometry import (
     rotate_points_about_axis,
     get_positions_aligned_with_parent_inertia_tensor,
     get_angle_between_parent_and_child, get_molecular_perpendicular_ax_direction_from_inertia,
-    get_molecular_orientation_vector_from_positions_and_masses, get_n_axis_and_angle,
+    get_molecular_orientation_vector_from_positions_and_masses, get_n_axis_and_angle, fix_orientation_vector,
 )
 
 
@@ -301,6 +301,25 @@ def test_get_molecular_orientation_vector_from_inertia(random_eigenvalues, rando
                                                                                         rotated_axis_direction)
 
     np.testing.assert_almost_equal(expected_orientation_vector, computed_orientation_vector)
+
+
+@pytest.mark.parametrize("vertical_offset", [-0.1, 0.1])
+def test_fix_orientation_vector(vertical_offset):
+    np.random.seed(111)
+
+    p1 = np.array([1.0, 1.0, vertical_offset])
+    p2 = np.array([1.0, -1.0, vertical_offset])
+    p3 = np.array([-1.0, 1.0, vertical_offset])
+    p4 = np.array([-1.0, -1.0, vertical_offset])
+    positions = np.array([p1, p2, p3, p4])
+    masses = np.ones(4)
+
+    orientation_vector = np.array([0., 0., 1.])
+    anchor_point = np.array([0., 0., 0.])
+
+    expected_fixed_orientation = np.sign(vertical_offset)*orientation_vector
+    computed_fixed_orientation = fix_orientation_vector(masses, positions, anchor_point, orientation_vector)
+    np.testing.assert_array_almost_equal(computed_fixed_orientation, expected_fixed_orientation)
 
 
 def test_get_molecular_orientation_vector_from_positions_and_masses(normalized_parent_positions_and_masses, random_translation, random_axis_direction):
