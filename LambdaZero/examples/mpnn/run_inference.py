@@ -20,7 +20,7 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 config = {
     "trainer_config": {
-        "dataset_root": "/home/nova/zinc_data",
+        "dataset_root": "/home/vbutoi/scratch/zinc_data",
         "targets": "gridscore",
         "target_norm": [-43.042, 7.057],
         "file_names": ["zinc15_full_2", "zinc15_full_46", "zinc15_full_13",
@@ -46,7 +46,7 @@ ray.init()
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 model = LambdaZero.models.MPNNet()
-model.load_state_dict(th.load('/home/nova/KNN/mpnn000_L2/BasicRegressor_26b1482e_0_2020-07-21_02-05-17y98a028f/checkpoint_100/model.pth'))
+model.load_state_dict(th.load('/home/vbutoi/LambdaZero/summaries/knn_split/mpnn000_L2/BasicRegressor_26b1482e_0_2020-07-21_02-05-17y98a028f/checkpoint_100/model.pth'))
 model.to(device)
 model.eval()
 
@@ -106,10 +106,10 @@ plt.title("Num Mols Seen vs Top 15 Med Regret")
 plt.xlabel("Num Mols Seen")
 plt.ylabel("Regret")
 plt.scatter(mol_seen, top_fifteen)
-plt.savefig("/home/nova/charts/regret_over_time15.png")
+plt.savefig("/home/vbutoi/scratch/charts/regret_over_time15.png")
 
 plt.title("Num Mols Seen vs Top 50 Med Regret")
 plt.xlabel("Num Mols Seen")
 plt.ylabel("Regret")
 plt.plot(mol_seen, top_fifty)
-plt.savefig("/home/nova/charts/regret_over_time50.png")
+plt.savefig("/home/vbutoi/scratch/charts/regret_over_time50.png")
