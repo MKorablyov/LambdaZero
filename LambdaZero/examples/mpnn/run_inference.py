@@ -44,7 +44,7 @@ ray.init()
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 model = LambdaZero.models.MPNNet()
-model.load_state_dict(th.load('/home/vbutoi/LambdaZero/summaries/predictions/vanilla_mpnn_L2/BasicRegressor_85ff6e04_0_2020-07-14_00-14-34rwsgu2d5/checkpoint_80/model.pth'))
+model.load_state_dict(th.load('/home/vbutoi/LambdaZero/summaries/knn_split/mpnn000_L2/BasicRegressor_26b1482e_0_2020-07-21_02-05-17y98a028f/checkpoint_100/model.pth'))
 model.to(device)
 model.eval()
 
@@ -76,8 +76,13 @@ num_mol_seen = 0
 real_energies = []
 predictions = []
 
-for bidx, data in enumerate(loader):
+print("About to start")
+i = 0
 
+for bidx, data in enumerate(loader):
+    
+    print("Current iter: " + str(i))
+    i += 1
     data = data.to(device)
 
     with th.no_grad():
