@@ -11,6 +11,8 @@ import ray
 from ray import tune
 from ray.rllib.utils import merge_dicts
 
+from torch_geometric.nn.models import DimeNet
+
 from LambdaZero.utils import get_external_dirs, BasicRegressor
 import LambdaZero.inputs
 import LambdaZero.utils
@@ -112,8 +114,8 @@ DEFAULT_CONFIG = {
             "transform": transform,
             "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
         },
-
-        "model": LambdaZero.models.MPNNet,
+        "model": DimeNet,
+        #"model": LambdaZero.models.MPNNet,
         "model_config": {},
 
         "optimizer": torch.optim.Adam,
