@@ -45,7 +45,7 @@ for m in data['smi']:
 fps = np.stack(fps,axis=0)
 
 _, klabel = kmeans2(fps, k=20)
-#print(klabel)
+
 train_set, val_set, test_set = [],[],[]
 for i in range(20):
     idx = np.where(klabel==i)[0]
@@ -61,8 +61,15 @@ train_set = np.array(np.concatenate(train_set))
 val_set = np.array(np.concatenate(val_set))
 test_set = np.array(np.concatenate(test_set))
 
+train_set = np.sort(train_set[train_set < 259324])
+val_set = np.sort(val_set[val_set < 259324])
+test_set = np.sort(test_set[test_set < 259324])
+
 splits = [train_set, val_set, test_set]
 
+print(train_set)
+print(val_set)
+print(test_set)
 print(len(train_set))
 print(len(val_set))
 print(len(test_set))

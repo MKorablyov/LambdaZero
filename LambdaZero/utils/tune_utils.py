@@ -15,13 +15,14 @@ class BasicRegressor(tune.Trainable):
 
         # load dataset
         dataset = config["dataset"](**config["dataset_config"])
+        
 
         # split dataset
         train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
 
         sampler = None
 
-        train_idxs = train_idxs[:-1]
+        val_idxs = val_idxs[:-1]
 
         if config['use_sampler']:
             train_dataset = dataset[torch.tensor(train_idxs)]

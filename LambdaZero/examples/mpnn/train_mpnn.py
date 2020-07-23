@@ -64,6 +64,7 @@ def train_epoch(loader, model, optimizer, device, config):
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
 
+
 def eval_epoch(loader, model, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.eval()
@@ -96,14 +97,12 @@ def eval_epoch(loader, model, device, config):
     return metrics
 
 
-
-
 DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/ksplit_Zinc15_260k.npy"),
         "b_size": 64,
 
         "dataset": LambdaZero.inputs.BrutalDock,
@@ -153,6 +152,6 @@ if __name__ == "__main__":
                         resources_per_trial=config["resources_per_trial"],
                         num_samples=config["num_samples"],
                         checkpoint_at_end=config["checkpoint_at_end"],
-                        local_dir=summaries_dir,
+                        local_dir=summaries_dir+"/knn_split/",
                         name=config_name,
                         checkpoint_freq=config["checkpoint_freq"])
