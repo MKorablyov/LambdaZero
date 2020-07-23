@@ -90,8 +90,9 @@ def get_inertia_tensor(list_masses, list_relative_positions) -> np.array:
 def project_direction_out_of_tensor(tensor: np.array, direction: np.array) -> np.array:
     """
     This method projects out the direction from the tensor. That is to say that
-        - direction . projected_tensor = 0
-        - projected_tensor . tensor = 0
+    .. math::
+        direction \cdot projected_tensor  = 0
+        projected_tensor \cdot direction = 0
 
     Args:
         tensor (np.array): a 3x3 matrix
@@ -161,6 +162,8 @@ def rotate_points_about_axis(
     rotation_angle: np.float,
 ) -> np.array:
     """
+    Rotates the points in the positions array by rotation_angle about the rotation axis
+    going through fixed_point and pointing in direction n_axis.
 
     Args:
         positions (np.array): points to be rotated
@@ -192,6 +195,25 @@ def rotate_points_about_axis(
 def get_positions_aligned_with_parent_inertia_tensor(
     all_positions: np.array, all_masses: np.array, number_of_parent_atoms: int
 ) -> np.array:
+    """
+    We assume the array all_positions contain the positions of all the atoms, the
+    first number_of_parent_atoms of which belong to the "parent" molecule. A similar
+    split applies to all_masses.
+
+    This method extracts the inertia tensor of the "parent" subset of atoms and aligns
+    all the positions to be centered on the parent center of mass and to be aligned with
+    the principal axes of the inertia tensor.
+
+    Args:
+        all_positions (np.array): 3D positions of all the atoms
+        all_masses (np.array): masses of all the atoms
+        number_of_parent_atoms (int): number of parent atoms.
+
+    Returns:
+        normalized_positions (np.array): positions of all atoms, translated to parent center of mass
+                                         and rotated to match the inertia tensor's principal axes.
+
+    """
 
     parent_positions = all_positions[:number_of_parent_atoms]
     parent_masses = all_masses[:number_of_parent_atoms]
@@ -209,6 +231,37 @@ def get_positions_aligned_with_parent_inertia_tensor(
 
 
 def get_angle_between_parent_and_child(parent_vector, child_vector, n_axis):
+    """
+    Assume that a parent point and a child point in 3D space are joined by a line. The unit vector
+    n_axis is parallel to this line and points from the parent point to the child point: n_axis
+    defines a rotation axis with the rotation direction defined about it using the right hand rule.
+
+    A unit length "parent vector" is attached to the parent point and a unit length "child vector"
+    is attached to the child point. Both directions are perpendicular to the rotation axis. The rotation
+    angle is defined as the rotation about n_axis which takes the parent vector into the child vector.
+
+
+    Args:
+        parent_vector (np.array):  unit 3D vector
+        child_vector (np.array):  unit 3D vector
+        n_axis (np.array):  unit 3D vector
+
+    Returns:
+        angle (float): the angle between parent and child vector, in radian.
+
+    """
+
+    #  Test the various assumptions on the input
+    for unit_vector in [parent_vector, child_vector, n_axis]:
+        assert np.isclose(
+            np.linalg.norm(unit_vector), 1.0
+        ), "An input vector is not unit length"
+
+    for direction_vector in [parent_vector, child_vector]:
+        np.isclose(
+            np.dot(direction_vector, n_axis), 0.0
+        ), "parent or child is not orthogonal to n_axis"
+
     x_hat = parent_vector
     y_hat = np.cross(n_axis, x_hat)
 
