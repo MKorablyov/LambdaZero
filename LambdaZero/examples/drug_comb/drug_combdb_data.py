@@ -66,6 +66,13 @@ def to_drug_induced_subgraphs(data_list):
         super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]][drug_indexer]
         super_graph.drug_idx_to_graph = drug_idx_to_graph
 
+        drugs_without_trgts = []
+        for drug in torch.unique(super_graph.edge_index):
+            if super_graph.drug_idx_to_graph[drug.item()].edge_index.shape[1] == 0:
+                drugs_without_trgts.append(drug.item())
+
+        import pdb; pdb.set_trace()
+
         new_data_list.append(super_graph)
 
     return new_data_list
@@ -100,7 +107,8 @@ def _build_subgraph(parent_graph, drug_idx_to_split, drug, num_drug_nodes):
 
 def _get_drug_indexer(drug_drug_index, drug_idx_to_graph):
     drugs_without_target = torch.tensor([
-        drug for drug, graph in drug_idx_to_graph.items() if len(graph.edge_index) == 0
+        drug for drug, graph in drug_idx_to_graph.items() 
+        if len(graph.edge_index) == 0 or graph.edge_index.shape[1] == 0
     ])
 
     # Tried to figure out how to do this vectorized, the below _almost_ works
@@ -126,8 +134,8 @@ def subgraph_protein_features_to_embedding(embedding_size, device):
                 'It must have this to use the transform subgraph_protein_features_to_embedding.'
             )
 
-        data.protein_features = torch.rand((data.protein_features.shape[0], embedding_size),
-                                           requires_grad=True, dtype=torch.float, device=device)
+        data.protein_ftrs = torch.rand((data.protein_ftrs.shape[0], embedding_size),
+                                       requires_grad=True, dtype=torch.float, device=device)
 
         return data
 
@@ -181,6 +189,19 @@ def to_bipartite_drug_protein_graph(data_list):
         new_data_list.append(super_graph)
 
     return new_data_list
+
+def use_single_cell_line(data):
+    cell_lines, cell_line_counts = torch.unique(data.edge_classes, return_counts=True)
+    cell_line = cell_lines[torch.argmax(cell_line_counts)]
+
+    # nonzero returns a tensor of size n x 1, but we want 1 x n, so flatten
+    matching_indices = (data.edge_classes == cell_line).nonzero().flatten()
+
+    data.edge_index = data.edge_index[:, matching_indices]
+    data.y = data.y[matching_indices]
+    data.edge_classes = data.edge_classes[matching_indices]
+
+    return data
 
 class DrugCombDb(InMemoryDataset):
     def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4):

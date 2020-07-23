@@ -9,7 +9,7 @@ import torch
 import random
 
 class SubgraphEmbeddingRegressorModel(torch.nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, cell_lines):
         super().__init__()
 
         self.out_channels = config["out_channels"]
@@ -26,8 +26,8 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
             # The input to the regressor will be the concatenation of two graph
             # embeddings, so take the in channels here to be 2 times the embedding size
             self.cell_line_to_regressor = {
-                cell_line: torch.nn.Linear(config["regressor_hidden_channels"], config["out_channels"])
-                for cell_line in range(config["num_cell_lines"])
+                cell_line.item(): torch.nn.Linear(config["regressor_hidden_channels"], config["out_channels"])
+                for cell_line in cell_lines
             }
 
         final_predictors = {
@@ -40,7 +40,6 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
     def to(self, device):
         new_model = super().to(device)
 
-        import pdb; pdb.set_trace()
         if hasattr(new_model, 'cell_line_to_regressor'):
             for cell_line, regressor in new_model.cell_line_to_regressor.items():
                 new_model.cell_line_to_regressor[cell_line] = regressor.to(device)

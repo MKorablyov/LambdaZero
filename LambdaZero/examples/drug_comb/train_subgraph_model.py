@@ -1,4 +1,4 @@
-from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs, subgraph_protein_features_to_embedding, use_score_type_as_target
+from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs, subgraph_protein_features_to_embedding, use_score_type_as_target, use_single_cell_line
 from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Batch
@@ -37,7 +37,7 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
                         shuffle=True)
     model.train()
 
-    num_batches = 0
+    num_batches = math.ceil(ddi_graph.edge_index.shape[1] / config["batch_size"])
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for i, drug_drug_batch in enumerate(loader):
         optimizer.zero_grad()
@@ -55,19 +55,22 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         loss.backward()
         optimizer.step()
 
-        metrics["loss"] += loss.item()
-        metrics["mse"] += loss.item()
-        metrics["mae"] += F.l1_loss(y, preds).item()
+        if math.isnan(loss.item()):
+            for k, v in metrics.items():
+                metrics[k] = (v * num_batches) / (num_batches - 1)
 
-        num_batches += 1
+            num_batches -= 1
+
+        else:
+            metrics["loss"] += loss.item() / num_batches
+            metrics["mse"] += loss.item() / num_batches
+            metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
+
         global num_iters
         num_iters += 1
         if num_iters % 40 == 0:
             print('Train MSE: %f' % loss.item())
 
-    metrics["loss"] = metrics["loss"] / num_batches
-    metrics["mse"] = metrics["mse"] / num_batches
-    metrics["mae"] = metrics["mae"] / num_batches
     return metrics
 
 def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
@@ -77,7 +80,7 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
     loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"], pin_memory=device == 'cpu')
     model.eval()
 
-    num_batches = 0
+    num_batches = math.ceil(ddi_graph.edge_index.shape[1] / config["batch_size"])
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for drug_drug_batch in loader:
         drug_drug_index, edge_classes, y = drug_drug_batch
@@ -90,31 +93,37 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
                       sg_edge_index, sg_nodes, sg_avging_idx)
         loss = F.mse_loss(y, preds)
 
-        num_batches += 1
-        metrics["loss"] += loss.item()
-        metrics["mse"] += F.mse_loss(y, preds).item()
-        metrics["mae"] += F.l1_loss(y, preds).item()
+        if math.isnan(loss.item()):
+            for k, v in metrics.items():
+                metrics[k] = (v * num_batches) / (num_batches - 1)
 
-    metrics["loss"] = metrics["loss"] / num_batches
-    metrics["mse"] = metrics["mse"] / num_batches
-    metrics["mae"] = metrics["mae"] / num_batches
+            num_batches -= 1
+
+        else:
+            metrics["loss"] += loss.item() / num_batches
+            metrics["mse"] += loss.item() / num_batches
+            metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
+
     print("Eval MSE: %f" % metrics["mse"])
     return metrics
 
 def get_batch_subgraph_edges(ddi_graph, batch_drug_drug_index):
-    batch_drugs = np.unique(drug_drug_index.flatten().cpu())
-    subgraph_edge_indices = tuple([ddi_graph.drug_idx_to_graph[drug].edge_index for drug in batch_drugs])
+    batch_drugs = torch.unique(batch_drug_drug_index.flatten())
+    subgraph_edge_indices = tuple([
+        ddi_graph.drug_idx_to_graph[drug.item()].edge_index for drug in batch_drugs
+    ])
 
     edge_index = torch.cat(subgraph_edge_indices, dim=1)
     edge_index = torch.unique(edge_index, dim=1, sorted=False)
 
-    subgraph_nodes = tuple([ddi_graph.drug_idx_to_graph[drug].nodes for drug in batch_drugs])
+    subgraph_nodes = tuple([ddi_graph.drug_idx_to_graph[drug.item()].nodes for drug in batch_drugs])
     nodes = torch.cat(subgraph_nodes)
 
-    averaging_idx_tensors = tuple(
-        [torch.full(size=len(nodes), fill_value=i) for i, nodes in enumerate(subgraph_nodes)])
+    averaging_idx_tensors = tuple([
+        torch.full((len(nodes),), i, dtype=torch.long) for i, nodes in enumerate(subgraph_nodes)
+    ])
 
-    averaging_idx = torch.cat(averaging_idx_tensors)
+    averaging_idx = torch.cat(averaging_idx_tensors).to(batch_drugs.device)
 
     return edge_index, nodes, averaging_idx
 
@@ -123,16 +132,16 @@ class SubgraphRegressor(tune.Trainable):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        transform = None
-        if config['use_one_hot'] == True:
-            transform = use_score_type_as_target(config['score_type'])
-        else:
-            transform = Compose([
-                subgraph_protein_features_to_embedding(config['protein_embedding_size'], self.device),
-                use_score_type_as_target(config['score_type']),
-            ])
+        transform_list = [use_score_type_as_target(config['score_type'])]
+        if not config['use_one_hot']:
+            transform_list.append(
+                subgraph_protein_features_to_embedding(config['protein_embedding_size'], self.device)
+            )
 
-        dataset = DrugCombDb(transform=transform, pre_transform=config["pre_transform"])
+        if config['use_single_cell_line']:
+            transform_list.append(use_single_cell_line)
+
+        dataset = DrugCombDb(transform=Compose(transform_list), pre_transform=config["pre_transform"])
         self.ddi_graph = self._extract_ddi_graph(dataset)
 
         self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.ddi_graph.edge_index.shape[1],
@@ -141,13 +150,13 @@ class SubgraphRegressor(tune.Trainable):
 
         config["in_channels"] = self.ddi_graph.x.shape[1] if config['use_one_hot'] else config["protein_embedding_size"]
         config["out_channels"] = self.ddi_graph.y.shape[1] if len(self.ddi_graph.y.shape) > 1 else 1
-        config["num_cell_lines"] = len(torch.unique(self.ddi_graph.edge_classes))
 
-        self.model = SubgraphEmbeddingRegressorModel(config).to(self.device)
+        self.model = SubgraphEmbeddingRegressorModel(
+            config, torch.unique(self.ddi_graph.edge_classes)).to(self.device)
 
         to_optimize = list(self.model.parameters())
         if config['use_one_hot'] == False:
-            to_optimize += [subgraph.x for subgraph in self.ddi_graph.drug_idx_to_graph.values()]
+            to_optimize.append(self.ddi_graph.protein_ftrs)
 
         self.optim = torch.optim.Adam(to_optimize, lr=config["lr"])
 
@@ -157,11 +166,12 @@ class SubgraphRegressor(tune.Trainable):
     def _extract_ddi_graph(self, dataset):
         ddi_graph = dataset[0].to(self.device)
         ddi_graph.protein_ftrs = ddi_graph.protein_ftrs.to(self.device)
-        for drug, subgraph in ddi_graph.edge_idx_to_graph.items():
+        for drug, subgraph in ddi_graph.drug_idx_to_graph.items():
             new_subgraph = subgraph.to(self.device)
-            new_subgraph.nodes = subgraph.nodes.to(self.device)
+            if hasattr(new_subgraph, 'nodes'):
+                new_subgraph.nodes = subgraph.nodes.to(self.device)
 
-            ddi_graph.edge_idx_to_graph[drug] = new_subgraph
+            ddi_graph.drug_idx_to_graph[drug] = new_subgraph
 
         return ddi_graph
 
@@ -190,10 +200,10 @@ config = {
         "pre_transform": to_drug_induced_subgraphs,
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
-        "prediction_type": "mlp",#tune.grid_search(["dot_product", "mlp"]),
-        "lr": 5e-4,#tune.grid_search([1e-4, 5e-4]),
-        "use_one_hot": False,#tune.grid_search([True, False]),
-        "score_type": 'zip',#tune.grid_search(['zip', 'loewe', 'hsa', 'bliss']),
+        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
+        "lr": tune.grid_search([1e-4, 5e-4, 5e-5, 1e-5]),
+        "use_one_hot": tune.grid_search([True, False]),
+        "score_type": 'hsa',
         "weight_initialization_type": "torch_base",
         "protein_embedding_size": 256,
         "train_epoch": train_epoch,
@@ -201,14 +211,15 @@ config = {
         "embed_channels": 256,
         "regressor_hidden_channels": 64,
         "num_epochs": 256,
-        "batch_size": 128,
+        "batch_size": 64,
         "conv_dropout_rate": 0.1,
-        "linear_dropout_rate": 0.5,
+        "linear_dropout_rate": 0.2,
+        "use_single_cell_line": tune.grid_search([True, False]),
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
-    "stop": {"training_iteration": 50},
+    "stop": {"training_iteration": 250},
     "checkpoint_at_end": True,
     "resources_per_trial": {"gpu": 1},
     "name": None
@@ -222,7 +233,7 @@ if __name__ == "__main__":
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
 
-    config["name"] = "FullDataTwoLRsTwoExtractorsAllScoreTypes"
+    config["name"] = "ShareFeaturesSingleCellLine"
     analysis = tune.run(
         config["trainer"],
         name=config["name"],
@@ -234,4 +245,10 @@ if __name__ == "__main__":
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"]
     )
+
+
+
+
+
+
 
