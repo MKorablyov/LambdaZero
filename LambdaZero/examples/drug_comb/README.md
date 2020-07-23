@@ -59,6 +59,16 @@ Note: we could use concatenation instead of sum between node and neighbour's mes
 - Investigate how to share knowledge between cell types in a smart way
 - Use percentage of cell deaths as input
 
+
+## Baseline pipeline
+
+Let $\phi: (fingerprint, cell-line)\rightarrow \mathbb{R}^k$ be a MLP. (we choose $k=100$).
+
+For a given pair of drugs with fingerprints $fp_1$ and $fp_2$, whose score was acquired on cell line $c$, we predict the score as:
+
+| $\hat{score} = \langle \phi(fp_1, c) | \phi(fp_2, c) \rangle$ |
+|----------|
+
 ## SubGraphs pipeline
 
 TODO
