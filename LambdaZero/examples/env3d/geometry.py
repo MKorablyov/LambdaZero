@@ -313,8 +313,8 @@ def get_molecular_perpendicular_ax_direction_from_inertia(total_inertia, n_axis)
 def fix_orientation_vector(list_masses: np.array, list_positions: np.array, anchor_point: np.array, orientation_vector: np.array):
     """
     The orientation vector of a molecule is only determined up to a sign. This method
-    fixes the sign by picking the orientation in the direction of maximum mass. If
-    the molecule is symmetrical, the degeneracy cannot be lifted and the original vector is returned.
+    fixes the sign by picking the orientation pointing from the rotational axis towards the center of mass.
+    If the center of mass is on the axis, the degeneracy cannot be lifted and the original vector is returned.
 
     Args:
         masses (np.array): atomic masses
@@ -327,16 +327,15 @@ def fix_orientation_vector(list_masses: np.array, list_positions: np.array, anch
         fixed_orentation_vector(np.array): orientation vector with the sign degeneracy lifted
 
     """
-    list_mr = multiply_scalars_and_vectors(list_masses, list_positions-anchor_point)
 
-    projected_mass_distance = np.sum(np.dot(list_mr, orientation_vector))
+    center_of_mass = get_center_of_mass(list_masses, list_positions)
+    relative_cm = center_of_mass-anchor_point
+    projected_cm = np.dot(relative_cm, orientation_vector)
 
-    if projected_mass_distance < 0.:
+    if projected_cm < 0.0:
         return -orientation_vector
     else:
         return orientation_vector
-
-
 
 
 def get_molecular_orientation_vector_from_positions_and_masses(
@@ -344,7 +343,9 @@ def get_molecular_orientation_vector_from_positions_and_masses(
 ) -> np.array:
 
     total_inertia = get_inertia_tensor(masses, positions-anchor_point)
-    return get_molecular_perpendicular_ax_direction_from_inertia(total_inertia, n_axis)
+    indefinite_orientation_vector = get_molecular_perpendicular_ax_direction_from_inertia(total_inertia, n_axis)
+    fixed_orientation_vector = fix_orientation_vector(masses, positions, anchor_point, indefinite_orientation_vector)
+    return fixed_orientation_vector
 
 
 def get_n_axis_and_angle(
