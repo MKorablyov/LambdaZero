@@ -17,13 +17,13 @@ from LambdaZero.examples.env3d.dataset.io_utilities import (
     process_row_for_writing_to_feather,
     create_or_append_feather_file,
 )
-from LambdaZero.examples.env3d.geometry import get_positions_aligned_with_parent_inertia_tensor
+from LambdaZero.examples.env3d.geometry import get_positions_aligned_with_parent_inertia_tensor, \
+    get_angle_between_parent_and_child
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_lowest_energy_and_mol_with_hydrogen,
     get_atomic_masses,
 )
 from LambdaZero.examples.env3d.sanity_checks.analyse_energy_vs_angle import (
-    get_angle_between_parent_and_child,
     get_molecular_orientation_vector_from_positions_and_masses,
 )
 

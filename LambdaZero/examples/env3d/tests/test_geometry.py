@@ -10,7 +10,7 @@ from LambdaZero.examples.env3d.geometry import (
     project_direction_out_of_tensor,
     multiply_scalars_and_vectors,
     rotate_single_point_about_axis,
-    rotate_points_about_axis, get_positions_aligned_with_parent_inertia_tensor,
+    rotate_points_about_axis, get_positions_aligned_with_parent_inertia_tensor, get_angle_between_parent_and_child,
 )
 
 
@@ -263,3 +263,20 @@ def test_get_positions_aligned_with_parent_inertia_tensor(number_of_parents_norm
     computed_normalized_positions = get_positions_aligned_with_parent_inertia_tensor(all_positions, all_masses, number_of_parent_atoms)
 
     np.testing.assert_almost_equal(normalized_positions, computed_normalized_positions)
+
+
+@pytest.mark.parametrize("angle", np.linspace(0., 2.*np.pi, 5))
+def test_get_angle_between_parent_and_child(random_rotation, angle):
+
+    parent_vector = np.array([1., 0., 0.])
+    parent_vector = np.dot(random_rotation, parent_vector)
+
+    child_vector = np.array([np.cos(angle), np.sin(angle), 0.])
+    child_vector = np.dot(random_rotation, child_vector)
+
+    n_axis = np.array([0., 0., 1.])
+    n_axis = np.dot(random_rotation, n_axis)
+
+    computed_angle = get_angle_between_parent_and_child(parent_vector, child_vector, n_axis)
+
+    np.testing.assert_almost_equal(angle, computed_angle)

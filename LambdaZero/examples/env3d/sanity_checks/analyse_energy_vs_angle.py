@@ -23,7 +23,7 @@ from LambdaZero.examples.env3d.geometry import (
     get_inertia_tensor,
     get_inertia_contribution,
     project_direction_out_of_tensor,
-    rotate_points_about_axis,
+    rotate_points_about_axis, get_angle_between_parent_and_child,
 )
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_atomic_masses,
@@ -39,27 +39,6 @@ blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 chimera_bin = os.path.join(programs_dir, "chimera/bin/chimera")
 
 results_dir = Path(summaries_dir).joinpath("env3d")
-
-
-def get_angle_between_parent_and_child(parent_vector, child_vector, n_axis):
-    x_hat = parent_vector
-    y_hat = np.cross(n_axis, x_hat)
-
-    projection_x = np.dot(child_vector, x_hat)
-    projection_y = np.dot(child_vector, y_hat)
-
-    ratio = np.abs(projection_y / projection_x)
-
-    if projection_x >= 0.0 and projection_y >= 0.0:
-        theta = np.arctan(ratio)
-    elif projection_x < 0.0 and projection_y >= 0.0:
-        theta = np.pi - np.arctan(ratio)
-    elif projection_x < 0.0 and projection_y < 0.0:
-        theta = np.pi + np.arctan(ratio)
-    else:
-        theta = 2 * np.pi - np.arctan(ratio)
-
-    return theta
 
 
 def get_molecular_orientation_vector_from_positions_and_masses(

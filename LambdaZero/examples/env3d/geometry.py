@@ -206,3 +206,24 @@ def get_positions_aligned_with_parent_inertia_tensor(
     normalized_positions = np.dot(all_positions - parent_center_of_mass, u_matrix)
 
     return normalized_positions
+
+
+def get_angle_between_parent_and_child(parent_vector, child_vector, n_axis):
+    x_hat = parent_vector
+    y_hat = np.cross(n_axis, x_hat)
+
+    projection_x = np.dot(child_vector, x_hat)
+    projection_y = np.dot(child_vector, y_hat)
+
+    ratio = np.abs(projection_y / projection_x)
+
+    if projection_x >= 0.0 and projection_y >= 0.0:
+        theta = np.arctan(ratio)
+    elif projection_x < 0.0 and projection_y >= 0.0:
+        theta = np.pi - np.arctan(ratio)
+    elif projection_x < 0.0 and projection_y < 0.0:
+        theta = np.pi + np.arctan(ratio)
+    else:
+        theta = 2 * np.pi - np.arctan(ratio)
+
+    return theta
