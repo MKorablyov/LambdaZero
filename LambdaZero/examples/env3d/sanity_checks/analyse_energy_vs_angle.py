@@ -32,6 +32,7 @@ from LambdaZero.examples.env3d.rdkit_utilities import (
     get_mmff_energy, get_lowest_energy_and_mol_with_hydrogen,
 )
 from LambdaZero.examples.env3d.sanity_checks.check_atomic_order import MolecularConnection
+from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
@@ -79,10 +80,6 @@ def get_molecular_orientation_vector_from_inertia(total_inertia, n_axis):
     eigs, u_matrix = np.linalg.eigh(projected_inertia)
     orientation_vector = u_matrix[:, 2]
     return orientation_vector
-
-
-def get_angles_in_degrees(angles_in_radian):
-    return angles_in_radian * 180.0 / np.pi
 
 
 def plot_molecule_and_block_with_rotation_axis(
