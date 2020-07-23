@@ -1,9 +1,5 @@
 """
-The goal of this script is to manipulate the orientation of the added block and to compute the
-energy vs. angle of block.
-
-The work is somewhat incomplete, and the energy of the original molecule is inconsistent with
-the energy following a ConstrainEmbed.
+The goal of this script is to generate the dataset of molecules embedded in 3D space.
 """
 import copy
 import os
@@ -40,8 +36,7 @@ def extract_lowest_energy_child(
     random_seed: int,
 ):
 
-    # limit to 10 first blocks
-    list_block_indices = np.arange(reference_molMDP.num_blocks)[:10]
+    list_block_indices = np.arange(reference_molMDP.num_blocks)
 
     list_min_energy = []
     list_relaxed_mol_with_hydrogen = []
@@ -178,23 +173,25 @@ output_path = results_dir.joinpath(
     f"env3d_dataset_{number_of_parent_blocks}_parent_blocks.feather"
 )
 
-num_conf = 100
+num_conf = 25
 max_iters = 200
 random_seed = 12312
 
-max_number_of_molecules = 100
+max_number_of_molecules = 1000
 
 if __name__ == "__main__":
     np.random.seed(random_seed)
 
     reference_molMDP = MolMDP(blocks_file=blocks_file)
 
-    for _ in range(max_number_of_molecules):
+    for index in range(max_number_of_molecules):
+        print(f" Computing molecule {index} of {max_number_of_molecules}")
         reference_molMDP.reset()
         reference_molMDP.random_walk(number_of_parent_blocks)
         number_of_stems = len(reference_molMDP.molecule.stems)
+
         if number_of_stems < 1:
-            print("no stems! Moving on")
+            print("no stems! Moving on to next molecule")
             continue
 
         attachment_stem_idx = np.random.choice(number_of_stems)
@@ -204,7 +201,7 @@ if __name__ == "__main__":
                 reference_molMDP, attachment_stem_idx, num_conf, max_iters, random_seed
             )
         except:
-            print("Something went wrong. Moving on.")
+            print("Something went wrong while relaxing molecule. Moving on to next molecule")
             continue
 
         byte_row = process_row_for_writing_to_feather(row)
