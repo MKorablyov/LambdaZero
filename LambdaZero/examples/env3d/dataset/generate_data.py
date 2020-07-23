@@ -17,7 +17,7 @@ from LambdaZero.examples.env3d.dataset.io_utilities import (
     process_row_for_writing_to_feather,
     create_or_append_feather_file,
 )
-from LambdaZero.examples.env3d.geometry import get_center_of_mass, get_inertia_tensor
+from LambdaZero.examples.env3d.geometry import get_positions_aligned_with_parent_inertia_tensor
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_lowest_energy_and_mol_with_hydrogen,
     get_atomic_masses,
@@ -70,25 +70,6 @@ def extract_lowest_energy_child(
     relaxed_mol = Chem.RemoveHs(list_relaxed_mol_with_hydrogen[min_index])
 
     return relaxed_mol, block_idx, anchor_indices
-
-
-def get_positions_aligned_with_parent_inertia_tensor(
-    all_positions: np.array, all_masses: np.array, number_of_parent_atoms: int
-) -> np.array:
-
-    parent_positions = all_positions[:number_of_parent_atoms]
-    parent_masses = all_masses[:number_of_parent_atoms]
-
-    parent_center_of_mass = get_center_of_mass(parent_masses, parent_positions)
-    parent_inertia_cm = get_inertia_tensor(
-        parent_masses, parent_positions - parent_center_of_mass
-    )
-
-    inertia_eigenvalues, u_matrix = np.linalg.eigh(parent_inertia_cm)
-
-    normalized_positions = np.dot(all_positions - parent_center_of_mass, u_matrix)
-
-    return normalized_positions
 
 
 def get_n_axis_and_angle(

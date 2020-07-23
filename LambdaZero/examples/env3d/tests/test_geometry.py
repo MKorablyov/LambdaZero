@@ -10,8 +10,28 @@ from LambdaZero.examples.env3d.geometry import (
     project_direction_out_of_tensor,
     multiply_scalars_and_vectors,
     rotate_single_point_about_axis,
-    rotate_points_about_axis,
+    rotate_points_about_axis, get_positions_aligned_with_parent_inertia_tensor,
 )
+
+
+@pytest.fixture
+def normalized_positions_and_masses():
+
+    p1 = np.array([ 1., 0., 0.])
+    p2 = np.array([-1., 0., 0.])
+
+    p3 = np.array([ 0., 1., 0.])
+    p4 = np.array([ 0.,-1., 0.])
+
+    p5 = np.array([ 0., 0., 1.])
+    p6 = np.array([ 0., 0.,-1.])
+
+
+    positions = np.array([p1, p2, p3, p4, p5, p6])
+    masses = np.array([10., 10., 5., 5., 1., 1.])
+
+    return positions, masses
+
 
 
 def get_epsilon():
@@ -100,6 +120,10 @@ def random_rotation():
     ).as_matrix()
     return rotation_matrix
 
+@pytest.fixture
+def random_translation():
+    np.random.seed(3442)
+    return np.random.rand(3)
 
 @pytest.fixture
 def random_tensor(random_eigenvalues, random_rotation):
@@ -121,6 +145,30 @@ def expected_projected_random_tensor(
             projected_eigenvector, projected_eigenvector
         )
     return projected_random_tensor
+
+
+@pytest.fixture
+def number_of_parents_normalized_positions_and_masses():
+
+    np.random.seed(34234)
+    p1 = np.array([ 1., 0., 0.])
+    p2 = np.array([-1., 0., 0.])
+
+    p3 = np.array([ 0., 1., 0.])
+    p4 = np.array([ 0.,-1., 0.])
+
+    p5 = np.array([ 0., 0., 1.])
+    p6 = np.array([ 0., 0.,-1.])
+
+    p7 = np.random.rand(3)
+    p8 = np.random.rand(3)
+    p9 = np.random.rand(3)
+
+    number_of_parent_atoms = 6
+    positions = np.array([p1, p2, p3, p4, p5, p6, p7, p8, p9])
+    masses = np.array([10., 10., 5., 5., 1., 1., 0.123, 0.5221, 1.553])
+
+    return number_of_parent_atoms, positions, masses
 
 
 def test_get_center_of_mass(masses, positions, expected_center_of_mass):
@@ -205,3 +253,13 @@ def test_rotate_points_about_axis(random_axis_direction, positions):
 
     expected_rotated_points = np.array(expected_rotated_points)
     np.testing.assert_almost_equal(computed_rotated_points, expected_rotated_points)
+
+
+def test_get_positions_aligned_with_parent_inertia_tensor(number_of_parents_normalized_positions_and_masses, random_rotation, random_translation):
+    number_of_parent_atoms, normalized_positions, all_masses = number_of_parents_normalized_positions_and_masses
+
+    all_positions = np.dot(normalized_positions, random_rotation) + random_translation
+
+    computed_normalized_positions = get_positions_aligned_with_parent_inertia_tensor(all_positions, all_masses, number_of_parent_atoms)
+
+    np.testing.assert_almost_equal(normalized_positions, computed_normalized_positions)

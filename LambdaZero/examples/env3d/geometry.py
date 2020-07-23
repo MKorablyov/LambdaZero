@@ -187,3 +187,22 @@ def rotate_points_about_axis(
     rotated_positions = rotated_center + rotated_relative_positions
 
     return rotated_positions
+
+
+def get_positions_aligned_with_parent_inertia_tensor(
+    all_positions: np.array, all_masses: np.array, number_of_parent_atoms: int
+) -> np.array:
+
+    parent_positions = all_positions[:number_of_parent_atoms]
+    parent_masses = all_masses[:number_of_parent_atoms]
+
+    parent_center_of_mass = get_center_of_mass(parent_masses, parent_positions)
+    parent_inertia_cm = get_inertia_tensor(
+        parent_masses, parent_positions - parent_center_of_mass
+    )
+
+    inertia_eigenvalues, u_matrix = np.linalg.eigh(parent_inertia_cm)
+
+    normalized_positions = np.dot(all_positions - parent_center_of_mass, u_matrix)
+
+    return normalized_positions
