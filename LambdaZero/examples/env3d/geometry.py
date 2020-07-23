@@ -280,3 +280,27 @@ def get_angle_between_parent_and_child(parent_vector, child_vector, n_axis):
         theta = 2 * np.pi - np.arctan(ratio)
 
     return theta
+
+
+def get_molecular_orientation_vector_from_inertia(total_inertia, n_axis):
+    """
+    Given the inertia tensor of a molecule and n_axis, the vector defining the rotation axis,
+    this method computes the direction perpendicular to n_axis for which the inertia is largest.
+
+    In essence, it computes the direction of a complementary rotation axis, perpendicular to n_axis,
+    in which it would be hardest to rotate the molecule. Intuitively, this direction should be roughly
+    as normal as possible to the plane of the molecule.
+
+    Args:
+        total_inertia (np.array):  inertia tensor
+        n_axis (np.array): unit 3D vector
+
+    Returns:
+        orientation_vector (np.array):  unit 3D vector
+
+
+    """
+    projected_inertia = project_direction_out_of_tensor(total_inertia, n_axis)
+    eigs, u_matrix = np.linalg.eigh(projected_inertia)
+    orientation_vector = u_matrix[:, 2]
+    return orientation_vector

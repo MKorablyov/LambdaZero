@@ -22,8 +22,7 @@ from LambdaZero.examples.env3d.geometry import (
     get_center_of_mass,
     get_inertia_tensor,
     get_inertia_contribution,
-    project_direction_out_of_tensor,
-    rotate_points_about_axis, get_angle_between_parent_and_child,
+    rotate_points_about_axis, get_angle_between_parent_and_child, get_molecular_orientation_vector_from_inertia,
 )
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_atomic_masses,
@@ -52,13 +51,6 @@ def get_molecular_orientation_vector_from_positions_and_masses(
     inertia_d = get_inertia_contribution(total_mass, d)
     total_inertia = inertia_cm + inertia_d
     return get_molecular_orientation_vector_from_inertia(total_inertia, n_axis)
-
-
-def get_molecular_orientation_vector_from_inertia(total_inertia, n_axis):
-    projected_inertia = project_direction_out_of_tensor(total_inertia, n_axis)
-    eigs, u_matrix = np.linalg.eigh(projected_inertia)
-    orientation_vector = u_matrix[:, 2]
-    return orientation_vector
 
 
 def plot_molecule_and_block_with_rotation_axis(

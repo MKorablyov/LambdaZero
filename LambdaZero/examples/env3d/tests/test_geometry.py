@@ -12,7 +12,7 @@ from LambdaZero.examples.env3d.geometry import (
     rotate_single_point_about_axis,
     rotate_points_about_axis,
     get_positions_aligned_with_parent_inertia_tensor,
-    get_angle_between_parent_and_child,
+    get_angle_between_parent_and_child, get_molecular_orientation_vector_from_inertia,
 )
 
 
@@ -284,3 +284,20 @@ def test_get_angle_between_parent_and_child(random_rotation, angle):
     )
 
     np.testing.assert_almost_equal(angle, computed_angle)
+
+
+def test_get_molecular_orientation_vector_from_inertia(random_eigenvalues, random_rotation):
+
+    # Diagonal inertia tensor, in the basis of its own principal axes
+    inertia_tensor = np.diag(random_eigenvalues)
+    n_axis = np.array([1., 0., 0.])
+    orientation_vector = np.array([0., 0., 1.])
+
+    rotated_inertia_tensor = np.dot(np.dot(random_rotation, inertia_tensor), random_rotation.T)
+    rotated_axis_direction = np.dot(random_rotation, n_axis)
+    expected_orientation_vector = np.dot(random_rotation, orientation_vector)
+
+    computed_orientation_vector = get_molecular_orientation_vector_from_inertia(rotated_inertia_tensor,
+                                                                                rotated_axis_direction)
+
+    np.testing.assert_almost_equal(expected_orientation_vector, computed_orientation_vector)
