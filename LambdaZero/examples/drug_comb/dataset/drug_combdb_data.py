@@ -129,7 +129,8 @@ def to_bipartite_drug_protein_graph(data_list):
 
 
 class DrugCombDb(InMemoryDataset):
-    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4, scores = ['ZIP', 'Bliss', 'Loewe', 'HSA']):
+    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4,
+                 scores=['ZIP', 'Bliss', 'Loewe', 'HSA']):
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
         

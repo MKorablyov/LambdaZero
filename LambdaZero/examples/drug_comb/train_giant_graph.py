@@ -1,6 +1,7 @@
 import torch
 from LambdaZero.examples.drug_comb.dataset.drug_combdb_data import DrugCombDb
 from LambdaZero.examples.drug_comb.model.multi_message_gcn import GiantGraphMPNN
+from LambdaZero.examples.drug_comb.model.baseline import BaselineMLP
 from LambdaZero.examples.drug_comb.utils.utils import random_split, get_ddi_edges, get_ppi_and_dpi_edges
 import os
 from LambdaZero.utils import get_external_dirs
@@ -77,7 +78,8 @@ class GiantGraphTrainer(tune.Trainable):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"])
+        dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"],
+                             scores=config["scores"])
 
         # restrict ourselves to fingerprint features (first column indicates nodes that are drugs):
         dataset.data.x = dataset.data.x[:, :1025]
@@ -113,7 +115,7 @@ class GiantGraphTrainer(tune.Trainable):
         config["device"] = self.device
 
         # Initialize model and optimizer
-        self.model = GiantGraphMPNN(config).to(self.device)
+        self.model = config["model"](config).to(self.device)
         # self.model = GCN(config).to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
 
@@ -140,12 +142,12 @@ class GiantGraphTrainer(tune.Trainable):
 
 if __name__ == '__main__':
 
-    # ray.init()
-    #
-    # time_to_sleep = 30
-    # print("Sleeping for %d seconds" % time_to_sleep)
-    # time.sleep(time_to_sleep)
-    # print("Woke up.. Scheduling")
+    ray.init()
+
+    time_to_sleep = 30
+    print("Sleeping for %d seconds" % time_to_sleep)
+    time.sleep(time_to_sleep)
+    print("Woke up.. Scheduling")
 
     _, _, summaries_dir = get_external_dirs()
     configuration = {
@@ -153,9 +155,11 @@ if __name__ == '__main__':
         "trainer_config": {
             "transform": None,
             "pre_transform": None,
+            "scores": ['ZIP', 'Bliss', 'Loewe', 'HSA'],
             "val_set_prop": 0.2,
             "test_set_prop": 0.0,
             "lr": 1e-3,
+            "model": tune.grid_search([GiantGraphMPNN, BaselineMLP]),
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
             "embed_channels": 256,
@@ -172,17 +176,17 @@ if __name__ == '__main__':
         "name": "TestGiantGraphMultiMessageNetwork"
     }
 
-    # analysis = tune.run(
-    #     configuration["trainer"],
-    #     name=configuration["name"],
-    #     config=configuration["trainer_config"],
-    #     stop=configuration["stop"],
-    #     resources_per_trial=configuration["resources_per_trial"],
-    #     num_samples=1,
-    #     checkpoint_at_end=configuration["checkpoint_at_end"],
-    #     local_dir=configuration["summaries_dir"],
-    #     checkpoint_freq=configuration["checkpoint_freq"]
-    # )
+    analysis = tune.run(
+        configuration["trainer"],
+        name=configuration["name"],
+        config=configuration["trainer_config"],
+        stop=configuration["stop"],
+        resources_per_trial=configuration["resources_per_trial"],
+        num_samples=1,
+        checkpoint_at_end=configuration["checkpoint_at_end"],
+        local_dir=configuration["summaries_dir"],
+        checkpoint_freq=configuration["checkpoint_freq"]
+    )
 
-    trainer = GiantGraphTrainer(configuration["trainer_config"])
-    trainer.train()
+    # trainer = GiantGraphTrainer(configuration["trainer_config"])
+    # trainer.train()
