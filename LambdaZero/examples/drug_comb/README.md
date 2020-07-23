@@ -49,6 +49,7 @@ Note: we could use concatenation instead of sum between node and neighbour's mes
 ### Short term
 
 - Implementing features based on the eigenvectors of Laplacian operator.
+- Implement simple baseline
 - Hyperparam tunning
 - Integrate with Active Learning
 
