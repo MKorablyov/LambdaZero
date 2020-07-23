@@ -13,7 +13,7 @@ from torch_geometric.data.makedirs import makedirs
 
 from ..acts import swish
 from ..inits import glorot_orthogonal
-from .dimenet_utils import bessel_basis, real_sph_harm
+from LambdaZero.examples.mpnn.dime_net.dimenet_utils import bessel_basis, real_sph_harm
 
 try:
     import sympy as sym

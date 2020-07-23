@@ -11,7 +11,7 @@ import ray
 from ray import tune
 from ray.rllib.utils import merge_dicts
 
-from torch_geometric.nn.models import DimeNet
+from .dimenet import DimeNet
 
 from LambdaZero.utils import get_external_dirs, BasicRegressor
 import LambdaZero.inputs
