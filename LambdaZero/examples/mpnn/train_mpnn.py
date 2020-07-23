@@ -114,7 +114,10 @@ DEFAULT_CONFIG = {
             "transform": transform,
             "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
         },
-        "model": DimeNet,
+        "model": DimeNet(hidden_channels=128, out_channels=1, num_blocks=6,
+                        num_bilinear=8, num_spherical=7, num_radial=6,
+                        cutoff=5.0, envelope_exponent=5, num_before_skip=1,
+                        num_after_skip=2, num_output_layers=3),
         #"model": LambdaZero.models.MPNNet,
         "model_config": {},
 
