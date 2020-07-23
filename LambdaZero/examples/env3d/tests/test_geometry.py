@@ -3,6 +3,7 @@ import itertools
 import numpy as np
 import pytest
 import scipy.spatial
+from scipy.spatial.transform import Rotation
 
 from LambdaZero.examples.env3d.geometry import (
     get_center_of_mass,
@@ -13,7 +14,7 @@ from LambdaZero.examples.env3d.geometry import (
     rotate_points_about_axis,
     get_positions_aligned_with_parent_inertia_tensor,
     get_angle_between_parent_and_child, get_molecular_orientation_vector_from_inertia,
-    get_molecular_orientation_vector_from_positions_and_masses,
+    get_molecular_orientation_vector_from_positions_and_masses, get_n_axis_and_angle,
 )
 
 
@@ -98,9 +99,7 @@ def random_rotation():
     vector = np.random.rand(3)
     vector = vector / np.linalg.norm(vector)
     angle = 2 * np.pi * np.random.rand()
-    rotation_matrix = scipy.spatial.transform.Rotation.from_rotvec(
-        angle * vector
-    ).as_matrix()
+    rotation_matrix = Rotation.from_rotvec(angle * vector).as_matrix()
     return rotation_matrix
 
 
@@ -319,3 +318,60 @@ def test_get_molecular_orientation_vector_from_positions_and_masses(normalized_p
     computed_orientation = get_molecular_orientation_vector_from_positions_and_masses(masses, positions, random_translation, random_axis_direction)
 
     np.testing.assert_almost_equal(expected_orientation, computed_orientation)
+
+
+@pytest.mark.parametrize("expected_angle", np.linspace(0.001, 2.0 * np.pi-0.001, 5))
+def test_get_n_axis_and_angle(expected_angle):
+
+    number_of_parents = 15
+    parent_anchor_index = 9
+
+    number_of_children = 11
+    child_anchor_index = 4
+    anchor_indices = (parent_anchor_index, number_of_parents + child_anchor_index)
+
+    np.random.seed(34523)
+    expected_n_axis = np.random.rand(3)
+    expected_n_axis /= np.linalg.norm(expected_n_axis)
+
+    parent_positions = np.random.rand(number_of_parents, 3)
+    parent_masses = np.random.rand(number_of_parents)
+    parent_anchor_point = parent_positions[parent_anchor_index]
+
+    parent_direction = get_molecular_orientation_vector_from_positions_and_masses(parent_masses,
+                                                                                  parent_positions,
+                                                                                  parent_anchor_point,
+                                                                                  expected_n_axis)
+
+    random_positions = np.random.rand(number_of_children, 3)
+    anchor_vector = random_positions[child_anchor_index]
+
+    translation = parent_anchor_point - anchor_vector + np.linalg.norm(anchor_vector)*expected_n_axis
+    children_positions = random_positions + translation
+
+    children_anchor_point = children_positions[child_anchor_index]
+
+    children_masses = np.random.rand(number_of_children)
+
+    child_direction = get_molecular_orientation_vector_from_positions_and_masses(children_masses,
+                                                                                 children_positions,
+                                                                                 children_anchor_point,
+                                                                                 expected_n_axis)
+
+    original_angle = get_angle_between_parent_and_child(parent_direction, child_direction, expected_n_axis)
+
+    rotated_children_positions = rotate_points_about_axis(children_positions,
+                                                          children_anchor_point,
+                                                          expected_n_axis,
+                                                          expected_angle - original_angle)
+
+    all_positions = np.concatenate([parent_positions, rotated_children_positions])
+    all_masses = np.concatenate([parent_masses, children_masses])
+
+    computed_n_axis, computed_angle = get_n_axis_and_angle(all_positions,
+                                                           all_masses,
+                                                           anchor_indices,
+                                                           number_of_parents)
+
+    np.testing.assert_almost_equal(computed_angle, expected_angle)
+    np.testing.assert_array_almost_equal(computed_n_axis, expected_n_axis)

@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -312,3 +314,54 @@ def get_molecular_orientation_vector_from_positions_and_masses(
 
     total_inertia = get_inertia_tensor(masses, positions-anchor_point)
     return get_molecular_orientation_vector_from_inertia(total_inertia, n_axis)
+
+
+def get_n_axis_and_angle(
+    all_positions: np.array,
+    all_masses: np.array,
+    anchor_indices: Tuple,
+    number_of_parent_atoms: int,
+):
+    """
+
+    Convenience method which extracts the rotation axis direction and rotation angle between
+    the parent molecule block and the child molecule block. It is assumed that the array containing
+    the positions has parent atoms in its first number_of_parent_atoms entries and child atoms in the
+    rest of the array; the same applies to the all_masses array.
+
+    Args:
+        all_positions (np.array):  all positions vectors
+        all_masses (np.array):  all masses
+        anchor_indices (Tuple(int)): a 2-tuple of ints: 1st is parent anchor atom, 2nd is child anchor atom
+        number_of_parent_atoms (int): number of parent atoms.
+
+    Returns:
+        n_axis (np.array): unit vector pointing from parent anchor to child anchor, defining rotation axis
+        angle (float): angle between parent and child direction vectors, in radian.
+
+    """
+    parent_positions = all_positions[:number_of_parent_atoms]
+    parent_masses = all_masses[:number_of_parent_atoms]
+
+    child_positions = all_positions[number_of_parent_atoms:]
+    child_masses = all_masses[number_of_parent_atoms:]
+
+    parent_anchor = all_positions[anchor_indices[0]]
+    child_anchor = all_positions[anchor_indices[1]]
+
+    n_axis = child_anchor - parent_anchor
+    n_axis /= np.linalg.norm(n_axis)
+
+    parent_vector = get_molecular_orientation_vector_from_positions_and_masses(
+        parent_masses, parent_positions, parent_anchor, n_axis
+    )
+
+    child_vector = get_molecular_orientation_vector_from_positions_and_masses(
+        child_masses, child_positions, child_anchor, n_axis
+    )
+
+    angle_in_radian = get_angle_between_parent_and_child(
+        parent_vector, child_vector, n_axis
+    )
+
+    return n_axis, angle_in_radian

@@ -4,7 +4,6 @@ The goal of this script is to generate the dataset of molecules embedded in 3D s
 import copy
 import os
 from pathlib import Path
-from typing import Tuple
 
 import numpy as np
 from rdkit import Chem
@@ -18,7 +17,7 @@ from LambdaZero.examples.env3d.dataset.io_utilities import (
     create_or_append_feather_file,
 )
 from LambdaZero.examples.env3d.geometry import get_positions_aligned_with_parent_inertia_tensor, \
-    get_angle_between_parent_and_child, get_molecular_orientation_vector_from_positions_and_masses
+    get_n_axis_and_angle
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_lowest_energy_and_mol_with_hydrogen,
     get_atomic_masses,
@@ -67,39 +66,6 @@ def extract_lowest_energy_child(
     relaxed_mol = Chem.RemoveHs(list_relaxed_mol_with_hydrogen[min_index])
 
     return relaxed_mol, block_idx, anchor_indices
-
-
-def get_n_axis_and_angle(
-    all_positions: np.array,
-    all_masses: np.array,
-    anchor_indices: Tuple,
-    number_of_parent_atoms: int,
-):
-    parent_positions = all_positions[:number_of_parent_atoms]
-    parent_masses = all_masses[:number_of_parent_atoms]
-
-    child_positions = all_positions[number_of_parent_atoms:]
-    child_masses = all_masses[number_of_parent_atoms:]
-
-    parent_anchor = all_positions[anchor_indices[0]]
-    child_anchor = all_positions[anchor_indices[1]]
-
-    n_axis = child_anchor - parent_anchor
-    n_axis /= np.linalg.norm(n_axis)
-
-    parent_vector = get_molecular_orientation_vector_from_positions_and_masses(
-        parent_masses, parent_positions, parent_anchor, n_axis
-    )
-
-    child_vector = get_molecular_orientation_vector_from_positions_and_masses(
-        child_masses, child_positions, child_anchor, n_axis
-    )
-
-    angle_in_radian = get_angle_between_parent_and_child(
-        parent_vector, child_vector, n_axis
-    )
-
-    return n_axis, angle_in_radian
 
 
 def get_data_row(
