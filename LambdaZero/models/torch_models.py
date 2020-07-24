@@ -205,7 +205,7 @@ class MPNNetDrop(nn.Module):
         self.lin1 = nn.Linear(2 * dim, dim)
         self.lin2 = nn.Linear(dim, 1)
 
-    def forward(self, data, do_dropout):
+    def forward(self, data, do_dropout, drop_p):
         out = nn.functional.relu(self.lin0(data.x))
         h = out.unsqueeze(0)
 
@@ -216,7 +216,7 @@ class MPNNetDrop(nn.Module):
 
         out = self.set2set(out, data.batch)
         out = nn.functional.relu(self.lin1(out))
-        out = nn.functional.dropout(out, training=do_dropout)
+        out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
         out = self.lin2(out)
         return out.view(-1)
 
