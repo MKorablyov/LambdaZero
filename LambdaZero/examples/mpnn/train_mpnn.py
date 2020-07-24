@@ -39,7 +39,7 @@ def train_epoch(loader, model, optimizer, device, config):
         targets = getattr(data, config["target"])
 
         optimizer.zero_grad()
-        logits = model(data)
+        logits = model(z=data,pos=None,batch=None)
 
         if config["loss"] == "L2":
             loss = F.mse_loss(logits, normalizer.normalize(targets))
