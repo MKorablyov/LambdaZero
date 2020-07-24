@@ -1,4 +1,4 @@
-from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs, subgraph_protein_features_to_embedding, use_score_type_as_target, use_single_cell_line
+from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs, subgraph_protein_features_to_embedding, use_score_type_as_target, use_single_cell_line, train_first_k_edges
 from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Batch
@@ -37,7 +37,7 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
                         shuffle=True)
     model.train()
 
-    num_batches = math.ceil(ddi_graph.edge_index.shape[1] / config["batch_size"])
+    num_batches = math.ceil(train_idxs.shape[0] / config["batch_size"])
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for i, drug_drug_batch in enumerate(loader):
         optimizer.zero_grad()
@@ -55,16 +55,9 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         loss.backward()
         optimizer.step()
 
-        if math.isnan(loss.item()):
-            for k, v in metrics.items():
-                metrics[k] = (v * num_batches) / (num_batches - 1)
-
-            num_batches -= 1
-
-        else:
-            metrics["loss"] += loss.item() / num_batches
-            metrics["mse"] += loss.item() / num_batches
-            metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
+        metrics["loss"] += loss.item() / num_batches
+        metrics["mse"] += loss.item() / num_batches
+        metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
 
         global num_iters
         num_iters += 1
@@ -80,7 +73,7 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
     loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"], pin_memory=device == 'cpu')
     model.eval()
 
-    num_batches = math.ceil(ddi_graph.edge_index.shape[1] / config["batch_size"])
+    num_batches = math.ceil(eval_idxs.shape[0] / config["batch_size"])
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for drug_drug_batch in loader:
         drug_drug_index, edge_classes, y = drug_drug_batch
@@ -93,18 +86,11 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
                       sg_edge_index, sg_nodes, sg_avging_idx)
         loss = F.mse_loss(y, preds)
 
-        if math.isnan(loss.item()):
-            for k, v in metrics.items():
-                metrics[k] = (v * num_batches) / (num_batches - 1)
+        metrics["loss"] += loss.item() / num_batches
+        metrics["mse"] += loss.item() / num_batches
+        metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
 
-            num_batches -= 1
-
-        else:
-            metrics["loss"] += loss.item() / num_batches
-            metrics["mse"] += loss.item() / num_batches
-            metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
-
-    print("Eval MSE: %f" % metrics["mse"])
+    #print("Eval MSE: %f" % metrics["mse"])
     return metrics
 
 def get_batch_subgraph_edges(ddi_graph, batch_drug_drug_index):
@@ -200,8 +186,8 @@ config = {
         "pre_transform": to_drug_induced_subgraphs,
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
-        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
-        "lr": tune.grid_search([1e-4, 5e-4, 5e-5, 1e-5]),
+        "prediction_type": tune.grid_search(["dot_product"]),# "mlp"]),
+        "lr": tune.grid_search([1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 5e-1, 5e-2, 5e-3, 5e-4, 5e-5]),
         "use_one_hot": tune.grid_search([True, False]),
         "score_type": 'hsa',
         "weight_initialization_type": "torch_base",
@@ -214,12 +200,15 @@ config = {
         "batch_size": 64,
         "conv_dropout_rate": 0.1,
         "linear_dropout_rate": 0.2,
-        "use_single_cell_line": tune.grid_search([True, False]),
+        "skip_gcn": tune.grid_search([False]),
+        "use_single_cell_line": True,
+        "use_gat": False,
+        "num_heads": 1,
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
-    "stop": {"training_iteration": 250},
+    "stop": {"training_iteration": 100},
     "checkpoint_at_end": True,
     "resources_per_trial": {"gpu": 1},
     "name": None
@@ -233,7 +222,7 @@ if __name__ == "__main__":
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
 
-    config["name"] = "ShareFeaturesSingleCellLine"
+    config["name"] = "TestFullSingleCellCorr"
     analysis = tune.run(
         config["trainer"],
         name=config["name"],
@@ -245,10 +234,4 @@ if __name__ == "__main__":
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"]
     )
-
-
-
-
-
-
 

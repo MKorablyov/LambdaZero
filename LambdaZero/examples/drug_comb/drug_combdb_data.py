@@ -71,8 +71,6 @@ def to_drug_induced_subgraphs(data_list):
             if super_graph.drug_idx_to_graph[drug.item()].edge_index.shape[1] == 0:
                 drugs_without_trgts.append(drug.item())
 
-        import pdb; pdb.set_trace()
-
         new_data_list.append(super_graph)
 
     return new_data_list
@@ -159,6 +157,16 @@ def use_score_type_as_target(score_type):
 
     return _use_score_type_as_target
 
+def train_first_k_edges(k):
+    def _train_first_k_edges(data):
+        data.edge_index = data.edge_index[:, :k]
+        data.edge_classes = data.edge_classes[:k]
+        data.y = data.y[:k]
+
+        return data
+
+    return _train_first_k_edges
+
 def to_bipartite_drug_protein_graph(data_list):
     new_data_list = []
     for data in data_list:
@@ -193,6 +201,7 @@ def to_bipartite_drug_protein_graph(data_list):
 def use_single_cell_line(data):
     cell_lines, cell_line_counts = torch.unique(data.edge_classes, return_counts=True)
     cell_line = cell_lines[torch.argmax(cell_line_counts)]
+    import pdb; pdb.set_trace()
 
     # nonzero returns a tensor of size n x 1, but we want 1 x n, so flatten
     matching_indices = (data.edge_classes == cell_line).nonzero().flatten()

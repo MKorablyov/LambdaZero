@@ -1,6 +1,6 @@
 from torch_geometric.data import DataLoader
 from torch.utils.data import random_split
-from torch_geometric.nn import GCNConv
+from torch_geometric.nn import GCNConv, GATConv
 from torch_scatter import scatter_mean
 from collections import defaultdict
 import torch.nn.functional as F
@@ -13,11 +13,19 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         super().__init__()
 
         self.out_channels = config["out_channels"]
-        self.conv1 = GCNConv(config["in_channels"], config["embed_channels"])
-        self.conv2 = GCNConv(config["embed_channels"], config["embed_channels"])
+        if config['use_gat'] == True:
+            self.conv1 = GATConv(config["in_channels"], config["embed_channels"], 
+                                 heads=config["num_heads"], concat=False)
+            self.conv2 = GATConv(config["embed_channels"], config["embed_channels"], 
+                                 heads=config["num_heads"], concat=False)
+        else:
+            self.conv1 = GCNConv(config["in_channels"], config["embed_channels"])
+            self.conv2 = GCNConv(config["embed_channels"], config["embed_channels"])
 
         self.conv_dropout = torch.nn.Dropout(config['conv_dropout_rate'])
         self.linear_dropout = torch.nn.Dropout(config['linear_dropout_rate'])
+
+        self.skip_gcn = config['skip_gcn']
 
         if config['prediction_type'] == 'mlp':
             self.shared_lin_lyr = torch.nn.Linear(2 * config["embed_channels"],
@@ -47,11 +55,13 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         return new_model
 
     def forward(self, x, drug_drug_batch, edge_cell_lines, sg_edge_index, sg_nodes, sg_avging_idx):
-        x = F.relu(self.conv1(x, sg_edge_index))
-        x = self.conv_dropout(x)
-        x = F.relu(self.conv2(x, sg_edge_index))
+        prot_embeds = x
+        if not self.skip_gcn:
+            h1 = F.relu(self.conv1(x, sg_edge_index))
+            h2 = F.relu(self.conv2(self.conv_dropout(h1), sg_edge_index)) + h1
+            prot_embeds = h2
 
-        node_embeds = x[sg_nodes]
+        node_embeds = prot_embeds[sg_nodes]
         graph_embeds = scatter_mean(node_embeds, sg_avging_idx, dim=0)
 
         return self._pred_with_graph_embeds(graph_embeds, drug_drug_batch, edge_cell_lines)
@@ -80,7 +90,7 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         for i, cell_line in enumerate(edge_cell_lines):
             cell_line_to_idx[cell_line.item()].append(i)
 
-        preds = torch.empty((from_drug_embeds.shape[1], self.out_channels),
+        preds = torch.empty((from_drug_embeds.shape[0], self.out_channels),
                             device=from_drug_embeds.device)
         for cell_line, cell_line_idxs in cell_line_to_idx.items():
             regressor = self.cell_line_to_regressor[cell_line]
