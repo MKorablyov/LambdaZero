@@ -198,6 +198,7 @@ class MPNNetDrop(nn.Module):
 
         h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
         self.conv = NNConv(dim, dim, h, aggr='mean')
+
         self.gru = nn.GRU(dim, dim)
 
         self.set2set = Set2Set(dim, processing_steps=3)
