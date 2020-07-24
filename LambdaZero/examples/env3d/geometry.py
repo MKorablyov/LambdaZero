@@ -313,8 +313,9 @@ def get_molecular_perpendicular_ax_direction_from_inertia(total_inertia, n_axis)
 def fix_orientation_vector(list_masses: np.array, list_positions: np.array, anchor_point: np.array, orientation_vector: np.array):
     """
     The orientation vector of a molecule is only determined up to a sign. This method
-    fixes the sign by picking the orientation pointing from the rotational axis towards the center of mass.
-    If the center of mass is on the axis, the degeneracy cannot be lifted and the original vector is returned.
+    fixes the sign by picking the orientation pointing from the rotational axis towards
+    the center of mass. If the center of mass is on the axis, the degeneracy cannot be lifted
+    and the original vector is returned.
 
     Args:
         masses (np.array): atomic masses
