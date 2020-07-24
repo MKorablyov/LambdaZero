@@ -1,5 +1,7 @@
 """
 The goal of this script is to generate the dataset of molecules embedded in 3D space.
+
+# TODO: we should use ray to parallelize effectively here. It will help if we want to scale to a very large dataset.
 """
 import json
 import os
