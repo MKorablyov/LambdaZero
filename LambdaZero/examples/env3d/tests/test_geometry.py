@@ -333,7 +333,7 @@ def test_get_molecular_orientation_vector_from_positions_and_masses(positions, m
     #np.testing.assert_almost_equal(expected_orientation, computed_orientation)
 
 
-@pytest.mark.parametrize("expected_angle", np.linspace(0., 2.0 * np.pi-0.01, 5))
+@pytest.mark.parametrize("expected_angle", np.linspace(0.+0.01, 2.0 * np.pi-0.01, 5))
 def test_get_n_axis_and_angle(expected_angle):
 
     number_of_parents = 15
