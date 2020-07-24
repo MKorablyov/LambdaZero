@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Dict
 import pandas as pd
@@ -34,3 +35,32 @@ def create_or_append_feather_file(feather_file_path: Path, row):
         new_df = pd.DataFrame(data=row, index=[0])
 
     new_df.to_feather(str(feather_file_path))
+
+
+def get_debug_blocks(block_file_path: str, number_of_blocks: int) -> Dict:
+    """
+
+    This method retains number_of_blocks in the block file for quick debugging caclulation.
+
+    Args:
+        block_file_path (str): path to original block file
+        number_of_blocks (int): number of blocks to keep
+
+    Returns:
+        debug_blocks_file_path (str):  path to debug block file
+
+    """
+
+    with open(block_file_path, 'r') as f:
+        blocks_dict = json.load(f)
+
+        new_block_dict = dict()
+        for high_level_key, values_dict in blocks_dict.items():
+            sublist_of_keys = list(values_dict.keys())[:number_of_blocks]
+            new_values_dict = {k: values_dict[k] for k in sublist_of_keys}
+            new_block_dict[high_level_key] = new_values_dict
+
+    return new_block_dict
+
+
+
