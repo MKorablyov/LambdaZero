@@ -17,6 +17,29 @@ def extract_lowest_energy_child(
     max_iters: int,
     random_seed: int,
 ):
+    """
+    This method extracts the lowest energy child conformer molecule given a reference MDP object which
+    already contains the parent molecule as its state, and provided the attachment information.
+
+    The possible blocks that can be attached are defined by the reference MDP.
+
+    The algorithm generates a child molecule for every possible block, embeds and relax the child
+    molecules to obtain a conformer and an energy, and then selects the child molecule with lowest energy.
+
+    Args:
+        reference_molMDP (molMDP): MDP object where a parent molecule is present.
+        attachment_stem_idx (int): attachment_stem id indicating where the child block will be attached.
+        num_conf (int): number of configurations attempted to embed the full child molecule as a conformer
+        max_iters (int): number of iterations to converge the atomic positions
+        random_seed (int): random seed used to embed molecule and create a conformer.
+
+    Returns:
+
+        relaxed_mol (Mol): child molecule, with relaxed positions conformer,
+        block_idx (int): index of the lowest energy block that was attached
+        anchor_indices (Tuple): atomic indices of the (parent, child block) attachment atoms
+
+    """
 
     list_block_indices = np.arange(reference_molMDP.num_blocks)
 
@@ -61,6 +84,25 @@ def get_data_row(
     max_iters: int,
     random_seed: int,
 ):
+    """
+
+    This method is a driver that extracts the lowest energy child conformer molecule
+    by calling `extract_lowest_energy_child` and then does the needed book keeping to
+    create a row of data to be appended to the pandas dataframe to be written as a feather file.
+
+
+    Args:
+        reference_molMDP (molMDP): MDP object where a parent molecule is present.
+        attachment_stem_idx (int): attachment_stem id indicating where the child block will be attached.
+        num_conf (int): number of configurations attempted to embed the full child molecule as a conformer
+        max_iters (int): number of iterations to converge the atomic positions
+        random_seed (int): random seed used to embed molecule and create a conformer.
+
+
+    Returns:
+        data_row (dict): a dictionary contraining a row of data to be saved as a feather file.
+
+    """
 
     number_of_parent_atoms = reference_molMDP.molecule.mol.GetNumAtoms()
 
