@@ -21,14 +21,14 @@ results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
 results_dir.mkdir(exist_ok=True)
 
 
-debug_flag = True
+debug_flag = False
 
 random_seed = 12312
 
 if __name__ == "__main__":
     np.random.seed(random_seed)
 
-    if debug_flag: #  small parameters for quick execution
+    if debug_flag:  #  Small parameters for quick execution
         number_of_parent_blocks = 3
         number_of_blocks = 10
         num_conf = 50
