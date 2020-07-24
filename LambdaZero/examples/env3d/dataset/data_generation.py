@@ -2,6 +2,7 @@ import copy
 
 import numpy as np
 from rdkit import Chem
+from rdkit.Chem.rdmolfiles import MolToSmiles
 from tqdm import tqdm
 
 from LambdaZero.chem import mol_from_frag
@@ -104,7 +105,9 @@ def get_data_row(
 
     """
 
-    number_of_parent_atoms = reference_molMDP.molecule.mol.GetNumAtoms()
+    parent_mol = reference_molMDP.molecule.mol
+    parent_smiles = MolToSmiles(parent_mol)
+    number_of_parent_atoms = parent_mol.GetNumAtoms()
 
     relaxed_mol, block_idx, anchor_indices = extract_lowest_energy_child(
         reference_molMDP, attachment_stem_idx, num_conf, max_iters, random_seed
@@ -125,9 +128,11 @@ def get_data_row(
     parent_positions = all_positions[:number_of_parent_atoms]
 
     return {
+        "smi": parent_smiles,
         "coord": parent_positions,
         "n_axis": n_axis,
         "attachment_node_index": attachment_index,
         "attachment_angle": angle_in_radian,
         "attachment_block_index": block_idx,
     }
+
