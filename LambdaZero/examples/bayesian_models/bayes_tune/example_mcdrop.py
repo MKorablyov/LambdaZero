@@ -204,10 +204,29 @@ class MCDropRegressor(BasicRegressor):
 
     def get_mean_and_variance(self, data_loader):
         # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
-        Yt_hat = self.get_predict_samples(data_loader)
-        sigma2 = 1./self.config["tau"]
-        var = (sigma2 + Yt_hat**2).mean(0) - Yt_hat.mean(0)**2
-        return Yt_hat.mean(0), var
+        y_hat = self.get_predict_samples(data_loader)
+        item2 = 0
+        means  = []
+        for y in y_hat:
+            item2 += np.matmul(y[:,None], y[None,:])
+            means.append(y)
+        item2 = item2 / self.config['T']
+        
+        D = y_hat.shape[1]
+        
+        item1 = np.eye(D) * (1/self.config['tau'])
+        means = np.asarray(means)
+        means = np.sum(means, axis = 0) / self.config['T']
+        item3 = np.matmul(means[:,None], means[None,:])
+        #import pdb;pdb.set_trace()
+        var = item1 + item2 - item3
+        var = np.diagonal(var)
+        return var
+        #term2 = 1/T * (
+       # Yt_hat = self.get_predict_samples(data_loader)
+       # sigma2 = 1./self.config["tau"]
+       # var = (sigma2 + Yt_hat**2).mean(0) - Yt_hat.mean(0)**2
+       # return Yt_hat.mean(0), var
 
 class UCB(BasicRegressor):
     pass
