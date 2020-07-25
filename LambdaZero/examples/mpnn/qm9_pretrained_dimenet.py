@@ -2,7 +2,7 @@ import os.path as osp
 
 import torch
 
-from torch_geometric.datasets import QM9
+from QM9 import QM9
 from torch_geometric.data import DataLoader
 from dimenet import DimeNet
 
