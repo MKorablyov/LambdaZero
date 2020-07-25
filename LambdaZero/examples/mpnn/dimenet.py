@@ -11,7 +11,7 @@ from torch_geometric.data import download_url
 from torch_geometric.data.makedirs import makedirs
 
 from dimenet_utils import bessel_basis, real_sph_harm
-import math
+from math import sqrt, pi as PI
 
 def uniform(size, tensor):
     bound = 1.0 / math.sqrt(size)

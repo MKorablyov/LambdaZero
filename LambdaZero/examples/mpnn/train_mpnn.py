@@ -11,7 +11,8 @@ import ray
 from ray import tune
 from ray.rllib.utils import merge_dicts
 
-from .dimenet import DimeNet
+from math import sqrt, pi as PI
+from dimenet import DimeNet
 
 from LambdaZero.utils import get_external_dirs, BasicRegressor
 import LambdaZero.inputs
@@ -39,7 +40,7 @@ def train_epoch(loader, model, optimizer, device, config):
         targets = getattr(data, config["target"])
 
         optimizer.zero_grad()
-        logits = model(z=data,pos=None,batch=None)
+        logits = model(z=data.x,pos=data.pos,batch=None)
 
         if config["loss"] == "L2":
             loss = F.mse_loss(logits, normalizer.normalize(targets))
@@ -78,7 +79,7 @@ def eval_epoch(loader, model, device, config):
         data = data.to(device)
         targets = getattr(data, config["target"])
 
-        logits = model(data)
+        logits = model(z=data,pos=None,batch=None)
         loss = F.mse_loss(logits, normalizer.normalize(targets))
 
         # log stuff

@@ -52,7 +52,8 @@ class BasicRegressor(tune.Trainable):
         self.test_set = DL(Subset(dataset, test_idxs.tolist()), batch_size=config["b_size"])
 
         # make model
-        self.model = config["model"](**config["model_config"])
+        #self.model = config["model"](**config["model_config"])
+        self.model = config["model"]
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
 
