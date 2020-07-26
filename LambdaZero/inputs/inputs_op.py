@@ -633,7 +633,6 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     # featurize elements
     atmfeat = pd.DataFrame(index=range(natm),columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic",
                                                       "sp", "sp2", "sp3", "num_hs"])
-
     # featurize
     fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
     factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
@@ -648,6 +647,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
         atmfeat["sp3"][i] = 1 if hybridization == HybridizationType.SP3 else 0
         atmfeat["num_hs"][i] = atom.GetTotalNumHs(includeNeighbors=True)
 
+    z = torch.tensor(atmfeat["atomic_number"].tolist(),dtype=torch.long)
     # get donors and acceptors
     atmfeat["acceptor"].values[:] = 0
     atmfeat["donor"].values[:] = 0
@@ -661,6 +661,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
              node_list = feats[j].GetAtomIds()
              for k in node_list:
                  atmfeat["acceptor"][k] = 1
+
     # get coord
     if ifcoord:
         coord = np.asarray([mol.GetConformer(0).GetAtomPosition(j) for j in range(natm)])
@@ -676,9 +677,10 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
         type_idx = np.stack(atmfeat["type_idx"].values,axis=0)
         atmfeat = atmfeat[["atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3","num_hs"]]
         atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
-    return atmfeat, coord, bond, bondfeat
 
-def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
+    return atmfeat, z, coord, bond, bondfeat
+
+def _mol_to_graph(atmfeat, z, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
@@ -689,19 +691,20 @@ def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
     # make torch data
     if coord is not None:
         coord = torch.tensor(coord,dtype=torch.float32)
-        data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+        data = Data(x=atmfeat, z=z, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
-        data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+        data = Data(x=atmfeat, z=z, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
 def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     "mol to graph convertor"
     mol,_,_ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
+
     if feat == "mpnn":
-        atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
+        atmfeat, z, coord, bond, bondfeat = mpnn_feat(mol)
     else:
         raise NotImplementedError(feat)
-    graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
+    graph = _mol_to_graph(atmfeat, z, coord, bond, bondfeat, props)
     return graph
 
 def create_mol_graph_with_3d_coordinates(smi, props):
@@ -738,7 +741,7 @@ def tpnn_proc(smi, props, pre_filter, pre_transform):
         graph = pre_transform(graph)
     return graph
 
-@ray.remote
+#@ray.remote
 def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
     try:
         graph = mol_to_graph(smi, props)
@@ -804,16 +807,20 @@ class BrutalDock(InMemoryDataset):
 
     def process(self):       
         print("processing", self.raw_paths)
+
         for raw_path, processed_path in zip(self.raw_paths, self.processed_paths):
             print('processing: ' + raw_path)
             if not os.path.isfile(processed_path):
                 docked_index = pd.read_feather(raw_path)
                 smis = docked_index["smi"].tolist()
+                #So far we have docked_index with all the mols one per row
+
                 props = {pr:docked_index[pr].tolist() for pr in self._props}
-                tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
-                                               self.pre_filter, self.pre_transform) for j in range(len(smis))]
+
+                tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props}, self.pre_filter, self.pre_transform) for j in range(len(smis))]
                 graphs = ray.get(tasks)
                 graphs = [g for g in graphs if g is not None]
                 # save to the disk
                 torch.save(self.collate(graphs), processed_path)
+
             print('file done: ' + processed_path)

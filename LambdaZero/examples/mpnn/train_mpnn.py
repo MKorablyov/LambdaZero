@@ -40,7 +40,11 @@ def train_epoch(loader, model, optimizer, device, config):
         targets = getattr(data, config["target"])
 
         optimizer.zero_grad()
-        logits = model(z=data.x,pos=data.pos,batch=None)
+
+        print(data.__dict__.keys())
+        raise ValueError
+
+        logits = model(z=data.z,pos=data.pos,batch=data.batch)
 
         if config["loss"] == "L2":
             loss = F.mse_loss(logits, normalizer.normalize(targets))
@@ -113,7 +117,7 @@ DEFAULT_CONFIG = {
             "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
             "props": ["gridscore"],
             "transform": transform,
-            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+            "file_names": ["Zinc15_260k_0"]
         },
         "model": DimeNet(hidden_channels=128, out_channels=1, num_blocks=6,
                         num_bilinear=8, num_spherical=7, num_radial=6,

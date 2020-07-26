@@ -62,7 +62,7 @@ def work_dir(expected_raw_files, expected_processed_file, real_molecule_dataset)
         for expected_raw_file in expected_raw_files:
             raw_path.joinpath(expected_raw_file).touch(mode=0o666, exist_ok=True)
 
-        processed_path = Path(tmp_dir_str).joinpath('processed/')
+        processed_path = Path(tmp_dir_str).joinpath('processed-done/')
         processed_path.mkdir(exist_ok=True)
         processed_file_path = processed_path.joinpath(expected_processed_file)
 

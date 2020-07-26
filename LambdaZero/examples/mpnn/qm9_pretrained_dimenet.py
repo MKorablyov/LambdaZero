@@ -25,7 +25,7 @@ for target in range(12):
     train_dataset, val_dataset, test_dataset = datasets
 
     model = model.to(device)
-    loader = DataLoader(test_dataset, batch_size=256)
+    loader = DataLoader(test_dataset, batch_size=64)
 
     maes = []
     for data in loader:
