@@ -69,7 +69,7 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, normalizer, device, con
 
     return metrics
 
-def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
+def eval_epoch(ddi_graph, eval_idxs, model, normalizer, device, config):
     subgraph_dataset = TensorDataset(ddi_graph.edge_index[:, eval_idxs].T,
                                      ddi_graph.edge_classes[eval_idxs], ddi_graph.y[eval_idxs])
 
