@@ -1,7 +1,7 @@
 from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb
 from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.examples.drug_comb import transforms
-from LambdaZero.utils import get_external_dirs
+from LambdaZero.utils import get_external_dirs, MeanVarianceNormalizer
 from torch_geometric.data import Batch
 from torchvision.transforms import Compose
 from torch.utils.data import TensorDataset, DataLoader
@@ -26,7 +26,7 @@ def random_split(num_examples, test_prob, valid_prob):
 
     return train_idx, val_idx, test_idx
 
-def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
+def train_epoch(ddi_graph, train_idxs, model, optimizer, normalizer, device, config):
     subgraph_dataset = TensorDataset(ddi_graph.edge_index[:, train_idxs].T,
                                      ddi_graph.edge_classes[train_idxs], ddi_graph.y[train_idxs])
 
@@ -36,7 +36,8 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
                         shuffle=True)
     model.train()
 
-    num_batches = math.ceil(train_idxs.shape[0] / config["batch_size"])
+    epoch_targets = []
+    epoch_preds = []
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for i, drug_drug_batch in enumerate(loader):
         optimizer.zero_grad()
@@ -51,14 +52,20 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
 
         preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_classes,
                       sg_edge_index, sg_nodes, sg_avging_idx)
-        loss = F.mse_loss(y, preds)
+        loss = F.mse_loss(normalizer.forward_transform(y), preds)
 
         loss.backward()
         optimizer.step()
 
-        metrics["loss"] += loss.item() / num_batches
-        metrics["mse"] += loss.item() / num_batches
-        metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
+        metrics["loss"] += loss.item() * drug_drug_index.shape[1]
+        epoch_targets.append(y.detach().cpu().numpy())
+        epoch_preds.append(normalizer.backward_transform(preds).detach().cpu().numpy())
+
+    epoch_targets = np.concatenate(epoch_targets,0)
+    epoch_preds = np.concatenate(epoch_preds, 0)
+    metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
+    metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
+    metrics["mse"] = ((epoch_targets - epoch_preds)**2).mean()
 
     return metrics
 
@@ -69,7 +76,8 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
     loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"], pin_memory=device == 'cpu')
     model.eval()
 
-    num_batches = math.ceil(eval_idxs.shape[0] / config["batch_size"])
+    epoch_targets = []
+    epoch_preds = []
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for drug_drug_batch in loader:
         drug_drug_index, edge_classes, y = drug_drug_batch
@@ -82,11 +90,17 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
 
         preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_classes,
                       sg_edge_index, sg_nodes, sg_avging_idx)
-        loss = F.mse_loss(y, preds)
+        loss = F.mse_loss(normalizer.forward_transform(y), preds)
 
-        metrics["loss"] += loss.item() / num_batches
-        metrics["mse"] += loss.item() / num_batches
-        metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
+        metrics["loss"] += loss.item() * drug_drug_index.shape[1]
+        epoch_targets.append(y.detach().cpu().numpy())
+        epoch_preds.append(normalizer.backward_transform(preds).detach().cpu().numpy())
+
+    epoch_targets = np.concatenate(epoch_targets,0)
+    epoch_preds = np.concatenate(epoch_preds, 0)
+    metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
+    metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
+    metrics["mse"] = ((epoch_targets - epoch_preds)**2).mean()
 
     return metrics
 
@@ -111,12 +125,76 @@ def get_batch_subgraph_edges(ddi_graph, batch_drug_drug_index):
     return edge_index, nodes, averaging_idx
 
 class SubgraphRegressor(tune.Trainable):
+    """A regressor class that plays nicely with ray.tune.
+
+    Attributes
+    ----------
+    config : Dict
+        A dictionary holding the various configurations for the model.
+    device : {'cpu', 'cuda'}
+        The device that the model will operate on.
+    ddi_graph : Data
+        The drug-drug graph.  Note that it is formed according to the pre_transform
+        to_drug_induced_subgraphs such that each drug in the ddi_graph has its own
+        protein subgraph.  For more details, refer to the documentation of
+        to_drug_induced_subgraphs.
+    train_idxs : torch.tensor
+        The indices of ddi_graph.edge_index representing training edges.
+    val_idxs : torch.tensor
+        The indices of ddi_graph.edge_index representing validation edges.
+    test_idxs : torch.tensor
+        The indices of ddi_graph.edge_index representing test edges.
+    model : SubgraphEmbeddingRegressorModel
+        The model to be used for prediction.  Refer to documentation of the
+        SubgraphEmbeddingRegressorModel class for more information.
+    optim : torch.optim.Adam
+        The optimizer to be user in the train step.
+    normalizer : MeanVarianceNormalizer
+        A normalizer to be applied during loss computation to properly scale
+        outputs.
+    train_epoch : Function
+        The method containing logic for the training step.
+    eval_epoch : Function
+        The method containing logic for the validation step.
+    """
     def _setup(self, config):
+        """Sets up the regressor.
+
+        Note that config contains all the arguments, so we detail the
+        keys of config in the Arguments section.
+
+        Arguments
+        ---------
+        score_type : {'hsa', 'zip', 'bliss', 'loewe'}
+            The score type to treat as the target for the model.
+        use_one_hot : bool
+            If True, use one-hot encodings for the protein features.  If False, use
+            learnable embeddings for the protein features.
+        protein_embedding_size : int
+            The size of the learnable protein embedding.
+        use_single_cell_line : bool
+            If True then only include drug-drug edges for the most populous in the
+            dataset.  If False, include all edges.
+        num_edges_to_take : int
+            If -1, keep all edges in the dataset. If positive, then keep
+            the first num_edges_to_take edges in the dataset and throw the rest
+            away.
+        test_set_prop : float (inclusive interval [0.0, 1.0])
+            The proportion of edges to be used in the test set.
+        val_set_prop : float (inclusive interval [0.0, 1.0])
+            The proportion of edges to be used in the validation set.
+        lr : float
+            The learning rate to use in optimization.
+        train_epoch : Function
+            The method to use for doing a train step over an epoch.
+        eval_epoch : Function
+            The method to use for doing a validation step over an epoch.
+        """
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         dataset = DrugCombDb(transform=self._get_transform(config),
-                             pre_transform=config["pre_transform"])
+                             pre_transform=transforms.to_drug_induced_subgraphs)
         self.ddi_graph = self._extract_ddi_graph(dataset)
 
         self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.ddi_graph.edge_index.shape[1],
@@ -135,6 +213,7 @@ class SubgraphRegressor(tune.Trainable):
             to_optimize.append(self.ddi_graph.protein_ftrs)
 
         self.optim = torch.optim.Adam(to_optimize, lr=config["lr"])
+        self.normalizer = MeanVarianceNormalizer((self.ddi_graph.y.mean(), self.ddi_graph.y.var()))
 
         self.train_epoch = config["train_epoch"]
         self.eval_epoch = config["eval_epoch"]
@@ -152,6 +231,8 @@ class SubgraphRegressor(tune.Trainable):
         use_one_hot : bool
             If True, use one-hot encodings for the protein features.  If False, use
             learnable embeddings for the protein features.
+        protein_embedding_size : int
+            The size of the learnable protein embedding.
         use_single_cell_line : bool
             If True then only include drug-drug edges for the most populous in the
             dataset.  If False, include all edges.
@@ -208,8 +289,10 @@ class SubgraphRegressor(tune.Trainable):
         return ddi_graph
 
     def _train(self):
-        train_scores = self.train_epoch(self.ddi_graph, self.train_idxs, self.model, self.optim, self.device, self.config)
-        eval_scores = self.eval_epoch(self.ddi_graph, self.val_idxs, self.model, self.device, self.config)
+        train_scores = self.train_epoch(self.ddi_graph, self.train_idxs, self.model,
+                                        self.optim, self.normalizer, self.device, self.config)
+        eval_scores = self.eval_epoch(self.ddi_graph, self.val_idxs, self.model,
+                                      self.normalizer, self.device, self.config)
 
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
@@ -224,11 +307,12 @@ class SubgraphRegressor(tune.Trainable):
     def _restore(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
+# For documentation of the config refer to the docstrings of
+# SubgraphRegressor._setup and SubgraphRegressor.
 _, _, summaries_dir =  get_external_dirs()
 config = {
     "trainer": SubgraphRegressor,
     "trainer_config": {
-        "pre_transform": transforms.to_drug_induced_subgraphs,
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
         "prediction_type": tune.grid_search(["dot_product", "mlp"]),
@@ -249,6 +333,7 @@ config = {
         "use_single_cell_line": True,
         "use_gat": False,
         "num_heads": 1,
+        "num_edges_to_take": -1,
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
@@ -262,7 +347,10 @@ config = {
 if __name__ == "__main__":
     ray.init()
 
-    # Sleep for 5 seconds to get around ray not noticing the node's resources
+    # Ray has a bug where a race condition can occur and ray may not pick up
+    # the available resources on a node and subsequently throw errors saying
+    # that insufficient resources are available.  Sleeping for a couple seconds
+    # gets around this error, so sleep for a bit here.
     time_to_sleep = 5
     print("Sleeping for %d seconds to appease ray" % time_to_sleep)
     time.sleep(time_to_sleep)
