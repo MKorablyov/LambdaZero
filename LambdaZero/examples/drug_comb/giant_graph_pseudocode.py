@@ -51,7 +51,8 @@ class MessagePassingBase(nn.Module):
  
 # A RGCN implementation based on third party torch_scatter. Similar to the implementation in PyG. 
 #
-# We may also implement using the native torch.spmm. torch.spmm is even faster since it wraps CuSparse and doesn't explicit create the messages.
+# We may also implement using the native torch.spmm.
+# torch.spmm is even faster since it wraps CuSparse and doesn't explicit create the messages.
 # However, torch.spmm only works for 2D tensor.
 # We need to reshape the adjacency (num_node, num_relation, num_node) into (num_node * num_relation, num_node) in propagation.
 # It could be less readable.
@@ -128,29 +129,7 @@ class DrugCombination(nn.Module):
         
         return pred
     
-# Zhaocheng: End of Pseudo code.
-# ==================================================================
 
-class RGCN_data:
-    def __init__(self, some):
-        print("init!!!!!!!!!!!1")
-        self.some = some
-        pass
-
-
-class RGCN_v1(torch.nn.Module, RGCN_data):
-
-    def __init__(self):
-        #self.data = data
-
-        super(RGCN_data, self).__init__()
-        super(RGCN_v1, self).__init__()
-
-        #super(torch.nn.Module, self).__init__()
-    #super(Envelope, self).__init__()
-
-
-    pass
 
 
 DEFAULT_CONFIG = {
@@ -185,9 +164,9 @@ def _train_epoch():
 if __name__ == "__main__":
     config = DEFAULT_CONFIG
     edge_list = _fake_data(config["num_relations"], config["num_nodes"], config["num_edges"])
-    node_feature = torch.randn(config["num_nodes"], config["feature_dim"])
+    #node_feature = torch.randn(config["num_nodes"], config["feature_dim"])
     print("edge list: %s" % edge_list)
-    print("node feature: %s" % node_feature)
+    #print("node feature: %s" % node_feature)
         
     dataset = GiantGraphDataset(edge_list, config["num_nodes"], config["num_relations"])
     
@@ -197,5 +176,6 @@ if __name__ == "__main__":
     )
     
     task = DrugCombination(model, dataset).cuda()
-    
+    print(task)
+    #print(task.forward())
     # RGCN_v1().to("cuda")

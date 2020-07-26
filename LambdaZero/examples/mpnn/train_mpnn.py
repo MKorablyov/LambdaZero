@@ -4,9 +4,6 @@ import os.path as osp
 import torch
 import torch.nn.functional as F
 
-from torch_geometric.utils import remove_self_loops
-import torch_geometric.transforms as T
-
 import ray
 from ray import tune
 from ray.rllib.utils import merge_dicts
@@ -28,65 +25,85 @@ def train_epoch(loader, model, optimizer, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.train()
 
-    metrics = {"loss":0, "mse": 0, "mae":0}
+    metrics = {"loss":0,}
+    epoch_targets = []
+    epoch_preds = []
+
     for bidx,data in enumerate(loader):
         data = data.to(device)
-        target = getattr(data, config["target"])
+        targets = getattr(data, config["target"])
 
         optimizer.zero_grad()
-        logit = model(data)
-        loss = F.mse_loss(logit, normalizer.normalize(target))
+        logits = model(data)
+        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
         loss.backward()
         optimizer.step()
 
+        # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
-        pred = normalizer.unnormalize(logit)
-        metrics["mse"] += ((target - pred) ** 2).sum().item()
-        metrics["mae"] += ((target - pred).abs()).sum().item()
+        epoch_targets.append(targets.detach().cpu().numpy())
+        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
 
-    metrics["loss"] = metrics["loss"] / len(loader.dataset)
-    metrics["mse"] = metrics["mse"] / len(loader.dataset)
-    metrics["mae"] = metrics["mae"] / len(loader.dataset)
+    epoch_targets = np.concatenate(epoch_targets,0)
+    epoch_preds = np.concatenate(epoch_preds, 0)
+    metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
+    metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
+    metrics["mse"] = ((epoch_targets - epoch_preds)**2).mean()
+
+    ranked_targets = epoch_targets[np.argsort(epoch_targets)]
+    predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
+    metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
+    metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
-
 
 def eval_epoch(loader, model, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.eval()
+    metrics = {"loss":0,}
+    epoch_targets = []
+    epoch_preds = []
 
-    metrics = {"loss": 0, "mse": 0, "mae": 0}
-    for bidx, data in enumerate(loader):
+    for bidx,data in enumerate(loader):
         data = data.to(device)
-        target = getattr(data, config["target"])
+        targets = getattr(data, config["target"])
 
-        logit = model(data)
-        loss = F.mse_loss(logit, normalizer.normalize(target))
+        logits = model(data)
+        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
 
+        # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
-        pred = normalizer.unnormalize(logit)
-        metrics["mse"] += ((target - pred) ** 2).sum().item()
-        metrics["mae"] += ((target - pred).abs()).sum().item()
+        epoch_targets.append(targets.detach().cpu().numpy())
+        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
 
-    metrics["loss"] = metrics["loss"] / len(loader.dataset)
-    metrics["mse"] = metrics["mse"] / len(loader.dataset)
-    metrics["mae"] = metrics["mae"] / len(loader.dataset)
+    epoch_targets = np.concatenate(epoch_targets,0)
+    epoch_preds = np.concatenate(epoch_preds, 0)
+    metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
+    metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
+    metrics["mse"] = ((epoch_targets - epoch_preds)**2).mean()
+
+    ranked_targets = epoch_targets[np.argsort(epoch_targets)]
+    predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
+    metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
+    metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
+
+
 
 
 DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
         "target": "gridscore",
-        "target_norm": [-26.3, 12.3],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/d4/raw/randsplit_dock_blocks105_walk40_clust.npy"),
+        "target_norm": [-43.042, 7.057],
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
         "b_size": 64,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
-            "root": os.path.join(datasets_dir, "brutal_dock/d4"),
-            "props": ["gridscore", "klabel"],
+            "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
+            "props": ["gridscore"],
             "transform": transform,
-            "file_names": ["dock_blocks105_walk40_clust"],
+            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
         },
 
         "model": LambdaZero.models.MPNNet,
@@ -104,14 +121,16 @@ DEFAULT_CONFIG = {
     "summaries_dir": summaries_dir,
     "memory": 10 * 10 ** 9,
 
-    "stop": {"training_iteration": 3},
+    "stop": {"training_iteration": 200},
     "resources_per_trial": {
-        "cpu": 4,  # fixme requesting all CPUs blocks additional call to ray from LambdaZero.input
+        "cpu": 4,  # fixme - calling ray.remote would request resources outside of tune allocation
         "gpu": 1.0
     },
+    "keep_checkpoint_num": 2,
+    "checkpoint_score_attr":"train_loss",
     "num_samples":1,
     "checkpoint_at_end": False,
-    "checkpoint_freq": 250000000,
+    #"checkpoint_freq": 1,
 }
 
 
