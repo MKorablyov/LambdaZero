@@ -213,7 +213,9 @@ class SubgraphRegressor(tune.Trainable):
             to_optimize.append(self.ddi_graph.protein_ftrs)
 
         self.optim = torch.optim.Adam(to_optimize, lr=config["lr"])
-        self.normalizer = MeanVarianceNormalizer((self.ddi_graph.y.mean(), self.ddi_graph.y.var()))
+
+        float_y = self.ddi_graph.y.to(dtype=torch.float)
+        self.normalizer = MeanVarianceNormalizer((float_y.mean(), float_y.var()))
 
         self.train_epoch = config["train_epoch"]
         self.eval_epoch = config["eval_epoch"]
@@ -315,9 +317,9 @@ config = {
     "trainer_config": {
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
-        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
-        "lr": tune.grid_search([1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 5e-1, 5e-2, 5e-3, 5e-4, 5e-5]),
-        "use_one_hot": tune.grid_search([True, False]),
+        "prediction_type": "mlp",#tune.grid_search(["dot_product", "mlp"]),
+        "lr": 1e-4,#tune.grid_search([1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 5e-1, 5e-2, 5e-3, 5e-4, 5e-5]),
+        "use_one_hot": False,#tune.grid_search([True, False]),
         "score_type": 'hsa',
         "weight_initialization_type": "torch_base",
         "protein_embedding_size": 256,
@@ -329,11 +331,11 @@ config = {
         "batch_size": 64,
         "conv_dropout_rate": 0.1,
         "linear_dropout_rate": 0.2,
-        "skip_gcn": tune.grid_search([False]),
+        "skip_gcn": False,#tune.grid_search([False]),
         "use_single_cell_line": True,
         "use_gat": False,
         "num_heads": 1,
-        "num_edges_to_take": -1,
+        "num_edges_to_take": 1000,
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
