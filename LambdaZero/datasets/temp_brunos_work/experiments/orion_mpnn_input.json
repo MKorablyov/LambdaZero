@@ -1,0 +1,22 @@
+{
+
+    "run_parameters": {
+        "experiment_name": "Orion-MPNN",
+        "run_name": "orion"
+    },
+    "training": {
+        "num_epochs": 100,
+        "num_workers": 4,
+        "batch_size": 64,
+        "learning_rate": "orion~loguniform(1e-6, 1e-3)",
+        "train_fraction": 0.8,
+        "validation_fraction": 0.1,
+        "patience": 10
+    },
+    "model": {
+        "name": "MPNN",
+        "gcn_size": "orion~choices([32, 64, 128, 256])",
+        "edge_hidden": "orion~choices([32, 64, 128, 256])",
+        "linear_hidden": "orion~choices([128, 256, 512])"
+    }
+}

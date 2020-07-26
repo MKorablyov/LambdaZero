@@ -1,24 +1,32 @@
-import os, sys, logging,time,string, random, time, subprocess
+import contextlib
+import logging
+import os
+import random
+import string
+import subprocess
 from collections import Counter
+
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import BRICS
-from rdkit.Chem import Draw
-from rdkit.Chem import AllChem
-from rdkit.Chem.Scaffolds import MurckoScaffold
-
-from rdkit import rdBase
-from rdkit.Chem.rdchem import HybridizationType
 from rdkit import RDConfig
+from rdkit import rdBase
+from rdkit.Chem import AllChem
+from rdkit.Chem import BRICS
 from rdkit.Chem import ChemicalFeatures
+from rdkit.Chem import Draw
+from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.rdchem import BondType as BT
+from rdkit.Chem.rdchem import HybridizationType
+
+from LambdaZero.chem.chimera_op import _add_hydrogens_and_compute_gasteiger_charges_with_chimera
+
 rdBase.DisableLog('rdApp.error')
 
 import pandas as pd
 from rdkit import DataStructs
 
-import torch as th
-from torch_geometric.data import (InMemoryDataset, download_url, extract_zip, Data)
+import torch
+from torch_geometric.data import (Data)
 from torch_sparse import coalesce
 
 atomic_numbers = {"H":1,"He":2,"Li":3,"Be":4,"B":5,"C":6,"N":7,"O":8,"F":9,"Ne":10,"Na":11,"Mg":12,"Al":13,"Si":14,
@@ -27,12 +35,14 @@ atomic_numbers = {"H":1,"He":2,"Li":3,"Be":4,"B":5,"C":6,"N":7,"O":8,"F":9,"Ne":
                   "Zr":40, "Nb":41,"Mo":42,"Tc":43,"Ru":44,"Rh":45,"Pd":46,"Ag":47,"Cd":48,"In":49,"Sn":50,"Sb":51,
                   "Te":52, "I":53,"Xe":54,"Cs":55,"Ba":56}
 
+
 def compute_isometry(mol):
     ":return [num_atoms] isometric group "
     isom_groups = list(Chem.rdmolfiles.CanonicalRankAtoms(mol, breakTies=False))
     return np.asarray(isom_groups,dtype=np.int32)
 
-def find_rota_murcko_bonds(mol,sanitize=False):
+
+def find_rota_murcko_bonds(mol, sanitize=False):
     """ Finds rotatable bonds (first) and Murcko bonds (second)
     :param mol:
     :return:
@@ -77,6 +87,7 @@ def find_rota_murcko_bonds(mol,sanitize=False):
     rota_bonds = np.reshape(np.asarray(rota_bonds, dtype=np.int64), [-1, 2])
     murcko_bonds = np.reshape(np.asarray(murcko_bonds, dtype=np.int64), [-1, 2])
     return rota_bonds,murcko_bonds
+
 
 def break_on_bonds(mol, jun_bonds, frags_generic):
     """ Breaks molecule into fragments
@@ -159,6 +170,7 @@ def mol_from_frag(jun_bonds, frags=None, frag_smis=None, coord=None, optimize=Fa
     [emol.AddBond(int(bond[0]),int(bond[1]), Chem.BondType.SINGLE) for bond in mol_bonds]
     mol = emol.GetMol()
     atoms = list(mol.GetAtoms())
+
     def _pop_H(atom):
         nh = atom.GetNumExplicitHs()
         if nh > 0: atom.SetNumExplicitHs(nh-1)
@@ -174,6 +186,7 @@ def mol_from_frag(jun_bonds, frags=None, frag_smis=None, coord=None, optimize=Fa
         AllChem.MMFFOptimizeMolecule(mol)
         Chem.RemoveHs(mol)
     return mol,mol_bonds
+
 
 def fragment_molecule(mol, frags_generic, decomposition):
     """ Fragments a whole molecule and adds to the database.
@@ -236,6 +249,7 @@ def draw_frag(frag_name,r_idx,out_path,out_file=None):
     logging.info("saved image", os.path.join(out_path, fragsp_name + ".svg"))
     return
 
+
 def build_mol(smiles=None,num_conf=1, minimize=False, noh=True,charges=True):
     # todo: things other than SMILES
     # fixme: return numpy array and not list
@@ -258,7 +272,7 @@ def build_mol(smiles=None,num_conf=1, minimize=False, noh=True,charges=True):
     elem = [int(atom.GetAtomicNum()) for atom in mol.GetAtoms()]
     coord = [np.asarray([mol.GetConformer(j).GetAtomPosition(i) for i in range(len(elem))]) for j in range(num_conf)]
     coord = np.asarray(np.stack(coord,axis=0),dtype=np.float32).tolist()
-    return pd.DataFrame({"mol":[mol], "elem":[elem], "coord":[coord]})
+    return mol, elem, coord
 
 
 def _gen_mol2(smi, mol_name, outpath, chimera_bin, charge_method, num_conf):
@@ -277,14 +291,8 @@ def _gen_mol2(smi, mol_name, outpath, chimera_bin, charge_method, num_conf):
     print(Chem.MolToMolBlock(mol,confId=int(mi)),file=open(mol_file,'w+'))
     # add hydrogens and compute gasteiger charges in Chimera
     mol2_file = os.path.join(outpath, mol_name + ".mol2")
-    chimera_cmd = "printf \"open {}" \
-              "\naddh" \
-              "\naddcharge all method {}" \
-              "\nwrite format mol2 0 {}" \
-              "\nstop now\"  | {} --nogui".format(
-        mol_file, charge_method, mol2_file, chimera_bin)
-    process = subprocess.Popen(chimera_cmd, shell=True, stdout=subprocess.PIPE)
-    process.wait()
+    _add_hydrogens_and_compute_gasteiger_charges_with_chimera(mol_file, charge_method, chimera_bin, mol2_file)
+
     return mol2_file
 
 
@@ -340,18 +348,32 @@ class Dock_smi:
             assert os.path.exists(self.dock_in_template), "can't find rec site file " + self.dock_in_template
 
     def dock(self, smi, mol_name=None, molgen_conf=20):
-        # generate random molecule name if needed
-        if mol_name is None: mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
-        # do smiles conversion and docking
-        mol2_file = _gen_mol2(smi, mol_name, self.outpath, self.chimera_bin, self.charge_method, num_conf=molgen_conf)
-        gridscore, coord = self._dock_dock6(smi, mol2_file, mol_name,
-                                            self.outpath, self.dock_in_template, self.dock6_bin)
-        if self.cleanup:
-            os.remove(os.path.join(self.outpath, mol_name + ".mol"))
-            os.remove(os.path.join(self.outpath, mol_name + ".mol2"))
-            os.remove(os.path.join(self.outpath, mol_name + "_dockin"))
-            os.remove(os.path.join(self.outpath, mol_name + "_dockout"))
-            os.remove(os.path.join(self.outpath, mol_name + "_scored.mol2"))
+        try:
+            # generate random molecule name if needed
+            if mol_name is None:
+                mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+
+            # do smiles conversion and docking
+            mol2_file = _gen_mol2(smi, mol_name, self.outpath, self.chimera_bin, self.charge_method, num_conf=molgen_conf)
+            gridscore, coord = self._dock_dock6(smi, mol2_file, mol_name,
+                                                self.outpath, self.dock_in_template, self.dock6_bin)
+        finally:
+            if self.cleanup:
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + ".mol"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + ".mol2"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + "_dockin"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + "_dockout"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, mol_name + "_scored.mol2"))
+
         return mol_name, gridscore, coord
 
     def _dock_dock6(self, smi, mol2file, mol_name, outpath, dock_pars_file, dock_bin):
@@ -372,7 +394,7 @@ class Dock_smi:
         # parse dock energy
         with open(dock_out_file) as f: lines = f.read().splitlines()
         gridscores = [float(line[38:]) for line in lines if line.startswith("                          Grid_Score")]
-        assert len(gridscores) == 1, "parsing error - multiple gridscores"
+        assert len(gridscores) == 1, "could not parse docking output - something wrong with docking"
         gridscore = gridscores[0]
 
         # parse dock coords
@@ -387,7 +409,6 @@ class Dock_smi:
         noh = np.where(noh)[0]
         coord = np.asarray([mol.GetConformer(0).GetAtomPosition(int(idx)) for idx in noh])
         return gridscore, coord
-
 
 
 class ScaffoldSplit:
@@ -429,23 +450,51 @@ def get_fp(mol, fp_length, fp_radiis, from_atoms=None):
     fps = np.asarray(np.concatenate(fps_, axis=0),dtype=np.float32)
     return fps
 
-def get_fingerprint(smiles, radius=2,length=1024):
-  """Get Morgan Fingerprint of a specific SMILES string.
-  Args:
-    smiles: String. The SMILES string of the molecule.
-    hparams: tf.contrib.training.HParams. Hyper parameters.
-  Returns:
-    np.array. shape = [hparams.fingerprint_length]. The Morgan fingerprint.
-  """
-  if smiles is None:
-    return np.zeros((length,))
-  molecule = Chem.MolFromSmiles(smiles)
-  if molecule is None:
-    return np.zeros((length,))
-  fingerprint = AllChem.GetMorganFingerprintAsBitVect(molecule, radius, length)
-  arr = np.zeros((1,))
-  DataStructs.ConvertToNumpyArray(fingerprint, arr)
-  return pd.DataFrame({"fingerprint":[arr]})
+class FPEmbedding_v2:
+    def __init__(self, mol_fp_len, mol_fp_radiis, stem_fp_len, stem_fp_radiis):
+        self.mol_fp_len = mol_fp_len
+        self.mol_fp_radiis = mol_fp_radiis
+        self.stem_fp_len = stem_fp_len
+        self.stem_fp_radiis = stem_fp_radiis
+
+    def __call__(self, molecule):
+        mol = molecule.mol
+        mol_fp = get_fp(mol, self.mol_fp_len, self.mol_fp_radiis)
+
+        # get fingerprints and also handle empty case
+        stem_fps = [get_fp(mol, self.stem_fp_len, self.stem_fp_radiis, [idx])
+                    for idx in molecule.stem_atmidxs]
+
+        jbond_fps = [(get_fp(mol, self.stem_fp_len, self.stem_fp_radiis, [idx[0]]) +
+                     get_fp(mol, self.stem_fp_len, self.stem_fp_radiis, [idx[1]]))/2.
+                     for idx in molecule.jbond_atmidxs]
+
+        if len(stem_fps) > 0: stem_fps = np.stack(stem_fps, 0)
+        else: stem_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
+        if len(jbond_fps) > 0: jbond_fps = np.stack(jbond_fps, 0)
+        else: jbond_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
+        return mol_fp, stem_fps, jbond_fps
+
+
+# def get_fingerprint(smiles, radius=2,length=1024):
+# fixme: make a part of get_fp
+#
+#   """Get Morgan Fingerprint of a specific SMILES string.
+#   Args:
+#     smiles: String. The SMILES string of the molecule.
+#     hparams: tf.contrib.training.HParams. Hyper parameters.
+#   Returns:
+#     np.array. shape = [hparams.fingerprint_length]. The Morgan fingerprint.
+#   """
+#   if smiles is None:
+#     return np.zeros((length,))
+#   molecule = Chem.MolFromSmiles(smiles)
+#   if molecule is None:
+#     return np.zeros((length,))
+#   fingerprint = AllChem.GetMorganFingerprintAsBitVect(molecule, radius, length)
+#   arr = np.zeros((1,))
+#   DataStructs.ConvertToNumpyArray(fingerprint, arr)
+#   return pd.DataFrame({"fingerprint":[arr]})
 
 
 def onehot(arr,num_classes,dtype=np.int):
@@ -455,42 +504,57 @@ def onehot(arr,num_classes,dtype=np.int):
     onehot_arr[np.arange(arr.shape[0]), arr] = 1
     return onehot_arr
 
-def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
+
+_mpnn_feat_cache = [None]
+
+def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_features=True):
     atomtypes = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
     bondtypes = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
 
     natm = len(mol.GetAtoms())
+    ntypes = len(atomtypes)
     # featurize elements
-    atmfeat = pd.DataFrame(index=range(natm),columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic",
-                                                      "sp", "sp2", "sp3", "num_hs"])
+    # columns are: ["type_idx" .. , "atomic_number", "acceptor", "donor",
+    # "aromatic", "sp", "sp2", "sp3", "num_hs", [atomic_number_onehot] .. ])
+
+    nfeat = ntypes + 1 + 8
+    if one_hot_atom:
+        nfeat += len(atomic_numbers)
+    atmfeat = np.zeros((natm, nfeat))
 
     # featurize
-    fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
-    factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
     for i,atom in enumerate(mol.GetAtoms()):
-        type_idx = atomtypes.get(atom.GetSymbol(),5)
-        atmfeat["type_idx"][i] = onehot([type_idx], num_classes=len(atomtypes) + 1)[0]
-        atmfeat["atomic_number"][i] = atom.GetAtomicNum()
-        atmfeat["aromatic"][i] = 1 if atom.GetIsAromatic() else 0
+        type_idx = atomtypes.get(atom.GetSymbol(), 5)
+        atmfeat[i, type_idx] = 1
+        if one_hot_atom:
+            atmfeat[i, ntypes + 9 + atom.GetAtomicNum() - 1] = 1
+        else:
+            atmfeat[i, ntypes + 1] = atom.GetAtomicNum()
+        atmfeat[i, ntypes + 4] = atom.GetIsAromatic()
         hybridization = atom.GetHybridization()
-        atmfeat["sp"][i] = 1 if hybridization == HybridizationType.SP else 0
-        atmfeat["sp2"][i] = 1 if hybridization == HybridizationType.SP2 else 0
-        atmfeat["sp3"][i] = 1 if hybridization == HybridizationType.SP3 else 0
-        atmfeat["num_hs"][i] = atom.GetTotalNumHs(includeNeighbors=True)
+        atmfeat[i, ntypes + 5] = hybridization == HybridizationType.SP
+        atmfeat[i, ntypes + 6] = hybridization == HybridizationType.SP2
+        atmfeat[i, ntypes + 7] = hybridization == HybridizationType.SP3
+        atmfeat[i, ntypes + 8] = atom.GetTotalNumHs(includeNeighbors=True)
 
     # get donors and acceptors
-    atmfeat["acceptor"].values[:] = 0
-    atmfeat["donor"].values[:] = 0
-    feats = factory.GetFeaturesForMol(mol)
-    for j in range(0, len(feats)):
-         if feats[j].GetFamily() == 'Donor':
-             node_list = feats[j].GetAtomIds()
-             for k in node_list:
-                 atmfeat["donor"][k] = 1
-         elif feats[j].GetFamily() == 'Acceptor':
-             node_list = feats[j].GetAtomIds()
-             for k in node_list:
-                 atmfeat["acceptor"][k] = 1
+    if donor_features:
+        if _mpnn_feat_cache[0] is None:
+            fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
+            factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
+            _mpnn_feat_cache[0] = factory
+        else:
+            factory = _mpnn_feat_cache[0]
+        feats = factory.GetFeaturesForMol(mol)
+        for j in range(0, len(feats)):
+             if feats[j].GetFamily() == 'Donor':
+                 node_list = feats[j].GetAtomIds()
+                 for k in node_list:
+                     atmfeat[k, ntypes + 3] = 1
+             elif feats[j].GetFamily() == 'Acceptor':
+                 node_list = feats[j].GetAtomIds()
+                 for k in node_list:
+                     atmfeat[k, ntypes + 2] = 1
     # get coord
     if ifcoord:
         coord = np.asarray([mol.GetConformer(0).GetAtomPosition(j) for j in range(natm)])
@@ -501,32 +565,47 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     bondfeat = [bondtypes[bond.GetBondType()] for bond in mol.GetBonds()]
     bondfeat = onehot(bondfeat,num_classes=len(bondtypes))
 
-    # convert atmfeat to numpy matrix
-    if not panda_fmt:
-        type_idx = np.stack(atmfeat["type_idx"].values,axis=0)
-        atmfeat = atmfeat[["atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3","num_hs"]]
-        atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
+    # convert atmfeat to pandas
+    if panda_fmt:
+        atmfeat_pd = pd.DataFrame(index=range(natm),columns=[
+            "type_idx", "atomic_number", "acceptor", "donor", "aromatic",
+            "sp", "sp2", "sp3", "num_hs"])
+        atmfeat_pd['type_idx'] = atmfeat[:, :ntypes+1]
+        atmfeat_pd['atomic_number'] = atmfeat[:, ntypes+1]
+        atmfeat_pd['acceptor'] = atmfeat[:, ntypes+2]
+        atmfeat_pd['donor'] = atmfeat[:, ntypes+3]
+        atmfeat_pd['aromatic'] = atmfeat[:, ntypes+4]
+        atmfeat_pd['sp'] = atmfeat[:, ntypes+5]
+        atmfeat_pd['sp2'] = atmfeat[:, ntypes+6]
+        atmfeat_pd['sp2'] = atmfeat[:, ntypes+7]
+        atmfeat_pd['sp3'] = atmfeat[:, ntypes+8]
+        atmfeat = atmfeat_pd
     return atmfeat, coord, bond, bondfeat
 
-def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
+def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}, data_cls=Data):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
-    atmfeat = th.tensor(atmfeat, dtype=th.float32)
-    edge_index = th.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=th.int64)
-    edge_attr = th.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=th.float32)
-    edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
+    if bond.shape[0] > 0:
+        edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=torch.int64)
+        edge_attr = torch.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=torch.float32)
+        edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    else:
+        edge_index = torch.zeros((0,2), dtype=torch.int64)
+        edge_attr = torch.tensor(bondfeat, dtype=torch.float32)
+
     # make torch data
     if coord is not None:
-        coord = th.tensor(coord,dtype=th.float32)
-        data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+        coord = torch.tensor(coord,dtype=torch.float32)
+        data = data_cls(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
-        data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+        data = data_cls(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
-    "mol to graph convertor"
-    mol = build_mol(smiles, num_conf=num_conf, noh=noh)["mol"].to_list()[0]
+    " mol to graph convertor "
+    mol, _, _ = build_mol(smiles, num_conf=num_conf, noh=noh)
     if feat == "mpnn":
         atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
     else:
