@@ -1,4 +1,5 @@
 from LambdaZero.utils import get_external_dirs
+from LambdaZero.examples.drug_comb.transforms import to_drug_induced_subgraphs
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -8,6 +9,24 @@ import pandas as pd
 import torch
 
 def get_fingerprint(smile, radius, n_bits):
+    """Gets the morgan fingerprint for a SMILES string
+
+    Parameters
+    ----------
+    smile : str
+        The SMILES string of the object we wish to get a fingerprint for.
+    radius : int
+        The radius of the fingerprint
+    n_bits : int
+        The number of bits to store the fingerprint's representation in
+
+    Returns
+    -------
+    np.ndarray
+        An np.array of shape (n_bits,) containing either the fingerprint,
+        or all -1s if we could not obtain the fingerprint.
+
+    """
     if smile == 'none':
         return np.array([-1]*n_bits)
     try:
@@ -15,204 +34,42 @@ def get_fingerprint(smile, radius, n_bits):
     except Exception as ex:
         return np.array([-1]*n_bits)
 
-def to_drug_induced_subgraphs(data_list):
-    new_data_list = []
-    for data in data_list:
-        all_edge_idx = data.edge_index
-
-        dpi_edge_idx_range = data.graph_type_idx_ranges['dpi']
-        dpi_edge_idx = all_edge_idx[:, dpi_edge_idx_range[0]:dpi_edge_idx_range[1]]
-
-        # Get the edges in order so that edges for the same drug are all
-        # grouped next to each other
-        idx_sorts = dpi_edge_idx[0,:].argsort()
-        re_index = dpi_edge_idx[:, idx_sorts]
-
-        # np.unique returns the index that each unique drug (i.e., value of re_index[0,:])
-        # occurs at. Since the edges were ordered with argsort above, consecutive items of
-        # idx_start represent begin and end ranges for a particular drug's edges.  Then,
-        # use these begin and end ranges to split the original edge index into a separate
-        # one for each drug with np.split
-        all_idxs = np.arange(re_index.shape[1])
-        _, idx_start = np.unique(re_index[0,:], return_index=True)
-        drug_to_prot_sorted = [re_index[:, split] for split in np.split(all_idxs, idx_start[1:])]
-
-        # split[0,0] is a tensor, so call item() on it to get the int out
-        drug_idx_to_split = {split[0,0].item(): split for split in drug_to_prot_sorted}
-
-        # Get all drugs by taking union of drugs in ddi_edge_idx and re_index
-        # (that is, the dpi graph drugs)
-        ddi_edge_idx_range = data.graph_type_idx_ranges['ddi']
-        ddi_edge_idx = all_edge_idx[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
-        unique_drugs = np.unique(np.hstack([ddi_edge_idx.flatten(), re_index[0,:]]))
-
-        # Create a new graph for each drug...
-        drug_graphs = [_build_subgraph(data, drug_idx_to_split, drug, len(unique_drugs)) for drug in unique_drugs]
-
-        drug_idx_to_graph = {unique_drugs[i]: drug_graph for i, drug_graph in enumerate(drug_graphs)}
-        drug_drug_index = data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
-        drug_indexer = _get_drug_indexer(drug_drug_index, drug_idx_to_graph)
-
-        # Create one graph object whose edges are simply the ddi edges, but augment
-        # the graph object with the attribute drug_idx_to_graph which maps a drug
-        # to its subgraph which can subsequently be used to compute a subgraph embedding.
-        super_graph = Data(
-            x=data.x[:len(unique_drugs)],
-            edge_index=drug_drug_index[:, drug_indexer],
-            y=data.y[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]][drug_indexer],
-        )
-
-        super_graph.protein_ftrs = data.x[len(unique_drugs):]
-        super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]][drug_indexer]
-        super_graph.drug_idx_to_graph = drug_idx_to_graph
-
-        drugs_without_trgts = []
-        for drug in torch.unique(super_graph.edge_index):
-            if super_graph.drug_idx_to_graph[drug.item()].edge_index.shape[1] == 0:
-                drugs_without_trgts.append(drug.item())
-
-        new_data_list.append(super_graph)
-
-    return new_data_list
-
-def _build_subgraph(parent_graph, drug_idx_to_split, drug, num_drug_nodes):
-    if drug not in drug_idx_to_split:
-        return Data(edge_index=torch.tensor([], dtype=torch.long))
-
-    drug_subgraph_idx = drug_idx_to_split[drug]
-    nodes_in_subgraph = np.unique(drug_subgraph_idx)
-
-    n_mask = np.zeros(parent_graph.num_nodes, dtype=np.bool_)
-    n_mask[nodes_in_subgraph] = 1
-
-    mask = n_mask[parent_graph.edge_index[0]] & n_mask[parent_graph.edge_index[1]]
-    subgraph_edge_index = parent_graph.edge_index[:, mask]
-
-    # remove drug node from the subgraph here.  edges_without_drug is a bool array
-    # wherein an item is True if the edge does not contain the drug node, and
-    # False if it does contain the drug edge
-    edges_without_drug = ~(subgraph_edge_index.T == drug).any(-1)
-    subgraph_edge_index = subgraph_edge_index[:,edges_without_drug]
-
-    # Make edge index relative to a 0-indexed protein feature matrix
-    subgraph_edge_index -= num_drug_nodes
-
-    # Maintain the protein nodes here as well
-    subgraph = Data(edge_index=torch.tensor(subgraph_edge_index, dtype=torch.long))
-    subgraph.nodes = torch.unique(subgraph.edge_index.flatten())
-
-    return subgraph
-
-def _get_drug_indexer(drug_drug_index, drug_idx_to_graph):
-    drugs_without_target = torch.tensor([
-        drug for drug, graph in drug_idx_to_graph.items() 
-        if len(graph.edge_index) == 0 or graph.edge_index.shape[1] == 0
-    ])
-
-    # Tried to figure out how to do this vectorized, the below _almost_ works
-    #
-    # (drug_drug_index[:, None].T == drugs_without_targets.T).all(-1).any(-1)
-    #
-    # But it only finds self loops it seems.  There's only 65k drug edges so a one-time
-    # loop isn't too bad.  Just doing this to save time on account of this.
-    bad_drug_indices = torch.zeros(drug_drug_index.shape[1]).to(torch.bool)
-    for i in range(drug_drug_index.shape[1]):
-        if drug_drug_index[0, i] in drugs_without_target or drug_drug_index[1, i] in drugs_without_target:
-            bad_drug_indices[i] = True
-
-    self_loop_indices = drug_drug_index[0] == drug_drug_index[1]
-
-    return ~torch.stack((self_loop_indices, bad_drug_indices)).any(0)
-
-def subgraph_protein_features_to_embedding(embedding_size, device):
-    def _subgraph_protein_features_to_embedding(data):
-        if not hasattr(data, 'drug_idx_to_graph'):
-            raise RuntimeError(
-                'Data object does not have an attribute drug_idx_to_graph. ' +
-                'It must have this to use the transform subgraph_protein_features_to_embedding.'
-            )
-
-        data.protein_ftrs = torch.rand((data.protein_ftrs.shape[0], embedding_size),
-                                       requires_grad=True, dtype=torch.float, device=device)
-
-        return data
-
-    return _subgraph_protein_features_to_embedding
-
-def use_score_type_as_target(score_type):
-    # Index in final tensors of targets for each score type
-    score_type_to_idx = {
-        'zip':   0,
-        'bliss': 1,
-        'loewe': 2,
-        'hsa':   3,
-    }
-
-    score_type = score_type.lower()
-    score_idx = score_type_to_idx[score_type]
-
-    def _use_score_type_as_target(data):
-        data.y = data.y[:, score_idx]
-        return data
-
-    return _use_score_type_as_target
-
-def train_first_k_edges(k):
-    def _train_first_k_edges(data):
-        data.edge_index = data.edge_index[:, :k]
-        data.edge_classes = data.edge_classes[:k]
-        data.y = data.y[:k]
-
-        return data
-
-    return _train_first_k_edges
-
-def to_bipartite_drug_protein_graph(data_list):
-    new_data_list = []
-    for data in data_list:
-        ddi_edge_idx_range = data.graph_type_idx_ranges['ddi']
-        dpi_edge_idx_range = data.graph_type_idx_ranges['dpi']
-
-        pdi_offset = ddi_edge_idx_range[1]
-        pdi_edge_idx_range = [idx + pdi_offset for idx in dpi_edge_idx_range]
-
-        new_edge_idx_first = data.edge_index[:, dpi_edge_idx_range[0]:dpi_edge_idx_range[1]]
-        new_edge_idx_scnd = data.edge_index[:, pdi_edge_idx_range[0]:pdi_edge_idx_range[1]]
-
-        new_edge_idx = torch.cat((new_edge_idx_first, new_edge_idx_scnd), dim=1)
-
-        ddi_edges = data.edge_index[:, ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
-        super_graph = Data(
-            x=data.x[:len(torch.unique(ddi_edges.flatten()))],
-            edge_index=ddi_edges,
-            y=data.y[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]],
-        )
-
-        super_graph.edge_classes = data.edge_classes[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]]
-        super_graph.drug_protein_graph = Data(
-            x=data.x,
-            edge_index=torch.tensor(new_edge_idx, dtype=torch.long),
-        )
-
-        new_data_list.append(super_graph)
-
-    return new_data_list
-
-def use_single_cell_line(data):
-    cell_lines, cell_line_counts = torch.unique(data.edge_classes, return_counts=True)
-    cell_line = cell_lines[torch.argmax(cell_line_counts)]
-    import pdb; pdb.set_trace()
-
-    # nonzero returns a tensor of size n x 1, but we want 1 x n, so flatten
-    matching_indices = (data.edge_classes == cell_line).nonzero().flatten()
-
-    data.edge_index = data.edge_index[:, matching_indices]
-    data.y = data.y[matching_indices]
-    data.edge_classes = data.edge_classes[matching_indices]
-
-    return data
-
 class DrugCombDb(InMemoryDataset):
+    """A dataset class holding data corresponding to the DrugCombDb dataset.
+
+    A dataset object compatible with pytorch-geometric and torch infrastructure.
+    This dataset object holds information pertaining to the DrugCombDb dataset.
+    The dataset represents a link prediction task, wherein we would like to
+    predict synergy scores for pairs of drugs in the dataset for specific
+    cell lines.
+
+    Notes
+    -----
+        If left unaltered from transform or pre_transform methods, this dataset
+        contains a graph which is the union of a drug-drug interaction graph,
+        a drug-protein target graph, and a protein-protein interaction graph.
+        The graph is undirected, such that if some edge `A -> B` exists in
+        the dataset's edge_index, then the edge `B -> A` also exists in the
+        edge_index.
+
+    Attributes
+    ----------
+    fp_bits : int
+        For all drugs in the dataset we obtain a morgan fingerprint.  This is the
+        number of bits used for said fingerprints.
+    fp_radius : int
+        For all drugs in the dataset we obtain a morgan fingerprint.  This is the
+        radius for said fingerprints.
+    _drug_protein_link_holder : pd.DataFrame
+        A convenience DataFrame maintaining the drug-protein targets for processing
+        in different parts of the code so that the DataFrame does not need to be
+        read from disk multiple times.
+    _protein_protein_interactions_holder : pd.DataFrame
+        A convenience DataFrame maintaining the protein-protein interactions for processing
+        in different parts of the code so that the DataFrame does not need to be
+        read from disk multiple times.
+    """
+
     def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4):
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
@@ -271,6 +128,20 @@ class DrugCombDb(InMemoryDataset):
             rar.extractall(path=self.raw_dir)
 
     def process(self):
+        """The main dataset processing method according to torch dataset convention.
+
+        This method, in order, gets nodes, gets edges, creates the graph (the graph
+        is represented by the Data object), and applies the pre_transform method if
+        one exists to this graph.  The method also adds the attributes edge_classes
+        and graph_type_idx_ranges to the graph so that they may be accessed at a later
+        time.  Refer to the documentation for _get_edges_information for details on
+        these objects.
+
+        Returns
+        _______
+        None
+
+        """
         nodes = self._get_nodes()
         edge_idxs, edge_trgt, edge_classes, graph_type_idx_ranges = self._get_edges_information(nodes)
 
@@ -291,6 +162,20 @@ class DrugCombDb(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
 
     def _get_node_ftrs(self, nodes):
+        """Gets the feature matrix for all graph nodes.
+
+        Parameters
+        ----------
+        nodes : pd.DataFrame
+            Each row in the nodes DataFrame is a node in the graph.
+
+        Returns
+        -------
+        np.ndarray
+            ndarray of the node features. The features are a concatenation
+            of a morgan fingerprint for drug nodes and a one-hot encoding
+            of proteins for the protein nodes.
+        """
         node_ftrs = nodes.fillna(-1)
         node_ftrs = node_ftrs.drop(['cIds', 'drugNameOfficial', 'molecularWeight',
                                     'smilesString', 'name', 'has_fp', 'is_drug'], axis=1)
@@ -298,6 +183,13 @@ class DrugCombDb(InMemoryDataset):
         return node_ftrs.to_numpy().astype(np.int)
 
     def _get_nodes(self):
+        """Combines the drug and protein nodes and returns them.
+
+        Returns
+        -------
+        pd.DataFrame
+            Protein and drug nodes.
+        """
         drug_nodes = self._get_drug_nodes()
         protein_nodes = self._get_protein_nodes()
 
@@ -306,6 +198,16 @@ class DrugCombDb(InMemoryDataset):
         return nodes
 
     def _get_drug_nodes(self):
+        """Processes drug nodes from the raw drug file.
+
+        For each drug all we do is get a fingerprint and give a bit of additional
+        information about this.
+
+        Returns
+        -------
+        pd.DataFrame
+            The drug nodes.  We add columns 'has_fp' and 'is_drug' to the nodes.
+        """
         print('Processing drug nodes..')
 
         drug_info_filename = '%s/%s' % (self.raw_dir, self.raw_file_names[0])
@@ -334,6 +236,17 @@ class DrugCombDb(InMemoryDataset):
         return pd.concat((drug_chem_info_no_fp, all_fp), axis=1)
 
     def _get_protein_nodes(self):
+        """Processes the protein nodes from the raw protein file.
+
+        To process we get protein nodes by taking the union of proteins
+        in the PPI and drug-protein target graphs.  Then, we just add
+        columns 'is_drug' ans 'has_fp'.
+
+        Returns
+        -------
+        pd.DataFrame
+            Each row is a protein node.
+        """
         print('Processing protein nodes..')
 
         all_proteins = set(self._drug_protein_link['protein']).union(
@@ -350,6 +263,57 @@ class DrugCombDb(InMemoryDataset):
         return protein_nodes
 
     def _get_edges_information(self, nodes):
+        """Gets the edges in the graph
+
+        Get all the edges, then add the reversed edges such that if edge
+        (A, B) is in the graph then (B, A) is also in the graph.
+
+        Parameters
+        ----------
+        nodes : pd.DataFrame
+            A DataFrame containing drug and protein nodes.
+
+        Returns
+        -------
+        all_edge_idxs : np.ndarray
+            The edge index for the entire graph.  This is the union of edges
+            in the drug-drug interaction graph, the drug-protein interaction
+            graph, and the protein-protein interaction graph.  It also contains
+            the reversed edges as detailed in the method description.
+        all_edge_trgt : np.ndarray
+            An ndarray of shape (num_edges, 4).  For each edge, this ndarray
+            contains values for the four synergy scores observed for the
+            interaction between these two edges.  These scores are only
+            meaningful for edges wherein the head and tail of the edge are both
+            drug nodes.  For edges where the head or tail is not a drug, the
+            edge's entry in this ndarray is a row of 0s.  The scores recorded
+            are the ZIP, Bliss, Loewe, and HSA scores.  Note that the scores'
+            indices in the ndarray are
+                ZIP   : 0
+                Bliss : 1
+                Loewe : 2
+                HSA   : 3
+        all_edge_classes : np.ndarray
+            An ndarray of shape (num_edges,).  Each entry in this ndarray
+            represents the cell line for the edge's observation.  The cell
+            line is recorded as a simple integer value encoding.  E.g.,
+            the first cell line is a 0, the second is a 1, the third a 2, and so on.
+            The values in this ndarray are only informative for drug-drug edges,
+            and for all other types of edges the edge's value in this ndarray is
+            a -1.
+        graph_type_idx_ranges : Dict[str, Tuple[int]]
+            A dictionary which represents what index ranges within the
+            all_edge_idxs, all_edge_trgt, and all_edge_classes ndarrays
+            represent which edge types.  Here, edge types are drug-drug
+            edges, drug-protein edges, and protein-protein edges. The
+            range tuples in the dict in the dict are inclusive at their
+            head, exclusive at their tail.  The dict looks like:
+            {
+                'ddi': (ddi_range_start, ddi_range_end),
+                'dpi': (dpi_range_start, dpi_range_end),
+                'ppi': (ppi_range_start, ppi_range_end),
+            }
+        """
         print('Processing edges..')
 
         cid_to_idx_dict = {nodes.at[i, 'cIds']: i for i in range(len(nodes))}
@@ -387,10 +351,22 @@ class DrugCombDb(InMemoryDataset):
         drug_drug_edges = drug_comb_scored[drug_comb_scored['idx_Drug1'] != -1]
         drug_drug_edges = drug_drug_edges[drug_drug_edges['idx_Drug2'] != -1]
 
-        # Keep the first score for each (drug, drug, cell line) tuple that exists
+        # The DrugCombDb dataset was built by its authors through a scraping &
+        # aggregation of a number of different drug combination datasets.  For
+        # some drug pairs and cell lines, the authors found multiple results
+        # across different sources where the synergy scores significantly
+        # differed across trials.  For these volatile drug pairs & cell lines,
+        # they include all of the different observations. In our case, since
+        # it is not clear whether we should average these trials or do
+        # something similar, we just keep the first instance of the drug pair
+        # and cell line and drop the others.
         drug_drug_edges = drug_drug_edges.drop_duplicates(['idx_Drug1', 'idx_Drug2', 'Cell line'])
 
-        # Remove edges with invalid scores
+        # There are a number of drug pair/cell line combinatioins which have
+        # scores far outside the -100 to 100 range.  We remove these so
+        # that the data is more well behaved.  (One question, maybe we
+        # shouldn't do this?  Perhaps including them and normalizing would
+        # still work okay?  I'm not sure, could be worth trying.)
         scores = drug_drug_edges[['ZIP', 'Bliss', 'Loewe', 'HSA']]
         bad_scores_arr = ((scores.notna()) & (-100 <= scores) & (scores <= 100)).all(axis=1)
         drug_drug_edges = drug_drug_edges[bad_scores_arr]
@@ -439,6 +415,23 @@ class DrugCombDb(InMemoryDataset):
         return ppi_edge_idxs, ppi_edge_attr, ppi_edge_classes
 
     def _get_graph_type_idx_ranges(self, ppi_edge_idx, dpi_edge_idx, ddi_edge_idx):
+        """Builds a dictionary detailing which edges belong to the ddi, dpi, and ppi.
+
+        Returns
+        -------
+        Dict[str, Tuple[int]]
+            A dictionary which represents what index ranges within the
+            all_edge_idxs, all_edge_trgt, and all_edge_classes ndarrays
+            represent which edge types.  Here, edge types are drug-drug
+            edges, drug-protein edges, and protein-protein edges. The
+            range tuples in the dict in the dict are inclusive at their
+            head, exclusive at their tail.  The dict looks like:
+            {
+                'ddi': (ddi_range_start, ddi_range_end),
+                'dpi': (dpi_range_start, dpi_range_end),
+                'ppi': (ppi_range_start, ppi_range_end),
+            }
+        """
         graph_type_idx_ranges = {}
 
         graph_type_idx_ranges['ppi'] = (0, ppi_edge_idx.shape[1])
