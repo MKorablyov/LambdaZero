@@ -1,5 +1,6 @@
-from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs, subgraph_protein_features_to_embedding, use_score_type_as_target, use_single_cell_line, train_first_k_edges
+from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb
 from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
+from LambdaZero.examples.drug_comb import transforms
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Batch
 from torchvision.transforms import Compose
@@ -13,8 +14,6 @@ import os
 import math
 import sys
 import time
-
-num_iters = 0
 
 def random_split(num_examples, test_prob, valid_prob):
     nvalid = int(num_examples * valid_prob)
@@ -45,7 +44,9 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         drug_drug_index, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
-        # Here, sg is shorthand for subgraph
+        # Here, sg is shorthand for subgraph.  See documentation of
+        # get_batch_subgraph_edges for more information on sg_edge_index,
+        # sg_nodes, and sg_avging_idx
         sg_edge_index, sg_nodes, sg_avging_idx = get_batch_subgraph_edges(ddi_graph, drug_drug_index)
 
         preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_classes,
@@ -58,11 +59,6 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, device, config):
         metrics["loss"] += loss.item() / num_batches
         metrics["mse"] += loss.item() / num_batches
         metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
-
-        global num_iters
-        num_iters += 1
-        if num_iters % 40 == 0:
-            print('Train MSE: %f' % loss.item())
 
     return metrics
 
@@ -79,7 +75,9 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
         drug_drug_index, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
-        # Here, sg is shorthand for subgraph
+        # Here, sg is shorthand for subgraph.  See documentation of
+        # get_batch_subgraph_edges for more information on sg_edge_index,
+        # sg_nodes, and sg_avging_idx
         sg_edge_index, sg_nodes, sg_avging_idx = get_batch_subgraph_edges(ddi_graph, drug_drug_index)
 
         preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_classes,
@@ -90,7 +88,6 @@ def eval_epoch(ddi_graph, eval_idxs,  model, device, config):
         metrics["mse"] += loss.item() / num_batches
         metrics["mae"] += F.l1_loss(y, preds).item() / num_batches
 
-    #print("Eval MSE: %f" % metrics["mse"])
     return metrics
 
 def get_batch_subgraph_edges(ddi_graph, batch_drug_drug_index):
@@ -118,30 +115,23 @@ class SubgraphRegressor(tune.Trainable):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        transform_list = [use_score_type_as_target(config['score_type'])]
-        if not config['use_one_hot']:
-            transform_list.append(
-                subgraph_protein_features_to_embedding(config['protein_embedding_size'], self.device)
-            )
-
-        if config['use_single_cell_line']:
-            transform_list.append(use_single_cell_line)
-
-        dataset = DrugCombDb(transform=Compose(transform_list), pre_transform=config["pre_transform"])
+        dataset = DrugCombDb(transform=self._get_transform(config),
+                             pre_transform=config["pre_transform"])
         self.ddi_graph = self._extract_ddi_graph(dataset)
 
         self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.ddi_graph.edge_index.shape[1],
                                                                       config["test_set_prop"],
                                                                       config["val_set_prop"])
 
-        config["in_channels"] = self.ddi_graph.x.shape[1] if config['use_one_hot'] else config["protein_embedding_size"]
+        config["in_channels"] = \
+            self.ddi_graph.x.shape[1] if config['use_one_hot'] else config["protein_embedding_size"]
         config["out_channels"] = self.ddi_graph.y.shape[1] if len(self.ddi_graph.y.shape) > 1 else 1
 
         self.model = SubgraphEmbeddingRegressorModel(
             config, torch.unique(self.ddi_graph.edge_classes)).to(self.device)
 
         to_optimize = list(self.model.parameters())
-        if config['use_one_hot'] == False:
+        if not config['use_one_hot']:
             to_optimize.append(self.ddi_graph.protein_ftrs)
 
         self.optim = torch.optim.Adam(to_optimize, lr=config["lr"])
@@ -149,7 +139,63 @@ class SubgraphRegressor(tune.Trainable):
         self.train_epoch = config["train_epoch"]
         self.eval_epoch = config["eval_epoch"]
 
+    def _get_transform(self, config):
+        """
+        Gets a transform object to be applied to items of the dataset on indexing.
+        Note that config holds all the arguments so we describe the keys of the dict
+        here.
+
+        Arguments
+        ---------
+        score_type : {'hsa', 'zip', 'bliss', 'loewe'}
+            The score type to treat as the target for the model.
+        use_one_hot : bool
+            If True, use one-hot encodings for the protein features.  If False, use
+            learnable embeddings for the protein features.
+        use_single_cell_line : bool
+            If True then only include drug-drug edges for the most populous in the
+            dataset.  If False, include all edges.
+        num_edges_to_take : int
+            If -1, keep all edges in the dataset. If positive, then keep
+            the first num_edges_to_take edges in the dataset and throw the rest
+            away.
+
+        Returns
+        -------
+        torchvision.transforms.Compose
+            A composition of transforms according to arguments in config.
+        """
+        transform_list = [transforms.use_score_type_as_target(config['score_type'])]
+        if not config['use_one_hot']:
+            transform_list.append(
+                transforms.subgraph_protein_features_to_embedding(
+                    config['protein_embedding_size'], self.device)
+            )
+
+        if config['use_single_cell_line']:
+            transform_list.append(transforms.use_single_cell_line)
+
+        if config['num_edges_to_take'] != -1:
+            transform_list.append(transforms.train_first_k_edges(config['num_edges_to_take']))
+
+        return Compose(transform_list)
+
     def _extract_ddi_graph(self, dataset):
+        """
+        The DrugCombDb dataset has only one item in it (i.e., len(DrugCombDb())
+        will always return 1), so this method extracts its only graph and moves
+        that graph to the device represented by self.device
+
+        Parameters
+        ----------
+        dataset : DrugCombDb
+            The dataset from which to return the single graph from.
+
+        Returns
+        -------
+        Data
+            The single graph held within the dataset object moved to self.device.
+        """
         ddi_graph = dataset[0].to(self.device)
         ddi_graph.protein_ftrs = ddi_graph.protein_ftrs.to(self.device)
         for drug, subgraph in ddi_graph.drug_idx_to_graph.items():
@@ -182,11 +228,10 @@ _, _, summaries_dir =  get_external_dirs()
 config = {
     "trainer": SubgraphRegressor,
     "trainer_config": {
-        "transform": None,
-        "pre_transform": to_drug_induced_subgraphs,
+        "pre_transform": transforms.to_drug_induced_subgraphs,
         "val_set_prop": 0.2,
         "test_set_prop": 0.0,
-        "prediction_type": tune.grid_search(["dot_product"]),# "mlp"]),
+        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
         "lr": tune.grid_search([1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 5e-1, 5e-2, 5e-3, 5e-4, 5e-5]),
         "use_one_hot": tune.grid_search([True, False]),
         "score_type": 'hsa',
@@ -217,8 +262,9 @@ config = {
 if __name__ == "__main__":
     ray.init()
 
+    # Sleep for 5 seconds to get around ray not noticing the node's resources
     time_to_sleep = 5
-    print("Sleeping for %d seconds" % time_to_sleep)
+    print("Sleeping for %d seconds to appease ray" % time_to_sleep)
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
 
