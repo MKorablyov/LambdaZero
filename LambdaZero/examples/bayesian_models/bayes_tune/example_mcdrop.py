@@ -51,7 +51,7 @@ def train_epoch(loader, model, optimizer, device, config):
     epoch_logits = []
 
     N = len(loader)
-    lambda = config['lambda'] #config['lengthscale'] ** 2 * (1 - config["drop_p"]) / (2. * N * config['tau'])
+    lambd = config['lambda'] #config['lengthscale'] ** 2 * (1 - config["drop_p"]) / (2. * N * config['tau'])
 
 
     for bidx,data in enumerate(loader):
@@ -61,7 +61,7 @@ def train_epoch(loader, model, optimizer, device, config):
         optimizer.zero_grad()
         logits = model(data, do_dropout=True, drop_p=config["drop_p"] )
         targets_norm = config["normalizer"].forward_transform(targets)
-        reg_loss = lambda * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
+        reg_loss = lambd * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
         loss = F.mse_loss(logits, targets_norm) + reg_loss
         loss.backward()
         optimizer.step()
@@ -92,17 +92,17 @@ def eval_epoch(loader, model, device, config):
     return scores
 
 DEFAULT_CONFIG = {
-    "regressor_config":
+    "regressor_config":{
         "run_or_experiment": BasicRegressor,
         "config": {
             "target": "gridscore",
             "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                            #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "b_size": 50,
-            "lambda": [1.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0]#5.0,
-            "T": [10,100,1000, 10000] #10,
-            "drop_p": [0.01, 0.1, 0.3, 0.5, 0.7, 0.9]
-            "lengthscale": [1e-2，1e-1，1.0, 10, 100],
+            "lambda": [1e-8, 1e-6, 1e-4, 1e-2, 1],#5.0,
+            "T": [10,100,1000, 10000], #10,
+            "drop_p": [0.01, 0.1, 0.3, 0.5, 0.7, 0.9],
+            "lengthscale": [1e-1, 1.0, 10, 100],
 
 
             "dataset": LambdaZero.inputs.BrutalDock,
@@ -147,8 +147,9 @@ DEFAULT_CONFIG = {
 # dropout_hyperparameter (drop_layers=True, drop_mlp=True)
 # todo: add BLL (from John's code)
 
-def get_tau(config):
-    tau = config["drop_p"] * (config["length_scale"]**2) / (2 * N * config["lambda"])
+def get_tau(config, N):
+    
+    tau = config["drop_p"] * (config["lengthscale"]**2) / (2 * N * config["lambda"])
     return tau
 
 
@@ -157,12 +158,12 @@ def _log_lik(y, Yt_hat, config):
     # ll = (logsumexp(-0.5 * self.tau * (y_test[None] - Yt_hat) ** 2., 0)
     # - np.log(T)
     # - 0.5 * np.log(2 * np.pi) + 0.5 * np.log(self.tau))
-    tau = get_tau(config)
+    tau = get_tau(config, Yt_hat.shape[1])
     ll = logsumexp(-0.5 * tau * (y[None] - Yt_hat) ** 2., 0)
     ll -= np.log(Yt_hat.shape[0])
     ll -= 0.5 * np.log(2 * np.pi)
     ll += 0.5 * np.log(tau)
-    return ll, tau
+    return ll
 
 
 class MCDropRegressor(BasicRegressor):
@@ -172,6 +173,9 @@ class MCDropRegressor(BasicRegressor):
     def fit(self, train_loader=None, val_loader=None):
         if train_loader is not None: self.train_loader = train_loader
         if val_loader is not None: self.val_loader = val_loader
+
+        self.N = len(self.val_loader.dataset)
+        
 
         # todo allow ray native stopping
         all_scores = []
@@ -217,12 +221,12 @@ class MCDropRegressor(BasicRegressor):
         item2 = item2 / self.config['T']
         
         D = y_hat.shape[1]
-        tau = get_tau(self.config)
-        item1 = np.eye(D) * (1/tau])
+
+        tau = get_tau(self.config, self.N)
+        item1 = np.eye(D) * (1/tau)
         means = np.asarray(means)
         means = np.sum(means, axis = 0) / self.config['T']
         item3 = np.matmul(means[:,None], means[None,:])
-
         var = item1 + item2 - item3
         var = np.diagonal(var)
         return var
@@ -243,5 +247,15 @@ if __name__ == "__main__":
     # analysis = tune.run(**regressor_config)
 
     # this will fit the model directly
-    rg = MCDropRegressor(regressor_config)
-    print(rg.fit())
+    for lambd in regressor_config['config']['lambda']:
+        for T in regressor_config['config']['T']:
+            for p in regressor_config['config']['drop_p']:
+                for length_scale in regressor_config['config']['lengthscale']:
+                    regressor_config['config']['lambda'] = lambd
+                    regressor_config['config']['T'] = T
+                    regressor_config['config']['drop_p'] = p
+                    regressor_config['config']['lengthscale'] = length_scale
+    
+                    rg = MCDropRegressor(regressor_config)
+                    print('experiment: lambda = {}\t T = {} \r\t\t drop_prob = {}\t length_scale = {}'.format(lambd, T, p, length_scale))
+                    print(rg.fit())
