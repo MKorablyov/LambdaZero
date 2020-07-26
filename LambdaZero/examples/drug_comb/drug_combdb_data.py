@@ -3,7 +3,7 @@ from LambdaZero.examples.drug_comb.transforms import to_drug_induced_subgraphs
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from rdkit import Chem
 from rdkit.Chem import AllChem
-#from unrar import rarfile
+from unrar import rarfile
 import numpy as np
 import pandas as pd
 import torch
