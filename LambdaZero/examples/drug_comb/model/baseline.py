@@ -3,21 +3,25 @@ from torch.nn import functional as F
 
 
 class BaselineMLP(torch.nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, data):
         super(BaselineMLP, self).__init__()
 
         self.device = config["device"]
 
-        self.num_cell_lines = config["num_cell_lines"]
+        self.num_cell_lines = len(torch.unique(data.ddi_edge_classes))
 
-        self.layer1 = torch.nn.Linear(config["in_channels"] + self.num_cell_lines, 300)
-        self.layer2 = torch.nn.Linear(300, 100)
+        self.layers = []
+        self.layers.append(torch.nn.Linear(data.x_drugs.shape[1] + self.num_cell_lines, config["layers"][0]))
+
+        for i in range(len(config["layers"]) - 1):
+            self.layers.append(torch.nn.Linear(config["layers"][i], config["layers"][i+1]))
+
+        self.layers = torch.nn.ModuleList(self.layers)
 
         self.activation = torch.nn.ReLU()
-
         self.criterion = torch.nn.MSELoss()
 
-    def forward(self, data, conv_edges, drug_drug_batch):
+    def forward(self, data, drug_drug_batch):
 
         #####################################################
         # Build batch data
@@ -28,8 +32,8 @@ class BaselineMLP(torch.nn.Module):
         drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
         cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
 
-        x_drug_1s = data.x[drug_1s]
-        x_drug_2s = data.x[drug_2s]
+        x_drug_1s = data.x_drugs[drug_1s]
+        x_drug_2s = data.x_drugs[drug_2s]
 
         # One hot embedding for cell lines
         one_hot_cell_lines = torch.zeros((batch_size, self.num_cell_lines)).to(self.device)
@@ -42,14 +46,17 @@ class BaselineMLP(torch.nn.Module):
         # Forward
         #####################################################
 
-        h_1 = self.layer2(self.activation(self.layer1(batch_data_1)))
-        h_2 = self.layer2(self.activation(self.layer1(batch_data_2)))
+        for i in range(len(self.layers) - 1):
+            batch_data_1 = self.activation(self.layers[i](batch_data_1))
+            batch_data_2 = self.activation(self.layers[i](batch_data_2))
 
-        return h_1.reshape(batch_size, 1, -1).bmm(h_2.reshape(batch_size, -1, 1))[:, 0, 0]
+        batch_data_1 = self.layers[-1](batch_data_1)
+        batch_data_2 = self.layers[-1](batch_data_2)
+
+        return batch_data_1.reshape(batch_size, 1, -1).bmm(batch_data_2.reshape(batch_size, -1, 1))[:, 0, 0]
 
     def loss(self, output, drug_drug_batch):
 
-        # Using HSA scores for now
-        ground_truth_scores = drug_drug_batch[2][:, 3]
+        ground_truth_scores = drug_drug_batch[2][:, 0]
 
         return self.criterion(output, ground_truth_scores)

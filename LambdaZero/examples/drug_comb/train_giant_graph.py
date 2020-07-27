@@ -2,7 +2,7 @@ import torch
 from LambdaZero.examples.drug_comb.dataset.drug_combdb_data import DrugCombDb
 from LambdaZero.examples.drug_comb.model.multi_message_gcn import GiantGraphMPNN
 from LambdaZero.examples.drug_comb.model.baseline import BaselineMLP
-from LambdaZero.examples.drug_comb.utils.utils import random_split, get_ddi_edges, get_ppi_and_dpi_edges
+from LambdaZero.examples.drug_comb.utils.utils import random_split
 import os
 from LambdaZero.utils import get_external_dirs
 from torch.utils.data import TensorDataset, DataLoader
@@ -16,15 +16,12 @@ def train_epoch(data, loader, model, optim):
     epoch_loss = 0
     num_batches = len(loader)
 
-    # Retrieve ppi and dpi edges that will be used for convolution in the model
-    ppi_and_dpi_edges = get_ppi_and_dpi_edges(data)
-
     for i, drug_drug_batch in enumerate(loader):
         optim.zero_grad()
 
         t = time.time()
 
-        out = model.forward(data, ppi_and_dpi_edges, drug_drug_batch)
+        out = model.forward(data, drug_drug_batch)
 
         print("time to forward", time.time() - t)
         t = time.time()
@@ -52,12 +49,9 @@ def eval_epoch(data, loader, model):
     epoch_loss = 0
     num_batches = len(loader)
 
-    # Retrieve ppi and dpi edges that will be used for convolution in the model
-    ppi_and_dpi_edges = get_ppi_and_dpi_edges(data)
-
     with torch.no_grad():
         for i, drug_drug_batch in enumerate(loader):
-            out = model.forward(data, ppi_and_dpi_edges, drug_drug_batch)
+            out = model.forward(data, drug_drug_batch)
 
             loss = model.loss(out, drug_drug_batch)
             epoch_loss += loss.item()
@@ -81,41 +75,31 @@ class GiantGraphTrainer(tune.Trainable):
         dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"],
                              scores=config["scores"])
 
-        # restrict ourselves to fingerprint features (first column indicates nodes that are drugs):
-        dataset.data.x = dataset.data.x[:, :1025]
-
         self.data = dataset[0].to(self.device)
 
-        # Retrieve ddi edges and perform train valid split
-        ddi_edges, ddi_edge_classes, ddi_y = get_ddi_edges(self.data)
-
-        train_idxs, val_idxs, test_idxs = random_split(ddi_edges.shape[1],
+        train_idxs, val_idxs, test_idxs = random_split(self.data.ddi_edge_idx.shape[1],
                                                        config["test_set_prop"],
                                                        config["val_set_prop"])
 
         # Train loader
-        train_ddi_dataset = TensorDataset(ddi_edges[:, train_idxs].T,
-                                          ddi_edge_classes[train_idxs], ddi_y[train_idxs])
+        train_ddi_dataset = TensorDataset(self.data.ddi_edge_idx[:, train_idxs].T,
+                                          self.data.ddi_edge_classes[train_idxs], self.data.ddi_edge_attr[train_idxs])
 
         self.train_loader = DataLoader(train_ddi_dataset,
                                        batch_size=config["batch_size"],
                                        pin_memory=(self.device == 'cpu'))
 
         # Valid loader
-        valid_ddi_dataset = TensorDataset(ddi_edges[:, val_idxs].T,
-                                          ddi_edge_classes[val_idxs], ddi_y[val_idxs])
+        valid_ddi_dataset = TensorDataset(self.data.ddi_edge_idx[:, val_idxs].T,
+                                          self.data.ddi_edge_classes[val_idxs], self.data.ddi_edge_attr[val_idxs])
 
         self.valid_loader = DataLoader(valid_ddi_dataset, batch_size=config["batch_size"],
                                        pin_memory=(self.device == 'cpu'))
 
-        # Add important dimensions of the dataset to config
-        config["in_channels"] = self.data.x.shape[1]
-        config["out_channels"] = self.data.y.shape[1]
-        config["num_cell_lines"] = len(torch.unique(ddi_edge_classes))
         config["device"] = self.device
 
         # Initialize model and optimizer
-        self.model = config["model"](config).to(self.device)
+        self.model = config["model"](config, self.data).to(self.device)
         # self.model = GCN(config).to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
 
@@ -155,11 +139,12 @@ if __name__ == '__main__':
         "trainer_config": {
             "transform": None,
             "pre_transform": None,
-            "scores": ['ZIP', 'Bliss', 'Loewe', 'HSA'],
+            "scores": ['HSA'],
+            "layers": tune.grid_search([[1024, 512], [1024, 100], [1024, 50], [1024, 20], [1024, 5]]),
             "val_set_prop": 0.2,
             "test_set_prop": 0.0,
-            "lr": 1e-3,
-            "model": tune.grid_search([GiantGraphMPNN, BaselineMLP]),
+            "lr": tune.grid_search([1e-4, 5e-5, 1e-5, 5e-6]),
+            "model": BaselineMLP,  # tune.grid_search([GiantGraphMPNN, BaselineMLP]),
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
             "embed_channels": 256,

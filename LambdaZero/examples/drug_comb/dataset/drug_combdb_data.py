@@ -1,6 +1,6 @@
 from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Data, InMemoryDataset, download_url
-from unrar import rarfile
+# from unrar import rarfile
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import numpy as np
@@ -8,16 +8,16 @@ import pandas as pd
 import torch
 import os
 from scipy.sparse import coo_matrix
-from scipy.linalg import eigvals
 
 
 class DrugCombDb(InMemoryDataset):
     def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4,
-                 scores=('ZIP', 'Bliss', 'Loewe', 'HSA')):
+                 scores=('ZIP', 'Bliss', 'Loewe', 'HSA'), n_laplace_feat=256):
 
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
         self.scores = scores
+        self.n_laplace_feat = n_laplace_feat
 
         datasets_dir, _, _ = get_external_dirs()
         super().__init__(datasets_dir + '/DrugCombDb/', transform, pre_transform)
@@ -26,9 +26,7 @@ class DrugCombDb(InMemoryDataset):
 
         assert set(scores).issubset(('ZIP', 'Bliss', 'Loewe', 'HSA'))
         scores_col_idx = [['ZIP', 'Bliss', 'Loewe', 'HSA'].index(i) for i in scores]
-        self.data.ddi_edge_attr = self.data.ddi_edge_attr[scores_col_idx]
-
-        self._get_protein_laplacian_features(self.data.ppi_edge_idx)
+        self.data.ddi_edge_attr = self.data.ddi_edge_attr[:, scores_col_idx]
 
     @property
     def raw_file_names(self):
@@ -79,24 +77,30 @@ class DrugCombDb(InMemoryDataset):
         dpi_edge_idx, dpi_edge_attr = self._get_dpi_edges(cid_to_idx_dict, name_to_idx_dict)  # One way only
         ddi_edge_idx, ddi_edge_attr, ddi_edge_classes = self._get_ddi_edges(name_to_idx_dict)  # One way only
 
-        x = self.nodes.drop(['cIds', 'drugNameOfficial', 'molecularWeight', 'smilesString', 'name', 'is_drug'], axis=1)
-        x = x.to_numpy().astype(np.int)
+        # Compute protein laplacian features
+        protein_laplacian_features = self._get_protein_laplacian_features(ppi_edge_idx, self.n_laplace_feat)
 
-        data = Data(x=torch.tensor(x, dtype=torch.float))
+        # Compute drug and protein feature arrays
+        x_drugs = self.nodes.drop(['cIds', 'drugNameOfficial', 'molecularWeight', 'smilesString', 'name', 'is_drug'],
+                                  axis=1)
+        x_drugs = x_drugs.to_numpy().astype(np.int)
+        x_prots = protein_laplacian_features.to_numpy()
+
+        data = Data(x_drugs=torch.tensor(x_drugs, dtype=torch.float), x_prots=torch.tensor(x_prots, dtype=torch.float))
 
         # Add ppi attributes to data
         data.ppi_edge_idx = torch.tensor(ppi_edge_idx, dtype=torch.long)
-        data.ppi_edge_attr = torch.tensor(ppi_edge_attr, dtype=torch.long)
+        data.ppi_edge_attr = torch.tensor(ppi_edge_attr, dtype=torch.float)
         # Add dpi attributes to data
         data.dpi_edge_idx = torch.tensor(dpi_edge_idx, dtype=torch.long)
-        data.dpi_edge_attr = torch.tensor(dpi_edge_attr, dtype=torch.long)
+        data.dpi_edge_attr = torch.tensor(dpi_edge_attr, dtype=torch.float)
         # Add ddi attributes to data
         data.ddi_edge_idx = torch.tensor(ddi_edge_idx, dtype=torch.long)
-        data.ddi_edge_attr = torch.tensor(ddi_edge_attr, dtype=torch.long)
+        data.ddi_edge_attr = torch.tensor(ddi_edge_attr, dtype=torch.float)
         data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.long)
 
         data.is_drug = torch.tensor(self.is_drug, dtype=torch.long)
-        data.number_of_drugs = self.is_drug.sum()[0]
+        data.number_of_drugs = self.is_drug.sum()
         data.number_of_proteins = len(self.is_drug) - data.number_of_drugs
 
         data_list = [data]
@@ -119,7 +123,7 @@ class DrugCombDb(InMemoryDataset):
         protein_nodes = self._get_protein_nodes()
 
         nodes = pd.concat((drug_nodes, protein_nodes), ignore_index=True, sort=False)
-        nodes = nodes.fillna(-1)
+        nodes = nodes.fillna(0)
 
         is_drug = nodes['is_drug'].to_numpy()
 
@@ -182,25 +186,46 @@ class DrugCombDb(InMemoryDataset):
         ppi_edge_idx = np.concatenate((ppi_edge_idx, ppi_edge_idx[::-1, :]), axis=1)
         ppi_edge_attr = np.concatenate((ppi_edge_attr, ppi_edge_attr), axis=0)
 
-        protein_laplacian_features = self._get_protein_laplacian_features(ppi_edge_idx)
-
         return ppi_edge_idx, ppi_edge_attr
 
-    def _get_protein_laplacian_features(self, ppi_edge_idx):
-        print('Computing laplacian features of the proteins')
-        # Build Laplacian matrix
-        n_edges = len(ppi_edge_idx.numpy()[0]) // 2
-        # Adjacency matrix
-        A = coo_matrix(
-            (np.ones(n_edges), (ppi_edge_idx.numpy()[0, :n_edges], ppi_edge_idx.numpy()[1, :n_edges])),
-            dtype=np.int8).toarray()
+    def _get_protein_laplacian_features(self, ppi_edge_idx, n_features=256):
 
-        # Node degree matrix
-        D = np.diag(A.sum(axis=0))
+        if not os.path.isfile(os.path.join(self.raw_dir, "laplacian_eigvects.npz")):
+            print('Computing laplacian features of the proteins, only happens the first time')
+            # Build Laplacian matrix
+            n_edges = len(ppi_edge_idx[0]) // 2
+            # Adjacency matrix
+            A = coo_matrix(
+                (np.ones(n_edges), (ppi_edge_idx[0, :n_edges],
+                                    ppi_edge_idx[1, :n_edges])),
+                dtype=np.int8).toarray()
 
-        L = D - A
+            # Node degree matrix
+            D = np.diag(A.sum(axis=0))
+            L = D - A
 
-        return 0
+            # Restrict to protein nodes
+            L = L[self.data.number_of_drugs[0]:, self.data.number_of_drugs[0]:]
+
+            eigvals, eigvects = np.linalg.eigh(L)  # Diagonalize the matrix
+            # Save results
+            np.savez(os.path.join(self.raw_dir, "laplacian_eigvects.npz"), eigvals=eigvals, eigvects=eigvects)
+
+        else:
+            npzfile = np.load(os.path.join(self.raw_dir, "laplacian_eigvects.npz"))
+            eigvals, eigvects = npzfile['eigvals'], npzfile['eigvects']
+
+        # Remove zero eigvalues and corresponding eigvectors
+        nonzero_vals = eigvals > 1e-6
+        eigvects = eigvects[:, nonzero_vals]
+
+        # Transform to dataframe
+        n_drugs = self.is_drug.sum()
+        col_names = ["lap_feat_"+ str(i) for i in range(256)]
+        zeros_for_drugs = pd.DataFrame(0, index=np.arange(n_drugs), columns=col_names)
+        laplacian_feats = pd.DataFrame(eigvects[:, :n_features], columns=col_names)
+
+        return pd.concat((zeros_for_drugs, laplacian_feats), ignore_index=True)
 
     def _get_dpi_edges(self, cid_to_idx_dict, name_to_idx_dict):
         print('Processing drug protein edges..')
