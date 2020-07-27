@@ -105,6 +105,57 @@ def eval_epoch(ddi_graph, eval_idxs, model, normalizer, device, config):
     return metrics
 
 def get_batch_subgraph_edges(ddi_graph, batch_drug_drug_index):
+    """Gets values to enable averaging over node embeddings.
+
+    Arguments
+    ---------
+    ddi_graph : Data
+        The drug-drug graph.  Note that it is formed according to the pre_transform
+        to_drug_induced_subgraphs such that each drug in the ddi_graph has its own
+        protein subgraph.  For more details, refer to the documentation of
+        to_drug_induced_subgraphs.
+    batch_drug_drug_index : torch.LongTensor
+        A tensor representing the drug-drug edges for this batch.  The tensor
+        is of shape (2, num_drug_drug_edges_in_batch).
+
+    Returns
+    -------
+    edge_index : torch.LongTensor
+        The edge index for all the edges in the subgraphs of the batch's drugs.
+        Write the set of edges in drug_drug_batch as :math:`B`.  Then write
+        the set of drugs in :math:`B` as :math:`D_B = {d | (d, d') or (d', d) \in B}`.
+        Following the notation of the docs for the method _build_subgraph in
+        transforms.py, edge_index is the union of the edges of the graphs in
+        :math:`M_B`, that is, :math:`edge_index = \bigcup_{d \in D_B} E_d`.
+        Thus, edge_index is a tensor of shape (2, :math:`|\bigcup_{d \in D_B} E_d|`).
+    nodes : torch.LongTensor
+        The indices of the protein nodes in each of the batch's drugs subgraphs.
+        Note that these indices are specified relative to the global ordering
+        of protein nodes as returned by the construction of the DrugCombDb object.
+        We follow the notation adopted in the explanation of edge_index here.
+        nodes can be represented by the following set allowing duplicates as
+        :math:`nodes = \bigcup_{d \in D_B} V_d`.  Thus, nodes is of shape
+        (:math:`|\bigcup_{d \in D_B} V_d|`,).  Note that the ordering of the protein
+        indices in this tensor are in order and relative to the drug's index. E.g.,
+        if :math:`D_B = {1, 4, 7}` and :math:`V_1 = {10, 11, 17}, V_4 = {8, 11},
+        V_7 = {9, 10, 14}` (where :math:`V_i` is the node set for drug i's subgraph),
+        then nodes will be the tensor:
+            torch.tensor([10, 11, 17, 8, 11, 9, 10, 14])
+
+        That is, nodes will be the concatenation of :math:`V_1, V_2, V_3`.
+    averaging_idx : torch.LongTensor
+        The indices in :math:`D_B` that the items of nodes belong to.
+        The tensor is then the same shape as nodes,
+        (:math:`|\bigcup_{d \in D_B} V_d|`,).  In the nodes example, drug 1
+        is at index 0 of :math:`D_B`, drug 4 is at index 1, and drug 7 is at
+        index 2.  Note that the first three nodes in the nodes example
+        above are for drug 1, the next two are for drug 4, and the final
+        three are for drug 7.  In this case, averaging_idx would be the tensor:
+            torch.tensor([0, 0, 0, 1, 1, 2, 2, 2])
+
+        averaging_idx is used by the method scatter_mean to do efficient
+        protein node embedding averaging when obtaining graph embeddings.
+    """
     batch_drugs = torch.unique(batch_drug_drug_index.flatten())
     subgraph_edge_indices = tuple([
         ddi_graph.drug_idx_to_graph[drug.item()].edge_index for drug in batch_drugs
