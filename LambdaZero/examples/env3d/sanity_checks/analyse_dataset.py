@@ -42,3 +42,4 @@ if __name__ == "__main__":
     ax2.set_xlim(0, 360)
     ax2.set_ylabel('count')
 
+    plt.show()
