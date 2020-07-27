@@ -99,10 +99,10 @@ DEFAULT_CONFIG = {
             "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                            #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "b_size": 50,
-            "lambda": [1e-8, 1e-6, 1e-4, 1e-2, 1],#5.0,
-            "T": [10,100,1000, 10000], #10,
-            "drop_p": [0.01, 0.1, 0.3, 0.5, 0.7, 0.9],
-            "lengthscale": [1e-1, 1.0, 10, 100],
+            "lambda": 1e-8#, 1e-6, 1e-4, 1e-2, 1],#5.0,
+            "T": 10#[10,100,1000, 10000], #10,
+            "drop_p": 0.1#[0.1, 0.3, 0.5, 0.7, 0.9],
+            "lengthscale": 1e-2#[1e-1, 1.0, 10, 100],
 
 
             "dataset": LambdaZero.inputs.BrutalDock,
@@ -246,18 +246,9 @@ if __name__ == "__main__":
     # this will run train the model in a plain way
     # analysis = tune.run(**regressor_config)
 
-    # this will fit the model directly
-    for lambd in regressor_config['config']['lambda']:
-        for T in regressor_config['config']['T']:
-            for p in regressor_config['config']['drop_p']:
-                for length_scale in regressor_config['config']['lengthscale']:
-                    regressor_config['config']['lambda'] = lambd
-                    regressor_config['config']['T'] = T
-                    regressor_config['config']['drop_p'] = p
-                    regressor_config['config']['lengthscale'] = length_scale
-    
-                    rg = MCDropRegressor(regressor_config)
-                    print('experiment: lambda = {}\t T = {} \r\t\t drop_prob = {}\t length_scale = {}'.format(lambd, T, p, length_scale))
-                    print(rg.fit())
+    # this will fit the model directly    
+    rg = MCDropRegressor(regressor_config)
+    #print('experiment: lambda = {}\t T = {} \r\t\t drop_prob = {}\t length_scale = {}'.format(lambd, T, p, length_scale))
+    print(rg.fit())
 
 
