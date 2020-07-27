@@ -32,7 +32,7 @@ class BaselineMLP(torch.nn.Module):
         x_drug_2s = data.x[drug_2s]
 
         # One hot embedding for cell lines
-        one_hot_cell_lines = torch.zeros((batch_size, self.num_cell_lines))
+        one_hot_cell_lines = torch.zeros((batch_size, self.num_cell_lines)).to(self.device)
         one_hot_cell_lines = one_hot_cell_lines.scatter(1, cell_lines[:, None], 1)
 
         batch_data_1 = torch.cat((x_drug_1s, one_hot_cell_lines.float()), dim=1)
