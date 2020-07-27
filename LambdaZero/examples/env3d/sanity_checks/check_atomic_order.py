@@ -44,13 +44,13 @@ if __name__ == "__main__":
         molMDP.random_walk(total_number_of_blocks)
 
         original_molecule = molMDP.molecule.mol
+
         smiles = Chem.MolToSmiles(original_molecule, rootedAtAtom=0)
         molecule_from_smiles = MolFromSmiles(smiles)
 
+        # TODO: run a check on consistency after going through a smiles.
         original_connection = MolecularConnection(original_molecule)
         smiles_connection = MolecularConnection(molecule_from_smiles)
-
-        #print(f"Checking all descendants in {smiles} are consistent...")
 
         mol = get_intermediate_mol(molMDP, number_of_blocks=1)
         parent = MolecularConnection(mol)
