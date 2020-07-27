@@ -260,7 +260,7 @@ def get_angle_between_parent_and_child(parent_vector, child_vector, n_axis):
         ), "An input vector is not unit length"
 
     for direction_vector in [parent_vector, child_vector]:
-        np.isclose(
+        assert np.isclose(
             np.dot(direction_vector, n_axis), 0.0
         ), "parent or child is not orthogonal to n_axis"
 
