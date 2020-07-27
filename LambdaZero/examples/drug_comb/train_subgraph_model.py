@@ -1,17 +1,14 @@
 from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb, to_drug_induced_subgraphs, subgraph_protein_features_to_embedding, use_score_type_as_target, use_single_cell_line
-from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
+from LambdaZero.examples.drug_comb.model.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.utils import get_external_dirs
-from torch_geometric.data import Batch
 from torchvision.transforms import Compose
 from torch.utils.data import TensorDataset, DataLoader
 from ray import tune
-import numpy as np
 import torch.nn.functional as F
 import ray
 import torch
 import os
 import math
-import sys
 import time
 
 num_iters = 0
