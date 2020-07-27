@@ -6,63 +6,21 @@ import os
 
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem.rdchem import Mol
+from rdkit.Chem.rdmolfiles import MolFromSmiles
+from tqdm import tqdm
 
 import LambdaZero.utils
 from LambdaZero.chem import mol_from_frag
+from LambdaZero.environments import molMDP
 from LambdaZero.environments.molMDP import MolMDP
+from LambdaZero.examples.env3d.molecular_connection import MolecularConnection
 from LambdaZero.examples.env3d.rdkit_utilities import optimize_mol_in_place
 
 
-class MolecularConnection:
-    def __init__(self, mol: Mol):
-
-        atoms = mol.GetAtoms()
-
-        self.nodes = []
-        self.atomic_type = []
-        self.neighbors = []
-
-        for a in atoms:
-            self.nodes.append(a.GetIdx())
-            self.atomic_type.append(a.GetAtomicNum())
-            self.neighbors.append(set(n.GetIdx() for n in a.GetNeighbors()))
-
-        self.size = len(self.nodes)
-
-        self.node_set = set(self.nodes)
-
-    def _have_same_nodes(self, child):
-        return self.nodes == child.nodes[: self.size]
-
-    def _have_same_atomic_types(self, child):
-        return self.atomic_type == child.atomic_type[: self.size]
-
-    def _neighborhood_sets_are_consistent(
-        self, parent_neighbors_set, child_neighors_set
-    ):
-        difference_set = child_neighors_set.difference(parent_neighbors_set)
-        return difference_set.isdisjoint(self.node_set)
-
-    def child_is_consistent(self, child):
-        if not self._have_same_nodes(child) or not self._have_same_atomic_types(child):
-            return False
-
-        for parent_neighbors_set, child_neighors_set in zip(
-            self.neighbors, child.neighbors[: self.size]
-        ):
-            if not self._neighborhood_sets_are_consistent(
-                parent_neighbors_set, child_neighors_set
-            ):
-                return False
-
-        return True
-
-
-def get_intermediate_mol(number_of_blocks: int):
+def get_intermediate_mol(mol_mdp: molMDP, number_of_blocks: int):
     mol, _ = mol_from_frag(
-        jun_bonds=molMDP.molecule.jbonds[: number_of_blocks - 1],
-        frags=molMDP.molecule.blocks[:number_of_blocks],
+        jun_bonds=mol_mdp.molecule.jbonds[: number_of_blocks - 1],
+        frags=mol_mdp.molecule.blocks[:number_of_blocks],
         optimize=False,
     )
     optimize_mol_in_place(mol)
@@ -81,18 +39,24 @@ if __name__ == "__main__":
 
     molMDP = MolMDP(blocks_file=blocks_file)
 
-    for _ in range(number_of_iterations):
+    for _ in tqdm(range(number_of_iterations)):
         molMDP.reset()
         molMDP.random_walk(total_number_of_blocks)
-        smiles = Chem.MolToSmiles(molMDP.molecule.mol)
 
-        print(f"Checking all descendants in {smiles} are consistent...")
+        original_molecule = molMDP.molecule.mol
+        smiles = Chem.MolToSmiles(original_molecule, rootedAtAtom=0)
+        molecule_from_smiles = MolFromSmiles(smiles)
 
-        mol = get_intermediate_mol(number_of_blocks=1)
+        original_connection = MolecularConnection(original_molecule)
+        smiles_connection = MolecularConnection(molecule_from_smiles)
+
+        #print(f"Checking all descendants in {smiles} are consistent...")
+
+        mol = get_intermediate_mol(molMDP, number_of_blocks=1)
         parent = MolecularConnection(mol)
 
         for number_of_blocks in range(2, total_number_of_blocks):
-            mol = get_intermediate_mol(number_of_blocks)
+            mol = get_intermediate_mol(molMDP, number_of_blocks)
             child = MolecularConnection(mol)
 
             are_consistent = parent.child_is_consistent(child)
