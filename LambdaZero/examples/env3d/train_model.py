@@ -15,7 +15,7 @@ from LambdaZero.utils import get_external_dirs
 datasets_dir, _, summaries_dir = get_external_dirs()
 results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
 
-data_filename_without_suffix = f"env3d_dataset_3_parent_blocks_debug"
+data_filename_without_suffix = f"env3d_dataset_5_parent_blocks"
 data_filename = f"{data_filename_without_suffix}.feather"
 
 source_path_to_dataset = results_dir.joinpath(data_filename)
