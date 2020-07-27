@@ -1,5 +1,6 @@
 """
-The goal of this script is to analyse a dataset.
+The goal of this script is to analyse the toy dataset, plotting the most frequent blocks to
+sanity check we get reasonable molecules.
 """
 import json
 import os
