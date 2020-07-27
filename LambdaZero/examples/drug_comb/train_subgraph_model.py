@@ -107,6 +107,8 @@ def eval_epoch(ddi_graph, eval_idxs, model, normalizer, device, config):
 def get_batch_subgraph_edges(ddi_graph, batch_drug_drug_index):
     """Gets values to enable averaging over node embeddings.
 
+    These docs follow the notation conventions of docs in drug_combdb_data.py.
+
     Arguments
     ---------
     ddi_graph : Data
