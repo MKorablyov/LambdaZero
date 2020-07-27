@@ -3,6 +3,8 @@ from typing import Tuple
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from LambdaZero.examples.env3d.utilities import get_angle_between_zero_and_two_pi
+
 
 def multiply_scalars_and_vectors(
     list_scalars: np.array, list_vectors: np.array
@@ -270,16 +272,7 @@ def get_angle_between_parent_and_child(parent_vector, child_vector, n_axis):
     projection_x = np.dot(child_vector, x_hat)
     projection_y = np.dot(child_vector, y_hat)
 
-    ratio = np.abs(projection_y / projection_x)
-
-    if projection_x >= 0.0 and projection_y >= 0.0:
-        theta = np.arctan(ratio)
-    elif projection_x < 0.0 and projection_y >= 0.0:
-        theta = np.pi - np.arctan(ratio)
-    elif projection_x < 0.0 and projection_y < 0.0:
-        theta = np.pi + np.arctan(ratio)
-    else:
-        theta = 2 * np.pi - np.arctan(ratio)
+    theta = get_angle_between_zero_and_two_pi(np.arctan2(projection_y, projection_x))
 
     return theta
 
