@@ -10,11 +10,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from rdkit import Chem
-
 from rdkit.Chem import Draw
 
 from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
-from LambdaZero.utils import get_external_dirs, AllChem
+from LambdaZero.utils import get_external_dirs
 
 datasets_dir, _, summaries_dir = get_external_dirs()
 results_dir = Path(summaries_dir).joinpath("env3d/analysis/")
@@ -38,9 +37,9 @@ if __name__ == "__main__":
         blocks_dict = json.load(f)
 
     block_indices, counts = np.unique(df['attachment_block_index'].values, return_counts=True)
-    I = np.argsort(counts)[::-1]
-    block_indices = block_indices[I]
-    counts = counts[I]
+    sorting_indices = np.argsort(counts)[::-1]
+    block_indices = block_indices[sorting_indices]
+    counts = counts[sorting_indices]
 
     list_common_block_smiles = [blocks_dict['block_smi'][f'{block_indices[i]}'] for i in range(10)]
     list_common_blocks = [Chem.MolFromSmiles(smiles) for smiles in list_common_block_smiles]
@@ -60,9 +59,7 @@ if __name__ == "__main__":
                                legends=[f'child block {index}' for index in list_child_blocks])
     img.save(results_dir.joinpath("sample_of_molecules.png"))
 
-
-
-    # Plot the distribution of blocks and angles
+    #  Plot the distribution of blocks and angles
     fig = plt.figure(figsize=(12, 8))
     fig.suptitle(f"Basic analysis of dataset. Number of molecules: {len(df)}")
 
