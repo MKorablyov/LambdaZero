@@ -23,8 +23,22 @@ from LambdaZero.examples.mpnn import config
 transform = LambdaZero.utils.Complete()
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
-if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "mpnn000"
+if len(sys.argv) >= 2:
+    config_name = sys.argv[1]
+    if len(sys.argv) > 2:
+        if len(sys.argv) > 3:
+            split_type = model_type = sys.argv[3]
+        else:
+            split_type = "rand"
+        model_type = sys.argv[2]
+    else:
+        model_type = "mpnn"
+        split_type = "rand"
+else:
+    config_name = "mpnn000"
+    model_type = "mpnn"
+    split_type = "rand"
+
 config = getattr(config, config_name)
 
 def train_epoch(loader, model, optimizer, device, config):
@@ -41,7 +55,10 @@ def train_epoch(loader, model, optimizer, device, config):
 
         optimizer.zero_grad()
 
-        logits = model(z=data.z,pos=data.pos,batch=data.batch)
+        if config["model_type"] == "dime":
+            logits = model(z=data.z,pos=data.pos,batch=data.batch)
+        else:
+            logits = model(data)
         
         print(logits)
 
@@ -102,13 +119,19 @@ def eval_epoch(loader, model, device, config):
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
 
+loaded_model = DimeNet(hidden_channels=128, out_channels=1, num_blocks=6,
+                        num_bilinear=8, num_spherical=7, num_radial=6,
+                        cutoff=5.0, envelope_exponent=5, num_before_skip=1,
+                        num_after_skip=2, num_output_layers=3) if model_type == "dime" else LambdaZero.models.MPNNet
+
+split_file = "ksplit_Zinc15_260k.npy" if split_type == "KNN" else "randsplit_Zinc15_260k.npy"
 
 DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/ksplit_Zinc15_260k.npy"),
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/" + split_file),
         "b_size": 1,
 
         "dataset": LambdaZero.inputs.BrutalDock,
@@ -118,20 +141,16 @@ DEFAULT_CONFIG = {
             "transform": transform,
             "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]
         },
-        "model": DimeNet(hidden_channels=128, out_channels=1, num_blocks=6,
-                        num_bilinear=8, num_spherical=7, num_radial=6,
-                        cutoff=5.0, envelope_exponent=5, num_before_skip=1,
-                        num_after_skip=2, num_output_layers=3),
-        #"model": LambdaZero.models.MPNNet,
+        "model": loaded_model,
         "model_config": {},
 
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
             "lr": 0.001
         },
-
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
+        "model_type": model_type
     },
 
     "summaries_dir": summaries_dir,
