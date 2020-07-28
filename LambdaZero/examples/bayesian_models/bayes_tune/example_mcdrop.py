@@ -61,8 +61,18 @@ def train_epoch(loader, model, optimizer, device, config):
         optimizer.zero_grad()
         logits = model(data, do_dropout=True, drop_p=config["drop_p"] )
         targets_norm = config["normalizer"].forward_transform(targets)
-        reg_loss = lambd * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
-        loss = F.mse_loss(logits, targets_norm) + reg_loss
+
+        reg_weight = 0
+        reg_bias = 0
+
+        for idx, param in enumerate(model.parameters()):
+            if idx % 2 == 0:
+                reg_weight += lambd * param.norm(2)
+            else:
+                reg_bias += (lambd/(1-config["drop_p"])) * param.norm(2)
+        loss = F.mse_loss(logits, targets_norm) + reg_weight + reg_bias
+        # reg_loss = lambd * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
+        # loss = F.mse_loss(logits, targets_norm) + reg_loss
         loss.backward()
         optimizer.step()
 
@@ -99,10 +109,10 @@ DEFAULT_CONFIG = {
             "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                            #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "b_size": 50,
-            "lambda": 1e-8#, 1e-6, 1e-4, 1e-2, 1],#5.0,
-            "T": 10#[10,100,1000, 10000], #10,
-            "drop_p": 0.1#[0.1, 0.3, 0.5, 0.7, 0.9],
-            "lengthscale": 1e-2#[1e-1, 1.0, 10, 100],
+            "lambda": 1e-8, #, 1e-6, 1e-4, 1e-2, 1],#5.0,
+            "T": 10, #[10,100,1000, 10000], #10,
+            "drop_p": 0.1, #[0.1, 0.3, 0.5, 0.7, 0.9],
+            "lengthscale": 1e-2, #[1e-1, 1.0, 10, 100],
 
 
             "dataset": LambdaZero.inputs.BrutalDock,
@@ -147,18 +157,18 @@ DEFAULT_CONFIG = {
 # dropout_hyperparameter (drop_layers=True, drop_mlp=True)
 # todo: add BLL (from John's code)
 
-def get_tau(config, N):
+def get_tau(config, N): 
     
-    tau = config["drop_p"] * (config["lengthscale"]**2) / (2 * N * config["lambda"])
+    tau = (1 - config["drop_p"]) * (config["lengthscale"]**2) / (2 * N * config["lambda"])
     return tau
 
 
-def _log_lik(y, Yt_hat, config):
+def _log_lik(y, Yt_hat, config, N):
     "computes log likelihood"
     # ll = (logsumexp(-0.5 * self.tau * (y_test[None] - Yt_hat) ** 2., 0)
     # - np.log(T)
     # - 0.5 * np.log(2 * np.pi) + 0.5 * np.log(self.tau))
-    tau = get_tau(config, Yt_hat.shape[1])
+    tau = get_tau(config, N)
     ll = logsumexp(-0.5 * tau * (y[None] - Yt_hat) ** 2., 0)
     ll -= np.log(Yt_hat.shape[0])
     ll -= 0.5 * np.log(2 * np.pi)
@@ -174,7 +184,7 @@ class MCDropRegressor(BasicRegressor):
         if train_loader is not None: self.train_loader = train_loader
         if val_loader is not None: self.val_loader = val_loader
 
-        self.N = len(self.val_loader.dataset)
+        self.N = len(self.train_loader.dataset)
         
 
         # todo allow ray native stopping
@@ -186,8 +196,8 @@ class MCDropRegressor(BasicRegressor):
                 y_norm = self.config["normalizer"].forward_transform(np.concatenate(y))
                 y_norm_shuff = np.array(sorted(y_norm, key=lambda k: random.random()))
                 Yt_hat = self.get_predict_samples(self.val_loader)
-                ll = _log_lik(y_norm, Yt_hat, self.config).mean()
-                ll_shuff = _log_lik(y_norm_shuff, Yt_hat, self.config).mean()
+                ll = _log_lik(y_norm, Yt_hat, self.config, self.N).mean()
+                ll_shuff = _log_lik(y_norm_shuff, Yt_hat, self.config, self.N).mean()
                 scores["eval_ll"] = ll
                 scores["eval_ll_shuff"] = ll_shuff
 
@@ -212,24 +222,32 @@ class MCDropRegressor(BasicRegressor):
         return np.asarray(Yt_hat)
 
     def get_mean_and_variance(self, data_loader):
-        y_hat = self.get_predict_samples(data_loader)
-        item2 = 0
-        means  = []
-        for y in y_hat:
-            item2 += np.matmul(y[:,None], y[None,:])
-            means.append(y)
-        item2 = item2 / self.config['T']
-        
-        D = y_hat.shape[1]
-
+        # Scalar version:
+        Yt_hat = self.get_predict_samples(data_loader)
         tau = get_tau(self.config, self.N)
-        item1 = np.eye(D) * (1/tau)
-        means = np.asarray(means)
-        means = np.sum(means, axis = 0) / self.config['T']
-        item3 = np.matmul(means[:,None], means[None,:])
-        var = item1 + item2 - item3
-        var = np.diagonal(var)
-        return var
+        sigma2 = 1./tau
+        var = (sigma2 + Yt_hat**2).mean(0) - Yt_hat.mean(0)**2
+        return Yt_hat.mean(0), var
+
+        # # Matrix version:
+        # y_hat = self.get_predict_samples(data_loader)
+        # item2 = 0
+        # means  = []
+        # for y in y_hat:
+        #     item2 += np.matmul(y[:,None], y[None,:])
+        #     means.append(y)
+        # item2 = item2 / self.config['T']
+        
+        # D = y_hat.shape[1]
+
+        # tau = get_tau(self.config, self.N)
+        # item1 = np.eye(D) * (1/tau)
+        # means = np.asarray(means)
+        # means = np.sum(means, axis = 0) / self.config['T']
+        # item3 = np.matmul(means[:,None], means[None,:])
+        # var = item1 + item2 - item3
+        # var = np.diagonal(var)
+        # return var
 
 class UCB(BasicRegressor):
     pass
