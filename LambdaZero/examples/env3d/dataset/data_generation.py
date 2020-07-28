@@ -115,7 +115,6 @@ def get_data_row(
     """
 
     parent_mol = reference_molMDP.molecule.mol
-    parent_smiles = MolToSmiles(parent_mol)
     number_of_parent_atoms = parent_mol.GetNumAtoms()
 
     relaxed_mol, block_idx, anchor_indices = extract_lowest_energy_child(
@@ -136,11 +135,18 @@ def get_data_row(
 
     parent_positions = all_positions[:number_of_parent_atoms]
 
+    # the atomic order in parent_mol is NOT THE SAME as the atomic order after creating the Mol from
+    # a smiles string. This method ensures that the positions and attachment index are consistent
+    # with the Mol created from a smiles.
+    parent_smiles, permuted_positions, permuted_attachment_index = get_smiles_and_consistent_positions(
+        parent_mol, parent_positions, attachment_index
+    )
+
     return {
         "smi": parent_smiles,
-        "coord": parent_positions,
+        "coord": permuted_positions,
         "n_axis": n_axis,
-        "attachment_node_index": attachment_index,
+        "attachment_node_index": permuted_attachment_index,
         "attachment_angle": angle_in_radian,
         "attachment_block_index": block_idx,
     }
