@@ -65,11 +65,11 @@ class MeanVarianceNormalizer:
         self.mean = mean_and_variance[0]
         self.variance = mean_and_variance[1]
 
-    def normalize(self, x):
+    def forward_transform(self, x):
         x_norm = (x - self.mean) / self.variance
         return x_norm
 
-    def unnormalize(self, x_norm):
+    def backward_transform(self, x_norm):
         x = (x_norm * self.variance) + self.mean
         return x
 
@@ -168,16 +168,25 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
 
 def molecule_pca(mol):
-    # fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
-    # mat = []
-    # for fp in fps:
-    #     bits = fp.ToBitString()
-    #     bitsvec = [int(bit) for bit in bits]
-    #     mat.append(bitsvec)
-    # mat = np.array(mat)
+    fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
+    mat = []
+    for fp in fps:
+        bits = fp.ToBitString()
+        bitsvec = [int(bit) for bit in bits]
+        mat.append(bitsvec)
+    mat = np.array(mat)
 
-    # pca = pk.load(open(pca_path, 'rb'))
-    # scaled_data = pca.transform(mat)
-    # log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
-    # return (log_vals)
-    return ({})
+    pca = pk.load(open(pca_path, 'rb'))
+    scaled_data = pca.transform(mat)
+    log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
+    return (log_vals)
+
+def logP(mu, sigma, x):
+    """
+    Estimate log likelihood of an estimator
+    :param mu: estimated mu
+    :param sigma: estimated sigma
+    :param x: ground truth
+    :return:
+    """
+    return (-np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) **2))

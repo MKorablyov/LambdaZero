@@ -5,6 +5,7 @@ import pandas as pd
 
 import LambdaZero.inputs
 import LambdaZero.utils
+from matplotlib import pyplot as plt
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -15,8 +16,8 @@ DEFAULT_CONFIG = {
     #"split_name": "randsplit_dock_blocks105_walk40_clust",
 
     "dataset_root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-    "file_names": ["Zinc15_260k_0",  "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
-    "split_name": "randsplit_Zinc15_260k",
+    "file_names": ["Zinc15_2k"],#["Zinc15_260k_0",  "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+    "split_name": "randsplit_Zinc15_2k",
     "probs": [0.8, 0.1, 0.1],
 }
 config = DEFAULT_CONFIG
@@ -28,11 +29,11 @@ if __name__ == "__main__":
     data = [pd.read_feather(osp.join(config["dataset_root"], "raw", f + ".feather")) for f in config["file_names"]]
     data = pd.concat(data, axis=0)
 
-    from matplotlib import pyplot as plt
-    score = data["gridscore"].to_numpy()
 
-    plt.show()
-    print(data["gridscore"].to_numpy().std())
+    #score = data["gridscore"].to_numpy()
+
+    #plt.show()
+    #print(data["gridscore"].to_numpy().std())
 
 
     data.reset_index(drop=True, inplace=True)

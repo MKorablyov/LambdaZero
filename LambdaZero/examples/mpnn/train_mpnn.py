@@ -4,9 +4,6 @@ import os.path as osp
 import torch
 import torch.nn.functional as F
 
-from torch_geometric.utils import remove_self_loops
-import torch_geometric.transforms as T
-
 import ray
 from ray import tune
 from ray.rllib.utils import merge_dicts
@@ -38,14 +35,14 @@ def train_epoch(loader, model, optimizer, device, config):
 
         optimizer.zero_grad()
         logits = model(data)
-        loss = F.mse_loss(logits, normalizer.normalize(targets))
+        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
         loss.backward()
         optimizer.step()
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.unnormalize(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
 
     epoch_targets = np.concatenate(epoch_targets,0)
     epoch_preds = np.concatenate(epoch_preds, 0)
@@ -71,12 +68,12 @@ def eval_epoch(loader, model, device, config):
         targets = getattr(data, config["target"])
 
         logits = model(data)
-        loss = F.mse_loss(logits, normalizer.normalize(targets))
+        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.unnormalize(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
 
     epoch_targets = np.concatenate(epoch_targets,0)
     epoch_preds = np.concatenate(epoch_preds, 0)

@@ -139,6 +139,9 @@ DEFAULT_CONFIG = {
         "qed_cutoff": [0.2, 0.7],
         # "synth_cutoff": [0, 4],
         "synth_config": synth_config,
+
+        # todo: simulation button; allow dense reward
+
         "soft_stop": True,
         "exp": None,
         "delta": False,
@@ -156,14 +159,14 @@ DEFAULT_CONFIG = {
     #    "device": "cuda",
     #},
     "reward": PredDockReward_v2,
-    "num_blocks": 105,
-    "max_steps": 7,
-    "max_blocks": 7,
+    "num_blocks": 105, # number of types of building blocks (can only change this to smaller number)
+    "max_steps": 7,    # number of steps an agent can take before forced to exit the environment
+    "max_blocks": 7,   # maximum number of building blocks in the molecule
+    # (if num_bloks(molecule) > max_bloks, block additon is not alowed)
     "max_atoms": 50,
-    "max_branches": 20,
-    "random_blocks": 2,
-    "dense_reward": False,
-    "max_simulations": 1,
+    "max_branches": 25,
+    "random_blocks": 2, # regularizer; start environment with molecule with random_bloks bloks
+    "max_simulations": 1, # max simulations before agent is forced to exit
     "allow_removal": True
 }
 
