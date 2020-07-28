@@ -1,14 +1,23 @@
 import copy
+from typing import Tuple
 
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem.rdmolfiles import MolToSmiles
+from rdkit.Chem.rdchem import Mol, Atom
+from rdkit.Chem.rdmolfiles import MolToSmiles, MolFromSmiles
 from tqdm import tqdm
 
 from LambdaZero.chem import mol_from_frag
 from LambdaZero.environments import MolMDP
-from LambdaZero.examples.env3d.geometry import get_positions_aligned_with_parent_inertia_tensor, get_n_axis_and_angle
-from LambdaZero.examples.env3d.rdkit_utilities import get_lowest_energy_and_mol_with_hydrogen, get_atomic_masses
+from LambdaZero.examples.env3d.geometry import (
+    get_positions_aligned_with_parent_inertia_tensor,
+    get_n_axis_and_angle,
+)
+from LambdaZero.examples.env3d.rdkit_utilities import (
+    get_lowest_energy_and_mol_with_hydrogen,
+    get_atomic_masses,
+    get_index_permutation_between_equivalent_molecules,
+)
 
 
 def extract_lowest_energy_child(
@@ -136,3 +145,39 @@ def get_data_row(
         "attachment_block_index": block_idx,
     }
 
+
+def get_smiles_and_consistent_positions(
+    mol: Mol, positions: np.array, attachment_index: int
+) -> Tuple[str, np.array, int]:
+    """
+    This method creates the smiles corresponding to the input Mol and a permutation of the
+    input positions and attachment index that are consistent with the smiles atomic ordering.
+
+    Args:
+        mol (Mol): a molecule in Mol form
+        positions (np.array): atomic positions corresponding to the atoms in mol
+        attachment_index (int): the index of one of these atoms, which is used to attach a child node.
+
+    Returns:
+        smiles (str): the smiles string corresponding to mol
+        smiles_consistent_positions (np.array): permuted positions consistent with the atom ordering implicit in smiles
+        smiles_consistent_attachment_index (int): correct index after permutation
+
+    """
+
+    smiles = MolToSmiles(mol)
+    smiles_mol = MolFromSmiles(smiles)
+    if smiles_mol is None:
+        raise ValueError("MolFromSmiles failed to generate a Mol. Bad molecule")
+
+    permutation = get_index_permutation_between_equivalent_molecules(mol, smiles_mol)
+
+    # permutation is an array of indices such that, for p_i = permutation[i],
+    #  the atom with index "i" in smiles_mol is equivalent to atom with index "p_i" in mol.
+    permuted_positions = positions[permutation]
+
+    # To find the index of the attachment atom, we have that p_i = attachment_index; we have to
+    # find the index "i" in smiles_mol that corresponds to this.
+    permuted_attachment_index = list(permutation).index(attachment_index)
+
+    return smiles, permuted_positions, permuted_attachment_index

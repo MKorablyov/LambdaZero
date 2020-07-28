@@ -152,7 +152,8 @@ def get_index_permutation_between_equivalent_molecules(
         smiles_mol (Mol): same molecule, but derived from the corresponding smiles string
 
     Returns:
-        permutation (np.array): array of integers that permutes the indices from original to smiles indexing.
+        permutation (np.array): Array of indices such that, for p_i = permutation[i],
+                                the atom with index "i" in smiles_mol is the same as atom with index "p_i" in mol.
 
     Example:
 
@@ -160,10 +161,10 @@ def get_index_permutation_between_equivalent_molecules(
             orignal_mol = [Carbon, Nitrogen, Sulfur]
             smiles_mol = [Sulfur, Carbon, Nitrogen]
 
-        Then permutation = [1, 2, 0], which is to say:
-            - the Carbon in position 0 in original_mol goes to position 1 in smiles_mol
-            - the Nitrogen in position 1 in original_mol goes to position 2 in smiles_mol
-            - the Sulfur in position 2 in original_mol goes to position 0 in smiles_mol
+        Then permutation = [2, 0, 1], which is to say:
+            - the Sulfur in position 0 in smiles_mol comes from position 2 in original_mol
+            - the Carbon in position 1 in smiles_mol comes from position 0 in original_mol
+            - the Nitrogen in position 2 in smiles_mol comes from position 1 in original_mol
 
     """
 
@@ -176,7 +177,7 @@ def get_index_permutation_between_equivalent_molecules(
     #    in the query. For example, the first index is for the atom in
     #    this molecule that matches the first atom in the query.
 
-    match = smiles_mol.GetSubstructMatch(original_mol)
+    match = original_mol.GetSubstructMatch(smiles_mol)
 
     expected_index_set = set(range(smiles_mol.GetNumAtoms()))
     computed_index_set = set(match)

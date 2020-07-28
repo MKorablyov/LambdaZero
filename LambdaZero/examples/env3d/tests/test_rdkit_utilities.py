@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 from rdkit import Chem
 from rdkit.Chem.rdchem import Atom
 from rdkit.Chem.rdmolfiles import MolToSmiles, MolFromSmiles
@@ -21,9 +21,13 @@ def original_mol():
     c_index = editable_mol.AddAtom(Atom("C"))
     n_index = editable_mol.AddAtom(Atom("N"))
     s_index = editable_mol.AddAtom(Atom("S"))
+    p_index = editable_mol.AddAtom(Atom("P"))
+    o_index = editable_mol.AddAtom(Atom("O"))
 
+    editable_mol.AddBond(c_index, o_index)
     editable_mol.AddBond(c_index, s_index)
     editable_mol.AddBond(s_index, n_index)
+    editable_mol.AddBond(n_index, p_index)
 
     original_mol = editable_mol.GetMol()
 
@@ -75,10 +79,10 @@ def expected_permutation(original_mol, smiles_mol):
     original_atoms = original_mol.GetAtoms()
 
     permutation = []
-    for original_atom in original_atoms:
-        for smiles_index, smiles_atom in enumerate(smiles_atoms):
+    for smiles_atom in smiles_atoms:
+        for original_index, original_atom in enumerate(original_atoms):
             if smiles_atom.GetSymbol() == original_atom.GetSymbol():
-                permutation.append(smiles_index)
+                permutation.append(original_index)
                 continue
 
     return np.array(permutation)
