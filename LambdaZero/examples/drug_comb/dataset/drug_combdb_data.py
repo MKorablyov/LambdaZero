@@ -205,7 +205,7 @@ class DrugCombDb(InMemoryDataset):
             L = D - A
 
             # Restrict to protein nodes
-            L = L[self.data.number_of_drugs[0]:, self.data.number_of_drugs[0]:]
+            L = L[self.is_drug.sum():, self.is_drug.sum():]
 
             eigvals, eigvects = np.linalg.eigh(L)  # Diagonalize the matrix
             # Save results
@@ -221,7 +221,7 @@ class DrugCombDb(InMemoryDataset):
 
         # Transform to dataframe
         n_drugs = self.is_drug.sum()
-        col_names = ["lap_feat_"+ str(i) for i in range(256)]
+        col_names = ["lap_feat_" + str(i) for i in range(256)]
         zeros_for_drugs = pd.DataFrame(0, index=np.arange(n_drugs), columns=col_names)
         laplacian_feats = pd.DataFrame(eigvects[:, :n_features], columns=col_names)
 
@@ -260,7 +260,7 @@ class DrugCombDb(InMemoryDataset):
         self._drugcomb_scored = self._drugcomb_scored.drop_duplicates(['idx_Drug1', 'idx_Drug2', 'Cell line'])
 
         # Remove edges with invalid scores
-        scores = self._drugcomb_scored[self.scores]
+        scores = self._drugcomb_scored[['ZIP', 'Bliss', 'Loewe', 'HSA']]
         good_scores_arr = ((scores.notna()) & (-100 <= scores) & (scores <= 100)).all(axis=1)
         self._drugcomb_scored = self._drugcomb_scored[good_scores_arr]
 
@@ -270,7 +270,7 @@ class DrugCombDb(InMemoryDataset):
         ddi_edge_classes = ddi_edge_classes.to_numpy()
 
         ddi_edge_idx = self._drugcomb_scored[['idx_Drug1', 'idx_Drug2']].to_numpy().T
-        ddi_edge_attr = self._drugcomb_scored[self.scores].to_numpy()
+        ddi_edge_attr = self._drugcomb_scored[['ZIP', 'Bliss', 'Loewe', 'HSA']].to_numpy()
 
         return ddi_edge_idx, ddi_edge_attr, ddi_edge_classes
 
