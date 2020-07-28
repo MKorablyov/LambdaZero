@@ -19,6 +19,7 @@ class BasicRegressor(tune.Trainable):
 
         # split dataset
         train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
+        #train_idxs, val_idxs, test_idxs = np.array([0]), np.array([0]), np.array([0])
 
         sampler = None
 

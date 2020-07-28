@@ -41,10 +41,9 @@ def train_epoch(loader, model, optimizer, device, config):
 
         optimizer.zero_grad()
 
-        print(data.__dict__.keys())
-        raise ValueError
-
         logits = model(z=data.z,pos=data.pos,batch=data.batch)
+        
+        print(logits)
 
         if config["loss"] == "L2":
             loss = F.mse_loss(logits, normalizer.normalize(targets))
@@ -83,7 +82,7 @@ def eval_epoch(loader, model, device, config):
         data = data.to(device)
         targets = getattr(data, config["target"])
 
-        logits = model(z=data,pos=None,batch=None)
+        logits = model(z=data.z,pos=data.pos,batch=data.batch)
         loss = F.mse_loss(logits, normalizer.normalize(targets))
 
         # log stuff
@@ -110,14 +109,14 @@ DEFAULT_CONFIG = {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
         "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/ksplit_Zinc15_260k.npy"),
-        "b_size": 64,
+        "b_size": 1,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
             "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
             "props": ["gridscore"],
             "transform": transform,
-            "file_names": ["Zinc15_260k_0"]
+            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]
         },
         "model": DimeNet(hidden_channels=128, out_channels=1, num_blocks=6,
                         num_bilinear=8, num_spherical=7, num_radial=6,
@@ -162,6 +161,6 @@ if __name__ == "__main__":
                         resources_per_trial=config["resources_per_trial"],
                         num_samples=config["num_samples"],
                         checkpoint_at_end=config["checkpoint_at_end"],
-                        local_dir=summaries_dir+"/knn_split/",
+                        local_dir=summaries_dir+"/dime/",
                         name=config_name,
                         checkpoint_freq=config["checkpoint_freq"])

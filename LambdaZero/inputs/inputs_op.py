@@ -741,7 +741,7 @@ def tpnn_proc(smi, props, pre_filter, pre_transform):
         graph = pre_transform(graph)
     return graph
 
-#@ray.remote
+@ray.remote
 def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
     try:
         graph = mol_to_graph(smi, props)
@@ -816,8 +816,15 @@ class BrutalDock(InMemoryDataset):
                 #So far we have docked_index with all the mols one per row
 
                 props = {pr:docked_index[pr].tolist() for pr in self._props}
+                
+                tasks = []
+                for j in range(len(smis)):
+                    print("Task: " + str(j) + " | Out of: " + str(len(smis)))
+                    tasks.append(self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props}, self.pre_filter, self.pre_transform))                    
 
-                tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props}, self.pre_filter, self.pre_transform) for j in range(len(smis))]
+                    #tasks.append(self.proc_func(smis[j], {pr: props[pr][j] for pr in props}, self.pre_filter, self.pre_transform))
+
+                #tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props}, self.pre_filter, self.pre_transform) for j in range(len(smis))]
                 graphs = ray.get(tasks)
                 graphs = [g for g in graphs if g is not None]
                 # save to the disk
