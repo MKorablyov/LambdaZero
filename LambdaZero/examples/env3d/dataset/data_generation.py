@@ -3,7 +3,7 @@ from typing import Tuple
 
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem.rdchem import Mol, Atom
+from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdmolfiles import MolToSmiles, MolFromSmiles
 from tqdm import tqdm
 
