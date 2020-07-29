@@ -1,6 +1,7 @@
 """
 The goal of this script is to generate the dataset of molecules embedded in 3D space.
 """
+import logging
 import warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
@@ -108,8 +109,7 @@ if __name__ == "__main__":
     while row_ids:
         done_ids, row_ids = ray.wait(row_ids)
         done_count += len(done_ids)
-        print(f"Done {done_count} out of {max_number_of_molecules}")
-        sys.stdout.flush()
+        logging.info(f"Done {done_count} out of {max_number_of_molecules}")
 
         for done_id in done_ids:
             try:
@@ -117,9 +117,8 @@ if __name__ == "__main__":
                 output_path = output_file_path_dict[done_id]
                 create_or_append_feather_file(output_path, byte_row)
             except (ValueError, AssertionError) as e:
-                print("Something went wrong with molecule generation. Exception:")
-                print(e)
-                print("Moving on.")
-                sys.stdout.flush()
+                logging.warning("Something went wrong with molecule generation. Exception:")
+                logging.warning(e)
+                logging.warning("Moving on.")
 
     ray.shutdown()
