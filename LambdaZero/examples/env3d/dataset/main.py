@@ -60,7 +60,7 @@ if __name__ == "__main__":
     num_cpus = config["num_cpus"]
     max_number_of_molecules = config["max_number_of_molecules"]
 
-    ray.init(num_cpus=num_cpus)
+    ray.init(local_mode=config["debug_run"], num_cpus=num_cpus)
 
     np.random.seed(config["master_random_seed"])
 
