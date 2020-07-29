@@ -11,9 +11,23 @@ from LambdaZero.examples.env3d.dataset.io_utilities import process_row_for_writi
 
 @ray.remote
 class DataRowGenerator:
+    """
+    This class drives the generation of the dataset, one row at a time, under the control of ray.
+    """
 
     def __init__(self, blocks_file: str, number_of_parent_blocks: int,
                  num_conf: int, max_iters: int, random_seed: int, logging_directory: Path):
+        """
+        Initialize the data generator.
+
+        Args:
+            blocks_file (str):  path to the file containing the vocabulary of blocks
+            number_of_parent_blocks (int): number of blocks to use to build the parent molecule
+            num_conf (int): number of conformer embeddings rdkit will try to converge the geometry
+            max_iters (int): number of iterations rdkit will try to converge the geometry, for a given conformer
+            random_seed (int): random seed used to generate random parents
+            logging_directory (Path): path to the directory where logging files will be written.
+        """
 
         np.random.seed(random_seed)
         self.random_seed = random_seed
