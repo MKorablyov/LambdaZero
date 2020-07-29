@@ -19,10 +19,10 @@ class BasicRegressor(tune.Trainable):
 
         # split dataset
         train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
-
-        self.train_set = DataLoader(Subset(dataset, train_idxs.tolist()), shuffle=True, batch_size=config["b_size"])
-        self.val_set = DataLoader(Subset(dataset, val_idxs.tolist()), batch_size=config["b_size"])
-        self.test_set = DataLoader(Subset(dataset, test_idxs.tolist()), batch_size=config["b_size"])
+        self.train_set = Subset(dataset, train_idxs.tolist())
+        self.val_set = Subset(dataset, val_idxs.tolist())
+        self.train_loader = DataLoader(self.train_set,shuffle=True, batch_size=config["b_size"])
+        self.val_loader = DataLoader(self.val_set, batch_size=config["b_size"])
 
         # make model
         self.model = config["model"](**config["model_config"])
@@ -34,8 +34,8 @@ class BasicRegressor(tune.Trainable):
         self.eval_epoch = config["eval_epoch"]
 
     def _train(self):
-        train_scores = self.train_epoch(self.train_set, self.model, self.optim, self.device, self.config)
-        eval_scores = self.eval_epoch(self.val_set, self.model,  self.device, self.config)
+        train_scores = self.train_epoch(self.train_loader, self.model, self.optim, self.device, self.config)
+        eval_scores = self.eval_epoch(self.val_loader, self.model,  self.device, self.config)
         # rename to make scope
         train_scores = [("train_" + k, v) for k,v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]

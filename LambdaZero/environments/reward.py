@@ -79,10 +79,10 @@ class PredDockReward:
         return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed}
 
 class PredDockReward_v2:
-    def __init__(self, load_model, natm_cutoff, qed_cutoff, synth_cutoff, synth_config,
-                 soft_stop, exp, delta, simulation_cost, device, transform=T.Compose([LambdaZero.utils.Complete()])):
+    def __init__(self, binding_model, qed_cutoff, synth_cutoff, synth_config,
+                 soft_stop, exp, delta, simulation_cost, device):
 
-        self.natm_cutoff = natm_cutoff
+        #self.natm_cutoff = natm_cutoff
         self.qed_cutoff = qed_cutoff
         self.synth_cutoff = synth_cutoff
         self.soft_stop = soft_stop
@@ -90,11 +90,11 @@ class PredDockReward_v2:
         self.delta = delta
         self.simulation_cost = simulation_cost
         self.device = device
-        self.transform = transform
+        self.transform = T.Compose([LambdaZero.utils.Complete()])
 
         self.net = LambdaZero.models.MPNNet()
         self.net.to(device)
-        self.net.load_state_dict(th.load(load_model, map_location=th.device(device)))
+        self.net.load_state_dict(th.load(binding_model, map_location=th.device(device)))
         self.net.eval()
 
         self.synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
@@ -106,8 +106,8 @@ class PredDockReward_v2:
 
         # num atoms constraint
         natm = mol.GetNumAtoms()
-        natm_discount = (self.natm_cutoff[1] - natm) / (self.natm_cutoff[1] - self.natm_cutoff[0])
-        natm_discount = min(max(natm_discount, 0.0), 1.0) # relu to maxout at 1
+        #natm_discount = (self.natm_cutoff[1] - natm) / (self.natm_cutoff[1] - self.natm_cutoff[0])
+        #natm_discount = min(max(natm_discount, 0.0), 1.0) # relu to maxout at 1
 
         # QED constraint
         qed = QED.qed(mol)
@@ -119,15 +119,17 @@ class PredDockReward_v2:
         synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
         synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
 
+        #print("synth discount", synth_discount, synth )
+
         # combine rewards
-        disc_reward = reward * natm_discount * qed_discount * synth_discount
+        disc_reward = reward * qed_discount * synth_discount
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"reward": reward, "natm": natm, "qed" : qed, "synth" : synth}
+        return disc_reward, {"dock_reward": reward, "natm": natm, "qed" : qed, "synth" : synth}
 
     def _simulation(self, molecule):
         mol = molecule.mol
@@ -153,11 +155,11 @@ class PredDockReward_v2:
             if reward is not None:
                 discounted_reward, log_vals = self._discount(molecule.mol, reward)
             else:
-                discounted_reward, log_vals = -0.5, {"reward": -0.5, "natm": 0.0, "qed" : -0.5, "synth" : -0.5}
+                discounted_reward, log_vals = -0.5, {"dock_reward": -0.5, "natm": 0.0, "qed" : -0.5, "synth" : -0.5}
         else:
             discounted_reward, log_vals = 0.0, {}
-
         return discounted_reward, log_vals
+
 
 class PredDockReward_v3:
     def __init__(self, qed_cutoff, synth_config, dockscore_config,
@@ -191,17 +193,17 @@ class PredDockReward_v3:
 
         # Binding energy prediction
         dockscore = self.binding_net(mol=mol)
-        dockscore_discount = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
+        dockscore_reward = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
 
         # combine rewards
-        disc_reward = dockscore_discount * qed_discount * synth_discount
+        disc_reward = dockscore_reward * qed_discount * synth_discount
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"dockscore": dockscore_discount, "qed": qed, "synth": synth}
+        return disc_reward, {"dockscore_reward": dockscore_reward, "qed": qed, "synth": synth}
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:

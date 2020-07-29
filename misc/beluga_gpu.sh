@@ -9,7 +9,7 @@
 #Change Maksym's output directory, environment initialization, 
 #python path, directory to the project, and other things to work.
 
-source /home/mkkr/anaconda3/bin/activate th
-export PYTHONPATH="${PYTHONPATH}:/home/mkkr/scratch/Projects/"
+source /lustre03/project/6004852/mkkr/anaconda3/bin/activate lz
+export PYTHONPATH="${PYTHONPATH}:/home/mkkr/scratch/Projects/LambdaZero"
 cd /scratch/mkkr/Projects/LambdaZero/examples
 python train_molecule.py $1

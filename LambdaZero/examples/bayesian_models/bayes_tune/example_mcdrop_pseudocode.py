@@ -1,25 +1,23 @@
 
-
-
-# class MCdropoutRegressor(tune.Trainable):
+# class BasicRegressor(tune.Trainable):
     # _(config)
     # self.model
 
-
 #   def _train():
-#
+    # todo every epoch evaluates uncertainty
 
 
+# class MCDropoutModel:
 
-# class MCDropout(ModelWithUncertainty):
+#   fit(dataset):
+        # tune.run(basic_regressor, loggers=None)
+
 #   get_predict_samples():
         # do 10 epochs
 
-#   fit(dataset):
-        # do 3 epochs
-
 #   predict_mean_variance(dataset)
-        # get_precit_samples(); compute mean and variance
+        # get_precit_samples();
+        # compute mean and variance
 
 
 
