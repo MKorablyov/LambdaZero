@@ -16,7 +16,8 @@ from LambdaZero.examples.env3d.geometry import (
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_lowest_energy_and_mol_with_hydrogen,
     get_atomic_masses,
-    get_index_permutation_between_equivalent_molecules, )
+    get_index_permutation_between_equivalent_molecules,
+)
 
 
 def extract_lowest_energy_child(
@@ -73,7 +74,10 @@ def extract_lowest_energy_child(
         parent_mol, num_conf, max_iters=max_iters, random_seed=random_seed
     )
 
-    for block_idx in tqdm(list_block_indices, desc=f"{MolToSmiles(parent_mol)}--stem idx {attachment_stem_idx}"):
+    for block_idx in tqdm(
+        list_block_indices,
+        desc=f"{MolToSmiles(parent_mol)}--stem idx {attachment_stem_idx}",
+    ):
         molMDP = copy.deepcopy(reference_molMDP)
         molMDP.add_block(block_idx=block_idx, stem_idx=attachment_stem_idx)
 
@@ -109,9 +113,11 @@ def extract_lowest_energy_child(
 
     relaxed_mol = Chem.RemoveHs(list_relaxed_mol_with_hydrogen[min_index])
 
-    energy_dict = {'total_energy': list_total_energy[min_index],
-                   'parent_energy': parent_energy,
-                   'binding_energy': list_binding_energy[min_index]}
+    energy_dict = {
+        "total_energy": list_total_energy[min_index],
+        "parent_energy": parent_energy,
+        "binding_energy": list_binding_energy[min_index],
+    }
 
     return relaxed_mol, block_idx, anchor_indices, energy_dict
 
@@ -171,18 +177,17 @@ def get_data_row(
         parent_mol, parent_positions, attachment_index
     )
 
-    output_row = {"smi": parent_smiles,
-                  "coord": permuted_positions,
-                  "n_axis": n_axis,
-                  "attachment_node_index": permuted_attachment_index,
-                  "attachment_angle": angle_in_radian,
-                  "attachment_block_index": block_idx,
-                  }
+    output_row = {
+        "smi": parent_smiles,
+        "coord": permuted_positions,
+        "n_axis": n_axis,
+        "attachment_node_index": permuted_attachment_index,
+        "attachment_angle": angle_in_radian,
+        "attachment_block_index": block_idx,
+    }
     output_row.update(energy_dict)
 
     return output_row
-
-
 
 
 def get_smiles_and_consistent_positions(
