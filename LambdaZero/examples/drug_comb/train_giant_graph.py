@@ -1,7 +1,8 @@
 import torch
 from LambdaZero.examples.drug_comb.dataset.drug_combdb_data import DrugCombDb
 from LambdaZero.examples.drug_comb.model.multi_message_gcn import GiantGraphMPNN
-from LambdaZero.examples.drug_comb.model.baseline import BaselineMLP
+from LambdaZero.examples.drug_comb.model.baseline import BaselineMLP, SimpleBaselineFP, BaselineProt, \
+    SimpleBaselineProt, Dummy
 from LambdaZero.examples.drug_comb.utils.utils import random_split
 import os
 from LambdaZero.utils import get_external_dirs
@@ -19,25 +20,13 @@ def train_epoch(data, loader, model, optim):
     for i, drug_drug_batch in enumerate(loader):
         optim.zero_grad()
 
-        t = time.time()
-
         out = model.forward(data, drug_drug_batch)
-
-        print("time to forward", time.time() - t)
-        t = time.time()
-
         loss = model.loss(out, drug_drug_batch)
-
-        print("time to compute loss", time.time() - t)
-        t = time.time()
 
         loss.backward()
         optim.step()
 
-        print("time to optimize", time.time() - t)
-
         epoch_loss += loss.item()
-        # print('batch train loss: {:.4f}'.format(loss.item()))
 
     print('Mean train loss: {:.4f}'.format(epoch_loss / num_batches))
 
@@ -55,7 +44,6 @@ def eval_epoch(data, loader, model):
 
             loss = model.loss(out, drug_drug_batch)
             epoch_loss += loss.item()
-            # print('batch valid loss: {:.4f}'.format(loss.item()))
 
     print('Mean valid loss: {:.4f}'.format(epoch_loss / num_batches))
 
@@ -73,7 +61,7 @@ class GiantGraphTrainer(tune.Trainable):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"],
-                             scores=config["scores"])
+                             scores=config["scores"], cell_line=config['cell_line'])
 
         self.data = dataset[0].to(self.device)
 
@@ -139,26 +127,26 @@ if __name__ == '__main__':
         "trainer_config": {
             "transform": None,
             "pre_transform": None,
-            "scores": ['HSA'],
-            "layers": tune.grid_search([[1024, 512], [1024, 100], [1024, 50], [1024, 20], [1024, 5]]),
+            "scores": ['HSA'],  # tune.grid_search([['ZIP'], ['Bliss'], ['Loewe'], ['HSA']]),
+            "layers": [1024, 1],  # tune.grid_search([[1024, 512], [1024, 100], [1024, 50], [1024, 20], [1024, 5]]),
             "val_set_prop": 0.2,
             "test_set_prop": 0.0,
-            "lr": tune.grid_search([1e-4, 5e-5, 1e-5, 5e-6]),
-            "model": BaselineMLP,  # tune.grid_search([GiantGraphMPNN, BaselineMLP]),
+            "lr": 1e-4,  # tune.grid_search([1e-4, 1e-5]),
+            "model": BaselineProt,  # tune.grid_search([GiantGraphMPNN, BaselineMLP]),
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
             "embed_channels": 256,
-            "regressor_hidden_channels": 64,
             "num_epochs": 256,
-            "batch_size": 1024,
+            'cell_line': 'one',
+            "batch_size": 512,
         },
         "summaries_dir": summaries_dir,
         "memory": 20 * 10 ** 9,
         "checkpoint_freq": 200,
-        "stop": {"training_iteration": 1024},
+        "stop": {"training_iteration": 600},
         "checkpoint_at_end": False,
         "resources_per_trial": {"gpu": 1},
-        "name": "TestGiantGraphMultiMessageNetwork"
+        "name": "SimpleBaselineProtOneCellLine"
     }
 
     analysis = tune.run(
