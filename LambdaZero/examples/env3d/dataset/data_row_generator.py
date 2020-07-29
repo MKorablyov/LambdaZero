@@ -1,3 +1,5 @@
+import logging
+
 import ray
 import numpy as np
 from LambdaZero.environments import MolMDP
@@ -18,7 +20,11 @@ class DataRowGenerator:
         self.number_of_parent_blocks = number_of_parent_blocks
         self.reference_molMDP = MolMDP(blocks_file=blocks_file)
 
+        self.logger = logging.getLogger(__name__)
+
     def generate_row(self):
+        self.logger.info(f"New row for actor with seed {self.random_seed}")
+
         self.reference_molMDP.reset()
         self.reference_molMDP.random_walk(self.number_of_parent_blocks)
         number_of_stems = len(self.reference_molMDP.molecule.stems)
@@ -36,4 +42,3 @@ class DataRowGenerator:
         byte_row = process_row_for_writing_to_feather(row)
 
         return byte_row
-

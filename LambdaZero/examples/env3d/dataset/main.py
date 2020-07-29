@@ -29,11 +29,15 @@ from LambdaZero.examples.env3d.dataset.parsing_parameter_inputs import (
     get_output_filename,
 )
 
-
 datasets_dir, _, summaries_dir = LambdaZero.utils.get_external_dirs()
 blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
 results_dir.mkdir(exist_ok=True, parents=True)
+
+log_file_name = str(results_dir.joinpath('info.log'))
+logging.basicConfig(filename=log_file_name, filemode='w', level=logging.INFO)
+
+logger = logging.getLogger(__name__)
 
 megabyte = 1024 * 1024
 
@@ -109,7 +113,7 @@ if __name__ == "__main__":
     while row_ids:
         done_ids, row_ids = ray.wait(row_ids)
         done_count += len(done_ids)
-        logging.info(f"Done {done_count} out of {max_number_of_molecules}")
+        logger.info(f"Done {done_count} out of {max_number_of_molecules}")
 
         for done_id in done_ids:
             try:
@@ -117,8 +121,8 @@ if __name__ == "__main__":
                 output_path = output_file_path_dict[done_id]
                 create_or_append_feather_file(output_path, byte_row)
             except (ValueError, AssertionError) as e:
-                logging.warning("Something went wrong with molecule generation. Exception:")
-                logging.warning(e)
-                logging.warning("Moving on.")
+                logger.warning("Something went wrong with molecule generation. Exception:")
+                logger.warning(e)
+                logger.warning("Moving on.")
 
     ray.shutdown()

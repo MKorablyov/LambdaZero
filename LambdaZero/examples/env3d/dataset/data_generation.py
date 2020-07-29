@@ -104,7 +104,7 @@ def extract_lowest_energy_child(
             list_bond.append(bond)
 
         except ValueError:
-            logging.debug(f"Problem with block {block_idx}: moving on.")
+            logging.warning(f"Problem with block {block_idx}: moving on.")
 
     min_index = int(np.nanargmin(list_binding_energy))
 
