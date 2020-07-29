@@ -33,9 +33,8 @@ datasets_dir, _, summaries_dir = LambdaZero.utils.get_external_dirs()
 blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
 results_dir.mkdir(exist_ok=True, parents=True)
-
-log_file_name = str(results_dir.joinpath('info.log'))
-logging.basicConfig(filename=log_file_name, filemode='w', level=logging.INFO)
+logging_dir = results_dir.joinpath('logs')
+logging_dir.mkdir(exist_ok=True)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +63,9 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     master_random_seed = args.seed
     np.random.seed(master_random_seed)
+
+    log_file_name = str(logging_dir.joinpath(f'info_MASTER_seed_{master_random_seed}.log'))
+    logging.basicConfig(filename=log_file_name, filemode='w', level=logging.INFO)
 
     config = extract_parameters_from_configuration_file(args.config)
 
@@ -94,6 +96,7 @@ if __name__ == "__main__":
             config["num_conf"],
             config["max_iters"],
             random_seed,
+            logging_dir
         )
         generators.append(g)
 

@@ -1,4 +1,6 @@
 import logging
+import time
+from pathlib import Path
 
 import ray
 import numpy as np
@@ -11,7 +13,7 @@ from LambdaZero.examples.env3d.dataset.io_utilities import process_row_for_writi
 class DataRowGenerator:
 
     def __init__(self, blocks_file: str, number_of_parent_blocks: int,
-                 num_conf: int, max_iters: int, random_seed: int):
+                 num_conf: int, max_iters: int, random_seed: int, logging_directory: Path):
 
         np.random.seed(random_seed)
         self.random_seed = random_seed
@@ -21,10 +23,13 @@ class DataRowGenerator:
         self.reference_molMDP = MolMDP(blocks_file=blocks_file)
 
         self.logger = logging.getLogger(__name__)
+        log_file_name = str(logging_directory.joinpath(f'info_ACTOR_seed_{random_seed}.log'))
+        logging.basicConfig(filename=log_file_name, filemode='w', level=logging.INFO)
+        self.counter = 0
 
     def generate_row(self):
-        self.logger.info(f"New row for actor with seed {self.random_seed}")
-
+        self.logger.info(f" Starting row {self.counter}")
+        t1 = time.time()
         self.reference_molMDP.reset()
         self.reference_molMDP.random_walk(self.number_of_parent_blocks)
         number_of_stems = len(self.reference_molMDP.molecule.stems)
@@ -40,5 +45,8 @@ class DataRowGenerator:
             )
 
         byte_row = process_row_for_writing_to_feather(row)
+        t2 = time.time()
+        self.logger.info(f"     -> Finished row {self.counter}. Execution time: {t2-t1:5.1f} seconds")
+        self.counter += 1
 
         return byte_row
