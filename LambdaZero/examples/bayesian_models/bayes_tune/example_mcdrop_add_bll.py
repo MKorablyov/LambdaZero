@@ -3,7 +3,7 @@ import numpy as np
 import os.path as osp
 import torch
 import torch.nn.functional as F
-
+import torch.nn as nn
 from torch_geometric.data import DataLoader
 
 import ray
@@ -18,6 +18,7 @@ from LambdaZero.examples.mpnn import config
 
 from scipy.special import logsumexp
 from matplotlib import pyplot as plt
+from sklearn import linear_model
 
 transform = LambdaZero.utils.Complete()
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
@@ -188,6 +189,8 @@ class MCDropRegressor(BasicRegressor):
         
 
         # todo allow ray native stopping
+
+
         all_scores = []
         for i in range(50):
             scores = self._train()
@@ -195,33 +198,86 @@ class MCDropRegressor(BasicRegressor):
                 y = [getattr(s, self.config["target"]).cpu().numpy() for s in self.val_set]
                 y_norm = self.config["normalizer"].forward_transform(np.concatenate(y))
                 y_norm_shuff = np.array(sorted(y_norm, key=lambda k: random.random()))
-                Yt_hat = self.get_predict_samples(self.val_loader)
+                Yt_hat = self.get_predict_samples(self.val_loader, self.model)
                 ll = _log_lik(y_norm, Yt_hat, self.config, self.N).mean()
                 ll_shuff = _log_lik(y_norm_shuff, Yt_hat, self.config, self.N).mean()
                 scores["eval_ll"] = ll
                 scores["eval_ll_shuff"] = ll_shuff
 
-                print(self.get_mean_and_variance(self.val_loader))
 
-            all_scores.append(scores)
-        return all_scores
+        print('mcdrop ll: {}'.format(ll))
+        print('mcdrop shuff ll: {}'.format(ll_shuff))
 
-    def _get_sample(self, loader):
+        #New model to drop the last layer, use the second to last layer as bayesian embedding
+
+        newmodel = MPNNetDrop2()
+        newmodel.to(self.device)
+        newmodel.load_state_dict(self.model.state_dict())
+
+        del newmodel.lin2
+
+        #get all embeddings
+        emb_train = []
+        emb_train_tar = []
+        for i, j in enumerate(self.train_loader):
+            emb_train.append(newmodel(j.to(self.device),do_dropout=True, drop_p=self.config["drop_p"]).detach().cpu().numpy())
+            targets = getattr(j, self.config["target"])
+            targets_norm = self.config["normalizer"].forward_transform(targets)
+            emb_train_tar.append(targets_norm.detach().cpu().numpy())
+
+
+        emb_val = []
+        emb_val_tar = []
+        for i, j in enumerate(self.val_loader):
+            emb_val.append(newmodel(j.to(self.device),do_dropout=True, drop_p=self.config["drop_p"]).detach().cpu().numpy())
+            targets = getattr(j, self.config["target"])
+            targets_norm = self.config["normalizer"].forward_transform(targets)
+            emb_val_tar.append(targets_norm.detach().cpu().numpy())
+
+        emb_train = np.concatenate(emb_train, 0)
+        emb_val = np.concatenate(emb_val, 0)
+        emb_train_tar = np.concatenate(emb_train_tar, 0)
+        emb_val_tar = np.concatenate(emb_val_tar, 0)
+
+        #Train a bayesian ridge regressor on the embeddings
+        clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
+        clf.fit(emb_train, emb_train_tar) 
+
+        pred = clf.predict(emb_val)
+        scores = _compute_metrics(emb_val_tar, pred, self.config["normalizer"])
+
+        #Get ll from bayesian model
+        y = [getattr(s, self.config["target"]).cpu().numpy() for s in self.val_set]
+        y_norm = self.config["normalizer"].forward_transform(np.concatenate(y))
+        y_norm_shuff = np.array(sorted(y_norm, key=lambda k: random.random()))
+        Yt_hat = pred 
+        ll = _log_lik(y_norm, Yt_hat, self.config, self.N).mean()
+        ll_shuff = _log_lik(y_norm_shuff, Yt_hat, self.config, self.N).mean()
+        scores["eval_ll"] = ll
+        scores["eval_ll_shuff"] = ll_shuff
+
+        print(ll)
+        print(ll_shuff)
+
+        return scores
+
+    def _get_sample(self, loader, model, drop=True):
         y_hat = []
         for bidx, data in enumerate(loader):
             data = data.to(self.device)
-            logit = self.model(data, do_dropout=True, drop_p=self.config["drop_p"])
+            logit = model(data, do_dropout=drop, drop_p=self.config["drop_p"])
             y_hat.append(logit.detach().cpu().numpy())
         y_hat = np.concatenate(y_hat,0)
         return y_hat
 
-    def get_predict_samples(self, data_loader):
+    def get_predict_samples(self, data_loader, model, drop=True):
         Yt_hat = []
         for i in range(self.config["T"]):
-            Yt_hat.append(self._get_sample(data_loader))
+            Yt_hat.append(self._get_sample(data_loader, model, drop))
         return np.asarray(Yt_hat)
 
     def get_mean_and_variance(self, data_loader):
+
         # Scalar version:
         Yt_hat = self.get_predict_samples(data_loader)
         tau = get_tau(self.config, self.N)
@@ -229,32 +285,25 @@ class MCDropRegressor(BasicRegressor):
         var = (sigma2 + Yt_hat**2).mean(0) - Yt_hat.mean(0)**2
         return Yt_hat.mean(0), var
 
-        # # Matrix version:
-        # y_hat = self.get_predict_samples(data_loader)
-        # item2 = 0
-        # means  = []
-        # for y in y_hat:
-        #     item2 += np.matmul(y[:,None], y[None,:])
-        #     means.append(y)
-        # item2 = item2 / self.config['T']
-        
-        # D = y_hat.shape[1]
+#changes MPNNetDrop forward pass to delete the final linear layer
+class MPNNetDrop2(LambdaZero.models.MPNNetDrop):
+    """
+    A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
+    """
+    def forward(self, data, do_dropout, drop_p):
+        out = nn.functional.dropout(nn.functional.relu(self.lin0(data.x)), training = do_dropout, p=drop_p)
+        h = out.unsqueeze(0)
 
-        # tau = get_tau(self.config, self.N)
-        # item1 = np.eye(D) * (1/tau)
-        # means = np.asarray(means)
-        # means = np.sum(means, axis = 0) / self.config['T']
-        # item3 = np.matmul(means[:,None], means[None,:])
-        # var = item1 + item2 - item3
-        # var = np.diagonal(var)
-        # return var
+        for i in range(3):
+            m = nn.functional.dropout(nn.functional.relu(self.conv(out, data.edge_index, data.edge_attr)), training = do_dropout, p=drop_p)
+            out, h = self.gru(m.unsqueeze(0), h)
+            out = out.squeeze(0)
 
-class UCB(BasicRegressor):
-    pass
+        out = self.set2set(out, data.batch)
+        out = nn.functional.dropout(nn.functional.relu(self.lin1(out)), training = do_dropout, p=drop_p)
+        out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
 
-
-
-
+        return out
 
 config = merge_dicts(DEFAULT_CONFIG, config)
 
@@ -268,5 +317,4 @@ if __name__ == "__main__":
     rg = MCDropRegressor(regressor_config)
     #print('experiment: lambda = {}\t T = {} \r\t\t drop_prob = {}\t length_scale = {}'.format(lambd, T, p, length_scale))
     print(rg.fit())
-
 
