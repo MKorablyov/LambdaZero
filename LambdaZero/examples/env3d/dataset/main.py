@@ -1,6 +1,8 @@
 """
 The goal of this script is to generate the dataset of molecules embedded in 3D space.
 """
+import warnings
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import argparse
 import json
@@ -26,8 +28,6 @@ from LambdaZero.examples.env3d.dataset.parsing_parameter_inputs import (
     get_output_filename,
 )
 
-import warnings
-warnings.simplefilter(action="ignore", category=FutureWarning)
 
 datasets_dir, _, summaries_dir = LambdaZero.utils.get_external_dirs()
 blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
@@ -43,12 +43,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--seed",
         required=True,
+        type=int,
         help="master random seed, used to generate Actor random seeds, int",
     )
 
     parser.add_argument(
         "--config",
         required=True,
+        type=str,
         help="path to input configuration file, in json format",
     )
 
