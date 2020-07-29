@@ -109,6 +109,7 @@ if __name__ == "__main__":
         done_ids, row_ids = ray.wait(row_ids)
         done_count += len(done_ids)
         print(f"Done {done_count} out of {max_number_of_molecules}")
+        sys.stdout.flush()
 
         for done_id in done_ids:
             try:
@@ -119,5 +120,6 @@ if __name__ == "__main__":
                 print("Something went wrong with molecule generation. Exception:")
                 print(e)
                 print("Moving on.")
+                sys.stdout.flush()
 
     ray.shutdown()
