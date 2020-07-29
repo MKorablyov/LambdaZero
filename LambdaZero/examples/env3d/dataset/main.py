@@ -94,7 +94,7 @@ if __name__ == "__main__":
             try:
                 byte_row = ray.get(done_id)
                 create_or_append_feather_file(output_path, byte_row)
-            except ValueError as e:
+            except (ValueError, AssertionError) as e:
                 print("Something went wrong with molecule generation. Exception:")
                 print(e)
                 print("Moving on.")
