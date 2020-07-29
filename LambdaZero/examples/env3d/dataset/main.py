@@ -100,6 +100,7 @@ if __name__ == "__main__":
         )
         generators.append(g)
 
+        # We'll create one output file per ray Actor, for reproducibility.
         output_path = results_dir.joinpath(get_output_filename(random_seed, config))
         output_file_paths.append(output_path)
 
@@ -114,6 +115,7 @@ if __name__ == "__main__":
 
     done_count = 0
     while row_ids:
+        #  This "while" mechanism is ray's way of getting results as soon as they are ready.
         done_ids, row_ids = ray.wait(row_ids)
         done_count += len(done_ids)
         logger.info(f"Done {done_count} out of {max_number_of_molecules}")
