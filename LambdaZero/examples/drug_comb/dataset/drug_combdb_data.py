@@ -12,7 +12,7 @@ from scipy.sparse import coo_matrix
 
 class DrugCombDb(InMemoryDataset):
     def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4,
-                 scores=('ZIP', 'Bliss', 'Loewe', 'HSA'), n_laplace_feat=256):
+                 scores=('ZIP', 'Bliss', 'Loewe', 'HSA'), n_laplace_feat=256, cell_line='all'):
 
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
@@ -27,6 +27,15 @@ class DrugCombDb(InMemoryDataset):
         assert set(scores).issubset(('ZIP', 'Bliss', 'Loewe', 'HSA'))
         scores_col_idx = [['ZIP', 'Bliss', 'Loewe', 'HSA'].index(i) for i in scores]
         self.data.ddi_edge_attr = self.data.ddi_edge_attr[:, scores_col_idx]
+
+        assert cell_line in ['all', 'one']
+        if cell_line == 'one':
+            most_frequent_cl = pd.DataFrame(self.data.ddi_edge_classes)[0].value_counts().index[0]
+            edge_in_most_frequent_cl = self.data.ddi_edge_classes == most_frequent_cl
+            self.data.ddi_edge_classes = self.data.ddi_edge_classes[edge_in_most_frequent_cl]
+            self.data.ddi_edge_attr = self.data.ddi_edge_attr[edge_in_most_frequent_cl]
+            self.data.ddi_edge_idx = self.data.ddi_edge_idx[:, edge_in_most_frequent_cl]
+
 
     @property
     def raw_file_names(self):
