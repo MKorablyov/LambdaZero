@@ -73,7 +73,7 @@ def extract_lowest_energy_child(
         parent_mol, num_conf, max_iters=max_iters, random_seed=random_seed
     )
 
-    for block_idx in tqdm(list_block_indices, desc=MolToSmiles(parent_mol)):
+    for block_idx in tqdm(list_block_indices, desc=f"{MolToSmiles(parent_mol)}--stem idx {attachment_stem_idx}"):
         molMDP = copy.deepcopy(reference_molMDP)
         molMDP.add_block(block_idx=block_idx, stem_idx=attachment_stem_idx)
 
