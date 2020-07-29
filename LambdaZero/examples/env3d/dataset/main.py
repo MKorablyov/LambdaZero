@@ -61,7 +61,7 @@ if __name__ == "__main__":
     config = extract_parameters_from_configuration_file(args.config)
 
     if config["debug_run"]:  # Small parameters for quick execution
-        debug_blocks = get_debug_blocks(blocks_file, number_of_blocks=10)
+        debug_blocks = get_debug_blocks(blocks_file, number_of_blocks=5)
         # overload the block file with a small subset, for quick execution
         blocks_file = results_dir.joinpath("blocks_debug.json")
         with open(blocks_file, "w") as f:
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     num_cpus = config["num_cpus"]
     max_number_of_molecules = config["max_number_of_molecules"]
 
-    ray.init(local_mode=config["debug_run"], num_cpus=num_cpus)
+    ray.init(num_cpus=num_cpus)
 
     generators = []
     output_file_paths = []
