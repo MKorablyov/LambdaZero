@@ -73,3 +73,5 @@ if __name__ == "__main__":
                 create_or_append_feather_file(output_path, byte_row)
             except:
                 print('Something went wrong with molecule generation. Moving on.')
+
+    ray.shutdown()
