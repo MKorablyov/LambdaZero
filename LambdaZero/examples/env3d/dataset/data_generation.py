@@ -16,8 +16,7 @@ from LambdaZero.examples.env3d.geometry import (
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_lowest_energy_and_mol_with_hydrogen,
     get_atomic_masses,
-    get_index_permutation_between_equivalent_molecules, get_mmff_energy,
-)
+    get_index_permutation_between_equivalent_molecules, )
 
 
 def extract_lowest_energy_child(
@@ -74,7 +73,7 @@ def extract_lowest_energy_child(
         parent_mol, num_conf, max_iters=max_iters, random_seed=random_seed
     )
 
-    for block_idx in tqdm(list_block_indices):
+    for block_idx in tqdm(list_block_indices, desc=MolToSmiles(parent_mol)):
         molMDP = copy.deepcopy(reference_molMDP)
         molMDP.add_block(block_idx=block_idx, stem_idx=attachment_stem_idx)
 
