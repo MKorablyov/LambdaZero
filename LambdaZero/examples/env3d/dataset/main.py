@@ -17,7 +17,7 @@ from LambdaZero.examples.env3d.dataset.io_utilities import (
 datasets_dir, _, summaries_dir = LambdaZero.utils.get_external_dirs()
 blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
-results_dir.mkdir(exist_ok=True)
+results_dir.mkdir(exist_ok=True, parents=True)
 
 debug_flag = False
 
