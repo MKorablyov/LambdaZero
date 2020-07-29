@@ -5,6 +5,12 @@ sanity check we get reasonable molecules.
 import json
 import os
 from pathlib import Path
+
+try:
+    import seaborn as sns
+    sns.set(font_scale=1.5)
+except:
+    print("seaborn not available. Moving on.")
 import matplotlib.pyplot as plt
 
 import pandas as pd
@@ -29,13 +35,66 @@ dataset_path = Path(summaries_dir).joinpath("env3d/dataset/").joinpath(
 
 if __name__ == "__main__":
 
-    df = pd.read_feather(dataset_path)
-
-    # Plot the most frequent blocks
-
     with open(block_file_path_path, 'r') as f:
         blocks_dict = json.load(f)
 
+    vocabulary_size = len(blocks_dict['block_smi'])
+
+    df = pd.read_feather(dataset_path)
+
+    number_of_blocks_present = np.unique(df['attachment_block_index']).shape[0]
+    subtitle = f"Vocabulary size: {vocabulary_size}, " \
+               f"number of blocks with non-zero count: {number_of_blocks_present}, " \
+               f"Number of molecules: {len(df)}"
+
+    #  Plot the distribution of blocks and angles
+    fig = plt.figure(figsize=(16, 10))
+    fig.suptitle(f"Basic analysis of dataset. \n{subtitle}")
+
+    ax1 = fig.add_subplot(121)
+    ax1.set_title("child block index")
+    df['attachment_block_index'].hist(bins=np.arange(106), ax=ax1)
+    ax1.set_xlabel('block index')
+    ax1.set_ylabel('count')
+    ax1.set_xlim(0, 105)
+
+    ax2 = fig.add_subplot(122)
+    ax2.set_title("Attachment angle")
+
+    angles_in_degree = get_angles_in_degrees(df['attachment_angle'].values)
+    ax2.hist(angles_in_degree, bins=60)
+    ax2.set_xlabel('angle (degree)')
+    ax2.set_xlim(0, 360)
+    ax2.set_ylabel('count')
+    fig.savefig(results_dir.joinpath("small_dataset_block_and_angle_distribution.png"))
+
+    #  Plot the sorted count distribution and cumulative sum; is there a natural cutoff?
+    value_count_series = df['attachment_block_index'].value_counts()
+    cumulative_counts_series = value_count_series.cumsum()
+
+    fig = plt.figure(figsize=(16, 8))
+    fig.suptitle(f"Sorted counts and cumulative sum over blocks\n{subtitle}")
+    ax1 = fig.add_subplot(111)
+    ax2 = ax1.twinx()
+    value_count_series.plot.bar(width=0.9, ax=ax1)
+    cumulative_counts_series.reset_index(drop=True).plot.line(drawstyle='steps', color='orange', lw=4, ax=ax2)
+    ax1.set_xticklabels([])
+    ax1.set_xlabel('block index sorted by count')
+    ax1.set_ylabel('block count')
+    ax2.set_ylabel('count cumulative sum')
+    ax1.grid(False)
+    ax2.grid(False)
+    fig.savefig(results_dir.joinpath("small_dataset_cumulative_counts.png"))
+
+    #  Plot the energy distributions
+    fig = plt.figure(figsize=(16, 8))
+    fig.suptitle(f"Energy distributions\n{subtitle}")
+    ax1 = fig.add_subplot(111)
+    df[['total_energy', 'parent_energy', 'binding_energy']].plot.hist(bins=100, alpha=0.5, ax=ax1)
+    ax1.set_xlabel('Energy (kcal/mol)')
+    fig.savefig(results_dir.joinpath("small_dataset_energies_distribution.png"))
+
+    # Plot the most frequent blocks
     block_indices, counts = np.unique(df['attachment_block_index'].values, return_counts=True)
     sorting_indices = np.argsort(counts)[::-1]
     block_indices = block_indices[sorting_indices]
@@ -59,22 +118,4 @@ if __name__ == "__main__":
                                legends=[f'child block {index}' for index in list_child_blocks])
     img.save(results_dir.joinpath("sample_of_molecules.png"))
 
-    #  Plot the distribution of blocks and angles
-    fig = plt.figure(figsize=(12, 8))
-    fig.suptitle(f"Basic analysis of dataset. Number of molecules: {len(df)}")
 
-    ax1 = fig.add_subplot(211)
-    ax1.set_title("child block index")
-    df['attachment_block_index'].hist(bins=np.arange(106), ax=ax1)
-    ax1.set_xlabel('block index')
-    ax1.set_ylabel('count')
-
-    ax2 = fig.add_subplot(212)
-    ax2.set_title("Attachment angle")
-
-    angles_in_degree = get_angles_in_degrees(df['attachment_angle'].values)
-    ax2.hist(angles_in_degree, bins=60)
-    ax2.set_xlabel('angle (degree)')
-    ax2.set_xlim(0, 360)
-    ax2.set_ylabel('count')
-    fig.savefig(results_dir.joinpath("small_dataset_block_and_angle_distribution.png"))
