@@ -389,6 +389,13 @@ def get_n_axis_and_angle(
     n_axis = child_anchor - parent_anchor
     n_axis /= np.linalg.norm(n_axis)
 
+    if len(child_positions) == 1:
+        # If the child block is a single atom, then the problem becomes ill-defined.
+        # The rotation axis necessarily goes through this single atom, and the inertia
+        # tensor vanishes identically. In this case, the angle has no meaning. We'll set it
+        # to zero.
+        return n_axis, 0.
+
     parent_vector = get_molecular_orientation_vector_from_positions_and_masses(
         parent_masses, parent_positions, parent_anchor, n_axis
     )
