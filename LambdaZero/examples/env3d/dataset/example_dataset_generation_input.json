@@ -1,7 +1,6 @@
 {
     "debug_run": false,
     "num_cpus": 4,
-    "master_random_seed": 12312,
     "number_of_parent_blocks": 5,
     "num_conf": 50,
     "max_iters": 200,
