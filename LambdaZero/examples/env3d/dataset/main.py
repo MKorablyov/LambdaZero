@@ -1,6 +1,7 @@
 """
 The goal of this script is to generate the dataset of molecules embedded in 3D space.
 """
+
 import argparse
 import json
 import os
@@ -10,10 +11,8 @@ from pathlib import Path
 
 import numpy as np
 import ray
-import warnings
-warnings.simplefilter(action="ignore", category=FutureWarning)
-
 import LambdaZero.utils
+
 from LambdaZero.examples.env3d.dataset.data_row_generator import DataRowGenerator
 from LambdaZero.examples.env3d.dataset.io_utilities import (
     create_or_append_feather_file,
@@ -27,6 +26,9 @@ from LambdaZero.examples.env3d.dataset.parsing_parameter_inputs import (
     get_output_filename,
 )
 
+import warnings
+warnings.simplefilter(action="ignore", category=FutureWarning)
+
 datasets_dir, _, summaries_dir = LambdaZero.utils.get_external_dirs()
 blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
@@ -39,12 +41,21 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--seed",
+        required=True,
+        help="master random seed, used to generate Actor random seeds, int",
+    )
+
+    parser.add_argument(
         "--config",
         required=True,
         help="path to input configuration file, in json format",
     )
 
     args = parser.parse_args(sys.argv[1:])
+    master_random_seed = args.seed
+    np.random.seed(master_random_seed)
+
     config = extract_parameters_from_configuration_file(args.config)
 
     if config["debug_run"]:  # Small parameters for quick execution
@@ -54,21 +65,17 @@ if __name__ == "__main__":
         with open(blocks_file, "w") as f:
             json.dump(debug_blocks, f)
 
-    output_file_name = get_output_filename(config)
-    output_path = results_dir.joinpath(output_file_name)
-
     num_cpus = config["num_cpus"]
     max_number_of_molecules = config["max_number_of_molecules"]
 
     ray.init(local_mode=config["debug_run"], num_cpus=num_cpus)
 
-    np.random.seed(config["master_random_seed"])
-
     generators = []
+    output_file_paths = []
     for _ in range(num_cpus):
         # Generate a ray Actor for each available cpu. It gets its own random seed to make
         # sure actors are not clones of each other.
-        random_seed = np.random.randint(1e9)
+        random_seed = np.random.randint(1e6)
         g = DataRowGenerator.remote(
             blocks_file,
             config["number_of_parent_blocks"],
@@ -78,11 +85,17 @@ if __name__ == "__main__":
         )
         generators.append(g)
 
+        output_path = results_dir.joinpath(get_output_filename(random_seed, config))
+        output_file_paths.append(output_path)
+
     # round robin the tasks to the different ray actors
-    row_ids = [
-        generators[i % num_cpus].generate_row.remote()
-        for i in range(max_number_of_molecules)
-    ]
+    row_ids = []
+    output_file_path_dict = dict()
+    for i in range(max_number_of_molecules):
+        actor_index = i % num_cpus
+        row_id = generators[actor_index].generate_row.remote()
+        row_ids.append(row_id)
+        output_file_path_dict[row_id] = output_file_paths[actor_index]
 
     done_count = 0
     while row_ids:
@@ -93,6 +106,7 @@ if __name__ == "__main__":
         for done_id in done_ids:
             try:
                 byte_row = ray.get(done_id)
+                output_path = output_file_path_dict[done_id]
                 create_or_append_feather_file(output_path, byte_row)
             except (ValueError, AssertionError) as e:
                 print("Something went wrong with molecule generation. Exception:")
