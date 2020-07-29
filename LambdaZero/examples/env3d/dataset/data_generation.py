@@ -1,4 +1,5 @@
 import copy
+import logging
 from typing import Tuple
 
 import numpy as np
@@ -7,7 +8,7 @@ from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdmolfiles import MolToSmiles, MolFromSmiles
 from tqdm import tqdm
 
-from LambdaZero.chem import mol_from_frag, logging
+from LambdaZero.chem import mol_from_frag
 from LambdaZero.environments import MolMDP
 from LambdaZero.examples.env3d.geometry import (
     get_positions_aligned_with_parent_inertia_tensor,
