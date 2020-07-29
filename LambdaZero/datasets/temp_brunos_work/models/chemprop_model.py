@@ -35,8 +35,7 @@ class ChempropNet(ModelBase):
 
         parameters_dict = dict(depth=depth,
                                ffn_num_layers=ffn_num_layers,
-                               ffn_hidden_size=ffn_hidden_size,
-                               num_tasks=1)
+                               ffn_hidden_size=ffn_hidden_size)
 
         parameters_dict.update(required_parameter_dict)
 
