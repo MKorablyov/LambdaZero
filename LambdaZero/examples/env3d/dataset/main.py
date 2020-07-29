@@ -34,6 +34,8 @@ blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
 results_dir.mkdir(exist_ok=True, parents=True)
 
+megabyte = 1024 * 1024
+
 if __name__ == "__main__":
     # Parse script input
     parser = argparse.ArgumentParser(
@@ -70,7 +72,10 @@ if __name__ == "__main__":
     num_cpus = config["num_cpus"]
     max_number_of_molecules = config["max_number_of_molecules"]
 
-    ray.init(num_cpus=num_cpus)
+    ray.init(num_cpus=num_cpus,
+             memory=500 * megabyte,
+             object_store_memory=300 * megabyte,
+             driver_object_store_memory=200 * megabyte)
 
     generators = []
     output_file_paths = []
