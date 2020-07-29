@@ -56,11 +56,9 @@ def train_epoch(loader, model, optimizer, device, config):
         optimizer.zero_grad()
 
         if config["model_type"] == "dime":
-            logits = model(z=data.z,pos=data.pos,batch=data.batch)
+            logits = model(z=data.z,pos=data.pos,batch=data.batch).squeeze(1)
         else:
             logits = model(data)
-        
-        print(logits)
 
         if config["loss"] == "L2":
             loss = F.mse_loss(logits, normalizer.normalize(targets))
@@ -122,7 +120,7 @@ def eval_epoch(loader, model, device, config):
 loaded_model = DimeNet(hidden_channels=128, out_channels=1, num_blocks=6,
                         num_bilinear=8, num_spherical=7, num_radial=6,
                         cutoff=5.0, envelope_exponent=5, num_before_skip=1,
-                        num_after_skip=2, num_output_layers=3) if model_type == "dime" else LambdaZero.models.MPNNet
+                        num_after_skip=2, num_output_layers=3) if model_type == "dime" else LambdaZero.models.MPNNet()
 
 split_file = "ksplit_Zinc15_260k.npy" if split_type == "KNN" else "randsplit_Zinc15_260k.npy"
 
@@ -132,7 +130,7 @@ DEFAULT_CONFIG = {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
         "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/" + split_file),
-        "b_size": 1,
+        "b_size": 8,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
