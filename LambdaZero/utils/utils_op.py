@@ -8,7 +8,9 @@ from torch_geometric.utils import remove_self_loops
 from rdkit.Chem import AllChem
 from sklearn.decomposition import PCA
 import pickle as pk
-
+from  rdkit import Chem
+import LambdaZero.utils
+import LambdaZero.chem
 
 def get_external_dirs():
     """Locate in the filesystem external programs/folders essensial for LambdaZero execution
@@ -77,6 +79,7 @@ class MeanVarianceNormalizer:
 class Complete(object):
     def __call__(self, data):
         device = data.edge_index.device
+
         row = torch.arange(data.num_nodes, dtype=torch.long, device=device)
         col = torch.arange(data.num_nodes, dtype=torch.long, device=device)
         row = row.view(-1, 1).repeat(1, data.num_nodes).view(-1)
@@ -95,6 +98,21 @@ class Complete(object):
         data.edge_attr = edge_attr
         data.edge_index = edge_index
         return data
+
+class MakeFP(object):
+    "makes a fingerprint for molecule"
+    def __call__(self, data, fp_length=1024, radii=3):
+        try:
+            mol = Chem.MolFromSmiles(data.smi)
+        except Exception as e:
+
+            fp = np.zeros(fp_length,dtype=np.float32)
+        else:
+            fp = LambdaZero.chem.get_fp(mol, fp_length=1024, fp_radiis=[radii])
+
+        data.fp = fp
+        return data
+
 
 def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
     data = np.asarray(data,dtype=np.float)
