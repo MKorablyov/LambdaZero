@@ -22,11 +22,11 @@ def get_output_filename(random_seed: int, config: Dict) -> str:
     num_conf = config["num_conf"]
     max_iters = config["max_iters"]
 
-    output_filename = f"env3d_dataset_" \
-                      f"{number_of_parent_blocks}_parent_blocks_" \
+    output_filename = f"env3d_" \
+                      f"parents_{number_of_parent_blocks}_" \
                       f"num_conf_{num_conf}_" \
                       f"max_iters_{max_iters}_" \
-                      f"master_random_seed_{random_seed}"
+                      f"seed_{random_seed}"
 
     if config["debug_run"]:
         output_filename += '_debug'
