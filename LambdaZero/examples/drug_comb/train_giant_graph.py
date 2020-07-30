@@ -1,5 +1,6 @@
 import torch
 from LambdaZero.examples.drug_comb.dataset.drug_combdb_data import DrugCombDb
+from LambdaZero.examples.drug_comb.dataset.drug_response_data import DrugResponse
 from LambdaZero.examples.drug_comb.model.multi_message_gcn import GiantGraphMPNN
 from LambdaZero.examples.drug_comb.model.baseline import BaselineMLP, SimpleBaselineFP, BaselineProt, \
     SimpleBaselineProt, Dummy
@@ -60,14 +61,12 @@ class GiantGraphTrainer(tune.Trainable):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        dataset = DrugCombDb(transform=config["transform"], pre_transform=config["pre_transform"],
-                             scores=config["scores"], cell_line=config['cell_line'])
+        dataset = config["dataset"](transform=config["transform"], pre_transform=config["pre_transform"],
+                                    scores=config["scores"], cell_line=config['cell_line'])
 
         self.data = dataset[0].to(self.device)
 
-        train_idxs, val_idxs, test_idxs = random_split(self.data.ddi_edge_idx.shape[1],
-                                                       config["test_set_prop"],
-                                                       config["val_set_prop"])
+        train_idxs, val_idxs, test_idxs = dataset.random_split(config["test_set_prop"], config["val_set_prop"])
 
         # Train loader
         train_ddi_dataset = TensorDataset(self.data.ddi_edge_idx[:, train_idxs].T,
@@ -113,7 +112,6 @@ class GiantGraphTrainer(tune.Trainable):
 
 
 if __name__ == '__main__':
-
     ray.init()
 
     time_to_sleep = 30
@@ -133,6 +131,7 @@ if __name__ == '__main__':
             "test_set_prop": 0.0,
             "lr": 1e-4,  # tune.grid_search([1e-4, 1e-5]),
             "model": BaselineProt,  # tune.grid_search([GiantGraphMPNN, BaselineMLP]),
+            "dataset": DrugCombDb,
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
             "embed_channels": 256,

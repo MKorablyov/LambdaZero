@@ -283,6 +283,20 @@ class DrugCombDb(InMemoryDataset):
 
         return ddi_edge_idx, ddi_edge_attr, ddi_edge_classes
 
+    def random_split(self, test_prob, valid_prob):
+
+        num_examples = self.data.ddi_edge_idx.shape[1]
+
+        nvalid = int(num_examples * valid_prob)
+        ntest = int(num_examples * test_prob)
+        idx = torch.randperm(num_examples)
+
+        train_idx = idx[ntest + nvalid:]
+        val_idx = idx[:nvalid]
+        test_idx = idx[:ntest]
+
+        return train_idx, val_idx, test_idx
+
 
 if __name__ == '__main__':
 
