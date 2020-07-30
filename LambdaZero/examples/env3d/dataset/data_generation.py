@@ -22,7 +22,7 @@ from LambdaZero.examples.env3d.rdkit_utilities import (
 )
 
 
-def extract_lowest_energy_child(
+def compute_parent_and_all_children_energies(
     reference_molMDP: MolMDP,
     attachment_stem_idx: int,
     child_block_energies_dict: Dict[int, float],
@@ -31,7 +31,7 @@ def extract_lowest_energy_child(
     random_seed: int,
 ):
     """
-    This method extracts the lowest binding energy child conformer molecule given a reference MDP object
+    This method computes the binding energy child conformer molecule given a reference MDP object
     which already contains the parent molecule as its state, and provided the attachment information.
 
     The binding energy is defined as
@@ -46,7 +46,7 @@ def extract_lowest_energy_child(
         - embeds and relaxes the parent molecule; gets the parent energy
         - generates a child molecule for every possible block, embeds and relax, gets total_energy
         - gets relevant child_block_energy from child_block_energies_dict
-        - selects the child molecule with lowest binding energy
+        - computes binding energy
 
     Args:
         reference_molMDP (molMDP): MDP object where a parent molecule is present.
@@ -58,26 +58,19 @@ def extract_lowest_energy_child(
 
     Returns:
 
-        relaxed_mol (Mol): child molecule, with relaxed positions conformer,
-        block_idx (int): index of the lowest energy block that was attached
-        anchor_indices (Tuple): atomic indices of the (parent, child block) attachment atoms
-        energy_dict (Dict): a dictionary containing parent energy, parent+child (total) energy, binding energy
-
+        energies_dataframe (DataFrame): a dataframe with all the energies and other info.
+        list_mols (List[Mol]) : relaxed child molecules, ordered by block index
     """
 
     list_block_indices = np.arange(reference_molMDP.num_blocks)
 
-    list_total_energy = []
-    list_binding_energy = []
-    list_relaxed_mol_with_hydrogen = []
-    list_bond = []
-
     parent_mol = Mol(reference_molMDP.molecule.mol)
-
     parent_energy, _, _ = get_lowest_energy_and_mol_with_conformer(
         parent_mol, num_conf, max_iters=max_iters, random_seed=random_seed
     )
 
+    list_rows = []
+    list_mols = []
     for block_idx in tqdm(
         list_block_indices,
         desc=f"{MolToSmiles(parent_mol)}--stem idx {attachment_stem_idx}",
@@ -98,28 +91,84 @@ def extract_lowest_energy_child(
 
             binding_energy = total_energy - parent_energy - child_block_energy
 
-            list_total_energy.append(total_energy)
-            list_binding_energy.append(binding_energy)
-            list_relaxed_mol_with_hydrogen.append(mol_with_hydrogens)
-            list_bond.append(bond)
-
-        except ValueError:
+        except ValueError as e:
             logging.warning(
-                f"Problem Computing the total energy with block {block_idx}: moving on."
+                f"Problem Computing the total energy with block {block_idx}:\n{e}\nMoving on."
             )
+            total_energy = np.NaN
+            binding_energy = np.NaN
+            mol_with_hydrogens = np.NaN
 
-    min_index = int(np.nanargmin(list_binding_energy))
+        list_mols.append(mol_with_hydrogens)
 
-    block_idx = list_block_indices[min_index]
-    bond = list_bond[min_index]
+        row = {'block_index': block_idx,
+               'parent_smiles': MolToSmiles(parent_mol),
+               'total_energy': total_energy,
+               'parent_energy': parent_energy,
+               'child_block_energy': child_block_energy,
+               'binding_energy': binding_energy,
+               'bond': bond}
+
+        list_rows.append(row)
+
+    return pd.DataFrame(list_rows), list_mols
+
+
+def extract_lowest_energy_child(
+    reference_molMDP: MolMDP,
+    attachment_stem_idx: int,
+    child_block_energies_dict: Dict[int, float],
+    num_conf: int,
+    max_iters: int,
+    random_seed: int,
+):
+    """
+    This method computes the binding energies of all parent+child blocks using
+        compute_parent_and_all_children_energies
+    and selects the child molecule with lowest binding energy.
+
+    Args:
+        reference_molMDP (molMDP): MDP object where a parent molecule is present.
+        attachment_stem_idx (int): attachment_stem id indicating where the child block will be attached.
+        child_block_energies_dict (Dict): dictionary containing the embedding energies of all the blocks on their own.
+        num_conf (int): number of configurations attempted to embed the full child molecule as a conformer
+        max_iters (int): number of iterations to converge the atomic positions
+        random_seed (int): random seed used to embed molecule and create a conformer.
+
+    Returns:
+
+        relaxed_mol (Mol): child molecule, with relaxed positions conformer,
+        block_idx (int): index of the lowest energy block that was attached
+        anchor_indices (Tuple): atomic indices of the (parent, child block) attachment atoms
+        energy_dict (Dict): a dictionary containing parent energy, parent+child (total) energy, binding energy
+
+    """
+
+    energies_df, list_relaxed_mol_with_hydrogen = compute_parent_and_all_children_energies(
+        reference_molMDP,
+        attachment_stem_idx,
+        child_block_energies_dict,
+        num_conf,
+        max_iters,
+        random_seed,
+    )
+
+    min_index = int(np.nanargmin(energies_df['binding_energy'].values))
+
+    block_idx = energies_df['block_index'].values[min_index]
+    parent_energy = energies_df['parent_energy'].values[min_index]
+    total_energy = energies_df['total_energy'].values[min_index]
+    binding_energy = energies_df['binding_energy'].values[min_index]
+
+    bond = energies_df['bond'].values[min_index]
     anchor_indices = (bond[-1][0], bond[-1][1])
 
     relaxed_mol = Chem.RemoveHs(list_relaxed_mol_with_hydrogen[min_index])
 
     energy_dict = {
-        "total_energy": list_total_energy[min_index],
+        "total_energy": total_energy,
         "parent_energy": parent_energy,
-        "binding_energy": list_binding_energy[min_index],
+        "binding_energy": binding_energy,
     }
 
     return relaxed_mol, block_idx, anchor_indices, energy_dict
