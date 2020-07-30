@@ -22,6 +22,10 @@ class DrugResponse(InMemoryDataset):
 
         self.data, self.slices = torch.load(self.processed_paths[0])
 
+        # Log transform concentrations
+        self.data.ddi_edge_attr[:, 1] = torch.log(self.data.ddi_edge_attr[:, 1] + 1e-6)
+        self.data.ddi_edge_attr[:, 2] = torch.log(self.data.ddi_edge_attr[:, 2] + 1e-6)
+
     @property
     def raw_file_names(self):
         return [
@@ -256,7 +260,7 @@ class DrugResponse(InMemoryDataset):
 
         # Remove combinations of a drug with itself
         is_pairs_of_diff_drugs = self._drugcomb_response[['idx_DrugRow', 'idx_DrugCol']].apply(
-            lambda s: s['idx_DrugRow'] != s['idx_DrugCol'],axis=1)
+            lambda s: s['idx_DrugRow'] != s['idx_DrugCol'], axis=1)
         self._drugcomb_response = self._drugcomb_response[is_pairs_of_diff_drugs]
 
         ddi_edge_idx = self._drugcomb_response[['idx_DrugRow', 'idx_DrugCol']].to_numpy().T

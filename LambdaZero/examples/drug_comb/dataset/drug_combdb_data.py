@@ -301,5 +301,5 @@ class DrugCombDb(InMemoryDataset):
 if __name__ == '__main__':
 
     dataset = DrugCombDb()
-    dataset.get_edge_type('ddi')
+    # dataset.get_edge_type('ddi')
 
