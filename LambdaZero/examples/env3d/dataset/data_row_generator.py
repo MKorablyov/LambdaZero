@@ -72,6 +72,7 @@ class DataRowGenerator:
             self.reference_molMDP,
             attachment_stem_idx,
             self.child_block_energies_dict,
+            self.num_conf,
             self.max_iters,
             self.random_seed,
         )
