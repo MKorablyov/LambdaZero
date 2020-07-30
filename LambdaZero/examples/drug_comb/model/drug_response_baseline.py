@@ -2,9 +2,9 @@ import torch
 from torch.nn import functional as F
 
 
-class Dummy(torch.nn.Module):
+class ResponseDummy(torch.nn.Module):
     def __init__(self, config, data):
-        super(Dummy, self).__init__()
+        super(ResponseDummy, self).__init__()
 
         self.param = torch.nn.Linear(1, 1)  # So that optimizer does not get an empty parameter list
         self.criterion = torch.nn.MSELoss()
@@ -13,7 +13,7 @@ class Dummy(torch.nn.Module):
 
         batch_size = drug_drug_batch[0].shape[0]
 
-        return torch.zeros(batch_size, requires_grad=True) + data.ddi_edge_attr.mean()
+        return torch.zeros(batch_size, requires_grad=True) + data.ddi_edge_attr[:, 0].mean()
 
     def loss(self, output, drug_drug_batch):
 
@@ -22,20 +22,15 @@ class Dummy(torch.nn.Module):
         return self.criterion(output, ground_truth_scores)
 
 
-class BaselineFP(torch.nn.Module):
+class ResponseBaselineFP(torch.nn.Module):
     def __init__(self, config, data):
-        super(BaselineFP, self).__init__()
+        super(ResponseBaselineFP, self).__init__()
 
         self.device = config["device"]
-        self.cell_line = config['cell_line']
 
         self.layers = []
 
-        if self.cell_line == 'all':
-            self.num_cell_lines = len(torch.unique(data.ddi_edge_classes))
-            self.layers.append(torch.nn.Linear(data.x_drugs.shape[1] + self.num_cell_lines, config["layers"][0]))
-        else:
-            self.layers.append(torch.nn.Linear(data.x_drugs.shape[1], config["layers"][0]))
+        self.layers.append(torch.nn.Linear(data.x_drugs.shape[1] + 1, config["layers"][0]))
 
         for i in range(len(config["layers"]) - 1):
             self.layers.append(torch.nn.Linear(config["layers"][i], config["layers"][i+1]))
@@ -54,21 +49,12 @@ class BaselineFP(torch.nn.Module):
         batch_size = drug_drug_batch[0].shape[0]
         drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
         drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
 
         x_drug_1s = data.x_drugs[drug_1s]
         x_drug_2s = data.x_drugs[drug_2s]
 
-        # One hot embedding for cell lines
-        if self.cell_line == 'all':
-            one_hot_cell_lines = torch.zeros((batch_size, self.num_cell_lines)).to(self.device)
-            one_hot_cell_lines = one_hot_cell_lines.scatter(1, cell_lines[:, None], 1)
-
-            batch_data_1 = torch.cat((x_drug_1s, one_hot_cell_lines.float()), dim=1)
-            batch_data_2 = torch.cat((x_drug_2s, one_hot_cell_lines.float()), dim=1)
-        else:
-            batch_data_1 = x_drug_1s
-            batch_data_2 = x_drug_2s
+        batch_data_1 = torch.cat((x_drug_1s, drug_drug_batch[2][:, 1][:, None]), dim=1)
+        batch_data_2 = torch.cat((x_drug_2s, drug_drug_batch[2][:, 2][:, None]), dim=1)
 
         #####################################################
         # Forward
@@ -90,20 +76,15 @@ class BaselineFP(torch.nn.Module):
         return self.criterion(output, ground_truth_scores)
 
 
-class SimpleBaselineFP(torch.nn.Module):
+class ResponseSimpleBaselineFP(torch.nn.Module):
     def __init__(self, config, data):
-        super(SimpleBaselineFP, self).__init__()
+        super(ResponseSimpleBaselineFP, self).__init__()
 
         self.device = config["device"]
-        self.cell_line = config['cell_line']
 
         self.layers = []
 
-        if self.cell_line == 'all':
-            self.num_cell_lines = len(torch.unique(data.ddi_edge_classes))
-            self.layers.append(torch.nn.Linear(2 * data.x_drugs.shape[1] + self.num_cell_lines, config["layers"][0]))
-        else:
-            self.layers.append(torch.nn.Linear(2 * data.x_drugs.shape[1], config["layers"][0]))
+        self.layers.append(torch.nn.Linear(2 * data.x_drugs.shape[1] + 2, config["layers"][0]))
 
         for i in range(len(config["layers"]) - 1):
             self.layers.append(torch.nn.Linear(config["layers"][i], config["layers"][i+1]))
@@ -127,16 +108,8 @@ class SimpleBaselineFP(torch.nn.Module):
         x_drug_1s = data.x_drugs[drug_1s]
         x_drug_2s = data.x_drugs[drug_2s]
 
-        # One hot embedding for cell lines
-        if self.cell_line == 'all':
-            one_hot_cell_lines = torch.zeros((batch_size, self.num_cell_lines)).to(self.device)
-            one_hot_cell_lines = one_hot_cell_lines.scatter(1, cell_lines[:, None], 1)
-
-            batch_data_1 = torch.cat((x_drug_1s, one_hot_cell_lines.float()), dim=1)
-            batch_data_2 = torch.cat((x_drug_2s, one_hot_cell_lines.float()), dim=1)
-        else:
-            batch_data_1 = x_drug_1s
-            batch_data_2 = x_drug_2s
+        batch_data_1 = torch.cat((x_drug_1s, drug_drug_batch[2][:, 1][:, None]), dim=1)
+        batch_data_2 = torch.cat((x_drug_2s, drug_drug_batch[2][:, 2][:, None]), dim=1)
 
         batch_order_1 = torch.cat((batch_data_1, batch_data_2), dim=1)
         batch_order_2 = torch.cat((batch_data_2, batch_data_1), dim=1)
@@ -163,20 +136,15 @@ class SimpleBaselineFP(torch.nn.Module):
         return (self.criterion(order_1, ground_truth_scores) + self.criterion(order_2, ground_truth_scores)) / 2
 
 
-class BaselineProt(torch.nn.Module):
+class ResponseBaselineProt(torch.nn.Module):
     def __init__(self, config, data):
-        super(BaselineProt, self).__init__()
+        super(ResponseBaselineProt, self).__init__()
 
         self.device = config["device"]
-        self.cell_line = config['cell_line']
 
         self.layers = []
 
-        if self.cell_line == 'all':
-            self.num_cell_lines = len(torch.unique(data.ddi_edge_classes))
-            self.layers.append(torch.nn.Linear(data.number_of_proteins + self.num_cell_lines, config["layers"][0]))
-        else:
-            self.layers.append(torch.nn.Linear(data.number_of_proteins, config["layers"][0]))
+        self.layers.append(torch.nn.Linear(data.number_of_proteins + 1, config["layers"][0]))
 
         for i in range(len(config["layers"]) - 1):
             self.layers.append(torch.nn.Linear(config["layers"][i], config["layers"][i+1]))
@@ -205,7 +173,6 @@ class BaselineProt(torch.nn.Module):
         batch_size = drug_drug_batch[0].shape[0]
         drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
         drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
 
         prot_1 = torch.zeros((batch_size, self.number_of_proteins)).to(self.device)
         prot_2 = torch.zeros((batch_size, self.number_of_proteins)).to(self.device)
@@ -214,16 +181,8 @@ class BaselineProt(torch.nn.Module):
             prot_1[i, self.drug2target_dict[int(drug_1s[i])]] = 1
             prot_2[i, self.drug2target_dict[int(drug_2s[i])]] = 1
 
-        # One hot embedding for cell lines
-        if self.cell_line == 'all':
-            one_hot_cell_lines = torch.zeros((batch_size, self.num_cell_lines)).to(self.device)
-            one_hot_cell_lines = one_hot_cell_lines.scatter(1, cell_lines[:, None], 1)
-
-            batch_data_1 = torch.cat((prot_1, one_hot_cell_lines.float()), dim=1)
-            batch_data_2 = torch.cat((prot_2, one_hot_cell_lines.float()), dim=1)
-        else:
-            batch_data_1 = prot_1
-            batch_data_2 = prot_2
+        batch_data_1 = torch.cat((prot_1, drug_drug_batch[2][:, 1][:, None]), dim=1)
+        batch_data_2 = torch.cat((prot_2, drug_drug_batch[2][:, 2][:, None]), dim=1)
 
         #####################################################
         # Forward
@@ -245,20 +204,15 @@ class BaselineProt(torch.nn.Module):
         return self.criterion(output, ground_truth_scores)
 
 
-class SimpleBaselineProt(torch.nn.Module):
+class ResponseSimpleBaselineProt(torch.nn.Module):
     def __init__(self, config, data):
-        super(SimpleBaselineProt, self).__init__()
+        super(ResponseSimpleBaselineProt, self).__init__()
 
         self.device = config["device"]
-        self.cell_line = config['cell_line']
 
         self.layers = []
 
-        if self.cell_line == 'all':
-            self.num_cell_lines = len(torch.unique(data.ddi_edge_classes))
-            self.layers.append(torch.nn.Linear(2 * data.number_of_proteins + self.num_cell_lines, config["layers"][0]))
-        else:
-            self.layers.append(torch.nn.Linear(2 * data.number_of_proteins, config["layers"][0]))
+        self.layers.append(torch.nn.Linear(2 * data.number_of_proteins + 2, config["layers"][0]))
 
         for i in range(len(config["layers"]) - 1):
             self.layers.append(torch.nn.Linear(config["layers"][i], config["layers"][i+1]))
@@ -287,7 +241,6 @@ class SimpleBaselineProt(torch.nn.Module):
         batch_size = drug_drug_batch[0].shape[0]
         drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
         drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
 
         prot_1 = torch.zeros((batch_size, self.number_of_proteins)).to(self.device)
         prot_2 = torch.zeros((batch_size, self.number_of_proteins)).to(self.device)
@@ -296,16 +249,8 @@ class SimpleBaselineProt(torch.nn.Module):
             prot_1[i, self.drug2target_dict[int(drug_1s[i])]] = 1
             prot_2[i, self.drug2target_dict[int(drug_2s[i])]] = 1
 
-        # One hot embedding for cell lines
-        if self.cell_line == 'all':
-            one_hot_cell_lines = torch.zeros((batch_size, self.num_cell_lines)).to(self.device)
-            one_hot_cell_lines = one_hot_cell_lines.scatter(1, cell_lines[:, None], 1)
-
-            batch_data_1 = torch.cat((prot_1, one_hot_cell_lines.float()), dim=1)
-            batch_data_2 = torch.cat((prot_2, one_hot_cell_lines.float()), dim=1)
-        else:
-            batch_data_1 = prot_1
-            batch_data_2 = prot_2
+        batch_data_1 = torch.cat((prot_1, drug_drug_batch[2][:, 1][:, None]), dim=1)
+        batch_data_2 = torch.cat((prot_2, drug_drug_batch[2][:, 2][:, None]), dim=1)
 
         batch_order_1 = torch.cat((batch_data_1, batch_data_2), dim=1)
         batch_order_2 = torch.cat((batch_data_2, batch_data_1), dim=1)

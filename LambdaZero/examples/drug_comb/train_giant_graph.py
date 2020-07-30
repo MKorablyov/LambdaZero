@@ -2,9 +2,10 @@ import torch
 from LambdaZero.examples.drug_comb.dataset.drug_combdb_data import DrugCombDb
 from LambdaZero.examples.drug_comb.dataset.drug_response_data import DrugResponse
 from LambdaZero.examples.drug_comb.model.multi_message_gcn import GiantGraphMPNN
-from LambdaZero.examples.drug_comb.model.baseline import BaselineMLP, SimpleBaselineFP, BaselineProt, \
+from LambdaZero.examples.drug_comb.model.baseline import BaselineFP, SimpleBaselineFP, BaselineProt, \
     SimpleBaselineProt, Dummy
-from LambdaZero.examples.drug_comb.utils.utils import random_split
+from LambdaZero.examples.drug_comb.model.drug_response_baseline import ResponseDummy, ResponseBaselineFP, \
+    ResponseSimpleBaselineFP, ResponseBaselineProt, ResponseSimpleBaselineProt
 import os
 from LambdaZero.utils import get_external_dirs
 from torch.utils.data import TensorDataset, DataLoader
@@ -126,12 +127,12 @@ if __name__ == '__main__':
             "transform": None,
             "pre_transform": None,
             "scores": ['HSA'],  # tune.grid_search([['ZIP'], ['Bliss'], ['Loewe'], ['HSA']]),
-            "layers": [1024, 1],  # tune.grid_search([[1024, 512], [1024, 100], [1024, 50], [1024, 20], [1024, 5]]),
+            "layers": [1024, 512, 100],
             "val_set_prop": 0.2,
             "test_set_prop": 0.0,
-            "lr": 1e-4,  # tune.grid_search([1e-4, 1e-5]),
-            "model": BaselineProt,  # tune.grid_search([GiantGraphMPNN, BaselineMLP]),
-            "dataset": DrugCombDb,
+            "lr": tune.grid_search([1e-4, 1e-5]),
+            "model": tune.grid_search([ResponseBaselineFP, ResponseBaselineProt]),
+            "dataset": DrugResponse,
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
             "embed_channels": 256,
