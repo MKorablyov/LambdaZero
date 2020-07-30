@@ -1,0 +1,8 @@
+{
+    "debug_run": false,
+    "num_cpus": 4,
+    "number_of_parent_blocks": 5,
+    "num_conf": 50,
+    "max_iters": 200,
+    "max_number_of_molecules": 1000
+}

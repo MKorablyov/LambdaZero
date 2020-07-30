@@ -261,10 +261,12 @@ def get_angle_between_parent_and_child(parent_vector, child_vector, n_axis):
             np.linalg.norm(unit_vector), 1.0
         ), "An input vector is not unit length"
 
-    for direction_vector in [parent_vector, child_vector]:
+    for name, direction_vector in zip(
+        ["parent", "child"], [parent_vector, child_vector]
+    ):
         assert np.isclose(
             np.dot(direction_vector, n_axis), 0.0
-        ), "parent or child is not orthogonal to n_axis"
+        ), f"{name} vector is not orthogonal to n_axis. {name} vector = {direction_vector}, n_axis = {n_axis} "
 
     x_hat = parent_vector
     y_hat = np.cross(n_axis, x_hat)
@@ -303,7 +305,12 @@ def get_molecular_perpendicular_ax_direction_from_inertia(total_inertia, n_axis)
     return orientation_vector
 
 
-def fix_orientation_vector(list_masses: np.array, list_positions: np.array, anchor_point: np.array, orientation_vector: np.array):
+def fix_orientation_vector(
+    list_masses: np.array,
+    list_positions: np.array,
+    anchor_point: np.array,
+    orientation_vector: np.array,
+):
     """
     The orientation vector of a molecule is only determined up to a sign. This method
     fixes the sign by picking the orientation pointing from the rotational axis towards
@@ -311,8 +318,8 @@ def fix_orientation_vector(list_masses: np.array, list_positions: np.array, anch
     and the original vector is returned.
 
     Args:
-        masses (np.array): atomic masses
-        positions (np.array): atomic positions
+        list_masses (np.array): atomic masses
+        list_positions (np.array): atomic positions
         anchor_point (np.array): point left unmoved by rotation
         orientation_vector (np.array): orientation of the ax perpendicular to the rotational axis; only defined
                                        up to a sign.
@@ -323,7 +330,7 @@ def fix_orientation_vector(list_masses: np.array, list_positions: np.array, anch
     """
 
     center_of_mass = get_center_of_mass(list_masses, list_positions)
-    relative_cm = center_of_mass-anchor_point
+    relative_cm = center_of_mass - anchor_point
     projected_cm = np.dot(relative_cm, orientation_vector)
 
     if projected_cm < 0.0:
@@ -336,9 +343,13 @@ def get_molecular_orientation_vector_from_positions_and_masses(
     masses: np.array, positions: np.array, anchor_point: np.array, n_axis: np.array
 ) -> np.array:
 
-    total_inertia = get_inertia_tensor(masses, positions-anchor_point)
-    indefinite_orientation_vector = get_molecular_perpendicular_ax_direction_from_inertia(total_inertia, n_axis)
-    fixed_orientation_vector = fix_orientation_vector(masses, positions, anchor_point, indefinite_orientation_vector)
+    total_inertia = get_inertia_tensor(masses, positions - anchor_point)
+    indefinite_orientation_vector = get_molecular_perpendicular_ax_direction_from_inertia(
+        total_inertia, n_axis
+    )
+    fixed_orientation_vector = fix_orientation_vector(
+        masses, positions, anchor_point, indefinite_orientation_vector
+    )
     return fixed_orientation_vector
 
 
@@ -377,6 +388,13 @@ def get_n_axis_and_angle(
 
     n_axis = child_anchor - parent_anchor
     n_axis /= np.linalg.norm(n_axis)
+
+    if len(child_positions) == 1:
+        # If the child block is a single atom, then the problem becomes ill-defined.
+        # The rotation axis necessarily goes through this single atom, and the inertia
+        # tensor vanishes identically. In this case, the angle has no meaning. We'll set it
+        # to zero.
+        return n_axis, 0.
 
     parent_vector = get_molecular_orientation_vector_from_positions_and_masses(
         parent_masses, parent_positions, parent_anchor, n_axis

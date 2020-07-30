@@ -24,7 +24,7 @@ def optimize_mol_in_place(mol: Mol):
 
     Chem.AddHs(mol)
     AllChem.EmbedMolecule(mol)
-    AllChem.MMFFOptimizeMolecule(mol, mmffVariant='MMFF94')
+    AllChem.MMFFOptimizeMolecule(mol, mmffVariant="MMFF94")
     Chem.RemoveHs(mol)
 
 
@@ -35,22 +35,28 @@ def set_positions_on_conformer(mol: Mol, positions: np.array):
         mol.GetConformer().SetAtomPosition(i, pt)
 
 
-def get_mmff_force_field(mol: Mol, confId: int=-1):
+def get_mmff_force_field(mol: Mol, confId: int = -1):
     """
     This hack is necessary to pass the correct information to the force field constructor
     """
-    properties = AllChem.MMFFGetMoleculeProperties(mol, mmffVariant='MMFF94')
+    properties = AllChem.MMFFGetMoleculeProperties(mol, mmffVariant="MMFF94")
 
     return AllChem.MMFFGetMoleculeForceField(mol, properties, confId)
 
 
 def get_mmff_energy(mol_with_hydrogens: Mol, conf_id: int = 0):
-    properties = AllChem.MMFFGetMoleculeProperties(mol_with_hydrogens, mmffVariant='MMFF94')
-    energy = AllChem.MMFFGetMoleculeForceField(mol_with_hydrogens, properties, confId=conf_id).CalcEnergy()
+    properties = AllChem.MMFFGetMoleculeProperties(
+        mol_with_hydrogens, mmffVariant="MMFF94"
+    )
+    energy = AllChem.MMFFGetMoleculeForceField(
+        mol_with_hydrogens, properties, confId=conf_id
+    ).CalcEnergy()
     return energy
 
 
-def find_index_of_lowest_converged_energy(list_tuples_energy_converged: List[Tuple]) -> int:
+def find_index_of_lowest_converged_energy(
+    list_tuples_energy_converged: List[Tuple]
+) -> int:
     """
     Finds the index of the lowest converged energy
 
@@ -61,7 +67,9 @@ def find_index_of_lowest_converged_energy(list_tuples_energy_converged: List[Tup
         lowest_converged_energy_index (int): index of lowest converged energy
 
     """
-    mask = np.array([t[0] != 0 for t in list_tuples_energy_converged])  # a flag value of 0 means "converged"
+    mask = np.array(
+        [t[0] != 0 for t in list_tuples_energy_converged]
+    )  # a flag value of 0 means "converged"
 
     if np.all(mask):  # nothing is converged
         return np.NaN
@@ -69,7 +77,9 @@ def find_index_of_lowest_converged_energy(list_tuples_energy_converged: List[Tup
     energies = np.array([t[1] for t in list_tuples_energy_converged])
 
     masked_energies = np.ma.masked_array(energies, mask=mask)
-    lowest_energy_index = int(np.argmin(masked_energies)) # cast to int because RDKIT is PICKY.
+    lowest_energy_index = int(
+        np.argmin(masked_energies)
+    )  # cast to int because RDKIT is PICKY.
 
     return lowest_energy_index
 
@@ -120,5 +130,61 @@ def get_lowest_energy_and_mol_with_hydrogen(
 
 
 def write_conformer_to_file(filepath, mol, conf_id=0):
-    with open(filepath, 'w') as f:
+    with open(filepath, "w") as f:
         print(Chem.MolToMolBlock(mol, confId=conf_id), file=f)
+
+
+def get_index_permutation_between_equivalent_molecules(
+    original_mol: Mol, smiles_mol: Mol
+):
+    """
+
+    The atoms in a Mol object are identified by indices. It is possible for the exact same molecule
+    to be represented by two nominally different Mol objects that only differ in how the atoms are indexed.
+    In particular, a Mol obtained from molMDP.random_walk and the Mol obtained from the corresponding smiles
+    string are not ordered the same way in general.
+
+    This method first validates that the two Mols are indeed the same up to index permutation, and computes
+    the index permutation that takes the original_mol indexing to the smiles_mol indexing.
+
+    Args:
+        original_mol (Mol): molecule represented as a Mol
+        smiles_mol (Mol): same molecule, but derived from the corresponding smiles string
+
+    Returns:
+        permutation (np.array): Array of indices such that, for p_i = permutation[i],
+                                the atom with index "i" in smiles_mol is the same as atom with index "p_i" in mol.
+
+    Example:
+
+        consider atoms ordered in the following way
+            orignal_mol = [Carbon, Nitrogen, Sulfur]
+            smiles_mol = [Sulfur, Carbon, Nitrogen]
+
+        Then permutation = [2, 0, 1], which is to say:
+            - the Sulfur in position 0 in smiles_mol comes from position 2 in original_mol
+            - the Carbon in position 1 in smiles_mol comes from position 0 in original_mol
+            - the Nitrogen in position 2 in smiles_mol comes from position 1 in original_mol
+
+    """
+
+    assert (
+        smiles_mol.GetNumAtoms() == original_mol.GetNumAtoms()
+    ), "the two molecules do not have the same number of atoms"
+
+    # The documentation for Mol.GetSubstructMatch states:
+    #    the ordering of the indices corresponds to the atom ordering
+    #    in the query. For example, the first index is for the atom in
+    #    this molecule that matches the first atom in the query.
+
+    match = original_mol.GetSubstructMatch(smiles_mol)
+
+    expected_index_set = set(range(smiles_mol.GetNumAtoms()))
+    computed_index_set = set(match)
+
+    assert (
+        expected_index_set == computed_index_set
+    ), "There is no perfect match between original_mol and smiles_mol: review input!"
+
+    permutation = np.array(match)
+    return permutation

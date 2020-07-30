@@ -29,7 +29,7 @@ from LambdaZero.examples.env3d.rdkit_utilities import (
     get_mmff_force_field,
     get_mmff_energy, get_lowest_energy_and_mol_with_hydrogen,
 )
-from LambdaZero.examples.env3d.sanity_checks.check_atomic_order import MolecularConnection
+from LambdaZero.examples.env3d.molecular_connection import MolecularConnection
 from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
