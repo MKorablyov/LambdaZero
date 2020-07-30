@@ -1,39 +1,36 @@
 """
 The goal of this script is to generate the dataset of molecules embedded in 3D space.
+
+This script assumes LambdaZero is properly installed, and that the external dependencies are available,
+namely that the script "install-prog-data.sh" has been executed so that the method get_external_dirs()
+can fetch the correct set of external directories.
 """
 import logging
-import warnings
-warnings.simplefilter(action="ignore", category=FutureWarning)
-
 import argparse
 import json
 import os
 import sys
-
 from pathlib import Path
 
 import numpy as np
 import ray
-import LambdaZero.utils
 
 from LambdaZero.examples.env3d.dataset.data_row_generator import DataRowGenerator
 from LambdaZero.examples.env3d.dataset.io_utilities import (
     create_or_append_feather_file,
     get_debug_blocks,
 )
-
-# This script assumes LambdaZero is properly installed, and that the
-# external dependencies are available.
 from LambdaZero.examples.env3d.dataset.parsing_parameter_inputs import (
     extract_parameters_from_configuration_file,
     get_output_filename,
 )
+from LambdaZero.utils import get_external_dirs
 
-datasets_dir, _, summaries_dir = LambdaZero.utils.get_external_dirs()
+datasets_dir, _, summaries_dir = get_external_dirs()
 blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
 results_dir.mkdir(exist_ok=True, parents=True)
-logging_dir = results_dir.joinpath('logs')
+logging_dir = results_dir.joinpath("logs")
 logging_dir.mkdir(exist_ok=True)
 
 logger = logging.getLogger(__name__)
@@ -64,8 +61,10 @@ if __name__ == "__main__":
     master_random_seed = args.seed
     np.random.seed(master_random_seed)
 
-    log_file_name = str(logging_dir.joinpath(f'info_MASTER_seed_{master_random_seed}.log'))
-    logging.basicConfig(filename=log_file_name, filemode='w', level=logging.INFO)
+    log_file_name = str(
+        logging_dir.joinpath(f"info_MASTER_seed_{master_random_seed}.log")
+    )
+    logging.basicConfig(filename=log_file_name, filemode="w", level=logging.INFO)
 
     config = extract_parameters_from_configuration_file(args.config)
 
@@ -79,10 +78,12 @@ if __name__ == "__main__":
     num_cpus = config["num_cpus"]
     max_number_of_molecules = config["max_number_of_molecules"]
 
-    ray.init(num_cpus=num_cpus,
-             memory=500 * megabyte,
-             object_store_memory=300 * megabyte,
-             driver_object_store_memory=200 * megabyte)
+    ray.init(
+        num_cpus=num_cpus,
+        memory=500 * megabyte,
+        object_store_memory=300 * megabyte,
+        driver_object_store_memory=200 * megabyte,
+    )
 
     generators = []
     output_file_paths = []
@@ -96,7 +97,7 @@ if __name__ == "__main__":
             config["num_conf"],
             config["max_iters"],
             random_seed,
-            logging_dir
+            logging_dir,
         )
         generators.append(g)
 
@@ -126,7 +127,9 @@ if __name__ == "__main__":
                 output_path = output_file_path_dict[done_id]
                 create_or_append_feather_file(output_path, byte_row)
             except (ValueError, AssertionError) as e:
-                logger.warning("Something went wrong with molecule generation. Exception:")
+                logger.warning(
+                    "Something went wrong with molecule generation. Exception:"
+                )
                 logger.warning(e)
                 logger.warning("Moving on.")
 

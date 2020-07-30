@@ -6,13 +6,8 @@ import json
 import os
 from pathlib import Path
 
-try:
-    import seaborn as sns
-    sns.set(font_scale=1.5)
-except:
-    print("seaborn not available. Moving on.")
+import seaborn as sns
 import matplotlib.pyplot as plt
-
 import pandas as pd
 import numpy as np
 from rdkit import Chem
@@ -20,6 +15,9 @@ from rdkit.Chem import Draw
 
 from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
 from LambdaZero.utils import get_external_dirs
+
+
+sns.set(font_scale=1.5)
 
 datasets_dir, _, summaries_dir = get_external_dirs()
 results_dir = Path(summaries_dir).joinpath("env3d/analysis/")
@@ -29,8 +27,10 @@ block_file_path_path = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 
 number_of_parent_blocks = 5
 
-dataset_path = Path(summaries_dir).joinpath("env3d/dataset/").joinpath(
-    f"env3d_dataset_{number_of_parent_blocks}_parent_blocks.feather"
+dataset_path = (
+    Path(summaries_dir)
+    .joinpath("env3d/dataset/")
+    .joinpath(f"env3d_dataset_{number_of_parent_blocks}_parent_blocks.feather")
 )
 
 if __name__ == "__main__":
@@ -118,4 +118,22 @@ if __name__ == "__main__":
                                legends=[f'child block {index}' for index in list_child_blocks])
     img.save(results_dir.joinpath("sample_of_molecules.png"))
 
+    #  Plot the distribution of blocks and angles
+    fig = plt.figure(figsize=(12, 8))
+    fig.suptitle(f"Basic analysis of dataset. Number of molecules: {len(df)}")
 
+    ax1 = fig.add_subplot(211)
+    ax1.set_title("child block index")
+    df['attachment_block_index'].hist(bins=np.arange(106), ax=ax1)
+    ax1.set_xlabel('block index')
+    ax1.set_ylabel('count')
+
+    ax2 = fig.add_subplot(212)
+    ax2.set_title("Attachment angle")
+
+    angles_in_degree = get_angles_in_degrees(df['attachment_angle'].values)
+    ax2.hist(angles_in_degree, bins=60)
+    ax2.set_xlabel('angle (degree)')
+    ax2.set_xlim(0, 360)
+    ax2.set_ylabel('count')
+    fig.savefig(results_dir.joinpath("small_dataset_block_and_angle_distribution.png"))
