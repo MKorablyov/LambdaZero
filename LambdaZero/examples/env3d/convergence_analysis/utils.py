@@ -7,7 +7,7 @@ from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdmolfiles import MolToSmiles
 from tqdm import tqdm
 
-from LambdaZero.examples.env3d.rdkit_utilities import get_lowest_energy_and_mol_with_hydrogen
+from LambdaZero.examples.env3d.rdkit_utilities import get_lowest_energy_and_mol_with_conformer
 
 
 def generate_minimum_energy_vs_number_of_configuration_profile(
@@ -31,7 +31,7 @@ def generate_minimum_energy_vs_number_of_configuration_profile(
     list_rows = []
     for num_conf in tqdm(list_num_conf, desc="EMBED_CONFIG", file=sys.stdout):
         try:
-            min_energy, mol_with_hydrogen, number_of_successes = get_lowest_energy_and_mol_with_hydrogen(
+            min_energy, mol_with_hydrogen, number_of_successes = get_lowest_energy_and_mol_with_conformer(
                 mol, num_conf, max_iters, random_seed
             )
         except ValueError as e:

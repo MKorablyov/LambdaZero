@@ -84,7 +84,7 @@ def find_index_of_lowest_converged_energy(
     return lowest_energy_index
 
 
-def get_lowest_energy_and_mol_with_hydrogen(
+def get_lowest_energy_and_mol_with_conformer(
     mol: Mol, num_conf: int, max_iters: int = 500, random_seed: int = 0
 ):
     """

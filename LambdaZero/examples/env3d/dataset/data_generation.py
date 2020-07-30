@@ -15,7 +15,7 @@ from LambdaZero.examples.env3d.geometry import (
     get_n_axis_and_angle,
 )
 from LambdaZero.examples.env3d.rdkit_utilities import (
-    get_lowest_energy_and_mol_with_hydrogen,
+    get_lowest_energy_and_mol_with_conformer,
     get_atomic_masses,
     get_index_permutation_between_equivalent_molecules,
 )
@@ -71,7 +71,7 @@ def extract_lowest_energy_child(
 
     parent_mol = Mol(reference_molMDP.molecule.mol)
 
-    parent_energy, _, _ = get_lowest_energy_and_mol_with_hydrogen(
+    parent_energy, _, _ = get_lowest_energy_and_mol_with_conformer(
         parent_mol, num_conf, max_iters=max_iters, random_seed=random_seed
     )
 
@@ -88,11 +88,11 @@ def extract_lowest_energy_child(
         )
 
         try:
-            total_energy, mol_with_hydrogens, _ = get_lowest_energy_and_mol_with_hydrogen(
+            total_energy, mol_with_hydrogens, _ = get_lowest_energy_and_mol_with_conformer(
                 mol, num_conf, max_iters=max_iters, random_seed=random_seed
             )
 
-            child_block_energy, _, _ = get_lowest_energy_and_mol_with_hydrogen(
+            child_block_energy, _, _ = get_lowest_energy_and_mol_with_conformer(
                 child_block_mol, num_conf, max_iters=max_iters, random_seed=random_seed
             )
 

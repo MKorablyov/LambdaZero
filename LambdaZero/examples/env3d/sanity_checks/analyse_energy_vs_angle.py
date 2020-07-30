@@ -27,7 +27,7 @@ from LambdaZero.examples.env3d.rdkit_utilities import (
     get_atomic_masses,
     set_positions_on_conformer,
     get_mmff_force_field,
-    get_mmff_energy, get_lowest_energy_and_mol_with_hydrogen,
+    get_mmff_energy, get_lowest_energy_and_mol_with_conformer,
 )
 from LambdaZero.examples.env3d.molecular_connection import MolecularConnection
 from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     )
     #optimize_mol_in_place(mol2)
 
-    min_energy, mol2, _ = get_lowest_energy_and_mol_with_hydrogen(mol2, num_conf, random_seed=random_seed)
+    min_energy, mol2, _ = get_lowest_energy_and_mol_with_conformer(mol2, num_conf, random_seed=random_seed)
     mol2 = Chem.RemoveHs(mol2)
 
     anchor_indices = (mol_bond2[-1][0], mol_bond2[-1][1])
