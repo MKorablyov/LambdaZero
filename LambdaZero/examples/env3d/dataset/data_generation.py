@@ -3,6 +3,7 @@ import logging
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 from rdkit import Chem
 from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdmolfiles import MolToSmiles, MolFromSmiles
@@ -121,6 +122,48 @@ def extract_lowest_energy_child(
     }
 
     return relaxed_mol, block_idx, anchor_indices, energy_dict
+
+
+def get_blocks_embedding_energies(
+    blocks_file: str, num_conf: int = 25, max_iters: int = 200, random_seed: int = 0
+):
+    """
+    Compute the embedding energy of each block in block_file. If only one atom is present in the block,
+    the energy defaults to zero.
+
+    Args:
+        blocks_file (str): path to the block file.
+        num_conf (int): number of conformers to embed
+        max_iters (int): max number of iterations to converge the relaxation energy
+        random_seed (int): random seed for the 3D embedding.
+
+    Returns:
+        energy_by_block_dict (Dict): dictionary with key = block index, value = embedding energy.
+
+    """
+
+    blocks_df = pd.read_json(blocks_file)
+
+    list_smiles = blocks_df["block_smi"].values
+
+    energy_dict_by_smiles = dict()
+    for smiles in tqdm(np.unique(list_smiles), desc="Child Block Embedding"):
+        block_mol = MolFromSmiles(smiles)
+
+        if block_mol.GetNumAtoms() == 1:
+            energy = 0.0
+        else:
+            energy, _, _ = get_lowest_energy_and_mol_with_conformer(
+                block_mol,
+                num_conf=num_conf,
+                max_iters=max_iters,
+                random_seed=random_seed,
+            )
+        energy_dict_by_smiles[smiles] = energy
+
+    return {
+        index: energy_dict_by_smiles[smiles] for index, smiles in enumerate(list_smiles)
+    }
 
 
 def get_data_row(
