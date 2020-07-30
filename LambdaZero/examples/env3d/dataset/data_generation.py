@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Tuple
+from typing import Tuple, Dict
 
 import numpy as np
 import pandas as pd
@@ -25,6 +25,7 @@ from LambdaZero.examples.env3d.rdkit_utilities import (
 def extract_lowest_energy_child(
     reference_molMDP: MolMDP,
     attachment_stem_idx: int,
+    child_block_energies_dict: Dict[int, float],
     num_conf: int,
     max_iters: int,
     random_seed: int,
@@ -44,12 +45,13 @@ def extract_lowest_energy_child(
     The algorithm :
         - embeds and relaxes the parent molecule; gets the parent energy
         - generates a child molecule for every possible block, embeds and relax, gets total_energy
-        - embeds and relaxes every child blocks, gets child_block_energy
+        - gets relevant child_block_energy from child_block_energies_dict
         - selects the child molecule with lowest binding energy
 
     Args:
         reference_molMDP (molMDP): MDP object where a parent molecule is present.
         attachment_stem_idx (int): attachment_stem id indicating where the child block will be attached.
+        child_block_energies_dict (Dict): dictionary containing the embedding energies of all the blocks on their own.
         num_conf (int): number of configurations attempted to embed the full child molecule as a conformer
         max_iters (int): number of iterations to converge the atomic positions
         random_seed (int): random seed used to embed molecule and create a conformer.
@@ -83,7 +85,8 @@ def extract_lowest_energy_child(
         molMDP = copy.deepcopy(reference_molMDP)
         molMDP.add_block(block_idx=block_idx, stem_idx=attachment_stem_idx)
 
-        child_block_mol = Mol(molMDP.molecule.blocks[-1])
+        child_block_energy = child_block_energies_dict[block_idx]
+
         mol, bond = mol_from_frag(
             jun_bonds=molMDP.molecule.jbonds, frags=molMDP.molecule.blocks
         )
@@ -91,10 +94,6 @@ def extract_lowest_energy_child(
         try:
             total_energy, mol_with_hydrogens, _ = get_lowest_energy_and_mol_with_conformer(
                 mol, num_conf, max_iters=max_iters, random_seed=random_seed
-            )
-
-            child_block_energy, _, _ = get_lowest_energy_and_mol_with_conformer(
-                child_block_mol, num_conf, max_iters=max_iters, random_seed=random_seed
             )
 
             binding_energy = total_energy - parent_energy - child_block_energy
@@ -105,7 +104,9 @@ def extract_lowest_energy_child(
             list_bond.append(bond)
 
         except ValueError:
-            logging.warning(f"Problem with block {block_idx}: moving on.")
+            logging.warning(
+                f"Problem Computing the total energy with block {block_idx}: moving on."
+            )
 
     min_index = int(np.nanargmin(list_binding_energy))
 
@@ -129,7 +130,7 @@ def get_blocks_embedding_energies(
 ):
     """
     Compute the embedding energy of each block in block_file. If only one atom is present in the block,
-    the energy defaults to zero.
+    the energy defaults to zero. The defaults converge well for the block file blocks_PDB_105.json.
 
     Args:
         blocks_file (str): path to the block file.
@@ -169,6 +170,7 @@ def get_blocks_embedding_energies(
 def get_data_row(
     reference_molMDP: MolMDP,
     attachment_stem_idx: int,
+    child_block_energies_dict: Dict[int, float],
     num_conf: int,
     max_iters: int,
     random_seed: int,
@@ -183,6 +185,7 @@ def get_data_row(
     Args:
         reference_molMDP (molMDP): MDP object where a parent molecule is present.
         attachment_stem_idx (int): attachment_stem id indicating where the child block will be attached.
+        child_block_energies_dict (Dict): dictionary containing the embedding energies of all the blocks on their own.
         num_conf (int): number of configurations attempted to embed the full child molecule as a conformer
         max_iters (int): number of iterations to converge the atomic positions
         random_seed (int): random seed used to embed molecule and create a conformer.
@@ -197,7 +200,12 @@ def get_data_row(
     number_of_parent_atoms = parent_mol.GetNumAtoms()
 
     relaxed_mol, block_idx, anchor_indices, energy_dict = extract_lowest_energy_child(
-        reference_molMDP, attachment_stem_idx, num_conf, max_iters, random_seed
+        reference_molMDP,
+        attachment_stem_idx,
+        child_block_energies_dict,
+        num_conf,
+        max_iters,
+        random_seed,
     )
     attachment_index = anchor_indices[0]
 
