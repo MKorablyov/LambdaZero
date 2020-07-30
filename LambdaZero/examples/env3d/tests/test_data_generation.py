@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 from rdkit import Chem
 from rdkit.Chem.rdDistGeom import EmbedMolecule
@@ -9,6 +10,7 @@ from rdkit.Chem.rdmolfiles import MolFromSmiles
 from LambdaZero.environments import MolMDP
 from LambdaZero.examples.env3d.dataset.data_generation import (
     get_smiles_and_consistent_positions,
+    get_blocks_embedding_energies,
 )
 from LambdaZero.examples.env3d.rdkit_utilities import (
     set_positions_on_conformer,
@@ -72,3 +74,25 @@ def test_get_smiles_and_consistent_positions(mol_positions_attachment_index):
     ).GetSymbol()
 
     assert mol_attached_atom == smiles_mol_attached_atom
+
+
+def test_get_blocks_embedding_energies(blocks_file):
+    blocks_df = pd.read_json(blocks_file)
+    computed_energy_dictionary = get_blocks_embedding_energies(blocks_file)
+
+    for block_index, row in blocks_df.iterrows():
+
+        # check that the energy for one atom blocks is zero.
+        if MolFromSmiles(row["block_smi"]).GetNumAtoms() == 1:
+            assert computed_energy_dictionary[block_index] == 0.0
+
+    for smiles, group_df in blocks_df.groupby(by="block_smi"):
+        if len(group_df) > 1:
+            same_smiles_indices = list(group_df.index)
+            same_smiles_energies = [
+                computed_energy_dictionary[block_index]
+                for block_index in same_smiles_indices
+            ]
+
+            # check that all energies for the same smiles are the same.
+            assert len(np.unique(same_smiles_energies)) == 1.0
