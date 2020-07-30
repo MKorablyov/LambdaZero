@@ -28,7 +28,7 @@ number_of_blocks = 5
 
 random_seed = 12312
 list_num_conf = [10, 20, 40]
-number_of_molecules = 10
+number_of_molecules = 100
 
 results_path = Path(results_dir).joinpath(
     f"num_conf_convergence/convergence_{number_of_blocks}_blocks.pkl"
@@ -53,22 +53,25 @@ if __name__ == "__main__":
 
         number_of_stems = len(reference_molMDP.molecule.stems)
         if number_of_stems < 1:
-            raise ValueError("no stems! Cannot proceed")
+            continue
 
         attachment_stem_idx = np.random.choice(number_of_stems)
 
         for num_conf in list_num_conf:
-            df, _ = compute_parent_and_all_children_energies(
-                reference_molMDP,
-                attachment_stem_idx,
-                child_block_energies_dict,
-                num_conf,
-                max_iters,
-                random_seed)
+            try:
+                df, _ = compute_parent_and_all_children_energies(
+                    reference_molMDP,
+                    attachment_stem_idx,
+                    child_block_energies_dict,
+                    num_conf,
+                    max_iters,
+                    random_seed)
 
-            df['num_conf'] = num_conf
-            list_df.append(df)
+                df['num_conf'] = num_conf
+                list_df.append(df)
+            except ValueError as e:
+                print("parent failed. Continue")
+                continue
 
     convergence_df = pd.concat(list_df).reset_index(drop=True)
-
     convergence_df.to_pickle(results_path)
