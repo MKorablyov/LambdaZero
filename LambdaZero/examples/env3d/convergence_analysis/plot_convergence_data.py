@@ -20,7 +20,7 @@ _, _, summaries_dir = get_external_dirs()
 # results_path = Path(summaries_dir).joinpath(f'num_conf_convergence/conv_{number_of_blocks}_blocks_test.pkl')
 
 # computation parameters
-number_of_blocks = 10
+number_of_blocks = 5
 results_dir = Path(summaries_dir).joinpath("env3d")
 results_path = Path(results_dir).joinpath(
     f"num_conf_convergence/conv_{number_of_blocks}_blocks.pkl"
