@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import Draw
+from rdkit.Chem import Draw, MolFromSmiles
 
 from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
 from LambdaZero.utils import get_external_dirs
@@ -33,7 +33,10 @@ dataset_path = (
     .joinpath(f"env3d_dataset_{number_of_parent_blocks}_parent_blocks.feather")
 )
 
-dataset_path = Path(summaries_dir).joinpath("env3d/dataset/combined_dataset.feather")
+#dataset_path = Path(summaries_dir).joinpath("env3d/dataset/combined_dataset.feather")
+
+dataset_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN2/combined_dataset.feather")
+
 
 
 if __name__ == "__main__":
@@ -41,7 +44,8 @@ if __name__ == "__main__":
     with open(block_file_path_path, 'r') as f:
         blocks_dict = json.load(f)
 
-    vocabulary_size = len(blocks_dict['block_smi'])
+    vocabulary = blocks_dict['block_smi']
+    vocabulary_size = len(vocabulary)
 
     df = pd.read_feather(dataset_path)
 
@@ -56,7 +60,22 @@ if __name__ == "__main__":
 
     ax1 = fig.add_subplot(121)
     ax1.set_title("child block index")
-    df['attachment_block_index'].hist(bins=np.arange(106), ax=ax1)
+
+    colors = []
+    for block_index in range(105):
+        number_of_atoms = MolFromSmiles(vocabulary[f"{block_index}"]).GetNumAtoms()
+        if number_of_atoms == 1:
+            colors.append('red')
+        else:
+            colors.append('blue')
+
+        #df['attachment_block_index'].hist(bins=np.arange(106), ax=ax1)
+
+    value_count_series = pd.Series(-1, index=range(105))
+    actual_values = df['attachment_block_index'].value_counts().sort_index()
+    value_count_series[actual_values.index] = actual_values
+
+    value_count_series.plot.bar(width=0.9, ax=ax1, color=colors)
     ax1.set_xlabel('block index')
     ax1.set_ylabel('count')
     ax1.set_xlim(0, 105)
