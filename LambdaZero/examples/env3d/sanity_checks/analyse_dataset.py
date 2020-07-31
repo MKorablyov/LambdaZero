@@ -33,6 +33,9 @@ dataset_path = (
     .joinpath(f"env3d_dataset_{number_of_parent_blocks}_parent_blocks.feather")
 )
 
+dataset_path = Path(summaries_dir).joinpath("env3d/dataset/combined_dataset.feather")
+
+
 if __name__ == "__main__":
 
     with open(block_file_path_path, 'r') as f:
