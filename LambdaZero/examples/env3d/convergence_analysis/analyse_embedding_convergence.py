@@ -7,15 +7,25 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from rdkit import Chem
+from rdkit.Chem import AllChem, Mol, MolToSmiles
+from rdkit.Chem.rdmolops import SanitizeMol
+from tqdm import tqdm
 
 import LambdaZero.utils
 from LambdaZero.environments.molMDP import MolMDP
-from LambdaZero.examples.env3d.dataset.data_generation import get_blocks_embedding_energies, \
-    compute_parent_and_all_children_energies
 
-pd.set_option('display.max_rows', 500)
-pd.set_option('display.max_columns', 500)
-pd.set_option('display.width', 1000)
+
+def get_cumulative_converged_min(list_tuples_energy_converged):
+    converged_min = np.inf
+    list_cumulative_converged_min = []
+
+    for (c, e) in list_tuples_energy_converged:
+        if c == 0:
+            if e < converged_min:
+                converged_min = e
+        list_cumulative_converged_min.append(converged_min)
+    return list_cumulative_converged_min
 
 
 datasets_dir, _, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -26,52 +36,72 @@ results_dir = Path(summaries_dir).joinpath("env3d")
 # computation parameters
 number_of_blocks = 5
 
-random_seed = 12312
-list_num_conf = [10, 20, 40]
+random_seed = 123
+small_num_conf = 5
+large_num_conf = 100
+
 number_of_molecules = 100
+max_iters = 200
 
 results_path = Path(results_dir).joinpath(
     f"num_conf_convergence/convergence_{number_of_blocks}_blocks.pkl"
 )
 results_path.parent.mkdir(exist_ok=True)
 
-
-max_iters = 200
-
 if __name__ == "__main__":
 
     np.random.seed(random_seed)
-    child_block_energies_dict = get_blocks_embedding_energies(blocks_file)
-
     reference_molMDP = MolMDP(blocks_file=blocks_file)
 
+    # find a few molecules that embed quickly
+    print("Finding reference molecules that embed quickly")
+    list_reference_mols = []
+    for _ in tqdm(range(number_of_molecules)):
+        number_of_successes = 0
+        counter = 0
+        while number_of_successes == 0:
+            counter += 1
+            print(f"  - Attempt {counter}")
+            reference_molMDP.reset()
+            reference_molMDP.random_walk(number_of_blocks)
+            augmented_mol = Chem.AddHs(reference_molMDP.molecule.mol)
+            SanitizeMol(augmented_mol)
+            AllChem.EmbedMultipleConfs(
+                augmented_mol, numConfs=small_num_conf, randomSeed=random_seed
+            )
+            list_tuples_energy_converged = AllChem.MMFFOptimizeMoleculeConfs(
+                augmented_mol, mmffVariant="MMFF94", maxIters=max_iters
+            )
+            number_of_successes = np.sum(
+                [t[0] == 0 for t in list_tuples_energy_converged]
+            )
+        list_reference_mols.append(Mol(reference_molMDP.molecule.mol))
+
+    print("Generating embedding energy data")
     list_df = []
-    for _ in range(number_of_molecules):
+    list_num_conf = list(range(large_num_conf))
+    for reference_mol in tqdm(list_reference_mols):
+        augmented_mol = Chem.AddHs(reference_mol)
+        SanitizeMol(augmented_mol)
+        AllChem.EmbedMultipleConfs(
+            augmented_mol, numConfs=large_num_conf, randomSeed=random_seed
+        )
+        list_tuples_energy_converged = AllChem.MMFFOptimizeMoleculeConfs(
+            augmented_mol, mmffVariant="MMFF94", maxIters=max_iters
+        )
+        list_cumulative_converged_min = get_cumulative_converged_min(
+            list_tuples_energy_converged
+        )
 
-        reference_molMDP.reset()
-        reference_molMDP.random_walk(number_of_blocks)
+        sub_df = pd.DataFrame(
+            data={
+                "min_energy": list_cumulative_converged_min,
+                "num_conf": list_num_conf,
+            }
+        )
+        sub_df["smiles"] = MolToSmiles(reference_mol)
+        list_df.append(sub_df)
 
-        number_of_stems = len(reference_molMDP.molecule.stems)
-        if number_of_stems < 1:
-            continue
-
-        attachment_stem_idx = np.random.choice(number_of_stems)
-
-        for num_conf in list_num_conf:
-            try:
-                df, _ = compute_parent_and_all_children_energies(
-                    reference_molMDP,
-                    attachment_stem_idx,
-                    child_block_energies_dict,
-                    num_conf,
-                    max_iters,
-                    random_seed)
-
-                df['num_conf'] = num_conf
-                list_df.append(df)
-            except ValueError as e:
-                print("parent failed. Continue")
-                continue
-
-    convergence_df = pd.concat(list_df).reset_index(drop=True)
-    convergence_df.to_pickle(results_path)
+        # Write at every iteration because it is SLOW to generate this data
+        convergence_df = pd.concat(list_df).reset_index(drop=True)
+        convergence_df.to_pickle(results_path)
