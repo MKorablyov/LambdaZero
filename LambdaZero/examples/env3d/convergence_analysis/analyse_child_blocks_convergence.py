@@ -8,7 +8,7 @@ The main conclusions are:
  - Some 1 atom blocks have zero energy, embedded with or without hydrogen (S, O, N, C [not zero but very close])
  - Some 1 atom blocks cannot be embedded with hydrogen (Br, Cl, F), and have zero energy when embedded with hydrogen.
  - Iodine (I) cannot be embedded with or without hydrogen.
-    ---> it makes sense to just but the energy of one-atom block to zero.
+    ---> it makes sense to just put the energy of one-atom block to zero.
 
 2. The embedding energy of blocks converges very fast with num_conf. By num_conf = 25, the error is negligible for all
    blocks.
