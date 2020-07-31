@@ -20,24 +20,17 @@ from LambdaZero.utils import get_external_dirs
 sns.set(font_scale=1.5)
 
 datasets_dir, _, summaries_dir = get_external_dirs()
-results_dir = Path(summaries_dir).joinpath("env3d/analysis/")
-results_dir.mkdir(exist_ok=True)
+
 
 block_file_path_path = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 
 number_of_parent_blocks = 5
 
-dataset_path = (
-    Path(summaries_dir)
-    .joinpath("env3d/dataset/")
-    .joinpath(f"env3d_dataset_{number_of_parent_blocks}_parent_blocks.feather")
-)
 
-#dataset_path = Path(summaries_dir).joinpath("env3d/dataset/combined_dataset.feather")
-
-dataset_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN2/combined_dataset.feather")
-
-
+dataset_base_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN2/")
+dataset_path = dataset_base_path.joinpath("combined_dataset.feather")
+results_dir = dataset_base_path.joinpath("analysis/")
+results_dir.mkdir(exist_ok=True)
 
 if __name__ == "__main__":
 
@@ -69,16 +62,22 @@ if __name__ == "__main__":
         else:
             colors.append('blue')
 
-        #df['attachment_block_index'].hist(bins=np.arange(106), ax=ax1)
-
     value_count_series = pd.Series(-1, index=range(105))
     actual_values = df['attachment_block_index'].value_counts().sort_index()
     value_count_series[actual_values.index] = actual_values
 
     value_count_series.plot.bar(width=0.9, ax=ax1, color=colors)
+
+    # place a text box in upper left in axes coords
+    textstr = "Red means single atom block\nNegative count means zero count"
+    props = dict(boxstyle='round', facecolor='white', alpha=0.5)
+    ax1.text(0.4, 0.75, textstr, transform=ax1.transAxes, fontsize=14,
+            verticalalignment='top', bbox=props)
+
     ax1.set_xlabel('block index')
     ax1.set_ylabel('count')
     ax1.set_xlim(0, 105)
+    ax1.set_xticklabels([])
 
     ax2 = fig.add_subplot(122)
     ax2.set_title("Attachment angle")
@@ -86,8 +85,17 @@ if __name__ == "__main__":
     angles_in_degree = get_angles_in_degrees(df['attachment_angle'].values)
     ax2.hist(angles_in_degree, bins=60)
     ax2.set_xlabel('angle (degree)')
-    ax2.set_xlim(0, 360)
+    ax2.set_xlim(-60, 360)
     ax2.set_ylabel('count')
+
+    # place a text box in upper left in axes coords
+    textstr = "Negative angle means single atom child block"
+    props = dict(boxstyle='round', facecolor='white', alpha=0.5)
+    ax2.text(0.05, 0.5, textstr, transform=ax2.transAxes, fontsize=14,
+            verticalalignment='top', bbox=props)
+
+    ax1.grid(False)
+    ax2.grid(False)
     fig.savefig(results_dir.joinpath("small_dataset_block_and_angle_distribution.png"))
 
     #  Plot the sorted count distribution and cumulative sum; is there a natural cutoff?
@@ -139,23 +147,3 @@ if __name__ == "__main__":
     img = Draw.MolsToGridImage(list_mols, molsPerRow=5, subImgSize=(200, 200),
                                legends=[f'child block {index}' for index in list_child_blocks])
     img.save(results_dir.joinpath("sample_of_molecules.png"))
-
-    #  Plot the distribution of blocks and angles
-    fig = plt.figure(figsize=(12, 8))
-    fig.suptitle(f"Basic analysis of dataset. Number of molecules: {len(df)}")
-
-    ax1 = fig.add_subplot(211)
-    ax1.set_title("child block index")
-    df['attachment_block_index'].hist(bins=np.arange(106), ax=ax1)
-    ax1.set_xlabel('block index')
-    ax1.set_ylabel('count')
-
-    ax2 = fig.add_subplot(212)
-    ax2.set_title("Attachment angle")
-
-    angles_in_degree = get_angles_in_degrees(df['attachment_angle'].values)
-    ax2.hist(angles_in_degree, bins=60)
-    ax2.set_xlabel('angle (degree)')
-    ax2.set_xlim(0, 360)
-    ax2.set_ylabel('count')
-    fig.savefig(results_dir.joinpath("small_dataset_block_and_angle_distribution.png"))
