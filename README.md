@@ -1,7 +1,43 @@
 # LambdaZero: search in the space of small molecules
 
-## Install
-Install anaconda: [miniconda](https://docs.conda.io/en/latest/miniconda.html)
+## Install 
+### On Beluga/ComputeCanada
+The anaconda environment and datasets are already available in a shared folder
+
+```
+# Clone this repo
+git clone https://github.com/MKorablyov/LambdaZero
+
+# LambdaZero needs the following folders: 
+# (1) Third-party softwares. These are already installed on beluga to /lustre03/project/6004852/mkkr/Programs
+# (2) Datasets not included in this repo. These are already installed on beluga to /lustre03/project/6004852/mkkr/Datasets
+# (3) Summaries where the program will write output. Please, indicate your own location for this
+cd LamdaZero
+cp ./misc/external_dirs.cfg . 
+vi external_dirs.cfg # change the name of your Summaries folder
+
+# Test if the setup is working on one of the most basic scripts
+cd LambdaZero/examples/mpnn
+salloc --time=1:0:0 --cpus-per-task=4 --gres=gpu:1 --mem=32G --account=rrg-bengioy-ad
+
+# Load environment variables (this would load the python environment modules with gcc/cuda modules)
+source /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
+
+# add current working repo to python path to allow global imports IE: import LambdaZero.some_module
+export PYTHONPATH="${PYTHONPATH}:/path-to-where-you-have-current-work-repo/LambdaZero" 
+
+# run mpnn training script
+python train_mpnn.py
+
+# for batch submisisons check LambdaZero/misc
+# and for the beluga documentation refer to docs.mila.quebec
+
+```
+
+
+
+### Install using Anaconda 
+Install [anaconda](https://www.anaconda.com/products/individual)
 
 Create the conda environment, based on your os:
 ```
@@ -25,23 +61,6 @@ Finally, install LambdaZero with the following command:
 pip install -e .
 ```
 
-### Setup on Beluga
-To setup the environment for Beluga, create a virtual environment and install dependencies.
-# Create virtual environments and install dependencies
-```bash
-module load python/3.6 cuda/10.1 cudnn/7.6.5
-virtualenv --no-download ~/env
-source ~/env/bin/activate
-cd ~/LambdaZero
-pip install -r requirements.txt
-```
-
-Add the following line to your slurm job file to load the required modules.
-```bash
-bash setup_beluga.sh
-```
-
-This will load the required modules and install the dependencies.
 
 ## Getting started
 
@@ -84,6 +103,9 @@ Use environment, make random walks, call oracles:
 cd ~/LambdaZero/LambdaZero/examples/oracles
 python oracle_examples.py
 ```
+
+## Useful Resources
+MILA cluster docs(https://docs.mila.quebec/). 
 
 ## Getting Involved
 [Calendar](https://calendar.google.com/calendar?cid=bnNncTk1NjVobWozY3Z2czUyZHI5anNuZThAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ)  

@@ -394,7 +394,7 @@ class Dock_smi:
         # parse dock energy
         with open(dock_out_file) as f: lines = f.read().splitlines()
         gridscores = [float(line[38:]) for line in lines if line.startswith("                          Grid_Score")]
-        assert len(gridscores) == 1, "parsing error - multiple gridscores"
+        assert len(gridscores) == 1, "could not parse docking output - something wrong with docking"
         gridscore = gridscores[0]
 
         # parse dock coords
@@ -582,7 +582,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
         atmfeat = atmfeat_pd
     return atmfeat, coord, bond, bondfeat
 
-def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
+def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}, data_cls=Data):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
@@ -598,9 +598,9 @@ def mol_to_graph_backend(atmfeat, coord, bond, bondfeat, props={}):
     # make torch data
     if coord is not None:
         coord = torch.tensor(coord,dtype=torch.float32)
-        data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+        data = data_cls(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
-        data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+        data = data_cls(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
 def mol_to_graph(smiles, num_conf=1, noh=True, feat="mpnn", dockscore=None, gridscore=None, klabel=None):
