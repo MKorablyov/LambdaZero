@@ -34,7 +34,7 @@ blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 results_dir = Path(summaries_dir).joinpath("env3d")
 
 # computation parameters
-number_of_blocks = 5
+number_of_blocks = 6
 
 random_seed = 123
 small_num_conf = 5
