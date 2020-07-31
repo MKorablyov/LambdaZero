@@ -38,16 +38,16 @@ def train_epoch(loader, model, optimizer, device, config):
         optimizer.zero_grad()
         logit = model(data)
         pred = (logit * target_norm[1]) + target_norm[0]
-        y = data.y
+        y = data.y.view(-1, 1)
 
-        loss = F.l1_loss(logit, ((y - target_norm[0]) / target_norm[1]).view(-1, 1))
+        loss = F.l1_loss(logit, (y - target_norm[0]) / target_norm[1])
         loss.backward()
         optimizer.step()
 
         metrics["loss"] += loss.item() * data.num_graphs
         metrics["mse"] += ((y - pred) ** 2).sum().item()
         metrics["mae"] += ((y - pred).abs()).sum().item()
-
+        
     metrics["loss"] = metrics["loss"] / len(loader.dataset)
     metrics["mse"] = metrics["mse"] / len(loader.dataset)
     metrics["mae"] = metrics["mae"] / len(loader.dataset)
@@ -66,9 +66,9 @@ def eval_epoch(loader, model, device, config):
             data = data.to(device)
             logit = model(data)
             pred = (logit * target_norm[1]) + target_norm[0]
-            y = data.y
+            y = data.y.view(-1, 1)
 
-            loss = F.l1_loss(logit, ((y - target_norm[0]) / target_norm[1]).view(-1, 1))
+            loss = F.l1_loss(logit, (y - target_norm[0]) / target_norm[1])
             metrics["loss"] += loss.item() * data.num_graphs
             metrics["mse"] += ((y - pred) ** 2).sum().item()
             metrics["mae"] += ((y - pred).abs()).sum().item()
@@ -150,7 +150,7 @@ TPNN_CONFIG = {
         "lr": 0.001,
         "b_size": 16,
         "dim": 64,
-        "num_epochs": 10,
+        "num_epochs": 100,
         "model_params": {
 		"Rs_in": [(23, 0)],
 		"Rs_hidden": [(16, 0), (16, 1)],
