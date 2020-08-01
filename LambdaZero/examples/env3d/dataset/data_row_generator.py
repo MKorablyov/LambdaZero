@@ -54,7 +54,11 @@ class DataRowGenerator:
         log_file_name = str(
             logging_directory.joinpath(f"info_ACTOR_seed_{random_seed}.log")
         )
-        logging.basicConfig(filename=log_file_name, filemode="w", level=logging.INFO)
+        logging.basicConfig(filename=log_file_name,
+                            format="%(asctime)s - %(filename)s:%(lineno)s - %(funcName)20s() - %(message)s",
+                            filemode="w",
+                            level=logging.INFO)
+
         self.counter = 0
 
     def generate_row(self):
@@ -65,6 +69,7 @@ class DataRowGenerator:
         number_of_stems = len(self.reference_molMDP.molecule.stems)
 
         if number_of_stems < 1:
+            self.logger.warning(f"no stems! Cannot proceed.")
             raise ValueError("no stems! Cannot proceed")
 
         attachment_stem_idx = np.random.choice(number_of_stems)
