@@ -157,7 +157,7 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
 
         return new_model
 
-    def forward(self, x, drug_drug_batch, edge_cell_lines, sg_edge_index, sg_nodes, sg_avging_idx):
+    def forward(self, x, drug_drug_batch, edge_attr, edge_cell_lines, sg_edge_index, sg_nodes, sg_avging_idx):
         """Does the forward pass for the model.
 
         Arguments
@@ -223,7 +223,7 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         node_embeds = prot_embeds[sg_nodes]
         graph_embeds = scatter_mean(node_embeds, sg_avging_idx, dim=0)
 
-        return self._pred_with_graph_embeds(graph_embeds, drug_drug_batch, edge_cell_lines)
+        return self._pred_with_graph_embeds(graph_embeds, drug_drug_batch, edge_attr, edge_cell_lines)
 
     def _pred_with_graph_embeds(self, graph_embeds, drug_drug_batch, edge_cell_lines):
         """Extract drug pair embeddings and do final prediction.
@@ -274,9 +274,9 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
         from_drug_embeds = graph_embeds[drug_drug_batch[0, :]]
         to_drug_embeds = graph_embeds[drug_drug_batch[1, :]]
 
-        return self._final_predictor(from_drug_embeds, to_drug_embeds, edge_cell_lines)
+        return self._final_predictor(from_drug_embeds, to_drug_embeds, edge_attr, edge_cell_lines)
 
-    def _pred_mlp(self, from_drug_embeds, to_drug_embeds, edge_cell_lines):
+    def _pred_mlp(self, from_drug_embeds, to_drug_embeds, edge_attr, edge_cell_lines):
         """
         Concatenate the embeddings then feed them through a shared linear layer,
         then finally through a separate linear layer per cell line.
@@ -286,6 +286,9 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
             x = torch.cat((from_drug_embeds, to_drug_embeds), dim=1)
         else:
             x = torch.cat((to_drug_embeds, from_drug_embeds), dim=1)
+
+        if edge_attr.shape[1] != 0:
+            x = torch.cat((x, edge_attr), dim=1)
 
         x = self.shared_lin_lyr(x)
         x = self.linear_dropout(x)
@@ -302,6 +305,6 @@ class SubgraphEmbeddingRegressorModel(torch.nn.Module):
 
         return preds
 
-    def _pred_dot_product(self, from_drug_embeds, to_drug_embeds, edge_cell_lines):
+    def _pred_dot_product(self, from_drug_embeds, to_drug_embeds, edge_attr, edge_cell_lines):
         return torch.sum(from_drug_embeds * to_drug_embeds, dim=1)
 

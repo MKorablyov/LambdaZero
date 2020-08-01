@@ -25,8 +25,11 @@ def random_split(num_examples, test_prob, valid_prob):
     return train_idx, val_idx, test_idx
 
 def train_epoch(ddi_graph, train_idxs, model, optimizer, normalizer, device, config):
+    import pdb; pdb.set_trace()
     subgraph_dataset = TensorDataset(ddi_graph.edge_index[:, train_idxs].T,
-                                     ddi_graph.edge_classes[train_idxs], ddi_graph.y[train_idxs])
+                                     ddi_graph.edge_attr[train_idxs],
+                                     ddi_graph.edge_classes[train_idxs],
+                                     ddi_graph.y[train_idxs])
 
     loader = DataLoader(subgraph_dataset,
                         batch_size=config["batch_size"],
@@ -40,7 +43,7 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, normalizer, device, con
     for i, drug_drug_batch in enumerate(loader):
         optimizer.zero_grad()
 
-        drug_drug_index, edge_classes, y = drug_drug_batch
+        drug_drug_index, edge_attr, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
         # Here, sg is shorthand for subgraph.  See documentation of
@@ -48,7 +51,7 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, normalizer, device, con
         # sg_nodes, and sg_avging_idx
         sg_edge_index, sg_nodes, sg_avging_idx = get_batch_subgraph_edges(ddi_graph, drug_drug_index)
 
-        preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_classes,
+        preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_attr, edge_classes,
                       sg_edge_index, sg_nodes, sg_avging_idx)
         loss = F.mse_loss(normalizer.forward_transform(y), preds)
 
@@ -69,7 +72,9 @@ def train_epoch(ddi_graph, train_idxs, model, optimizer, normalizer, device, con
 
 def eval_epoch(ddi_graph, eval_idxs, model, normalizer, device, config):
     subgraph_dataset = TensorDataset(ddi_graph.edge_index[:, eval_idxs].T,
-                                     ddi_graph.edge_classes[eval_idxs], ddi_graph.y[eval_idxs])
+                                     ddi_graph.edge_attr[eval_idxs],
+                                     ddi_graph.edge_classes[eval_idxs],
+                                     ddi_graph.y[eval_idxs])
 
     loader = DataLoader(subgraph_dataset, batch_size=config["batch_size"], pin_memory=device == 'cpu')
     model.eval()
@@ -78,7 +83,7 @@ def eval_epoch(ddi_graph, eval_idxs, model, normalizer, device, config):
     epoch_preds = []
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for drug_drug_batch in loader:
-        drug_drug_index, edge_classes, y = drug_drug_batch
+        drug_drug_index, edge_attr, edge_classes, y = drug_drug_batch
         drug_drug_index = drug_drug_index.T
 
         # Here, sg is shorthand for subgraph.  See documentation of
@@ -86,7 +91,7 @@ def eval_epoch(ddi_graph, eval_idxs, model, normalizer, device, config):
         # sg_nodes, and sg_avging_idx
         sg_edge_index, sg_nodes, sg_avging_idx = get_batch_subgraph_edges(ddi_graph, drug_drug_index)
 
-        preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_classes,
+        preds = model(ddi_graph.protein_ftrs, drug_drug_index, edge_attr, edge_classes,
                       sg_edge_index, sg_nodes, sg_avging_idx)
         loss = F.mse_loss(normalizer.forward_transform(y), preds)
 
@@ -245,12 +250,13 @@ class SubgraphRegressor(tune.Trainable):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         dataset = DrugCombDb(transform=self._get_transform(config),
-                             pre_transform=transforms.to_drug_induced_subgraphs)
+                             pre_transform=transforms.to_drug_induced_subgraphs,
+                             prot_ftr_type='laplacian',
+                             target_type='response')
         self.ddi_graph = self._extract_ddi_graph(dataset)
 
-        self.train_idxs, self.val_idxs, self.test_idxs = random_split(self.ddi_graph.edge_index.shape[1],
-                                                                      config["test_set_prop"],
-                                                                      config["val_set_prop"])
+        self.train_idxs, self.val_idxs, self.test_idxs = \
+            dataset.random_split(config["test_set_prop"], config["val_set_prop"])
 
         config["in_channels"] = \
             self.ddi_graph.x.shape[1] if config['use_one_hot'] else config["protein_embedding_size"]

@@ -96,6 +96,7 @@ def _build_subgraphs_data(data):
     super_graph = Data(
         x=data.x[:len(unique_drugs)],
         edge_index=drug_drug_index[:, drug_indexer],
+        edge_attr=data.edge_attr[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]][drug_indexer],
         y=data.y[ddi_edge_idx_range[0]:ddi_edge_idx_range[1]][drug_indexer],
     )
 
