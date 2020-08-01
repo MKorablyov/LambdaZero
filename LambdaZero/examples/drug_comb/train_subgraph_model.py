@@ -1,18 +1,16 @@
 from LambdaZero.examples.drug_comb.drug_combdb_data import DrugCombDb
-from LambdaZero.examples.drug_comb.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
+from LambdaZero.examples.drug_comb.model.subgraph_embedding_model import SubgraphEmbeddingRegressorModel
 from LambdaZero.examples.drug_comb import transforms
 from LambdaZero.utils import get_external_dirs, MeanVarianceNormalizer
 from torch_geometric.data import Batch
 from torchvision.transforms import Compose
 from torch.utils.data import TensorDataset, DataLoader
 from ray import tune
-import numpy as np
 import torch.nn.functional as F
 import ray
 import torch
 import os
 import math
-import sys
 import time
 
 def random_split(num_examples, test_prob, valid_prob):

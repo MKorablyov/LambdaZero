@@ -60,6 +60,12 @@ class DrugCombDb(InMemoryDataset):
     fp_radius : int
         For all drugs in the dataset we obtain a morgan fingerprint.  This is the
         radius for said fingerprints.
+    use_laplacian : bool
+        If True, use laplacian embeddings as protein features.  If False, use one-hot
+        encodings.
+    target_type : {'response', 'synergy_scores'}
+        If 'response', use the raw drug response as the target.  If 'score', use the
+        synergy scores as the target.
     _drug_protein_link_holder : pd.DataFrame
         A convenience DataFrame maintaining the drug-protein targets for processing
         in different parts of the code so that the DataFrame does not need to be
@@ -70,7 +76,10 @@ class DrugCombDb(InMemoryDataset):
         read from disk multiple times.
     """
 
-    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4):
+    def __init__(self, transform=None, pre_transform=None, prot_ftr_type='one_hot',
+                 target_type='response', fp_bits=1024, fp_radius=4):
+        self._get_prot_ftrs = self._get_get_prot_ftr_method(prot_ftr_type)
+        self._get_trgts = self._get_get_trgt_method(target_type)
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
 
@@ -81,6 +90,54 @@ class DrugCombDb(InMemoryDataset):
         super().__init__(datasets_dir + '/DrugCombDb/', transform, pre_transform)
 
         self.data, self.slices = torch.load(self.processed_paths[0])
+
+    def _get_get_prot_ftr_method(self, prot_ftr_type):
+        """Gets the method which builds the protein features
+
+        Arguments
+        ---------
+        prot_ftr_type : {'laplacian', 'one_hot'}
+            String with value of either laplacian or one_hot.
+
+        Returns
+        -------
+        Function[pd.DataFrame, pd.DataFrame]
+            Method which will compute protein features
+        """
+        if prot_ftr_type not in {'laplacian', 'one_hot'}:
+            raise ValueError(
+                "prot_ftr_type must be one of 'laplacian' or 'one_hot'.  " +
+                "Was %s instead" % prot_ftr_type
+            )
+
+        method_dict = {'laplacian': self._get_laplacian_features,
+                       'one_hot': self._get_one_hot_features}
+
+        return method_dict[prot_ftr_type]
+
+    def _get_get_trgt_method(self, target_type):
+        """Gets the method which builds the targets
+
+        Arguments
+        ---------
+        target_type : {'response', 'synergy_scores'}
+            String with value of either response or synergy_scores.
+
+        Returns
+        -------
+        Function[pd.DataFrame, pd.DataFrame]
+            Method which will compute drug pair targets
+        """
+        if prot_ftr_type not in {'response', 'synergy_scores'}:
+            raise ValueError(
+                "prot_ftr_type must be one of 'laplacian' or 'one_hot'.  " +
+                "Was %s instead" % prot_ftr_type
+            )
+
+        method_dict = {'response': self._get_response_trgt,
+                       'synergy_scores': self._get_synergy_score_trgt}
+
+        return method_dict[target_type]
 
     @property
     def _drug_protein_link(self):
@@ -104,7 +161,8 @@ class DrugCombDb(InMemoryDataset):
             'drug_chemical_info.csv',
             'drugcombs_scored.csv',
             'drug_protein_links.tsv',
-            'protein_protein_links.txt'
+            'protein_protein_links.txt',
+            'drugcombs_response.csv',
         ]
 
     @property
@@ -114,6 +172,7 @@ class DrugCombDb(InMemoryDataset):
     def download(self):
         urls = [
             'http://drugcombdb.denglab.org/download/drugcombs_scored.csv',
+            'http://drugcombdb.denglab.org/download/drugcombs_response.csv',
             'http://drugcombdb.denglab.org/download/drug_protein_links.rar',
             'http://drugcombdb.denglab.org/download/protein_protein_links.rar',
             'http://drugcombdb.denglab.org/download/drug_chemical_info.csv'
@@ -257,10 +316,53 @@ class DrugCombDb(InMemoryDataset):
         protein_nodes['is_drug'] = 0
         protein_nodes['has_fp'] = False
 
-        one_hot = pd.get_dummies(protein_nodes['name'])
-        protein_nodes = protein_nodes.join(one_hot)
+        ftrs = self._get_prot_ftrs(protein_nodes)
+        protein_nodes = protein_nodes.join(ftrs)
 
         return protein_nodes
+
+    def _get_one_hot_features(self, protein_nodes):
+        return pd.get_dummies(protein_nodes['name'])
+
+    def _get_laplacian_features(self, protein_nodes, n_features=256):
+        if not os.path.isfile(os.path.join(self.raw_dir, "laplacian_eigvects.npz")):
+            ppi_edge_idx = self._protein_protein_interactions[['idx_prot1', 'idx_prot2']].to_numpy().T
+            ppi_edge_idx = np.concatenate((ppi_edge_idx, ppi_edge_idx[::-1, :]), axis=1)
+
+            print('Computing laplacian features of the proteins, only happens the first time')
+            # Build Laplacian matrix
+            n_edges = len(ppi_edge_idx[0]) // 2
+            # Adjacency matrix
+            A = coo_matrix(
+                (np.ones(n_edges), (ppi_edge_idx[0, :n_edges],
+                                    ppi_edge_idx[1, :n_edges])),
+                dtype=np.int8).toarray()
+
+            # Node degree matrix
+            D = np.diag(A.sum(axis=0))
+            L = D - A
+
+            import pdb; pdb.set_trace()
+            ## Restrict to protein nodes
+            #L = L[self.is_drug.sum():, self.is_drug.sum():]
+
+            eigvals, eigvects = np.linalg.eigh(L)  # Diagonalize the matrix
+            # Save results
+            np.savez(os.path.join(self.raw_dir, "laplacian_eigvects.npz"), eigvals=eigvals, eigvects=eigvects)
+
+        else:
+            npzfile = np.load(os.path.join(self.raw_dir, "laplacian_eigvects.npz"))
+            eigvals, eigvects = npzfile['eigvals'], npzfile['eigvects']
+
+        # Remove zero eigvalues and corresponding eigvectors
+        nonzero_vals = eigvals > 1e-6
+        eigvects = eigvects[:, nonzero_vals]
+
+        # Transform to dataframe
+        n_drugs = self.is_drug.sum()
+        col_names = ["lap_feat_" + str(i) for i in range(256)]
+
+        return pd.DataFrame(eigvects[:, :n_features], columns=col_names)
 
     def _get_edges_information(self, nodes):
         """Gets the edges in the graph
