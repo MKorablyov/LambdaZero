@@ -1,8 +1,9 @@
 import copy
 import logging
-from typing import Tuple
+from typing import Tuple, Dict
 
 import numpy as np
+import pandas as pd
 from rdkit import Chem
 from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdmolfiles import MolToSmiles, MolFromSmiles
@@ -15,21 +16,22 @@ from LambdaZero.examples.env3d.geometry import (
     get_n_axis_and_angle,
 )
 from LambdaZero.examples.env3d.rdkit_utilities import (
-    get_lowest_energy_and_mol_with_hydrogen,
+    get_lowest_energy_and_mol_with_conformer,
     get_atomic_masses,
     get_index_permutation_between_equivalent_molecules,
 )
 
 
-def extract_lowest_energy_child(
+def compute_parent_and_all_children_energies(
     reference_molMDP: MolMDP,
     attachment_stem_idx: int,
+    child_block_energies_dict: Dict[int, float],
     num_conf: int,
     max_iters: int,
     random_seed: int,
 ):
     """
-    This method extracts the lowest binding energy child conformer molecule given a reference MDP object
+    This method computes the binding energy child conformer molecule given a reference MDP object
     which already contains the parent molecule as its state, and provided the attachment information.
 
     The binding energy is defined as
@@ -43,12 +45,92 @@ def extract_lowest_energy_child(
     The algorithm :
         - embeds and relaxes the parent molecule; gets the parent energy
         - generates a child molecule for every possible block, embeds and relax, gets total_energy
-        - embeds and relaxes every child blocks, gets child_block_energy
-        - selects the child molecule with lowest binding energy
+        - gets relevant child_block_energy from child_block_energies_dict
+        - computes binding energy
 
     Args:
         reference_molMDP (molMDP): MDP object where a parent molecule is present.
         attachment_stem_idx (int): attachment_stem id indicating where the child block will be attached.
+        child_block_energies_dict (Dict): dictionary containing the embedding energies of all the blocks on their own.
+        num_conf (int): number of configurations attempted to embed the full child molecule as a conformer
+        max_iters (int): number of iterations to converge the atomic positions
+        random_seed (int): random seed used to embed molecule and create a conformer.
+
+    Returns:
+
+        energies_dataframe (DataFrame): a dataframe with all the energies and other info.
+        list_mols (List[Mol]) : relaxed child molecules, ordered by block index
+    """
+
+    list_block_indices = np.arange(reference_molMDP.num_blocks)
+
+    parent_mol = Mol(reference_molMDP.molecule.mol)
+    parent_energy, _, _ = get_lowest_energy_and_mol_with_conformer(
+        parent_mol, num_conf, max_iters=max_iters, random_seed=random_seed
+    )
+
+    list_rows = []
+    list_mols = []
+    for block_idx in tqdm(
+        list_block_indices,
+        desc=f"{MolToSmiles(parent_mol)}--stem idx {attachment_stem_idx}",
+    ):
+        molMDP = copy.deepcopy(reference_molMDP)
+        molMDP.add_block(block_idx=block_idx, stem_idx=attachment_stem_idx)
+
+        child_block_energy = child_block_energies_dict[block_idx]
+
+        mol, bond = mol_from_frag(
+            jun_bonds=molMDP.molecule.jbonds, frags=molMDP.molecule.blocks
+        )
+
+        try:
+            total_energy, mol_with_hydrogens, _ = get_lowest_energy_and_mol_with_conformer(
+                mol, num_conf, max_iters=max_iters, random_seed=random_seed
+            )
+
+            binding_energy = total_energy - parent_energy - child_block_energy
+
+        except ValueError as e:
+            logging.warning(
+                f"Problem Computing the total energy with block {block_idx}:\n{e}\nMoving on."
+            )
+            total_energy = np.NaN
+            binding_energy = np.NaN
+            mol_with_hydrogens = np.NaN
+
+        list_mols.append(mol_with_hydrogens)
+
+        row = {'block_index': block_idx,
+               'parent_smiles': MolToSmiles(parent_mol),
+               'total_energy': total_energy,
+               'parent_energy': parent_energy,
+               'child_block_energy': child_block_energy,
+               'binding_energy': binding_energy,
+               'bond': bond}
+
+        list_rows.append(row)
+
+    return pd.DataFrame(list_rows), list_mols
+
+
+def extract_lowest_energy_child(
+    reference_molMDP: MolMDP,
+    attachment_stem_idx: int,
+    child_block_energies_dict: Dict[int, float],
+    num_conf: int,
+    max_iters: int,
+    random_seed: int,
+):
+    """
+    This method computes the binding energies of all parent+child blocks using
+        compute_parent_and_all_children_energies
+    and selects the child molecule with lowest binding energy.
+
+    Args:
+        reference_molMDP (molMDP): MDP object where a parent molecule is present.
+        attachment_stem_idx (int): attachment_stem id indicating where the child block will be attached.
+        child_block_energies_dict (Dict): dictionary containing the embedding energies of all the blocks on their own.
         num_conf (int): number of configurations attempted to embed the full child molecule as a conformer
         max_iters (int): number of iterations to converge the atomic positions
         random_seed (int): random seed used to embed molecule and create a conformer.
@@ -62,70 +144,82 @@ def extract_lowest_energy_child(
 
     """
 
-    list_block_indices = np.arange(reference_molMDP.num_blocks)
-
-    list_total_energy = []
-    list_binding_energy = []
-    list_relaxed_mol_with_hydrogen = []
-    list_bond = []
-
-    parent_mol = Mol(reference_molMDP.molecule.mol)
-
-    parent_energy, _, _ = get_lowest_energy_and_mol_with_hydrogen(
-        parent_mol, num_conf, max_iters=max_iters, random_seed=random_seed
+    energies_df, list_relaxed_mol_with_hydrogen = compute_parent_and_all_children_energies(
+        reference_molMDP,
+        attachment_stem_idx,
+        child_block_energies_dict,
+        num_conf,
+        max_iters,
+        random_seed,
     )
 
-    for block_idx in tqdm(
-        list_block_indices,
-        desc=f"{MolToSmiles(parent_mol)}--stem idx {attachment_stem_idx}",
-    ):
-        molMDP = copy.deepcopy(reference_molMDP)
-        molMDP.add_block(block_idx=block_idx, stem_idx=attachment_stem_idx)
+    min_index = int(np.nanargmin(energies_df['binding_energy'].values))
 
-        child_block_mol = Mol(molMDP.molecule.blocks[-1])
-        mol, bond = mol_from_frag(
-            jun_bonds=molMDP.molecule.jbonds, frags=molMDP.molecule.blocks
-        )
+    block_idx = energies_df['block_index'].values[min_index]
+    parent_energy = energies_df['parent_energy'].values[min_index]
+    total_energy = energies_df['total_energy'].values[min_index]
+    binding_energy = energies_df['binding_energy'].values[min_index]
 
-        try:
-            total_energy, mol_with_hydrogens, _ = get_lowest_energy_and_mol_with_hydrogen(
-                mol, num_conf, max_iters=max_iters, random_seed=random_seed
-            )
-
-            child_block_energy, _, _ = get_lowest_energy_and_mol_with_hydrogen(
-                child_block_mol, num_conf, max_iters=max_iters, random_seed=random_seed
-            )
-
-            binding_energy = total_energy - parent_energy - child_block_energy
-
-            list_total_energy.append(total_energy)
-            list_binding_energy.append(binding_energy)
-            list_relaxed_mol_with_hydrogen.append(mol_with_hydrogens)
-            list_bond.append(bond)
-
-        except ValueError:
-            logging.warning(f"Problem with block {block_idx}: moving on.")
-
-    min_index = int(np.nanargmin(list_binding_energy))
-
-    block_idx = list_block_indices[min_index]
-    bond = list_bond[min_index]
+    bond = energies_df['bond'].values[min_index]
     anchor_indices = (bond[-1][0], bond[-1][1])
 
     relaxed_mol = Chem.RemoveHs(list_relaxed_mol_with_hydrogen[min_index])
 
     energy_dict = {
-        "total_energy": list_total_energy[min_index],
+        "total_energy": total_energy,
         "parent_energy": parent_energy,
-        "binding_energy": list_binding_energy[min_index],
+        "binding_energy": binding_energy,
     }
 
     return relaxed_mol, block_idx, anchor_indices, energy_dict
 
 
+def get_blocks_embedding_energies(
+    blocks_file: str, num_conf: int = 25, max_iters: int = 200, random_seed: int = 0
+):
+    """
+    Compute the embedding energy of each block in block_file. If only one atom is present in the block,
+    the energy defaults to zero. The defaults converge well for the block file blocks_PDB_105.json.
+
+    Args:
+        blocks_file (str): path to the block file.
+        num_conf (int): number of conformers to embed
+        max_iters (int): max number of iterations to converge the relaxation energy
+        random_seed (int): random seed for the 3D embedding.
+
+    Returns:
+        energy_by_block_dict (Dict): dictionary with key = block index, value = embedding energy.
+
+    """
+
+    blocks_df = pd.read_json(blocks_file)
+
+    list_smiles = blocks_df["block_smi"].values
+
+    energy_dict_by_smiles = dict()
+    for smiles in tqdm(np.unique(list_smiles), desc="Child Block Embedding"):
+        block_mol = MolFromSmiles(smiles)
+
+        if block_mol.GetNumAtoms() == 1:
+            energy = 0.0
+        else:
+            energy, _, _ = get_lowest_energy_and_mol_with_conformer(
+                block_mol,
+                num_conf=num_conf,
+                max_iters=max_iters,
+                random_seed=random_seed,
+            )
+        energy_dict_by_smiles[smiles] = energy
+
+    return {
+        index: energy_dict_by_smiles[smiles] for index, smiles in enumerate(list_smiles)
+    }
+
+
 def get_data_row(
     reference_molMDP: MolMDP,
     attachment_stem_idx: int,
+    child_block_energies_dict: Dict[int, float],
     num_conf: int,
     max_iters: int,
     random_seed: int,
@@ -140,6 +234,7 @@ def get_data_row(
     Args:
         reference_molMDP (molMDP): MDP object where a parent molecule is present.
         attachment_stem_idx (int): attachment_stem id indicating where the child block will be attached.
+        child_block_energies_dict (Dict): dictionary containing the embedding energies of all the blocks on their own.
         num_conf (int): number of configurations attempted to embed the full child molecule as a conformer
         max_iters (int): number of iterations to converge the atomic positions
         random_seed (int): random seed used to embed molecule and create a conformer.
@@ -154,7 +249,12 @@ def get_data_row(
     number_of_parent_atoms = parent_mol.GetNumAtoms()
 
     relaxed_mol, block_idx, anchor_indices, energy_dict = extract_lowest_energy_child(
-        reference_molMDP, attachment_stem_idx, num_conf, max_iters, random_seed
+        reference_molMDP,
+        attachment_stem_idx,
+        child_block_energies_dict,
+        num_conf,
+        max_iters,
+        random_seed,
     )
     attachment_index = anchor_indices[0]
 
