@@ -55,10 +55,12 @@ if __name__ == "__main__":
     ax1.set_title("child block index")
 
     colors = []
+    single_block_blocks = [] # convenient data structure to have in hand when running this script interactively.
     for block_index in range(105):
         number_of_atoms = MolFromSmiles(vocabulary[f"{block_index}"]).GetNumAtoms()
         if number_of_atoms == 1:
             colors.append('red')
+            single_block_blocks.append((block_index, vocabulary[f"{block_index}"]))
         else:
             colors.append('blue')
 
@@ -106,15 +108,23 @@ if __name__ == "__main__":
     fig = plt.figure(figsize=(16, 8))
     fig.suptitle(f"Sorted counts and cumulative sum over blocks\n{subtitle}")
     ax1 = fig.add_subplot(111)
+    textstr = "Red means single atom block"
+    props = dict(boxstyle='round', facecolor='white', alpha=0.5)
+    ax1.text(0.4, 0.75, textstr, transform=ax1.transAxes, fontsize=14,
+            verticalalignment='top', bbox=props)
     ax2 = ax1.twinx()
-    value_count_series.plot.bar(width=0.9, ax=ax1)
+    sorted_colors = []
+    for index in value_count_series.index:
+        sorted_colors.append(colors[index])
+    value_count_series.plot.bar(width=0.9, color=sorted_colors, ax=ax1)
     cumulative_counts_series.reset_index(drop=True).plot.line(drawstyle='steps', color='orange', lw=4, ax=ax2)
-    ax1.set_xticklabels([])
     ax1.set_xlabel('block index sorted by count')
     ax1.set_ylabel('block count')
     ax2.set_ylabel('count cumulative sum')
     ax1.grid(False)
     ax2.grid(False)
+    for label in ax1.get_xticklabels():
+        label.set_fontsize(10)
     ax1.semilogy()
     fig.savefig(results_dir.joinpath("small_dataset_cumulative_counts.png"))
 
