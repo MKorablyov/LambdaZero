@@ -10,6 +10,8 @@ import ray
 from ray import tune
 from ray.rllib.utils import merge_dicts
 
+from torch_geometric import transforms as T
+
 from LambdaZero.utils import get_external_dirs, BasicRegressor
 import LambdaZero.inputs
 import LambdaZero.utils
@@ -19,7 +21,10 @@ from LambdaZero.examples.mpnn import config
 from scipy.special import logsumexp
 from matplotlib import pyplot as plt
 
-transform = LambdaZero.utils.Complete()
+
+transform = T.Compose([LambdaZero.utils.Complete(),LambdaZero.utils.MakeFP()])
+
+
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
@@ -31,7 +36,6 @@ def _compute_metrics(epoch_targets_norm, epoch_logits, normalizer):
     epoch_targets = normalizer.backward_transform(epoch_targets_norm)
     epoch_preds = normalizer.backward_transform(epoch_logits)
     metrics = {}
-
     #metrics["loss"] = metrics["loss"] / epoch_targets.shape[0] todo
     metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
     metrics["mse"] = ((epoch_targets - epoch_preds)**2).mean()
@@ -52,6 +56,10 @@ def train_epoch(loader, model, optimizer, device, config):
 
     N = len(loader)
     alpha = config['lengthscale'] ** 2 * (1 - config["drop_p"]) / (2. * N * config['tau'])
+
+    fps = np.concatenate([d.fp for d in loader],axis=0)
+    print("fingerprints", fps.shape)
+    time.sleep(100)
 
 
     for bidx,data in enumerate(loader):
@@ -108,7 +116,7 @@ DEFAULT_CONFIG = {
             "dataset": LambdaZero.inputs.BrutalDock,
             "dataset_config": {
                 "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                "props": ["gridscore"],
+                "props": ["gridscore", "smi"],
                 "transform": transform,
                 "file_names": ["Zinc15_2k"], #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
             },
@@ -161,12 +169,15 @@ def _log_lik(y, Yt_hat, tau):
 
 
 class MCDropRegressor(BasicRegressor):
-    def __init__(self, regressor_config):
-        super(BasicRegressor, self).__init__(regressor_config["config"])
+    def __init__(self, config):
+        super(BasicRegressor, self).__init__(config["config"])
 
-    def fit(self, train_loader=None, val_loader=None):
-        if train_loader is not None: self.train_loader = train_loader
-        if val_loader is not None: self.val_loader = val_loader
+    def fit(self, train_loader, val_loader):
+        # update internal dataset
+        self.train_loader, self.val_loader = train_loader, val_loader
+        # make a new model
+        self.model = self.config["model"](**self.config["model_config"])
+        self.model.to(self.device)
 
         # todo allow ray native stopping
         all_scores = []
@@ -181,7 +192,6 @@ class MCDropRegressor(BasicRegressor):
                 ll_shuff = _log_lik(y_norm_shuff, Yt_hat, self.config["tau"]).mean()
                 scores["eval_ll"] = ll
                 scores["eval_ll_shuff"] = ll_shuff
-
                 print(self.get_mean_and_variance(self.val_loader))
 
             all_scores.append(scores)
@@ -209,10 +219,6 @@ class MCDropRegressor(BasicRegressor):
         var = (sigma2 + Yt_hat**2).mean(0) - Yt_hat.mean(0)**2
         return Yt_hat.mean(0), var
 
-class UCB(BasicRegressor):
-    pass
-
-
 
 
 
@@ -226,18 +232,5 @@ if __name__ == "__main__":
 
     # this will fit the model directly
     rg = MCDropRegressor(regressor_config)
-    print(rg.fit())
-
-
-
-    #dataloader = DataLoader(regressor_config["config"]["dataset"](**regressor_config["config"]["dataset_config"])[:100])
-    #mean, var = rg.get_mean_and_variance(dataloader)
-    #print(mean,var)
-
-
-    #train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
-    #train_set = DataLoader(Subset(dataset, train_idxs.tolist()), shuffle=True, batch_size=config["b_size"])
-
-
-
+    print(rg.fit(rg.train_loader, rg.val_loader))
 
