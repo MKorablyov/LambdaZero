@@ -148,14 +148,3 @@ def input_and_run_config(paths, model_parameters):
 
     return config_and_augmented
 
-
-@pytest.mark.parametrize("model_name", ["chemprop", "MPNN"])
-def test_smoke_test_experiment_driver(model_name, model_class, input_and_run_config):
-    dataset_class = D4MoleculesDataset
-    logger_class = MLFlowLogger
-    with pytest.warns(None) as record:
-        _ = experiment_driver(input_and_run_config, dataset_class, model_class, logger_class)
-
-    for warning in record.list:
-        assert warning.category != UserWarning, "A user warning was raised"
-

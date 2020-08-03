@@ -149,9 +149,6 @@ def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
     return sele_idxs
 
 
-datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
-
 def molecule_pca(mol):
     fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
     mat = []
@@ -160,6 +157,9 @@ def molecule_pca(mol):
         bitsvec = [int(bit) for bit in bits]
         mat.append(bitsvec)
     mat = np.array(mat)
+
+    datasets_dir, _, _ = get_external_dirs()
+    pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
 
     pca = pk.load(open(pca_path, 'rb'))
     scaled_data = pca.transform(mat)
