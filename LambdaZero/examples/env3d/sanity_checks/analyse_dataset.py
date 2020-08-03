@@ -55,7 +55,7 @@ if __name__ == "__main__":
     ax1.set_title("child block index")
 
     colors = []
-    single_block_blocks = [] # convenient data structure to have in hand when running this script interactively.
+    single_block_blocks = []  # convenient data structure to have in hand when running this script interactively.
     for block_index in range(105):
         number_of_atoms = MolFromSmiles(vocabulary[f"{block_index}"]).GetNumAtoms()
         if number_of_atoms == 1:
