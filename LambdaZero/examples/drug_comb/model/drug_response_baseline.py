@@ -275,3 +275,110 @@ class ResponseSimpleBaselineProt(torch.nn.Module):
         ground_truth_scores = drug_drug_batch[2][:, 0]
 
         return (self.criterion(order_1, ground_truth_scores) + self.criterion(order_2, ground_truth_scores)) / 2
+
+
+class ResponseConcentrationOnlyBaseline(torch.nn.Module):
+    def __init__(self, config, data):
+        super(ResponseConcentrationOnlyBaseline, self).__init__()
+
+        self.layers = []
+
+        self.layers.append(torch.nn.Linear(2, config["layers"][0]))
+
+        for i in range(len(config["layers"]) - 1):
+            self.layers.append(torch.nn.Linear(config["layers"][i], config["layers"][i+1]))
+
+        self.layers = torch.nn.ModuleList(self.layers)
+
+        self.activation = torch.nn.ReLU()
+        self.criterion = torch.nn.MSELoss()
+
+    def forward(self, data, drug_drug_batch):
+
+        #####################################################
+        # Build batch data
+        #####################################################
+
+        conc_1 = drug_drug_batch[2][:, 1][:, None]
+        conc_2 = drug_drug_batch[2][:, 2][:, None]
+
+        batch_order_1 = torch.cat((conc_1, conc_2), dim=1)
+        batch_order_2 = torch.cat((conc_2, conc_1), dim=1)
+
+        #####################################################
+        # Forward
+        #####################################################
+
+        for i in range(len(self.layers) - 1):
+            batch_order_1 = self.activation(self.layers[i](batch_order_1))
+            batch_order_2 = self.activation(self.layers[i](batch_order_2))
+
+        batch_order_1 = self.layers[-1](batch_order_1)
+        batch_order_2 = self.layers[-1](batch_order_2)
+
+        return batch_order_1[:, 0], batch_order_2[:, 0]
+
+    def loss(self, output, drug_drug_batch):
+
+        order_1, order_2 = output
+
+        ground_truth_scores = drug_drug_batch[2][:, 0]
+
+        return (self.criterion(order_1, ground_truth_scores) + self.criterion(order_2, ground_truth_scores)) / 2
+
+
+class ResponseNoSynergyBaselineFP(torch.nn.Module):
+    """
+    Baseline that is designed to be unable to capture synergies.
+    """
+    def __init__(self, config, data):
+        super(ResponseNoSynergyBaselineFP, self).__init__()
+
+        self.device = config["device"]
+
+        self.layers = []
+
+        self.layers.append(torch.nn.Linear(data.x_drugs.shape[1] + 1, config["layers"][0]))
+
+        for i in range(len(config["layers"]) - 1):
+            self.layers.append(torch.nn.Linear(config["layers"][i], config["layers"][i+1]))
+
+        self.layers = torch.nn.ModuleList(self.layers)
+
+        self.activation = torch.nn.ReLU()
+        self.criterion = torch.nn.MSELoss()
+
+    def forward(self, data, drug_drug_batch):
+
+        #####################################################
+        # Build batch data
+        #####################################################
+
+        batch_size = drug_drug_batch[0].shape[0]
+        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+
+        x_drug_1s = data.x_drugs[drug_1s]
+        x_drug_2s = data.x_drugs[drug_2s]
+
+        batch_data_1 = torch.cat((x_drug_1s, drug_drug_batch[2][:, 1][:, None]), dim=1)
+        batch_data_2 = torch.cat((x_drug_2s, drug_drug_batch[2][:, 2][:, None]), dim=1)
+
+        #####################################################
+        # Forward
+        #####################################################
+
+        for i in range(len(self.layers) - 1):
+            batch_data_1 = self.activation(self.layers[i](batch_data_1))
+            batch_data_2 = self.activation(self.layers[i](batch_data_2))
+
+        batch_data_1 = self.layers[-1](batch_data_1)
+        batch_data_2 = self.layers[-1](batch_data_2)
+
+        return (batch_data_1 + batch_data_2)[:, 0]
+
+    def loss(self, output, drug_drug_batch):
+
+        ground_truth_scores = drug_drug_batch[2][:, 0]
+
+        return self.criterion(output, ground_truth_scores)
