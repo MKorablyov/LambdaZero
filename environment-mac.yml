@@ -54,10 +54,12 @@ dependencies:
     - torch-cluster==latest+cpu
     - torch-spline-conv==latest+cpu
     - https://ray-wheels.s3-us-west-2.amazonaws.com/master/11c2b500b86e1a02a97f65708796e1605eb91808/ray-0.9.0.dev0-cp36-cp36m-macosx_10_13_intel.whl
+      #- ray # https://ray-wheels.s3-us-west-2.amazonaws.com/master/11c2b500b86e1a02a97f65708796e1605eb91808/ray-0.9.0.dev0-cp36-cp36m-macosx_10_13_intel.whl
+    - ray[rllib]
+    - ray[debug]
     - orion
     - wandb
     - torch-geometric
-    - ray[rllib]
     - git+https://github.com/chemprop/chemprop.git#egg=chemprop
     - typed-argument-parser
     - gym
