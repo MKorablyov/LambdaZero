@@ -60,6 +60,7 @@ dependencies:
     - orion
     - wandb
     - torch-geometric
+    - ray[rllib]
     - git+https://github.com/chemprop/chemprop.git#egg=chemprop
     - typed-argument-parser
     - gym
