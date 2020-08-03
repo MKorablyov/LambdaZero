@@ -136,7 +136,8 @@ ARCH=`uname`
 echo "The architecture is $ARCH"
 if [ $ARCH == 'Darwin' ]; then
 
-      CHIMERA_BIN=$PROGRAMS_DIR/chimera/bin
+      CHIMERA_ROOT_DIR=$PROGRAMS_DIR/chimera
+      CHIMERA_BIN=$CHIMERA_ROOT_DIR/bin
       mkdir -p $CHIMERA_BIN
 
       DMG=chimera-1.14-mac64.dmg
