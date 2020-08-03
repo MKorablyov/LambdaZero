@@ -99,8 +99,8 @@ def project_direction_out_of_tensor(tensor: np.array, direction: np.array) -> np
     """
     This method projects out the direction from the tensor. That is to say that
     .. math::
-        direction \cdot projected_tensor  = 0
-        projected_tensor \cdot direction = 0
+        direction cdot projected_tensor  = 0
+        projected_tensor cdot direction = 0
 
     Args:
         tensor (np.array): a 3x3 matrix
