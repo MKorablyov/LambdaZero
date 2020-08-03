@@ -27,7 +27,7 @@ block_file_path_path = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 number_of_parent_blocks = 5
 
 
-dataset_base_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN3/")
+dataset_base_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN4/")
 dataset_path = dataset_base_path.joinpath("combined_dataset.feather")
 results_dir = dataset_base_path.joinpath("analysis/")
 results_dir.mkdir(exist_ok=True)
@@ -69,9 +69,9 @@ if __name__ == "__main__":
     value_count_series.plot.bar(width=0.9, ax=ax1, color=colors)
 
     # place a text box in upper left in axes coords
-    textstr = "Red means single atom block\nNegative count means zero count"
+    textstr = "Red means single atom block"
     props = dict(boxstyle='round', facecolor='white', alpha=0.5)
-    ax1.text(0.4, 0.75, textstr, transform=ax1.transAxes, fontsize=14,
+    ax1.text(0.4, 0.95, textstr, transform=ax1.transAxes, fontsize=14,
             verticalalignment='top', bbox=props)
 
     ax1.set_xlabel('block index')
@@ -94,8 +94,9 @@ if __name__ == "__main__":
     ax2.text(0.05, 0.5, textstr, transform=ax2.transAxes, fontsize=14,
             verticalalignment='top', bbox=props)
 
-    ax1.grid(False)
-    ax2.grid(False)
+    for ax in [ax1, ax2]:
+        ax.grid(False)
+        ax.semilogy()
     fig.savefig(results_dir.joinpath("small_dataset_block_and_angle_distribution.png"))
 
     #  Plot the sorted count distribution and cumulative sum; is there a natural cutoff?
@@ -114,6 +115,7 @@ if __name__ == "__main__":
     ax2.set_ylabel('count cumulative sum')
     ax1.grid(False)
     ax2.grid(False)
+    ax1.semilogy()
     fig.savefig(results_dir.joinpath("small_dataset_cumulative_counts.png"))
 
     #  Plot the energy distributions
