@@ -64,7 +64,11 @@ if __name__ == "__main__":
     log_file_name = str(
         logging_dir.joinpath(f"info_MASTER_seed_{master_random_seed}.log")
     )
-    logging.basicConfig(filename=log_file_name, filemode="w", level=logging.INFO)
+
+    logging.basicConfig(filename=log_file_name,
+                        format="%(asctime)s - %(filename)s:%(lineno)s - %(funcName)20s() - %(message)s",
+                        filemode="w",
+                        level=logging.INFO)
 
     config = extract_parameters_from_configuration_file(args.config)
 
@@ -78,6 +82,7 @@ if __name__ == "__main__":
     num_cpus = config["num_cpus"]
     max_number_of_molecules = config["max_number_of_molecules"]
 
+    logger.info("Initializing Ray")
     ray.init(
         num_cpus=num_cpus,
         memory=500 * megabyte,
@@ -91,6 +96,8 @@ if __name__ == "__main__":
         # Generate a ray Actor for each available cpu. It gets its own random seed to make
         # sure actors are not clones of each other.
         random_seed = np.random.randint(1e6)
+
+        logger.info(f"Initializing Actor with seed {random_seed}")
         g = DataRowGenerator.remote(
             blocks_file,
             config["number_of_parent_blocks"],

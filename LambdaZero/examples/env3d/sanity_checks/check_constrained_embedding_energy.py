@@ -14,7 +14,7 @@ from LambdaZero.environments.molMDP import MolMDP
 from LambdaZero.examples.env3d.rdkit_utilities import (
     get_mmff_force_field,
     get_mmff_energy,
-    get_lowest_energy_and_mol_with_hydrogen,
+    get_lowest_energy_and_mol_with_conformer,
     get_atomic_symbols,
 )
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     print(f" - A random molecule has been generated, smiles = {MolToSmiles(mol)}")
 
-    min_energy, mol_with_hydrogens, _ = get_lowest_energy_and_mol_with_hydrogen(
+    min_energy, mol_with_hydrogens, _ = get_lowest_energy_and_mol_with_conformer(
         mol, num_conf, random_seed=random_seed
     )
 

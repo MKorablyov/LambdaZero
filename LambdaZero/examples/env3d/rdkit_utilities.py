@@ -1,12 +1,11 @@
 from typing import List, Tuple
 
+import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdmolops import SanitizeMol
 from rdkit.Geometry.rdGeometry import Point3D
-
-import numpy as np
 
 
 def get_atomic_symbols(mol: Mol):
@@ -84,11 +83,15 @@ def find_index_of_lowest_converged_energy(
     return lowest_energy_index
 
 
-def get_lowest_energy_and_mol_with_hydrogen(
-    mol: Mol, num_conf: int, max_iters: int = 500, random_seed: int = 0
+def get_lowest_energy_and_mol_with_conformer(
+    mol: Mol,
+    num_conf: int,
+    max_iters: int = 500,
+    random_seed: int = 0,
+    augment_mol_with_hydrogen: bool = True,
 ):
     """
-    Convenience method to add hydrogens, embed num_conf versions, optimize positions and extract lowest
+    Convenience method to (optionally) add hydrogens, embed num_conf versions, optimize positions and extract lowest
     energy conformer.
 
     Args:
@@ -96,21 +99,24 @@ def get_lowest_energy_and_mol_with_hydrogen(
         num_conf (int): number of conformers to embed
         max_iters (int): maximum number of iterations for the optimizer to converge
         random_seed (int): random seed for the embedding
+        augment_mol_with_hydrogen (bool) [default True]: whether the code should add explicit hydrogens to the molecule.
 
     Returns:
         min_energy (float): lowest converged energy
-        mol_with_hydrogen (Mol):  mol object, with hydrogens and a single conformer corresponding to
+        augmented_mol (Mol):  mol object, with hydrogens if flag is set, and a single conformer corresponding to
                                   the lowest energy.
         number_of_successes (int): how many optimizations converged
 
     """
-    mol_with_hydrogen = Chem.AddHs(mol)
-    SanitizeMol(mol_with_hydrogen)
-    AllChem.EmbedMultipleConfs(
-        mol_with_hydrogen, numConfs=num_conf, randomSeed=random_seed
-    )
+    if augment_mol_with_hydrogen:
+        augmented_mol = Chem.AddHs(mol)
+    else:
+        augmented_mol = Mol(mol)
+
+    SanitizeMol(augmented_mol)
+    AllChem.EmbedMultipleConfs(augmented_mol, numConfs=num_conf, randomSeed=random_seed)
     list_tuples_energy_converged = AllChem.MMFFOptimizeMoleculeConfs(
-        mol_with_hydrogen, mmffVariant="MMFF94", maxIters=max_iters
+        augmented_mol, mmffVariant="MMFF94", maxIters=max_iters
     )
     lowest_energy_index = find_index_of_lowest_converged_energy(
         list_tuples_energy_converged
@@ -124,9 +130,9 @@ def get_lowest_energy_and_mol_with_hydrogen(
 
     conformer_indices_to_remove = list(range(num_conf))
     conformer_indices_to_remove.pop(lowest_energy_index)
-    _ = [mol_with_hydrogen.RemoveConformer(i) for i in conformer_indices_to_remove]
+    _ = [augmented_mol.RemoveConformer(i) for i in conformer_indices_to_remove]
 
-    return min_energy, mol_with_hydrogen, number_of_successes
+    return min_energy, augmented_mol, number_of_successes
 
 
 def write_conformer_to_file(filepath, mol, conf_id=0):

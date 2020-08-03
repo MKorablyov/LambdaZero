@@ -5,6 +5,10 @@ from scipy.spatial.transform import Rotation
 
 from LambdaZero.examples.env3d.utilities import get_angle_between_zero_and_two_pi
 
+# If a child block has a single atom, then the angle between child and parent does not make sense.
+# We will return a special placeholder value.
+SINGLE_ATOM_ANGLE = -1.0
+
 
 def multiply_scalars_and_vectors(
     list_scalars: np.array, list_vectors: np.array
@@ -393,8 +397,8 @@ def get_n_axis_and_angle(
         # If the child block is a single atom, then the problem becomes ill-defined.
         # The rotation axis necessarily goes through this single atom, and the inertia
         # tensor vanishes identically. In this case, the angle has no meaning. We'll set it
-        # to zero.
-        return n_axis, 0.
+        # to a special placeholder value SINGLE_ATOM_ANGLE.
+        return n_axis, SINGLE_ATOM_ANGLE
 
     parent_vector = get_molecular_orientation_vector_from_positions_and_masses(
         parent_masses, parent_positions, parent_anchor, n_axis
