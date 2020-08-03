@@ -4,6 +4,8 @@ when the tests are executed.
 """
 import logging
 import tempfile
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -12,6 +14,7 @@ import torch
 from torch_geometric.data import Batch
 
 from LambdaZero.datasets.temp_brunos_work.dataset_utils import get_molecule_graphs_from_raw_data_dataframe
+from LambdaZero.utils import get_external_dirs
 from tests.fake_molecule_dataset import FakeMoleculeDataset
 from tests.fake_molecules import get_random_molecule_data
 from tests.testing_utils import generate_random_string
@@ -33,6 +36,28 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_external_program_integration)
 
 
+def pytest_configure(config):
+    """
+    The code base peppers calls to get_external_dirs() all over the place. This breaks the tests
+    if the installation script "install-prog-data.sh" has not been executed to create the
+    external_dirs.cfg file. This operation is expensive and time consuming: it's fine on a local
+    machine, but we don't want to do it all the time on the CI server. Here we'll create a fake
+    config file if it doesn't exist.
+
+    """
+
+    try:
+        get_external_dirs()
+    except ImportError:
+        logging.warning("The external directories are not configured. Creating a fake config file for testing.")
+
+        config_file_path = Path(__file__).parent.parent.joinpath("external_dirs.cfg")
+
+        with open(config_file_path, 'w') as f:
+            f.write('[dir]\n')
+            f.write('datasets=/some/fake/path/datasets/\n')
+            f.write('programs=/some/fake/path/programs/\n')
+            f.write('summaries=/some/fake/path/summaries/')
 
 
 @pytest.fixture
