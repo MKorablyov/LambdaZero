@@ -110,7 +110,7 @@ class MPNNBlock(nn.Module):
         node_embeddings = self._imbed_node_features(data.x, self.num_hidden_features)
 
         # There is a bit of tediousness below with squeezes and unsqueezes. This is caused by the GRU
-        # udpate function that requires a "sequence length" dimension.
+        # update function that requires a "sequence length" dimension.
 
         # We use "unsqueeze" to create a first dimension of size 1 in "h", such that
         # h is of dimension [1, total number of nodes, hidden representation dimension]
