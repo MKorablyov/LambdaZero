@@ -22,11 +22,13 @@ class MPNNBlock(nn.Module):
         """
 
         Args:
-            num_edge_features (int): the dimension of an edge's attribute array.
-            num_hidden_features (int): the dimension of node hidden representations arrays
-            num_edge_network_hidden_features (int): the hidden layer dimension  of the edge network MLP
-            number_of_layers (int): number of MPNN iterations
-            set2set_steps (int): number of processing steps to take in the set2set readout function
+            num_edge_features (int, optional): the dimension of an edge's attribute array. Defaults to 4.
+            num_hidden_features (int, optional): the dimension of node hidden representations arrays. Defaults to 64.
+            num_edge_network_hidden_features (int, optional): the hidden layer dimension  of the edge network MLP.
+                                                              Defaults to 128.
+            number_of_layers (int, optional): number of MPNN iterations. Defaults to 3.
+            set2set_steps (int, optional): number of processing steps to take in the set2set readout function.
+                                           Defaults to 3.
         """
         super(MPNNBlock, self).__init__()
 
@@ -71,11 +73,13 @@ class MPNNBlock(nn.Module):
         This function implements this approach.
 
         Args:
-            node_features (Tensor): node features in their original dimensions
-            num_hidden_features (int):
+            node_features (Tensor): node features in their original dimensions.
+                                    shape = [total number of nodes in batch, number of node features]
+            num_hidden_features (int): the dimension of node hidden representations arrays.
 
         Returns:
             hidden_embedding (Tensor): node features padded to the hidden representation dimension
+                                    shape = [total number of nodes in batch, num_hidden_features]
         """
 
         shape = list(node_features.shape)
@@ -99,9 +103,9 @@ class MPNNBlock(nn.Module):
 
         Returns:
             node_representations (torch.Tensor): node level representation for all nodes
-                                                 dim = [total number of nodes in batch, num_hidden_features]
+                                                 shape = [total number of nodes in batch, num_hidden_features]
             graph_representation (torch.Tensor): graph level representation array
-                                                 dim = [batch size, num_hidden_features]
+                                                 shape = [batch size, num_hidden_features]
         """
 
         # embed the node features into the hidden representation space
