@@ -47,8 +47,6 @@ def get_external_dirs():
     return datasets_dir, programs_dir, summaries_dir
 
 
-
-# log_env_info
 def dock_metrics(info):
     """ Report custom metrics for each episode in RayRllib
     :param info: episode info
@@ -67,11 +65,13 @@ class MeanVarianceNormalizer:
         self.mean = mean_and_variance[0]
         self.variance = mean_and_variance[1]
 
-    def forward_transform(self, x):
+    def tfm(self, x):
+        "normalize x"
         x_norm = (x - self.mean) / self.variance
         return x_norm
 
-    def backward_transform(self, x_norm):
+    def itfm(self, x_norm):
+        "unnormalize x"
         x = (x_norm * self.variance) + self.mean
         return x
 

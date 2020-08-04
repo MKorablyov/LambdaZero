@@ -9,21 +9,18 @@ from ray import tune
 
 class BasicRegressor(tune.Trainable):
 
-    def _load_dataset(self):
-        # load/split dataset
+    def _setup(self, config):
+
+        self.config = config
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # make dataset
         dataset = self.config["dataset"](**self.config["dataset_config"])
         train_idxs, val_idxs, test_idxs = np.load(self.config["dataset_split_path"], allow_pickle=True)
         self.train_set = Subset(dataset, train_idxs.tolist())
         self.val_set = Subset(dataset, val_idxs.tolist())
         self.train_loader = DataLoader(self.train_set,shuffle=True, batch_size=self.config["b_size"])
         self.val_loader = DataLoader(self.val_set, batch_size=self.config["b_size"])
-
-    def _setup(self, config):
-
-        self.config = config
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        if config["dataset"] is not None: self._load_dataset()
 
         # make model
         self.model = config["model"](**config["model_config"])
