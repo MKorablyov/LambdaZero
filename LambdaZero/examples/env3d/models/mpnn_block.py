@@ -64,7 +64,7 @@ class MPNNBlock(nn.Module):
         )
 
     @staticmethod
-    def _imbed_node_features(node_features: torch.tensor, num_hidden_features: int):
+    def _embed_node_features(node_features: torch.tensor, num_hidden_features: int):
         """
         The MPNN model of Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>  embeds
         the initial node features by zero-padding to the dimension of the hidden representation.
@@ -107,7 +107,7 @@ class MPNNBlock(nn.Module):
         # embed the node features into the hidden representation space
         #   data.x is of dimensions [total number of nodes in batch, number of node features]
         #   node_embeddings  is of dimensions [total number of nodes, hidden representation dimension]
-        node_embeddings = self._imbed_node_features(data.x, self.num_hidden_features)
+        node_embeddings = self._embed_node_features(data.x, self.num_hidden_features)
 
         # There is a bit of tediousness below with squeezes and unsqueezes. This is caused by the GRU
         # update function that requires a "sequence length" dimension.

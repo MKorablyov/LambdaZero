@@ -51,7 +51,7 @@ def test_mpnn_model_imbed_node_features():
             for k in range(num_node_features):
                 expected_hidden_features[i, j, k] = node_features[i, j, k]
 
-    computed_hidden_features = MPNNBlock._imbed_node_features(
+    computed_hidden_features = MPNNBlock._embed_node_features(
         node_features, num_hidden_features
     )
 
