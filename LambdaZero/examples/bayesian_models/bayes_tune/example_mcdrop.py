@@ -104,8 +104,8 @@ def sample_targets(loader, config):
 
 def eval_epoch(loader, model, device, config):
     logits = sample_logits(loader, model, device, config, 1, False)[0]
-    targets = sample_targets(loader, config)
-    scores = _epoch_metrics(targets, logits, config["normalizer"])
+    norm_targets = config["normalizer"].tfm(sample_targets(loader, config))
+    scores = _epoch_metrics(norm_targets, logits, config["normalizer"])
     return scores
 
 def eval_uncertainty(loader, model, device, config, N):
@@ -115,7 +115,6 @@ def eval_uncertainty(loader, model, device, config, N):
     shuff_targets = np.array(sorted(targets, key=lambda k: random.random()))
     shuf_ll = _log_lik(shuff_targets, logits, config, N).mean()
     return {"ll":ll, "shuff_ll":shuf_ll}
-
 
 
 def _dataset_creator(config):
@@ -152,6 +151,10 @@ class MCDrop(tune.Trainable):
         eval_scores = self.eval_epoch(self.val_loader, self.model, self.device, self.config)
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
         scores = dict(train_scores + eval_scores)
+
+
+        print(scores)
+
 
         if self._iteration % 15 == 1:
             print("iteration", self._iteration)
@@ -268,7 +271,9 @@ if __name__ == "__main__":
     ray.init(memory=config["memory"])
     # this will run train the model in a plain way
 
-    #tune.run(**config["regressor_config"])
+    tune.run(**config["regressor_config"])
+
+
 
     def bll_on_fps(config):
         "this just computes uncertainty on FPs"
@@ -296,30 +301,6 @@ if __name__ == "__main__":
         print("eval:", val_scores, "LL:", ll)
 
 
-
-
     bll_on_fps(config["regressor_config"]["config"])
 
-    # train_preds = clf.predict(emb_train)
-    # val_preds = clf.predict(emb_val)
-    # print('mpnneval mse: {}'.format(((emb_val_tar - val_preds) ** 2).mean()))
-    # print('train mse: {}'.format(((emb_train_tar - train_preds) ** 2).mean()))
-    #
-    # pred = clf.predict(emb_val)
-    # scores = _compute_metrics(emb_val_tar, pred, self.config["normalizer"])
-    #
-    # # Get ll from bayesian model
-    # predicted_mn, predicted_std = clf.predict(emb_val, return_std=True)
-    # ll_Bayesian_MPNN = -0.5 * np.mean(
-    #     np.log(2 * np.pi * predicted_std ** 2) + ((emb_val_tar - predicted_mn) ** 2 / predicted_std ** 2))
-
-    # print('Bayesian linear with MPNN: {}'.format(ll_Bayesian_MPNN))
-
-
-
-
-
-    # this will fit the model directly
-    #rg = MCDrop(config["regressor_config"]["config"])
-    #print(rg.fit(rg.train_loader, rg.val_loader))
 
