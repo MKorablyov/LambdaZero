@@ -39,12 +39,9 @@ def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer):
     predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
     metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
-    #metrics["epoch_targets_norm"] = epoch_targets
-    #metrics["epoch_preds"] = epoch_preds
     return metrics
 
-def get_tau(config, N): 
-
+def get_tau(config, N):
     tau = (1 - config["drop_p"]) * (config["lengthscale"]**2) / (2 * N * config["lambda"])
     return tau
 
@@ -66,17 +63,14 @@ def train_epoch(loader, model, optimizer, device, config):
     epoch_targets_norm = []
     epoch_logits = []
 
-    N = len(loader.dataset)
-    lambd = config['lambda']
-
     for bidx,data in enumerate(loader):
         data = data.to(device)
         targets = getattr(data, config["target"])
 
         optimizer.zero_grad()
-        logits = model(data, do_dropout=True, drop_p=config["drop_p"] )
+        logits = model(data, do_dropout=True, drop_p=config["drop_p"])
         targets_norm = config["normalizer"].tfm(targets)
-        reg_loss = lambd * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
+        reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
         loss = F.mse_loss(logits, targets_norm) + reg_loss
         loss.backward()
         optimizer.step()
@@ -90,39 +84,69 @@ def train_epoch(loader, model, optimizer, device, config):
     return scores
 
 
-def sample_logits(loader, model, device, config, num_samples):
+def sample_logits(loader, model, device, config, num_samples, do_dropout):
     sample_logits = []
     for i in range(num_samples):
         epoch_logits = []
         for bidx, data in enumerate(loader):
             data = data.to(device)
-            logit = model(data, do_dropout=False, drop_p=config["drop_p"])
+            logit = model(data, do_dropout=do_dropout, drop_p=config["drop_p"])
             epoch_logits.append(logit.detach().cpu().numpy())
         sample_logits.append(np.concatenate(epoch_logits, 0))
     return np.stack(sample_logits,0)
 
 
 def sample_targets(loader, config):
-    epoch_targets = []
-    for bidx, data in enumerate(loader):
-        targets = getattr(data, config["target"]).detach().cpu().numpy()
-        epoch_targets.append(config["normalizer"].tfm(targets))
+    epoch_targets = [getattr(d, config["target"]).cpu().numpy() for d in loader.dataset]
     return np.concatenate(epoch_targets,0)
 
 
 def eval_epoch(loader, model, device, config):
-    logits = sample_logits(loader, model, device, config, num_samples=1)[0]
+    logits = sample_logits(loader, model, device, config, 1, False)[0]
     targets = sample_targets(loader, config)
     scores = _epoch_metrics(targets, logits, config["normalizer"])
     return scores
 
 def eval_uncertainty(loader, model, device, config, N):
-    logits = sample_logits(loader, model, device, config, num_samples=config["T"])
     targets = sample_targets(loader, config)
+    logits = sample_logits(loader, model, device, config, num_samples=config["T"], do_dropout=True)
     ll = _log_lik(targets, logits, config, N).mean()
     shuff_targets = np.array(sorted(targets, key=lambda k: random.random()))
     shuf_ll = _log_lik(shuff_targets, logits, config, N).mean()
     return {"ll":ll, "shuff_ll":shuf_ll}
+
+
+def bll_on_fps(loader, model, device, config, N):
+    "this just computes uncertainty on FPs"
+    fps = [getattr(d, config["target"]).cpu().numpy() for d in loader.dataset]
+
+
+
+    pass
+
+
+    #targets = sample_targets(loader, config)
+    #logits, embeds = samples_logits()
+
+
+# clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
+# clf.fit(emb_train, emb_train_tar)
+#
+# train_preds = clf.predict(emb_train)
+# val_preds = clf.predict(emb_val)
+# print('mpnneval mse: {}'.format(((emb_val_tar - val_preds) ** 2).mean()))
+# print('train mse: {}'.format(((emb_train_tar - train_preds) ** 2).mean()))
+#
+# pred = clf.predict(emb_val)
+# scores = _compute_metrics(emb_val_tar, pred, self.config["normalizer"])
+#
+# # Get ll from bayesian model
+# predicted_mn, predicted_std = clf.predict(emb_val, return_std=True)
+# ll_Bayesian_MPNN = -0.5 * np.mean(
+#     np.log(2 * np.pi * predicted_std ** 2) + ((emb_val_tar - predicted_mn) ** 2 / predicted_std ** 2))
+
+# print('Bayesian linear with MPNN: {}'.format(ll_Bayesian_MPNN))
+
 
 
 def _dataset_creator(config):
@@ -134,7 +158,7 @@ def _dataset_creator(config):
     val_set = Subset(dataset, val_idxs.tolist())
     train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
     val_loader = DataLoader(val_set, batch_size=config["b_size"])
-    return train_set, val_set, train_loader, val_loader
+    return train_loader, val_loader
 
 
 class MCDrop(tune.Trainable):
@@ -142,7 +166,7 @@ class MCDrop(tune.Trainable):
         self.config = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if config["dataset_creator"] is not None:
-            self.train_set, self.val_set, self.train_loader, self.val_loader = config["dataset_creator"](config)
+            self.train_loader, self.val_loader = config["dataset_creator"](config)
         self.N = len(self.train_loader.dataset)
 
         # make model
@@ -150,8 +174,10 @@ class MCDrop(tune.Trainable):
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
         # make epochs
-        self.train_epoch = config["train_epoch"]
-        self.eval_epoch = config["eval_epoch"]
+        self.train_epoch, self.eval_epoch = config["train_epoch"], config["eval_epoch"]
+        # todo: add embeddings
+
+
 
     def _train(self):
         train_scores = self.train_epoch(self.train_loader, self.model, self.optim, self.device, self.config)
@@ -196,11 +222,14 @@ class MCDrop(tune.Trainable):
 
 
 
+
+
+
+
 # todo: dropout (p= 0.01, 0.03, 0.09, 0.5)
 # todo: lengthscale (0.01, 0.03, ??? )
 # dropout_hyperparameter (drop_layers=True, drop_mlp=True)
 # todo: add BLL (from John's code)
-
 # todo: I want to be able to do proper tune logging
 # todo: I don't want to assume I have a dataset when initializing MCDrop
 # todo: I want to have a proper fit() function; maybe that could run tune in the background
@@ -227,7 +256,7 @@ DEFAULT_CONFIG = {
             "b_size": 40,
             "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
 
-            "lambda": 1e-8,
+            "lambda": 1e-6,
             "T": 10,
             "drop_p": 0.1,
             "lengthscale": 1e-2,

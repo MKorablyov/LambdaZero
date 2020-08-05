@@ -33,12 +33,11 @@ class UCT(tune.Trainable):
         train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
         self.train_set = Subset(dataset, train_idxs.tolist())
         self.val_set = Subset(dataset, val_idxs.tolist())
-
-
-
         #self.train_loader = DataLoader(self.train_set, shuffle=True, batch_size=config["b_size"])
         #self.val_loader = DataLoader(self.val_set, batch_size=config["b_size"])
         #self.regressor = config["regressor"](**config["regressor_config"])
+
+
 
     def _train(self):
         # idxs = self.acquire_batch()
