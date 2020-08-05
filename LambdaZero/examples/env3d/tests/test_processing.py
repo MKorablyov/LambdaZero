@@ -54,6 +54,11 @@ def test_env3d_proc(local_ray, dataset_root_and_filename, data_df):
     for row_index, graph in enumerate(dataset):
         row = data_df.iloc[row_index]
 
+        computed_attachment_node_index = graph.attachment_node_index.numpy()[0]
+        expected_attachment_node_index = row['attachment_node_index']
+
+        assert computed_attachment_node_index == expected_attachment_node_index
+
         expected_coords = row["coord"]
         computed_coords = graph.pos.numpy()
         np.testing.assert_allclose(expected_coords, computed_coords)
