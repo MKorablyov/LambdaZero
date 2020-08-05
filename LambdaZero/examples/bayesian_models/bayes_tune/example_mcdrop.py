@@ -154,12 +154,11 @@ class MCDrop(tune.Trainable):
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
         scores = dict(train_scores + eval_scores)
 
-        if self._iteration % 15 == 1:
-            print("iteration", self._iteration)
+        if self._iteration % 15 == 5:
             eval_scores = eval_uncertainty(self.val_loader, self.model, self.device, self.config, self.N)
             eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
             scores = dict(list(scores.items()) + eval_scores)
-
+            print(scores)
         return scores
 
     def fit(self, train_loader, val_loader):
@@ -224,7 +223,7 @@ DEFAULT_CONFIG = {
             "b_size": 40,
             "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
 
-            "lambda": 1e-6,
+            "lambda": 1e-8,
             "T": 10,
             "drop_p": 0.1,
             "lengthscale": 1e-2,
