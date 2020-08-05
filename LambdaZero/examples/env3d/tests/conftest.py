@@ -7,7 +7,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import ray
 from rdkit.Chem.rdmolfiles import MolFromSmiles
+from torch_geometric.data import DataLoader
+
+from LambdaZero.examples.env3d.dataset.processing import env3d_proc
+from LambdaZero.inputs import BrutalDock
 
 
 @pytest.fixture
@@ -141,3 +146,33 @@ def dataset_root_and_filename(data_df):
 
         yield root_dir, filename
     logging.info("deleting test folder")
+
+
+@pytest.fixture
+def local_ray(scope="session"):
+    ray.init(local_mode=True)
+    yield
+    ray.shutdown()
+
+
+@pytest.fixture
+def dataset(local_ray, dataset_root_and_filename, data_df):
+    root_directory, data_filename = dataset_root_and_filename
+
+    props = [
+        "coord",
+        "n_axis",
+        "attachment_node_index",
+        "attachment_angle",
+        "attachment_block_index",
+    ]
+
+    dataset = BrutalDock(
+        root_directory, props=props, file_names=[data_filename], proc_func=env3d_proc
+    )
+    return dataset
+
+
+@pytest.fixture
+def dataloader(local_ray, dataset):
+    return DataLoader(dataset, shuffle=False, batch_size=3)

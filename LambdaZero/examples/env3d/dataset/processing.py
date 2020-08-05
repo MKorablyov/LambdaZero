@@ -1,4 +1,5 @@
 from collections import Callable
+from copy import copy
 from plistlib import Dict
 
 import numpy as np
@@ -59,18 +60,25 @@ def get_graph_from_properties(smiles: str, properties_dictionary: Dict) -> Data:
         graph (torch_geometric.data.data.Data): a graph data object
 
     """
-    expected_properties = {'coord', 'n_axis', 'attachment_node_index', 'attachment_angle', 'attachment_block_index'}
+    expected_properties = {
+        "coord",
+        "n_axis",
+        "attachment_node_index",
+        "attachment_angle",
+        "attachment_block_index",
+    }
 
-    assert set(properties_dictionary.keys()) == expected_properties, \
-        "The properties are not consistent with the env3d dataset. Review code."
+    assert (
+        set(properties_dictionary.keys()) == expected_properties
+    ), "The properties are not consistent with the env3d dataset. Review code."
 
     props = dict(properties_dictionary)  # make a local copy to not affect the input
 
     # The coordinates are stored as np.tobytes in the feather file because pyArrow is finicky.
     # We must convert back to a numpy array, and deal with flat arrays
-    flat_coord = np.frombuffer(props['coord'])
-    props["coord"] = flat_coord.reshape(len(flat_coord)//3, 3)
-    props["n_axis"] = torch.from_numpy(np.frombuffer(props['n_axis'])).unsqueeze(0)
+    flat_coord = np.frombuffer(props["coord"])
+    props["coord"] = flat_coord.reshape(len(flat_coord) // 3, 3)
+    props["n_axis"] = torch.from_numpy(np.frombuffer(props["n_axis"])).unsqueeze(0)
 
     mol = Chem.MolFromSmiles(smiles)
     Chem.SanitizeMol(mol)
@@ -78,7 +86,26 @@ def get_graph_from_properties(smiles: str, properties_dictionary: Dict) -> Data:
     # get the mpnn features, but NOT the coordinates; we have them already.
     atmfeat, _, bond, bondfeat = mpnn_feat(mol, ifcoord=False)
 
-    coord = props.pop('coord')
+    coord = props.pop("coord")
     graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
 
     return graph
+
+
+def transform_concatenate_positions_to_node_features(graph: Data) -> Data:
+    """
+    This function concatenates the node positions to the node features. It is intended to be
+    used as a "transform" function in the constructor of InMemoryDataset-like classes.
+
+    Args:
+        graph (Data): input graph, assumed to have node features (property x) and node positions (property pos)
+
+    Returns:
+        transformed_graph (Data): a transformed version of the graph, where the positions are concatenated to the
+                                  node features.
+    """
+
+    transformed_graph = copy(graph)
+    transformed_graph.x = torch.cat([graph.x, graph.pos], axis=1)
+
+    return transformed_graph
