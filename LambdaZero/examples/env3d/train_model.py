@@ -145,7 +145,7 @@ def class_and_angle_loss(block_predictions, block_targets, angle_predictions, an
     angle_mae = torch.sum(angle_mae, dim=-1)
 
     # create a mask of 0 where angle_target is invalid (-1), and 1 elsewhere
-    mask = torch.where(angle_targets > -1, torch.ones_like(angle_targets), torch.zeros_like(angle_targets))
+    mask = torch.where(angle_targets > 0, torch.ones_like(angle_targets), torch.zeros_like(angle_targets))
     num_elem = torch.sum(mask)
 
     # calculate the mean over valid elements only
@@ -182,7 +182,7 @@ def train_epoch(loader, model, optimizer, device, config):
     for data in loader:
         data = data.to(device)
 
-        class_target = data.attachment_block_index
+        class_target = data.attachment_block_class
         angle_target = data.attachment_angle
 
         optimizer.zero_grad()
@@ -225,7 +225,7 @@ def train_epoch(loader, model, optimizer, device, config):
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
     if device == torch.device("cpu"):
-        metrics["angle_rmse"] = metrics["angle_rmse"].numpy()
+        metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].numpy())
         metrics["angle_mae"] = metrics["angle_mae"].numpy()
     else:
         metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].cpu().numpy())
@@ -297,7 +297,7 @@ def eval_epoch(loader, model, device, config):
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
     if device == torch.device("cpu"):
-        metrics["angle_rmse"] = metrics["angle_rmse"].numpy()
+        metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].numpy())
         metrics["angle_mae"] = metrics["angle_mae"].numpy()
     else:
         metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].cpu().numpy())
