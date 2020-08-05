@@ -99,20 +99,22 @@ def sample_logits(loader, model, device, config, num_samples, do_dropout):
 
 def sample_targets(loader, config):
     epoch_targets = [getattr(d, config["target"]).cpu().numpy() for d in loader.dataset]
-    return np.concatenate(epoch_targets,0)
+    norm_targets = config["normalizer"].tfm(np.concatenate(epoch_targets,0))
+    return norm_targets
 
 
 def eval_epoch(loader, model, device, config):
     logits = sample_logits(loader, model, device, config, 1, False)[0]
-    norm_targets = config["normalizer"].tfm(sample_targets(loader, config))
+    norm_targets = sample_targets(loader, config)
     scores = _epoch_metrics(norm_targets, logits, config["normalizer"])
     return scores
 
 def eval_uncertainty(loader, model, device, config, N):
-    targets = sample_targets(loader, config)
+    norm_targets = sample_targets(loader, config)
     logits = sample_logits(loader, model, device, config, num_samples=config["T"], do_dropout=True)
-    ll = _log_lik(targets, logits, config, N).mean()
-    shuff_targets = np.array(sorted(targets, key=lambda k: random.random()))
+
+    ll = _log_lik(norm_targets, logits, config, N).mean()
+    shuff_targets = np.array(sorted(norm_targets, key=lambda k: random.random()))
     shuf_ll = _log_lik(shuff_targets, logits, config, N).mean()
     return {"ll":ll, "shuff_ll":shuf_ll}
 
@@ -151,10 +153,6 @@ class MCDrop(tune.Trainable):
         eval_scores = self.eval_epoch(self.val_loader, self.model, self.device, self.config)
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
         scores = dict(train_scores + eval_scores)
-
-
-        print(scores)
-
 
         if self._iteration % 15 == 1:
             print("iteration", self._iteration)
