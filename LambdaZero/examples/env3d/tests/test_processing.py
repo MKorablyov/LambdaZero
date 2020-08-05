@@ -75,3 +75,25 @@ def test_transform_concatenate_positions_to_node_features(graph, transformed_gra
         assert torch.all(torch.eq(expected_tensor, computed_tensor))
 
 
+def test_dataset_creation_with_transform(local_ray, dataset_root_and_filename, data_df):
+
+    root_directory, data_filename = dataset_root_and_filename
+
+    props = [
+        "coord",
+        "n_axis",
+        "attachment_node_index",
+        "attachment_angle",
+        "attachment_block_index",
+    ]
+
+    dataset = BrutalDock(
+        root_directory,
+        props=props,
+        file_names=[data_filename],
+        proc_func=env3d_proc,
+        transform=transform_concatenate_positions_to_node_features,
+    )
+
+    for graph in dataset:
+        assert torch.all(torch.eq(graph.x[:, -3:], graph.pos))
