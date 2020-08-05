@@ -282,9 +282,9 @@ def get_data_row(
         "smi": parent_smiles,
         "coord": permuted_positions,
         "n_axis": n_axis,
-        "attachment_node_index": permuted_attachment_index,
+        "attachment_node_idx": permuted_attachment_index,
         "attachment_angle": angle_in_radian,
-        "attachment_block_index": block_idx,
+        "attachment_block_class": block_idx,
     }
     output_row.update(energy_dict)
 

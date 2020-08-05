@@ -11,6 +11,7 @@ import ray
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 from torch_geometric.data import DataLoader
 
+from LambdaZero.examples.env3d.dataset import ENV3D_DATA_PROPERTIES
 from LambdaZero.examples.env3d.dataset.processing import env3d_proc
 from LambdaZero.inputs import BrutalDock
 
@@ -115,9 +116,9 @@ def data_df(smiles):
             "smi": s,
             "coord": coord,
             "n_axis": n_axis,
-            "attachment_node_index": attachment_node_index,
+            "attachment_node_idx": attachment_node_index,
             "attachment_angle": theta,
-            "attachment_block_index": block_index,
+            "attachment_block_class": block_index,
         }
 
         list_rows.append(row)
@@ -159,16 +160,8 @@ def local_ray(scope="session"):
 def dataset(local_ray, dataset_root_and_filename, data_df):
     root_directory, data_filename = dataset_root_and_filename
 
-    props = [
-        "coord",
-        "n_axis",
-        "attachment_node_index",
-        "attachment_angle",
-        "attachment_block_index",
-    ]
-
     dataset = BrutalDock(
-        root_directory, props=props, file_names=[data_filename], proc_func=env3d_proc
+        root_directory, props=ENV3D_DATA_PROPERTIES, file_names=[data_filename], proc_func=env3d_proc
     )
     return dataset
 

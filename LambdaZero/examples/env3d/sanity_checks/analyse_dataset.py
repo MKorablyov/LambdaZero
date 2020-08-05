@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     df = pd.read_feather(dataset_path)
 
-    number_of_blocks_present = np.unique(df['attachment_block_index']).shape[0]
+    number_of_blocks_present = np.unique(df['attachment_block_class']).shape[0]
     subtitle = f"Vocabulary size: {vocabulary_size}, " \
                f"number of blocks with non-zero count: {number_of_blocks_present}, " \
                f"Number of molecules: {len(df)}"
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             colors.append('blue')
 
     value_count_series = pd.Series(-1, index=range(105))
-    actual_values = df['attachment_block_index'].value_counts().sort_index()
+    actual_values = df['attachment_block_class'].value_counts().sort_index()
     value_count_series[actual_values.index] = actual_values
 
     value_count_series.plot.bar(width=0.9, ax=ax1, color=colors)
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     fig.savefig(results_dir.joinpath("small_dataset_block_and_angle_distribution.png"))
 
     #  Plot the sorted count distribution and cumulative sum; is there a natural cutoff?
-    value_count_series = df['attachment_block_index'].value_counts()
+    value_count_series = df['attachment_block_class'].value_counts()
     cumulative_counts_series = value_count_series.cumsum()
 
     fig = plt.figure(figsize=(16, 8))
@@ -137,7 +137,7 @@ if __name__ == "__main__":
     fig.savefig(results_dir.joinpath("small_dataset_energies_distribution.png"))
 
     # Plot the most frequent blocks
-    block_indices, counts = np.unique(df['attachment_block_index'].values, return_counts=True)
+    block_indices, counts = np.unique(df['attachment_block_class'].values, return_counts=True)
     sorting_indices = np.argsort(counts)[::-1]
     block_indices = block_indices[sorting_indices]
     counts = counts[sorting_indices]
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     number_of_sample_molecules = 25
     list_smiles = df['smi'].values
     list_mols = [Chem.MolFromSmiles(smiles) for smiles in list_smiles[:number_of_sample_molecules]]
-    list_child_blocks = df['attachment_block_index'].values[:number_of_sample_molecules]
+    list_child_blocks = df['attachment_block_class'].values[:number_of_sample_molecules]
 
     img = Draw.MolsToGridImage(list_mols, molsPerRow=5, subImgSize=(200, 200),
                                legends=[f'child block {index}' for index in list_child_blocks])
