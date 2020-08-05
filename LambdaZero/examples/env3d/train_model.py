@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.examples.env3d.dataset.processing import env3d_proc
+from LambdaZero.examples.env3d.dataset.processing import transform_concatenate_positions_to_node_features
 from LambdaZero.inputs import BrutalDock
 from LambdaZero.utils import get_external_dirs
 
@@ -334,6 +335,7 @@ if __name__ == "__main__":
             props=props,
             file_names=[data_filename_without_suffix],
             proc_func=env3d_proc,
+            transform=transform_concatenate_positions_to_node_features,
         )
 
         print(f"size of dataset: {len(dataset)}")
