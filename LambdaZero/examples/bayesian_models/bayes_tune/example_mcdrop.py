@@ -43,12 +43,17 @@ def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer):
     #metrics["epoch_preds"] = epoch_preds
     return metrics
 
-def _log_lik(y, Yt_hat, tau):
+def get_tau(config, N): 
+
+    tau = (1 - config["drop_p"]) * (config["lengthscale"]**2) / (2 * N * config["lambda"])
+    return tau
+
+def _log_lik(y, Yt_hat, config, N):
     "computes log likelihood"
     # ll = (logsumexp(-0.5 * self.tau * (y_test[None] - Yt_hat) ** 2., 0)
     # - np.log(T)
     # - 0.5 * np.log(2 * np.pi) + 0.5 * np.log(self.tau))
-
+    tau = get_tau(config, N)
     ll = logsumexp(-0.5 * tau * (y[None] - Yt_hat) ** 2., 0)
     ll -= np.log(Yt_hat.shape[0])
     ll -= 0.5 * np.log(2 * np.pi)
@@ -61,8 +66,8 @@ def train_epoch(loader, model, optimizer, device, config):
     epoch_targets_norm = []
     epoch_logits = []
 
-    N = len(loader)
-    alpha = config['lengthscale'] ** 2 * (1 - config["drop_p"]) / (2. * N * config['tau'])
+    N = len(loader.dataset)
+    lambd = config['lambda']
 
     for bidx,data in enumerate(loader):
         data = data.to(device)
@@ -71,7 +76,7 @@ def train_epoch(loader, model, optimizer, device, config):
         optimizer.zero_grad()
         logits = model(data, do_dropout=True, drop_p=config["drop_p"] )
         targets_norm = config["normalizer"].tfm(targets)
-        reg_loss = alpha * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
+        reg_loss = lambd * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
         loss = F.mse_loss(logits, targets_norm) + reg_loss
         loss.backward()
         optimizer.step()
@@ -91,7 +96,7 @@ def sample_logits(loader, model, device, config, num_samples):
         epoch_logits = []
         for bidx, data in enumerate(loader):
             data = data.to(device)
-            logit = model(data, do_dropout=True, drop_p=config["drop_p"])
+            logit = model(data, do_dropout=False, drop_p=config["drop_p"])
             epoch_logits.append(logit.detach().cpu().numpy())
         sample_logits.append(np.concatenate(epoch_logits, 0))
     return np.stack(sample_logits,0)
@@ -111,12 +116,12 @@ def eval_epoch(loader, model, device, config):
     scores = _epoch_metrics(targets, logits, config["normalizer"])
     return scores
 
-def eval_uncertainty(loader, model, device, config):
+def eval_uncertainty(loader, model, device, config, N):
     logits = sample_logits(loader, model, device, config, num_samples=config["T"])
     targets = sample_targets(loader, config)
-    ll = _log_lik(targets, logits, config["tau"]).mean()
+    ll = _log_lik(targets, logits, config, N).mean()
     shuff_targets = np.array(sorted(targets, key=lambda k: random.random()))
-    shuf_ll = _log_lik(shuff_targets, logits, config["tau"]).mean()
+    shuf_ll = _log_lik(shuff_targets, logits, config, N).mean()
     return {"ll":ll, "shuff_ll":shuf_ll}
 
 
@@ -138,6 +143,8 @@ class MCDrop(tune.Trainable):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if config["dataset_creator"] is not None:
             self.train_set, self.val_set, self.train_loader, self.val_loader = config["dataset_creator"](config)
+        self.N = len(self.train_loader.dataset)
+
         # make model
         self.model = config["model"](**config["model_config"])
         self.model.to(self.device)
@@ -155,7 +162,7 @@ class MCDrop(tune.Trainable):
 
         if self._iteration % 15 == 1:
             print("iteration", self._iteration)
-            eval_scores = eval_uncertainty(self.val_loader, self.model, self.device, self.config)
+            eval_scores = eval_uncertainty(self.val_loader, self.model, self.device, self.config, self.N)
             eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
             scores = dict(list(scores.items()) + eval_scores)
 
@@ -181,7 +188,8 @@ class MCDrop(tune.Trainable):
     def get_mean_and_variance(self, loader):
         # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
         Yt_hat = self.get_samples(loader, self.config["T"])
-        sigma2 = 1./self.config["tau"]
+        tau = get_tau(self.config, self.N)
+        sigma2 = 1./tau
         var = (sigma2 + Yt_hat**2).mean(0) - Yt_hat.mean(0)**2
         return Yt_hat.mean(0), var
 
@@ -219,7 +227,7 @@ DEFAULT_CONFIG = {
             "b_size": 40,
             "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
 
-            "tau": 5.0,
+            "lambda": 1e-8,
             "T": 10,
             "drop_p": 0.1,
             "lengthscale": 1e-2,
