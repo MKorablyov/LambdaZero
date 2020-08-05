@@ -26,3 +26,26 @@ def test_extract_attachment_node_representation(dataloader):
         )
 
         assert torch.allclose(computed_attachment_node_representations, expected_attachment_node_representations)
+
+
+def test_smoke_block_angle_model(local_ray, dataloader):
+    """
+    A simple "smoke test", ie will the model even run given expected input data.
+    """
+
+    number_of_block_classes = 7
+    model = BlockAngleModel(num_edge_features=4,
+                            num_hidden_features=28,
+                            num_edge_network_hidden_features=16,
+                            num_block_prediction_hidden_features=12,
+                            num_angle_prediction_hidden_features=12,
+                            number_of_block_classes=number_of_block_classes)
+
+    for batch in dataloader:
+        block_logits, angle_uv = model.forward(batch)
+
+        expected_block_logits_shape = torch.Size([batch.num_graphs, number_of_block_classes])
+        expected_angle_uv_shape = torch.Size([batch.num_graphs, 2])
+
+        assert block_logits.shape == expected_block_logits_shape
+        assert angle_uv.shape == expected_angle_uv_shape
