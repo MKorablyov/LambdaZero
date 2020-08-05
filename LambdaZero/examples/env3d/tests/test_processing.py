@@ -97,37 +97,34 @@ def test_dataset_creation_with_transform(local_ray, dataset_root_and_filename, d
 
 
 def test_dataloader_sanity(data_df, dataloader, dataset):
+    """
+    This test assumes the dataloader is not shuffled.
 
-    list_atom_counts = (
-        data_df["smi"].apply(lambda s: MolFromSmiles(s).GetNumAtoms()).values
-    )
-    attachment_angles = []
-    attachment_node_indices = []
-    attachment_block_indices = []
+    This sanity check is necessary because some variable names have special properties in pytorch-geometric.
+    For instance, torch_geometric.data.data.Data.__inc__ treats variable names containing "index"
+    in a special way, which breaks the batching.
 
-    for batch in dataloader:
-        attachment_angles.append(batch.attachment_angle)
-        attachment_node_indices.append(batch.attachment_node_idx)
-        attachment_block_indices.append(batch.attachment_block_class)
+    This test insures that there are no other lingering dirty tricks because of inadvertantly poor naming.
+    """
 
-    computed_attachment_angles = torch.cat(attachment_angles)
-    expected_attachment_angles = torch.tensor(
-        data_df["attachment_angle"].values, dtype=torch.float
-    )
-    assert torch.allclose(expected_attachment_angles, computed_attachment_angles)
+    for prop in ENV3D_DATA_PROPERTIES:
 
-    computed_attachment_node_indices = torch.cat(attachment_node_indices)
-    expected_attachment_node_indices = torch.tensor(
-        data_df["attachment_node_idx"].values
-    )
-    assert torch.allclose(
-        computed_attachment_node_indices, expected_attachment_node_indices
-    )
+        if prop == 'coord':
+            batch_prop = 'pos'
+            expected_properties = np.concatenate(data_df['coord'].values)
+        elif prop == 'n_axis':
+            batch_prop = prop
+            expected_properties = np.stack(data_df['n_axis'].values)
+        else:
+            batch_prop = prop
+            expected_properties = data_df[prop].values
 
-    computed_attachment_block_indices = torch.cat(attachment_block_indices)
-    expected_attachment_block_indices = torch.tensor(
-        data_df["attachment_block_class"].values
-    )
-    assert torch.allclose(
-        computed_attachment_block_indices, expected_attachment_block_indices
-    )
+        properties_from_batches = []
+
+        for batch in dataloader:
+            properties_from_batches.append(batch[batch_prop])
+
+        computed_properties = torch.cat(properties_from_batches).numpy()
+
+        np.testing.assert_allclose(computed_properties, expected_properties)
+
