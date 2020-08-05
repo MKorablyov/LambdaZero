@@ -9,6 +9,7 @@ from torch_geometric.data import DataLoader
 
 import ray
 from ray import tune
+from ray.tune import grid_search
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models.catalog import ModelCatalog
 
@@ -28,7 +29,7 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 transform = T.Compose([LambdaZero.utils.Complete(),LambdaZero.utils.MakeFP()])
 
 
-def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer):
+def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer, scope):
     epoch_targets = normalizer.itfm(epoch_targets_norm)
     epoch_preds = normalizer.itfm(epoch_logits)
     metrics = {}
@@ -40,6 +41,7 @@ def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer):
     predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
     metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
+    if scope is not None: metrics = dict([(scope + "_" + k, v) for k, v in metrics.items()])
     return metrics
 
 def get_tau(config, N):
@@ -59,7 +61,7 @@ def _log_lik(y, Yt_hat, config, N):
     return ll
 
 
-def train_epoch(loader, model, optimizer, device, config):
+def train_epoch(loader, model, optimizer, device, config, scope):
     model.train()
     epoch_targets_norm = []
     epoch_logits = []
@@ -81,7 +83,7 @@ def train_epoch(loader, model, optimizer, device, config):
 
     epoch_targets_norm = np.concatenate(epoch_targets_norm,0)
     epoch_logits = np.concatenate(epoch_logits, 0)
-    scores = _epoch_metrics(epoch_targets_norm, epoch_logits, config["normalizer"])
+    scores = _epoch_metrics(epoch_targets_norm, epoch_logits, config["normalizer"], scope)
     return scores
 
 
@@ -103,20 +105,57 @@ def sample_targets(loader, config):
     return norm_targets
 
 
-def eval_epoch(loader, model, device, config):
+def eval_epoch(loader, model, device, config, scope):
     logits = sample_logits(loader, model, device, config, 1, False)[0]
     norm_targets = sample_targets(loader, config)
-    scores = _epoch_metrics(norm_targets, logits, config["normalizer"])
+    scores = _epoch_metrics(norm_targets, logits, config["normalizer"], scope)
     return scores
 
-def eval_uncertainty(loader, model, device, config, N):
+
+def eval_uncertainty(loader, model, device, config, N, scope):
     norm_targets = sample_targets(loader, config)
     logits = sample_logits(loader, model, device, config, num_samples=config["T"], do_dropout=True)
-
     ll = _log_lik(norm_targets, logits, config, N).mean()
     shuff_targets = np.array(sorted(norm_targets, key=lambda k: random.random()))
     shuf_ll = _log_lik(shuff_targets, logits, config, N).mean()
-    return {"ll":ll, "shuff_ll":shuf_ll}
+    return {scope + "_ll":ll, scope + "_shuff_ll":shuf_ll}
+
+
+def bayesian_ridge(train_x, val_x, train_targets_norm, val_targets_norm, config):
+    clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
+    clf.fit(train_x, train_targets_norm)
+    train_logits = clf.predict(train_x)
+    val_logits, val_std = clf.predict(val_x, return_std=True)
+    train_scores = _epoch_metrics(train_targets_norm, train_logits, config["normalizer"], "train_ridge")
+    val_scores = _epoch_metrics(val_targets_norm, val_logits, config["normalizer"], "val_ridge")
+    ll = -0.5 * np.mean(np.log(2 * np.pi * val_std ** 2) + ((val_targets_norm - val_logits) ** 2 / val_std ** 2))
+    val_scores["val_ll"] = ll
+    return {**train_scores, **val_scores}
+
+
+def sample_embeds(loader, model, device, config):
+    epoch_embeds = []
+    for bidx, data in enumerate(loader):
+        data = data.to(device)
+        embeds = model.get_embed(data, do_dropout=False, drop_p=config["drop_p"])
+        epoch_embeds.append(embeds.detach().cpu().numpy())
+    epoch_embeds = np.concatenate(epoch_embeds,axis=0)
+    return epoch_embeds
+
+
+def eval_brr(train_loader, val_loader, model, device, config, N):
+    # todo(maksym) I am not sure what is the best way to keep order
+    train_loader = DataLoader(train_loader.dataset, batch_size=config["b_size"])
+    val_loader = DataLoader(val_loader.dataset, batch_size=config["b_size"])
+
+    train_targets_norm = sample_targets(train_loader, config)
+    val_targets_norm = sample_targets(val_loader, config)
+    train_embeds = sample_embeds(train_loader, model, device, config)
+    val_embeds = sample_embeds(val_loader, model, device, config)
+    scores = bayesian_ridge(train_embeds, val_embeds, train_targets_norm, val_targets_norm, config)
+
+    print("scores", scores)
+    return scores
 
 
 def _dataset_creator(config):
@@ -148,17 +187,14 @@ class MCDrop(tune.Trainable):
         # todo: add embeddings
 
     def _train(self):
-        train_scores = self.train_epoch(self.train_loader, self.model, self.optim, self.device, self.config)
-        train_scores = [("train_" + k, v) for k, v in train_scores.items()]
-        eval_scores = self.eval_epoch(self.val_loader, self.model, self.device, self.config)
-        eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
-        scores = dict(train_scores + eval_scores)
+        train_scores = self.train_epoch(self.train_loader, self.model, self.optim, self.device, self.config, "train")
+        val_scores = self.eval_epoch(self.val_loader, self.model, self.device, self.config, "val")
+        scores = {**train_scores, **val_scores}
 
-        if self._iteration % 15 == 5:
-            eval_scores = eval_uncertainty(self.val_loader, self.model, self.device, self.config, self.N)
-            eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
-            scores = dict(list(scores.items()) + eval_scores)
-            print(scores)
+        if self._iteration % 10 == 1:
+            _scores = eval_brr(self.train_loader, self.val_loader, self.model, self.device,  self.config, self.N)
+            scores = {**scores, **_scores}
+
         return scores
 
     def fit(self, train_loader, val_loader):
@@ -188,11 +224,6 @@ class MCDrop(tune.Trainable):
 
 
 
-
-
-
-
-
 # todo: dropout (p= 0.01, 0.03, 0.09, 0.5)
 # todo: lengthscale (0.01, 0.03, ??? )
 # dropout_hyperparameter (drop_layers=True, drop_mlp=True)
@@ -210,21 +241,24 @@ DEFAULT_CONFIG = {
         "config": {
             "target": "gridscore",
             "dataset_creator": _dataset_creator,
-            "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+            "dataset_split_path": osp.join(datasets_dir,
+                                           "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                            #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "dataset": LambdaZero.inputs.BrutalDock,
             "dataset_config": {
                 "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
                 "props": ["gridscore", "smi"],
                 "transform": transform,
-                "file_names": ["Zinc15_2k"],  # ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+                "file_names":
+                 ["Zinc15_2k"],
+                #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
 
             },
             "b_size": 40,
             "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
 
             "lambda": 1e-8,
-            "T": 10,
+            "T": 20,
             "drop_p": 0.1,
             "lengthscale": 1e-2,
 
@@ -253,15 +287,13 @@ DEFAULT_CONFIG = {
     "memory": 10 * 10 ** 9
 }
 
-
-
 #if len(sys.argv) >= 2: config_name = sys.argv[1]
 #else: config_name = "mpnn000"
 #config = getattr(config, config_name)
 #config = merge_dicts(DEFAULT_CONFIG, config)
 config = DEFAULT_CONFIG
-
-
+#lambdas = list(0.1**np.linspace(start=7,stop=9,num=10))
+#config["regressor_config"]["config"]["lambda"] = grid_search(lambdas)
 
 
 if __name__ == "__main__":
@@ -269,7 +301,6 @@ if __name__ == "__main__":
     # this will run train the model in a plain way
 
     tune.run(**config["regressor_config"])
-
 
 
     def bll_on_fps(config):
@@ -282,21 +313,8 @@ if __name__ == "__main__":
         val_fps = np.stack([d.fp for d in val_loader.dataset], axis=0)
         train_targets_norm = config["normalizer"].tfm(train_targets)
         val_targets_norm = config["normalizer"].tfm(val_targets)
-
-        clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
-        clf.fit(train_fps, train_targets_norm)
-
-        train_logits = clf.predict(train_fps)
-        val_logits, val_std  = clf.predict(val_fps, return_std=True)
-
-        # def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer):
-        train_scores = _epoch_metrics(train_targets_norm, train_logits, config["normalizer"])
-        val_scores = _epoch_metrics(val_targets_norm, val_logits, config["normalizer"])
-        ll = -0.5 * np.mean(np.log(2 * np.pi * val_std ** 2) + ((val_targets_norm - val_logits) ** 2 / val_std ** 2))
-
-        print("train:", train_scores)
-        print("eval:", val_scores, "LL:", ll)
-
+        scores = bayesian_ridge(train_fps,val_fps,train_targets_norm, val_targets_norm, config)
+        print(scores)
 
     bll_on_fps(config["regressor_config"]["config"])
 
