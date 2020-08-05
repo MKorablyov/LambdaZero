@@ -21,6 +21,7 @@ import LambdaZero.models
 #from LambdaZero.examples.mpnn import config
 
 from scipy.special import logsumexp
+from sklearn import linear_model
 from matplotlib import pyplot as plt
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
@@ -116,38 +117,6 @@ def eval_uncertainty(loader, model, device, config, N):
     return {"ll":ll, "shuff_ll":shuf_ll}
 
 
-def bll_on_fps(loader, model, device, config, N):
-    "this just computes uncertainty on FPs"
-    fps = [getattr(d, config["target"]).cpu().numpy() for d in loader.dataset]
-
-
-
-    pass
-
-
-    #targets = sample_targets(loader, config)
-    #logits, embeds = samples_logits()
-
-
-# clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
-# clf.fit(emb_train, emb_train_tar)
-#
-# train_preds = clf.predict(emb_train)
-# val_preds = clf.predict(emb_val)
-# print('mpnneval mse: {}'.format(((emb_val_tar - val_preds) ** 2).mean()))
-# print('train mse: {}'.format(((emb_train_tar - train_preds) ** 2).mean()))
-#
-# pred = clf.predict(emb_val)
-# scores = _compute_metrics(emb_val_tar, pred, self.config["normalizer"])
-#
-# # Get ll from bayesian model
-# predicted_mn, predicted_std = clf.predict(emb_val, return_std=True)
-# ll_Bayesian_MPNN = -0.5 * np.mean(
-#     np.log(2 * np.pi * predicted_std ** 2) + ((emb_val_tar - predicted_mn) ** 2 / predicted_std ** 2))
-
-# print('Bayesian linear with MPNN: {}'.format(ll_Bayesian_MPNN))
-
-
 
 def _dataset_creator(config):
     # make dataset
@@ -176,8 +145,6 @@ class MCDrop(tune.Trainable):
         # make epochs
         self.train_epoch, self.eval_epoch = config["train_epoch"], config["eval_epoch"]
         # todo: add embeddings
-
-
 
     def _train(self):
         train_scores = self.train_epoch(self.train_loader, self.model, self.optim, self.device, self.config)
@@ -301,7 +268,55 @@ if __name__ == "__main__":
     ray.init(memory=config["memory"])
     # this will run train the model in a plain way
 
-    tune.run(**config["regressor_config"])
+    #tune.run(**config["regressor_config"])
+
+    def bll_on_fps(config):
+        "this just computes uncertainty on FPs"
+        # make dataset
+        train_loader, val_loader = config["dataset_creator"](config)
+        train_targets = np.concatenate([getattr(d, config["target"]).cpu().numpy() for d in train_loader.dataset])
+        train_fps = np.stack([d.fp for d in train_loader.dataset], axis=0)
+        val_targets = np.concatenate([getattr(d, config["target"]).cpu().numpy() for d in val_loader.dataset])
+        val_fps = np.stack([d.fp for d in val_loader.dataset], axis=0)
+        train_targets_norm = config["normalizer"].tfm(train_targets)
+        val_targets_norm = config["normalizer"].tfm(val_targets)
+
+        clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
+        clf.fit(train_fps, train_targets_norm)
+
+        train_logits = clf.predict(train_fps)
+        val_logits, val_std  = clf.predict(val_fps, return_std=True)
+
+        # def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer):
+        train_scores = _epoch_metrics(train_targets_norm, train_logits, config["normalizer"])
+        val_scores = _epoch_metrics(val_targets_norm, val_logits, config["normalizer"])
+        ll = -0.5 * np.mean(np.log(2 * np.pi * val_std ** 2) + ((val_targets_norm - val_logits) ** 2 / val_std ** 2))
+
+        print("train:", train_scores)
+        print("eval:", val_scores, "LL:", ll)
+
+
+
+
+    bll_on_fps(config["regressor_config"]["config"])
+
+    # train_preds = clf.predict(emb_train)
+    # val_preds = clf.predict(emb_val)
+    # print('mpnneval mse: {}'.format(((emb_val_tar - val_preds) ** 2).mean()))
+    # print('train mse: {}'.format(((emb_train_tar - train_preds) ** 2).mean()))
+    #
+    # pred = clf.predict(emb_val)
+    # scores = _compute_metrics(emb_val_tar, pred, self.config["normalizer"])
+    #
+    # # Get ll from bayesian model
+    # predicted_mn, predicted_std = clf.predict(emb_val, return_std=True)
+    # ll_Bayesian_MPNN = -0.5 * np.mean(
+    #     np.log(2 * np.pi * predicted_std ** 2) + ((emb_val_tar - predicted_mn) ** 2 / predicted_std ** 2))
+
+    # print('Bayesian linear with MPNN: {}'.format(ll_Bayesian_MPNN))
+
+
+
 
 
     # this will fit the model directly
