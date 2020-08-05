@@ -116,10 +116,9 @@ def eval_epoch(loader, model, device, config):
     scores = _epoch_metrics(targets, logits, config["normalizer"])
     return scores
 
-def eval_uncertainty(loader, model, device, config):
+def eval_uncertainty(loader, model, device, config, N):
     logits = sample_logits(loader, model, device, config, num_samples=config["T"])
     targets = sample_targets(loader, config)
-    N = len(loader.dataset)
     ll = _log_lik(targets, logits, config, N).mean()
     shuff_targets = np.array(sorted(targets, key=lambda k: random.random()))
     shuf_ll = _log_lik(shuff_targets, logits, config, N).mean()
@@ -163,7 +162,7 @@ class MCDrop(tune.Trainable):
 
         if self._iteration % 15 == 1:
             print("iteration", self._iteration)
-            eval_scores = eval_uncertainty(self.val_loader, self.model, self.device, self.config)
+            eval_scores = eval_uncertainty(self.val_loader, self.model, self.device, self.config, self.N)
             eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
             scores = dict(list(scores.items()) + eval_scores)
 
