@@ -27,7 +27,7 @@ block_file_path_path = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 number_of_parent_blocks = 5
 
 
-dataset_base_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN4/")
+dataset_base_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN4/combined/")
 dataset_path = dataset_base_path.joinpath("combined_dataset.feather")
 results_dir = dataset_base_path.joinpath("analysis/")
 results_dir.mkdir(exist_ok=True)
