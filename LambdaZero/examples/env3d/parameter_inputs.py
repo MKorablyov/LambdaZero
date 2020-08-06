@@ -9,7 +9,14 @@ def get_input_arguments():
     )
 
     parser.add_argument(
-        "--data_directory", help="Directory where to fetch preprocessed data",
+        "--root_path", help="Directory where to fetch data. Pytorch-geometric "
+                            "assumes that the raw data is in [root_path]/raw/ and the processed data"
+                            "is in [root_path]/processed/",
+    )
+
+    parser.add_argument(
+        "--data_file_name", help="name of file with raw data. It is assumed that this is a pandas"
+                                 "feather file."
     )
 
     parser.add_argument("--config", help="path to input configuration file, in json format")
