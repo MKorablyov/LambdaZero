@@ -1,26 +1,22 @@
 import os
-import shutil
-import tempfile
-from pathlib import Path
 
 import numpy as np
 import ray
-from ray import tune
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from ray import tune
 from torch_geometric.data import DataLoader
 
 from LambdaZero.examples.env3d.dataset import ENV3D_DATA_PROPERTIES
 from LambdaZero.examples.env3d.dataset.processing import env3d_proc, transform_concatenate_positions_to_node_features
+from LambdaZero.examples.env3d.models.joint_prediction_model import BlockAngleModel
 from LambdaZero.inputs import BrutalDock
 from LambdaZero.utils import get_external_dirs
 
 
-NCLASS = 170
-
-
 class Env3dModelTrainer(tune.Trainable):
+
     def _setup(self, config: dict):
 
         self.config = config
@@ -31,13 +27,15 @@ class Env3dModelTrainer(tune.Trainable):
             config.get("train_ratio", 0.8) + config.get("valid_ratio", 0.1) <= 1.0
         ), "Train and validation data ratio should be less than 1."
         np.random.seed(config.get("seed_for_dataset_split", 0))
-        ndata = len(config["dataset"])
+
+        dataset = self.config["dataset"](**self.config["dataset_config"])
+        ndata = len(dataset)
         shuffle_idx = np.arange(ndata)
         np.random.shuffle(shuffle_idx)
         n_train = int(config.get("train_ratio", 0.8) * ndata)
         n_valid = int(config.get("valid_ratio", 0.1) * ndata)
         train_idxs = shuffle_idx[:n_train]
-        val_idxs = shuffle_idx[n_train : n_train + n_valid]
+        val_idxs = shuffle_idx[n_train: n_train + n_valid]
         test_idxs = shuffle_idx[n_valid:]
         batchsize = config.get("batchsize", 32)
 
@@ -82,21 +80,7 @@ class Env3dModelTrainer(tune.Trainable):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
 
-datasets_dir, _, summaries_dir = get_external_dirs()
-results_dir = Path(summaries_dir).joinpath("env3d/dataset/")
-
-data_filename_without_suffix = "env3d_dataset_5_parent_blocks"
-data_filename = f"{data_filename_without_suffix}.feather"
-
-source_path_to_dataset = results_dir.joinpath(data_filename)
-
-props = [
-    "coord",
-    "n_axis",
-    "attachment_node_index",
-    "attachment_angle",
-    "attachment_block_index",
-]
+_, _, summaries_dir = get_external_dirs()
 
 
 def class_and_angle_loss(block_predictions, block_targets, angle_predictions, angle_targets):
@@ -129,7 +113,7 @@ def class_and_angle_loss(block_predictions, block_targets, angle_predictions, an
     norm = torch.max(norm, 1e-6 * torch.ones_like(norm))
     # norm is a (batchsize) tensor. convert to (batchsize, 2)
     norm = norm.unsqueeze(-1).repeat(1, 2)
-    angle_predictions /= norm
+    angle_predictions = angle_predictions/norm  # the idiom angle_predictions /= norm leas to a pytorch runtime error
     # angle_predictions[:, 0] is sin, [:, 1] is cos
     # now, convert the ground truth
     sin_target = torch.sin(angle_targets)
@@ -260,7 +244,7 @@ def eval_epoch(loader, model, device, config):
     for data in loader:
         data = data.to(device)
 
-        class_target = data.attachment_block_index
+        class_target = data.attachment_block_class
         angle_target = data.attachment_angle
 
         # model outputs 2 tensors:
@@ -307,72 +291,46 @@ def eval_epoch(loader, model, device, config):
     return metrics
 
 
-class DebugModel(nn.Module):
-    """
-    a model for dev & debug. Delete when real models are available.
-    """
-    def __init__(self):
-        super(DebugModel, self).__init__()
-        self.lin0 = nn.Linear(3, NCLASS)
-
-    def forward(self, data):
-        batchsize = data.num_graphs
-        return self.lin0(torch.zeros([batchsize, 3]).to(torch.device('cuda'))), torch.ones([batchsize, 2]).to(torch.device('cuda'))
-
-
 if __name__ == "__main__":
 
     ray.init(local_mode=True)
+    # ray.init(memory=env3d_config["memory"])
 
-    with tempfile.TemporaryDirectory() as root_directory:
-        raw_data_directory = Path(root_directory).joinpath("raw")
-        raw_data_directory.mkdir()
-        dest_path_to_dataset = raw_data_directory.joinpath(data_filename)
-        shutil.copyfile(source_path_to_dataset, dest_path_to_dataset)
-
-        dataset = BrutalDock(
-            root_directory,
-            props=ENV3D_DATA_PROPERTIES,
-            file_names=[data_filename_without_suffix],
-            proc_func=env3d_proc,
-            transform=transform_concatenate_positions_to_node_features,
-        )
-
-        print(f"size of dataset: {len(dataset)}")
-
-    # TO DO: read hyperparameters from a config file as ray tune variables
     env3d_config = {
         "trainer": Env3dModelTrainer,
         "trainer_config": {
-            "dataset": dataset,
+            "dataset": BrutalDock,
             "seed_for_dataset_split": 0,
             "train_ratio": 0.8,
             "valid_ratio": 0.1,
             "batchsize": 5,
-            "model": DebugModel,  # to do: insert a real model here
+            "model": BlockAngleModel,  # to do: insert a real model here
             "model_config": {},
             "optimizer": torch.optim.Adam,
             "optimizer_config": {"lr": 1e-3},
             "angle_loss_weight": 1,
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
-            "target": "gridscore",
-            "target_norm": [-43.042, 7.057],
+            "dataset_config": {
+                "root": "/Users/bruno/LambdaZero/summaries/env3d/dataset/from_cluster/RUN4/combined",
+                "props": ENV3D_DATA_PROPERTIES,
+                "proc_func": env3d_proc,
+                "transform": transform_concatenate_positions_to_node_features,
+                "file_names": ["debug"],
+            },
         },
         "summaries_dir": summaries_dir,
         "memory": 10 * 10 ** 9,
         "stop": {"training_iteration": 200},
         "resources_per_trial": {
-            "cpu": 4,  # fixme - calling ray.remote would request resources outside of tune allocation
-            "gpu": 1.0,
+            "cpu": 1,  # fixme - calling ray.remote would request resources outside of tune allocation
+            "gpu": 0.0,
         },
         "keep_checkpoint_num": 2,
         "checkpoint_score_attr": "train_loss",
         "num_samples": 1,
         "checkpoint_at_end": False,
     }
-
-    # ray.init(memory=env3d_config["memory"])
 
     analysis = tune.run(
         env3d_config["trainer"],
