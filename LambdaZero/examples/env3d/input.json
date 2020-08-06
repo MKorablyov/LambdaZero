@@ -10,9 +10,9 @@
     "trainer_config": {
         "seed_for_dataset_split": 0,
         "angle_loss_weight": 1.0,
-        "num_epochs": 500,
+        "num_epochs": 20,
         "num_workers": 4,
-        "batch_size": 1024,
+        "batch_size": 32,
         "learning_rate": 0.001,
         "train_ratio": 0.8,
         "validation_valid": 0.1,
