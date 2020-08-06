@@ -9,7 +9,10 @@ from ray import tune
 from torch_geometric.data import DataLoader
 
 from LambdaZero.examples.env3d.dataset import ENV3D_DATA_PROPERTIES
-from LambdaZero.examples.env3d.dataset.processing import env3d_proc, transform_concatenate_positions_to_node_features
+from LambdaZero.examples.env3d.dataset.processing import (
+    env3d_proc,
+    transform_concatenate_positions_to_node_features,
+)
 from LambdaZero.examples.env3d.models.joint_prediction_model import BlockAngleModel
 from LambdaZero.examples.env3d.wandb_logger import LambdaZeroWandbLogger
 from LambdaZero.inputs import BrutalDock
@@ -17,7 +20,6 @@ from LambdaZero.utils import get_external_dirs
 
 
 class Env3dModelTrainer(tune.Trainable):
-
     def _setup(self, config: dict):
 
         self.config = config
@@ -36,7 +38,7 @@ class Env3dModelTrainer(tune.Trainable):
         n_train = int(config.get("train_ratio", 0.8) * ndata)
         n_valid = int(config.get("valid_ratio", 0.1) * ndata)
         train_idxs = shuffle_idx[:n_train]
-        val_idxs = shuffle_idx[n_train: n_train + n_valid]
+        val_idxs = shuffle_idx[n_train : n_train + n_valid]
         test_idxs = shuffle_idx[n_valid:]
         batchsize = config.get("batchsize", 32)
 
@@ -84,7 +86,9 @@ class Env3dModelTrainer(tune.Trainable):
 _, _, summaries_dir = get_external_dirs()
 
 
-def class_and_angle_loss(block_predictions, block_targets, angle_predictions, angle_targets):
+def class_and_angle_loss(
+    block_predictions, block_targets, angle_predictions, angle_targets
+):
     """
     calculate losses for block predictions (class) and angle predictions
 
@@ -114,7 +118,9 @@ def class_and_angle_loss(block_predictions, block_targets, angle_predictions, an
     norm = torch.max(norm, 1e-6 * torch.ones_like(norm))
     # norm is a (batchsize) tensor. convert to (batchsize, 2)
     norm = norm.unsqueeze(-1).repeat(1, 2)
-    angle_predictions = angle_predictions/norm  # the idiom angle_predictions /= norm leas to a pytorch runtime error
+    angle_predictions = (
+        angle_predictions / norm
+    )  # the idiom angle_predictions /= norm leas to a pytorch runtime error
     # angle_predictions[:, 0] is sin, [:, 1] is cos
     # now, convert the ground truth
     sin_target = torch.sin(angle_targets)
@@ -131,7 +137,11 @@ def class_and_angle_loss(block_predictions, block_targets, angle_predictions, an
     angle_mae = torch.sum(angle_mae, dim=-1)
 
     # create a mask of 0 where angle_target is invalid (-1), and 1 elsewhere
-    mask = torch.where(angle_targets > 0, torch.ones_like(angle_targets), torch.zeros_like(angle_targets))
+    mask = torch.where(
+        angle_targets > 0,
+        torch.ones_like(angle_targets),
+        torch.zeros_like(angle_targets),
+    )
     num_elem = torch.sum(mask)
 
     # calculate the mean over valid elements only
@@ -178,8 +188,9 @@ def train_epoch(loader, model, optimizer, device, config):
         class_predictions, angle_predictions = model(data)
 
         # prediction over classes in a straight-forward cross-entropy
-        class_loss, angle_loss, angle_mae, n_angle = \
-            class_and_angle_loss(class_predictions, class_target, angle_predictions, angle_target)
+        class_loss, angle_loss, angle_mae, n_angle = class_and_angle_loss(
+            class_predictions, class_target, angle_predictions, angle_target
+        )
 
         loss = class_loss + config.get("angle_loss_weight", 1) * angle_loss
 
@@ -189,24 +200,32 @@ def train_epoch(loader, model, optimizer, device, config):
         # log loss information
         # global cumulative losses on this epoch
         metrics["loss"] = metrics.get("loss", 0) + loss.item() * data.num_graphs
-        metrics["block_loss"] = metrics.get("block_loss", 0) + class_loss.item() * data.num_graphs
-        metrics["angle_loss"] = metrics.get("angle_loss", 0) + angle_loss.item() * data.num_graphs
+        metrics["block_loss"] = (
+            metrics.get("block_loss", 0) + class_loss.item() * data.num_graphs
+        )
+        metrics["angle_loss"] = (
+            metrics.get("angle_loss", 0) + angle_loss.item() * data.num_graphs
+        )
 
         # let's log some more informative metrics as well
         # for prediction, accuracy is good to know
         _, predicted = torch.max(class_predictions, dim=1)
         correct = (predicted == class_target).sum().item()
         # consider the accuracy as a rolling average. We have to adjust the previously calculated accuracy by the number of elements in it
-        metrics["block_accuracy"] = (metrics.get("block_accuracy", 0) * metrics.get("n_blocks", 0) + correct) / \
-            max(1, metrics.get("n_blocks", 0) + data.num_graphs)
+        metrics["block_accuracy"] = (
+            metrics.get("block_accuracy", 0) * metrics.get("n_blocks", 0) + correct
+        ) / max(1, metrics.get("n_blocks", 0) + data.num_graphs)
         metrics["n_blocks"] = metrics.get("n_blocks", 0) + data.num_graphs
 
         # for the angle, we want the RMSE and the MAE, both as rolling averages as well. Beware the mask for invalid angles here
-        metrics["angle_rmse"] = (metrics.get("angle_rmse", 0) * metrics.get("n_angles", 0) + angle_loss.item() * n_angle) / \
-            max(1, metrics.get("n_angles", 0) + n_angle)
+        metrics["angle_rmse"] = (
+            metrics.get("angle_rmse", 0) * metrics.get("n_angles", 0)
+            + angle_loss.item() * n_angle.item()
+        ) / max(1, metrics.get("n_angles", 0) + n_angle.item())
         # we have to do the same for the MAE
-        metrics["angle_mae"] = (metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item()) / \
-            max(1, metrics.get("n_angles", 0) + n_angle)
+        metrics["angle_mae"] = (
+            metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item()
+        ) / max(1, metrics.get("n_angles", 0) + n_angle.item())
 
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
@@ -254,31 +273,41 @@ def eval_epoch(loader, model, device, config):
         class_predictions, angle_predictions = model(data)
 
         # prediction over classes in a straight-forward cross-entropy
-        class_loss, angle_loss, angle_mae, n_angle = class_and_angle_loss(class_predictions, class_target, angle_predictions, angle_target)
+        class_loss, angle_loss, angle_mae, n_angle = class_and_angle_loss(
+            class_predictions, class_target, angle_predictions, angle_target
+        )
 
         loss = class_loss + config.get("angle_loss_weight", 1) * angle_loss
 
         # log loss information
         # global cumulative losses on this epoch
         metrics["loss"] = metrics.get("loss", 0) + loss.item() * data.num_graphs
-        metrics["block_loss"] = metrics.get("block_loss", 0) + class_loss.item() * data.num_graphs
-        metrics["angle_loss"] = metrics.get("angle_loss", 0) + angle_loss.item() * data.num_graphs
+        metrics["block_loss"] = (
+            metrics.get("block_loss", 0) + class_loss.item() * data.num_graphs
+        )
+        metrics["angle_loss"] = (
+            metrics.get("angle_loss", 0) + angle_loss.item() * data.num_graphs
+        )
 
         # let's log some more informative metrics as well
         # for prediction, accuracy is good to know
         _, predicted = torch.max(class_predictions, dim=1)
         correct = (predicted == class_target).sum().item()
         # consider the accuracy as a rolling average. We have to adjust the previously calculated accuracy by the number of elements in it
-        metrics["block_accuracy"] = (metrics.get("block_accuracy", 0) * metrics.get("n_blocks", 0) + correct) / \
-            max(1, metrics.get("n_blocks", 0) + data.num_graphs)
+        metrics["block_accuracy"] = (
+            metrics.get("block_accuracy", 0) * metrics.get("n_blocks", 0) + correct
+        ) / max(1, metrics.get("n_blocks", 0) + data.num_graphs)
         metrics["n_blocks"] = metrics.get("n_blocks", 0) + data.num_graphs
 
         # for the angle, we want the RMSE and the MAE, both as rolling averages as well. Beware the mask for invalid angles here
-        metrics["angle_rmse"] = (metrics.get("angle_rmse", 0) * metrics.get("n_angles", 0) + angle_loss.item() * n_angle) / \
-            max(1, metrics.get("n_angles", 0) + n_angle)
+        metrics["angle_rmse"] = (
+            metrics.get("angle_rmse", 0) * metrics.get("n_angles", 0)
+            + angle_loss.item() * n_angle.item()
+        ) / max(1, metrics.get("n_angles", 0) + n_angle.item())
         # we have to do the same for the MAE
-        metrics["angle_mae"] = (metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item()) / \
-            max(1, metrics.get("n_angles", 0) + n_angle)
+        metrics["angle_mae"] = (
+            metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item()
+        ) / max(1, metrics.get("n_angles", 0) + n_angle.item())
 
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
@@ -292,7 +321,7 @@ def eval_epoch(loader, model, device, config):
     return metrics
 
 
-wandb_logging_config = dict(project='env3d', entity='lambdazero', name='debug')
+wandb_logging_config = dict(project="env3d", entity="lambdazero", name="debug")
 
 
 if __name__ == "__main__":
@@ -347,6 +376,5 @@ if __name__ == "__main__":
         checkpoint_at_end=env3d_config["checkpoint_at_end"],
         local_dir=summaries_dir,
         checkpoint_freq=env3d_config.get("checkpoint_freq", 1),
-        loggers=[LambdaZeroWandbLogger]
+        loggers=[LambdaZeroWandbLogger],
     )
-
