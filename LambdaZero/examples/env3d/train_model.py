@@ -11,7 +11,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
-import LambdaZero
 from LambdaZero.examples.env3d.dataset import ENV3D_DATA_PROPERTIES
 from LambdaZero.examples.env3d.dataset.processing import env3d_proc, transform_concatenate_positions_to_node_features
 from LambdaZero.inputs import BrutalDock
