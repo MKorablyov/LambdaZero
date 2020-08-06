@@ -20,9 +20,6 @@ class BlockAngleModel(nn.Module):
         number_of_block_classes: int = 105,
     ):
         """
-
-
-
         Args:
             num_edge_features (int, optional): the dimension of an edge's attribute array for MPNN block. Defaults to 4.
             num_hidden_features (int, optional): the dimension of node hidden representations arrays for MPNN block.
