@@ -10,19 +10,24 @@ from LambdaZero.examples.env3d.dataset.processing import (
 from LambdaZero.examples.env3d.env3d_model_trainer import Env3dModelTrainer
 from LambdaZero.examples.env3d.epoch_stepper import train_epoch, eval_epoch
 from LambdaZero.examples.env3d.models.joint_prediction_model import BlockAngleModel
+from LambdaZero.examples.env3d.parameter_inputs import get_input_arguments, read_configuration_file
 from LambdaZero.examples.env3d.wandb_logger import LambdaZeroWandbLogger
 from LambdaZero.inputs import BrutalDock
 from LambdaZero.utils import get_external_dirs
 
 _, _, summaries_dir = get_external_dirs()
 
-wandb_logging_config = dict(project="env3d", entity="lambdazero", name="debug3")
-
-
 if __name__ == "__main__":
+    args = get_input_arguments()
 
-    ray.init(local_mode=True)
-    # ray.init(memory=env3d_config["memory"])
+    input_config = read_configuration_file(args.config)
+
+    wandb_logging_config = dict(entity="lambdazero",
+                                project=input_config["logging"].get("project", "env3d"),
+                                name=input_config["logging"].get("name", "debug")
+                                )
+
+    ray.init()
 
     env3d_config = {
         "trainer": Env3dModelTrainer,
@@ -30,32 +35,28 @@ if __name__ == "__main__":
             "monitor": True,
             "env_config": {"wandb": wandb_logging_config},
             "dataset": BrutalDock,
-            "seed_for_dataset_split": 0,
-            "train_ratio": 0.8,
-            "valid_ratio": 0.1,
-            "batchsize": 5,
-            "model": BlockAngleModel,  # to do: insert a real model here
-            "model_config": {},
+            "seed_for_dataset_split": input_config["trainer_config"]["seed_for_dataset_split"],
+            "train_ratio": input_config["trainer_config"]["train_ratio"],
+            "valid_ratio": input_config["trainer_config"]["valid_ratio"],
+            "batchsize": input_config["trainer_config"]["batch_size"],
+            "model": BlockAngleModel,
+            "model_config": input_config["model_config"],
             "optimizer": torch.optim.Adam,
-            "optimizer_config": {"lr": 1e-3},
-            "angle_loss_weight": 1,
+            "optimizer_config": {"lr": input_config["trainer_config"]["learning_rate"]},
+            "angle_loss_weight": input_config["trainer_config"]["angle_loss_weight"],
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
             "dataset_config": {
-                "root": "/Users/bruno/LambdaZero/summaries/env3d/dataset/from_cluster/RUN4/combined",
+                "root": args.root_path,
                 "props": ENV3D_DATA_PROPERTIES,
                 "proc_func": env3d_proc,
                 "transform": transform_concatenate_positions_to_node_features,
-                "file_names": ["debug"],
+                "file_names": [args.data_file_name.replace(".feather", "")], # remove suffix in case it is there
             },
         },
         "summaries_dir": summaries_dir,
-        "memory": 10 * 10 ** 9,
-        "stop": {"training_iteration": 200},
-        "resources_per_trial": {
-            "cpu": 1,  # fixme - calling ray.remote would request resources outside of tune allocation
-            "gpu": 0.0,
-        },
+        "stop": {"training_iteration": input_config["trainer_config"]["num_epochs"]},
+        "resources_per_trial": input_config["resources_per_trial"],
         "keep_checkpoint_num": 2,
         "checkpoint_score_attr": "train_loss",
         "num_samples": 1,
