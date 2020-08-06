@@ -143,7 +143,7 @@ class BlockAngleModel(nn.Module):
             data (Batch): pytorch-geometric batch of graphs, assumed to contain the needed extra information
                           for this task.
         Returns:
-            blocks_logits (Tensor): the unnormalised probabilities for every block.
+            blocks_logits (Tensor): the unnormalized probabilities for every block.
                                     shape = [batch size, number_of_block_classes]
             angle_uv (Tensor): the unnormalized u, v values that can be used to predict cos(theta) and sin(theta)
                                     shape = [batch size, 2]
