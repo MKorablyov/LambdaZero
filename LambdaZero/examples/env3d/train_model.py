@@ -220,21 +220,17 @@ def train_epoch(loader, model, optimizer, device, config):
         # for the angle, we want the RMSE and the MAE, both as rolling averages as well. Beware the mask for invalid angles here
         metrics["angle_rmse"] = (
             metrics.get("angle_rmse", 0) * metrics.get("n_angles", 0)
-            + angle_loss.item() * n_angle.item()
-        ) / max(1, metrics.get("n_angles", 0) + n_angle.item())
+            + angle_loss.item() * n_angle
+        ) / max(1, metrics.get("n_angles", 0) + n_angle)
         # we have to do the same for the MAE
         metrics["angle_mae"] = (
             metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item()
-        ) / max(1, metrics.get("n_angles", 0) + n_angle.item())
+        ) / max(1, metrics.get("n_angles", 0) + n_angle)
 
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
-    if device == torch.device("cpu"):
-        metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].numpy())
-        metrics["angle_mae"] = metrics["angle_mae"].numpy()
-    else:
-        metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].cpu().numpy())
-        metrics["angle_mae"] = metrics["angle_mae"].cpu().numpy()
+    metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].cpu().item())
+    metrics["angle_mae"] = metrics["angle_mae"].cpu().item()
 
     return metrics
 
@@ -302,26 +298,22 @@ def eval_epoch(loader, model, device, config):
         # for the angle, we want the RMSE and the MAE, both as rolling averages as well. Beware the mask for invalid angles here
         metrics["angle_rmse"] = (
             metrics.get("angle_rmse", 0) * metrics.get("n_angles", 0)
-            + angle_loss.item() * n_angle.item()
-        ) / max(1, metrics.get("n_angles", 0) + n_angle.item())
+            + angle_loss.item() * n_angle
+        ) / max(1, metrics.get("n_angles", 0) + n_angle)
         # we have to do the same for the MAE
         metrics["angle_mae"] = (
             metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item()
-        ) / max(1, metrics.get("n_angles", 0) + n_angle.item())
+        ) / max(1, metrics.get("n_angles", 0) + n_angle)
 
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
-    if device == torch.device("cpu"):
-        metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].numpy())
-        metrics["angle_mae"] = metrics["angle_mae"].numpy()
-    else:
-        metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].cpu().numpy())
-        metrics["angle_mae"] = metrics["angle_mae"].cpu().numpy()
+    metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].cpu().item())
+    metrics["angle_mae"] = metrics["angle_mae"].cpu().item()
 
     return metrics
 
 
-wandb_logging_config = dict(project="env3d", entity="lambdazero", name="debug")
+wandb_logging_config = dict(project="env3d", entity="lambdazero", name="debug3")
 
 
 if __name__ == "__main__":
