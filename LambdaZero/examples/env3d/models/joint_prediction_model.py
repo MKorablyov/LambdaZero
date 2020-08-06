@@ -8,6 +8,11 @@ from LambdaZero.examples.env3d.models.mpnn_block import MPNNBlock
 
 
 class BlockAngleModel(nn.Module):
+    """
+    This model implements the "block angle" prediction architecture. Predicting the blocks is treated as
+    a classification problem, and predicting the angles is treated as a regression problem. Both block and
+    angle are predicted jointly.
+    """
     def __init__(
         self,
         num_edge_features: int = 4,
