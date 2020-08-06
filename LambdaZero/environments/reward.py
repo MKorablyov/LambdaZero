@@ -163,7 +163,7 @@ class PredDockReward_v2:
 
 class PredDockReward_v3:
     def __init__(self, qed_cutoff, synth_config, dockscore_config,
-                 soft_stop, exp, delta, simulation_cost, device, transform=T.Compose([LambdaZero.utils.Complete()])):
+                 soft_stop, exp, delta, simulation_cost, device, transform=T.Compose([LambdaZero.utils.Complete()]), **unused):
 
         self.qed_cutoff = qed_cutoff
         self.soft_stop = soft_stop

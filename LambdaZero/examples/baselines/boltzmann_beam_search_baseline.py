@@ -135,7 +135,7 @@ programs_dir = os.environ["SLURM_TMPDIR"]+"/Programs"
 DOCK_OUT_DIR = os.environ["SLURM_TMPDIR"]
 DOCK6_DIR = path.join(programs_dir, "dock6")
 CHIMERA_DIR = path.join(programs_dir, "chimera")
-DOCKSETUP_DIR = path.join(datasets_dir, "brutal_dock/d4/docksetup")
+DOCKSETUP_DIR = path.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup")#"brutal_dock/d4/docksetup")
 
 
 @ray.remote
@@ -145,8 +145,10 @@ class DockActor:
         self._dock_smi = chem.Dock_smi(outpath=DOCK_OUT_DIR,
                                        chimera_dir=CHIMERA_DIR,
                                        dock6_dir=DOCK6_DIR,
-                                       docksetup_dir=DOCKSETUP_DIR)
+                                       docksetup_dir=DOCKSETUP_DIR,
+                                       gas_charge=True)
         self._num_evals = 0
+        self.dockscore_std = binding_config["dockscore_std"]
 
     def evaluate_molecule(self, molecule):
         try:
@@ -154,7 +156,8 @@ class DockActor:
             _, energy, _ = self._dock_smi.dock(Chem.MolToSmiles(molecule))
         except AssertionError:
             energy = np.inf
-        return -energy
+        energy = (self.dockscore_std[0] - energy) / (self.dockscore_std[1])
+        return energy
 
     def evaluation_count(self):
         return self._num_evals
@@ -225,7 +228,7 @@ if __name__ == "__main__":
 
     values, states = beam_search(100, evaluate_molecules, total_evaluations,
                                  evaluate_molecules_pd, total_evaluations_pd,
-                                 2.0, None, 100)
+                                 2.0, None, 50)
 
     print(states)
     print(values)
