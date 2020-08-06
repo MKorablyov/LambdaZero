@@ -161,8 +161,8 @@ class BlockAngleModel(nn.Module):
             [attachment_node_representations, graph_representation, n_axis], axis=1
         )
 
-        blocks_logits = self.block_prediction_head.forward(concatenated_representation)
+        blocks_logits = self.block_prediction_head(concatenated_representation)
 
-        angle_uv = self.angle_prediction_head.forward(concatenated_representation)
+        angle_uv = self.angle_prediction_head(concatenated_representation)
 
         return blocks_logits, angle_uv
