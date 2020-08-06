@@ -11,6 +11,7 @@ from torch_geometric.data import DataLoader
 from LambdaZero.examples.env3d.dataset import ENV3D_DATA_PROPERTIES
 from LambdaZero.examples.env3d.dataset.processing import env3d_proc, transform_concatenate_positions_to_node_features
 from LambdaZero.examples.env3d.models.joint_prediction_model import BlockAngleModel
+from LambdaZero.examples.env3d.wandb_logger import LambdaZeroWandbLogger
 from LambdaZero.inputs import BrutalDock
 from LambdaZero.utils import get_external_dirs
 
@@ -291,6 +292,9 @@ def eval_epoch(loader, model, device, config):
     return metrics
 
 
+wandb_logging_config = dict(project='env3d', entity='lambdazero', name='debug')
+
+
 if __name__ == "__main__":
 
     ray.init(local_mode=True)
@@ -299,6 +303,8 @@ if __name__ == "__main__":
     env3d_config = {
         "trainer": Env3dModelTrainer,
         "trainer_config": {
+            "monitor": True,
+            "env_config": {"wandb": wandb_logging_config},
             "dataset": BrutalDock,
             "seed_for_dataset_split": 0,
             "train_ratio": 0.8,
@@ -341,4 +347,6 @@ if __name__ == "__main__":
         checkpoint_at_end=env3d_config["checkpoint_at_end"],
         local_dir=summaries_dir,
         checkpoint_freq=env3d_config.get("checkpoint_freq", 1),
+        loggers=[LambdaZeroWandbLogger]
     )
+
