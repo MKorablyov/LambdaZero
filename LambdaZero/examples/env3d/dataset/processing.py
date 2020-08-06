@@ -8,6 +8,7 @@ from rdkit import Chem
 from torch_geometric.data import Data
 
 from LambdaZero.chem import mpnn_feat, torch
+from LambdaZero.examples.env3d.dataset import ENV3D_DATA_PROPERTIES
 from LambdaZero.inputs import _mol_to_graph
 
 
@@ -60,16 +61,8 @@ def get_graph_from_properties(smiles: str, properties_dictionary: Dict) -> Data:
         graph (torch_geometric.data.data.Data): a graph data object
 
     """
-    expected_properties = {
-        "coord",
-        "n_axis",
-        "attachment_node_index",
-        "attachment_angle",
-        "attachment_block_index",
-    }
-
     assert (
-        set(properties_dictionary.keys()) == expected_properties
+        set(properties_dictionary.keys()) == set(ENV3D_DATA_PROPERTIES)
     ), "The properties are not consistent with the env3d dataset. Review code."
 
     props = dict(properties_dictionary)  # make a local copy to not affect the input
