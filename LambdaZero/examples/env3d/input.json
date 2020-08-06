@@ -1,16 +1,16 @@
 {
     "logging": {
         "project": "env3d",
-        "name": "debugging"
+        "name": "debugging-500-epochs"
     },
     "resources_per_trial": {
-        "cpu": 1,
+        "cpu": 4,
         "gpu": 0.0
     },
     "trainer_config": {
         "seed_for_dataset_split": 0,
         "angle_loss_weight": 1.0,
-        "num_epochs": 20,
+        "num_epochs": 500,
         "num_workers": 4,
         "batch_size": 32,
         "learning_rate": 0.001,
