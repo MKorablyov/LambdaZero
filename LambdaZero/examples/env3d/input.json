@@ -1,0 +1,30 @@
+{
+    "logging": {
+        "project": "env3d",
+        "name": "debugging"
+    },
+    "resources_per_trial": {
+        "cpu": 1,
+        "gpu": 0.0
+    },
+    "trainer_config": {
+        "seed_for_dataset_split": 0,
+        "angle_loss_weight": 1.0,
+        "num_epochs": 500,
+        "num_workers": 4,
+        "batch_size": 1024,
+        "learning_rate": 0.001,
+        "train_ratio": 0.8,
+        "validation_valid": 0.1,
+        "patience": 5
+    },
+    "model_config": {
+        "num_hidden_features": 64,
+        "num_edge_network_hidden_features": 128,
+        "number_of_layers": 3,
+        "set2set_steps": 3,
+        "num_block_prediction_hidden_features": 128,
+        "num_angle_prediction_hidden_features": 128,
+        "number_of_block_classes": 105
+    }
+}
