@@ -34,7 +34,6 @@ class BlockAngleModel(nn.Module):
             number_of_layers (int, optional): number of MPNN iterations. Defaults to 3.
             set2set_steps (int, optional): number of processing steps to take in the set2set readout function for
                                             MPNN block. Defaults to 3.
-
             num_block_prediction_hidden_features (int, optional): dimension of block prediction hidden layer in single
                                                                   layer MLP prediction head. Defaults to 128.
             num_angle_prediction_hidden_features (int, optional): dimension of angle prediction hidden layer in single
