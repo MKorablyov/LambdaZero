@@ -16,7 +16,7 @@ from LambdaZero.datasets.temp_brunos_work.loggers.wandb_logger import WandbLogge
 from LambdaZero.datasets.temp_brunos_work.metrics_utils import get_prediction_statistics
 from LambdaZero.datasets.temp_brunos_work.model_trainer import MoleculeModelTrainer
 from LambdaZero.datasets.temp_brunos_work.models.model_base import ModelBase
-from LambdaZero.datasets.temp_brunos_work.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, \
+from LambdaZero.examples.env3d.parameter_inputs import CONFIG_KEY, NON_CONFIG_KEY, PATHS_KEY, \
     EXECUTION_FILENAME_KEY, RUN_PARAMETERS_KEY, TRAINING_PARAMETERS_KEY, MODEL_PARAMETERS_KEY, write_configuration_file
 
 loss_function = F.mse_loss

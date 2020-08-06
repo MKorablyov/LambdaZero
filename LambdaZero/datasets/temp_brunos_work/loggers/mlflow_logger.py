@@ -4,7 +4,7 @@ import mlflow
 import logging
 
 from LambdaZero.datasets.temp_brunos_work.loggers.experiment_logger import ExperimentLogger
-from LambdaZero.datasets.temp_brunos_work.parameter_inputs import get_user, get_git_hash
+from LambdaZero.examples.env3d.parameter_inputs import get_user, get_git_hash
 
 
 class MLFlowLogger(ExperimentLogger):
