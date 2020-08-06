@@ -8,7 +8,11 @@ from torch_geometric.utils import remove_self_loops
 from rdkit.Chem import AllChem
 from sklearn.decomposition import PCA
 import pickle as pk
-
+from  rdkit import Chem
+import LambdaZero.utils
+import LambdaZero.chem
+from torch.utils.data import Subset
+from torch_geometric.data import DataLoader
 
 def get_external_dirs():
     """Locate in the filesystem external programs/folders essensial for LambdaZero execution
@@ -45,8 +49,6 @@ def get_external_dirs():
     return datasets_dir, programs_dir, summaries_dir
 
 
-
-# log_env_info
 def dock_metrics(info):
     """ Report custom metrics for each episode in RayRllib
     :param info: episode info
@@ -60,22 +62,26 @@ def dock_metrics(info):
         episode.custom_metrics[key] = value
 
 
-# class Normalize(object):
-#     def __init__(self, target, target_norm):
-#         self.target = target
-#         self.target_norm = target_norm
-#
-#     def __call__(self, data):
-#         # Specify target.
-#         y = getattr(data, self.target)
-#         y = (y - self.target_norm[0]) / self.target_norm[1]
-#         data.y = y
-#         return data
+class MeanVarianceNormalizer:
+    def __init__(self, mean_and_variance):
+        self.mean = mean_and_variance[0]
+        self.variance = mean_and_variance[1]
+
+    def tfm(self, x):
+        "normalize x"
+        x_norm = (x - self.mean) / self.variance
+        return x_norm
+
+    def itfm(self, x_norm):
+        "unnormalize x"
+        x = (x_norm * self.variance) + self.mean
+        return x
 
 
 class Complete(object):
     def __call__(self, data):
         device = data.edge_index.device
+
         row = torch.arange(data.num_nodes, dtype=torch.long, device=device)
         col = torch.arange(data.num_nodes, dtype=torch.long, device=device)
         row = row.view(-1, 1).repeat(1, data.num_nodes).view(-1)
@@ -94,6 +100,21 @@ class Complete(object):
         data.edge_attr = edge_attr
         data.edge_index = edge_index
         return data
+
+class MakeFP(object):
+    "makes a fingerprint for molecule"
+    def __call__(self, data, fp_length=1024, radii=3):
+        try:
+            mol = Chem.MolFromSmiles(data.smi)
+        except Exception as e:
+
+            fp = np.zeros(fp_length,dtype=np.float32)
+        else:
+            fp = LambdaZero.chem.get_fp(mol, fp_length=1024, fp_radiis=[radii])
+
+        data.fp = fp
+        return data
+
 
 def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
     data = np.asarray(data,dtype=np.float)
@@ -133,7 +154,6 @@ def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
 pca_cache = [None]
-
 def molecule_pca(mol):
     fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
     mat = []
@@ -150,3 +170,25 @@ def molecule_pca(mol):
     scaled_data = pca.transform(mat)
     log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
     return (log_vals)
+
+def logP(mu, sigma, x):
+    """
+    Estimate log likelihood of an estimator
+    :param mu: estimated mu
+    :param sigma: estimated sigma
+    :param x: ground truth
+    :return:
+    """
+    return (-np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) **2))
+
+def dataset_creator_v1(config):
+    # make dataset
+    dataset = config["dataset"](**config["dataset_config"])
+    train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
+
+    train_set = Subset(dataset, train_idxs.tolist())
+    val_set = Subset(dataset, val_idxs.tolist())
+    train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
+    val_loader = DataLoader(val_set, batch_size=config["b_size"])
+    return train_loader, val_loader
+

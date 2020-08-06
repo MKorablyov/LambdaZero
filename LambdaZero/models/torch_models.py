@@ -188,6 +188,51 @@ class MPNNet(nn.Module):
         out = self.lin2(out)
         return out.view(-1)
 
+class MPNNetDrop(nn.Module):
+    """
+    A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
+    """
+    def __init__(self, num_feat=14, dim=64):
+        super(MPNNetDrop, self).__init__()
+        self.lin0 = nn.Linear(num_feat, dim)
+
+        h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
+        self.conv = NNConv(dim, dim, h, aggr='mean')
+
+        self.gru = nn.GRU(dim, dim)
+
+        self.set2set = Set2Set(dim, processing_steps=3)
+        self.lin1 = nn.Linear(2 * dim, dim)
+        self.lin2 = nn.Linear(dim, 1)
+
+    def forward(self, data, do_dropout, drop_p):
+        out = nn.functional.relu(self.lin0(data.x))
+        h = out.unsqueeze(0)
+
+        for i in range(3):
+            m = nn.functional.relu(self.conv(out, data.edge_index, data.edge_attr))
+            out, h = self.gru(m.unsqueeze(0), h)
+            out = out.squeeze(0)
+
+        out = self.set2set(out, data.batch)
+        out = nn.functional.relu(self.lin1(out))
+        out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
+        out = self.lin2(out)
+        return out.view(-1)
+
+    def get_embed(self, data, do_dropout, drop_p):
+        out = nn.functional.relu(self.lin0(data.x))
+        h = out.unsqueeze(0)
+
+        for i in range(3):
+            m = nn.functional.relu(self.conv(out, data.edge_index, data.edge_attr))
+            out, h = self.gru(m.unsqueeze(0), h)
+            out = out.squeeze(0)
+
+        out = self.set2set(out, data.batch)
+        out = nn.functional.relu(self.lin1(out))
+        out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
+        return out
 
 class GraphIsomorphismNet(nn.Module):
     def __init__(self,
