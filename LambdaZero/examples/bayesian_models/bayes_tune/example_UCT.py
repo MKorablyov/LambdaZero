@@ -30,8 +30,9 @@ class UCT(tune.Trainable):
         train_set = Subset(self.dataset, train_idxs.tolist())
         ul_set = Subset(self.dataset, ul_idxs.tolist())
         val_set = Subset(self.dataset, val_idxs.tolist())
-        self.train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
-        self.ul_loader = DataLoader(ul_set, batch_size=config["b_size"])
+        self.train_loader = DataLoader(train_set, shuffle=True,
+                                       batch_size=config["regressor_config"]["config"]["b_size"])
+        self.ul_loader = DataLoader(ul_set, batch_size=config["regressor_config"]["config"]["b_size"])
         self.val_loader = DataLoader(val_set, batch_size=config["b_size"])
 
         # make model with uncertainty
@@ -54,8 +55,9 @@ class UCT(tune.Trainable):
         train_idxs = self.train_loader.dataset.indices + aq_idxs
         train_set = Subset(self.dataset, train_idxs)
         ul_set = Subset(self.dataset, ul_idxs)
-        self.train_loader = DataLoader(train_set, shuffle=True, batch_size=self.config["b_size"])
-        self.ul_loader = DataLoader(ul_set, batch_size=self.config["b_size"])
+        self.train_loader = DataLoader(train_set, shuffle=True,
+                                       batch_size=self.config["regressor_config"]["config"]["b_size"])
+        self.ul_loader = DataLoader(ul_set, batch_size=self.config["regressor_config"]["config"]["b_size"])
         # fit model to the data
         scores = self.regressor.fit(self.train_loader, self.val_loader)
         return scores[-1]
@@ -111,12 +113,12 @@ DEFAULT_CONFIG = {
             "regressor": MCDrop,
             "regressor_config": regressor_config,
             "b_size0": 200,
-            "b_size": 20,
+            "b_size": 50,
             "kappa": 0.2,
             "invert_objective":True,
         },
         "local_dir": summaries_dir,
-        "stop": {"training_iteration": 200},
+        "stop": {"training_iteration": 20},
         "resources_per_trial": {"cpu": 4, "gpu": 1.0}
     },
     "memory": 10 * 10 ** 9
