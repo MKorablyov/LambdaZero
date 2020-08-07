@@ -1,18 +1,18 @@
 {
     "logging": {
         "project": "env3d",
-        "name": "debugging"
+        "name": "debugging-500-epochs"
     },
     "resources_per_trial": {
-        "cpu": 4,
-        "gpu": 0.0
+        "cpu": 8,
+        "gpu": 1.0
     },
     "trainer_config": {
         "seed_for_dataset_split": 0,
         "angle_loss_weight": 1.0,
-        "num_epochs": 10,
-        "num_workers": 4,
-        "batch_size": 32,
+        "num_epochs": 500,
+        "num_workers": 8,
+        "batch_size": 64,
         "learning_rate": 0.001,
         "train_ratio": 0.8,
         "valid_ratio": 0.1,
