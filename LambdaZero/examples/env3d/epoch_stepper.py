@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from LambdaZero.examples.env3d.loss import class_and_angle_loss
 
@@ -28,7 +29,7 @@ def train_epoch(loader, model, optimizer, device, config):
 
     metrics = {}
 
-    for data in loader:
+    for data in tqdm(loader, desc="TRAIN"):
 
         data = data.to(device)
 
@@ -111,7 +112,7 @@ def eval_epoch(loader, model, device, config):
     model.eval()
     metrics = {}
 
-    for data in loader:
+    for data in tqdm(loader, desc="EVAL"):
         data = data.to(device)
 
         class_target = data.attachment_block_class
