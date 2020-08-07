@@ -90,7 +90,7 @@ class MPNNBlock(nn.Module):
         num_node_features = shape[-1]
         shape[-1] = num_hidden_features
 
-        hidden_embedding = torch.zeros(shape).to()
+        hidden_embedding = torch.zeros(shape)
         hidden_embedding[..., :num_node_features] = node_features
 
         return hidden_embedding
