@@ -105,10 +105,19 @@ def train_mcdrop(train_loader, val_loader, model, device, config, optim, iterati
     val_scores = config["eval_epoch"](val_loader, model, device, config, "val")
     scores = {**train_scores, **val_scores}
 
-    if iteration % 10 == 1:
+    if iteration % config["uncertainty_eval_freq"] == 1:
         _scores = eval_mcdrop(val_loader, model, device, config, N, "val")
         scores = {**scores, **_scores}
     return scores
+
+
+def mcdrop_mean_variance(loader, model, device, config, N):
+    # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
+    Yt_hat = sample_logits(loader, model, device, config, config["T"], do_dropout=True)
+    tau = get_tau(config, N)
+    sigma_sqr = 1. / tau
+    var = (sigma_sqr + Yt_hat ** 2).mean(0) - Yt_hat.mean(0) ** 2
+    return Yt_hat.mean(0), var
 
 
 def bayesian_ridge(train_x, val_x, train_targets_norm, val_targets_norm, config):
@@ -145,7 +154,7 @@ def eval_mcdrop_brr(train_loader, val_loader, model, device, config, N):
     scores = bayesian_ridge(train_embeds, val_embeds, train_targets_norm, val_targets_norm, config)
     return scores
 
-def train_mcdrop_brr(train_loader, val_loader, model, device, config, optim, iteration):
+def train_mpnn_brr(train_loader, val_loader, model, device, config, optim, iteration):
     N = len(train_loader.dataset)
     train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
     val_scores = config["eval_epoch"](val_loader, model, device, config, "val")

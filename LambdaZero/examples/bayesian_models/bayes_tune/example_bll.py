@@ -3,7 +3,7 @@ import numpy as np
 from torch_geometric import transforms as T
 import LambdaZero.inputs
 import LambdaZero.utils
-from example_mcdrop import bayesian_ridge
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import bayesian_ridge
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 transform = T.Compose([LambdaZero.utils.Complete(),LambdaZero.utils.MakeFP()])

@@ -12,9 +12,10 @@ import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
 from LambdaZero.examples.bayesian_models.bayes_tune import config
-from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch, eval_epoch, train_mcdrop
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch, eval_epoch, \
+    train_mcdrop, mcdrop_mean_variance
 
-datasets_dir, programs_dir, summaries_dir =  LambdaZero.utils.get_external_dirs()
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 transform = T.Compose([LambdaZero.utils.Complete()])
 
 
@@ -38,30 +39,23 @@ class MCDrop(tune.Trainable):
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
         return scores
 
-    # def fit(self, train_loader, val_loader):
-    #     # update internal dataset
-    #     self.train_loader, self.val_loader = train_loader, val_loader
-    #     # make a new model
-    #     self.model = self.config["model"](**self.config["model_config"]) # todo: reset?
-    #     self.model.to(self.device)
-    #
-    #     # todo allow ray native stopping
-    #     all_scores = []
-    #     for i in range(2):
-    #         scores = self._train()
-    #         all_scores.append(scores)
-    #     return all_scores
+    def fit(self, train_loader, val_loader):
+        # update internal dataset
+        self.train_loader, self.val_loader = train_loader, val_loader
+        # make a new model
+        self.model = self.config["model"](**self.config["model_config"]) # todo: reset?
+        self.model.to(self.device)
 
-    #def get_samples(self, loader, num_samples):
-    #    return sample_logits(loader, self.model, self.device, self.config, num_samples)
+        # todo allow ray native stopping
+        all_scores = []
+        for i in range(10): # 50 epochs
+            scores = self._train()
+            all_scores.append(scores)
+            return all_scores
 
-    def get_mean_and_variance(self, loader):
-        # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
-        Yt_hat = self.get_samples(loader, self.config["T"])
-        tau = get_tau(self.config, self.N)
-        sigma2 = 1./tau
-        var = (sigma2 + Yt_hat**2).mean(0) - Yt_hat.mean(0)**2
-        return Yt_hat.mean(0), var
+    def get_mean_variance(self, loader):
+        N = len(self.train_loader.dataset)
+        return mcdrop_mean_variance(loader, self.model, self.device, self.config, N)
 
 
 DEFAULT_CONFIG = {
@@ -118,16 +112,19 @@ DEFAULT_CONFIG = {
     "memory": 10 * 10 ** 9
 }
 
-if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "mcdrop003"
-config = getattr(config, config_name)
-config = merge_dicts(DEFAULT_CONFIG, config)
+
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 2: config_name = sys.argv[1]
+    else: config_name = "mcdrop003"
+    config = getattr(config, config_name)
+    config = merge_dicts(DEFAULT_CONFIG, config)
     ray.init(memory=config["memory"])
-    # this will run train the model in a plain way
+    # this will run train the model with tune scheduler
     tune.run(**config["regressor_config"])
-
-
+#     # this will fit the model outside of tune
+#     mcdrop = MCDrop(config["regressor_config"]["config"])
+#     print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
+#
 
 

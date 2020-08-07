@@ -1,6 +1,6 @@
 import numpy as np
 from ray.tune import grid_search
-from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_mcdrop, train_mcdrop_brr
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_mcdrop, train_mpnn_brr
 
 mcdrop000 = {}
 
@@ -18,7 +18,7 @@ mcdrop002 = {"regressor_config":
 
 mcdrop003 = {"regressor_config":
                  {"config":
-                      {"train":train_mcdrop_brr}
+                      {"train":train_mpnn_brr}
                   },
              }
 
