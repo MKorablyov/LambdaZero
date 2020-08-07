@@ -57,3 +57,4 @@ share/python-wheels/
 logs/
 results/
 mlruns/
+wandb/
