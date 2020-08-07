@@ -27,7 +27,7 @@ class MCDrop(tune.Trainable):
             self.train_loader, self.val_loader = config["dataset_creator"](config)
 
         # make model
-        self.model = config["model"](**config["model_config"])
+        self.model = self.config["model"](**self.config["model_config"])
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
 
@@ -37,6 +37,8 @@ class MCDrop(tune.Trainable):
     def _train(self):
         scores = self._train_ref(
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
+
+        print(scores)
         return scores
 
     def fit(self, train_loader, val_loader):
@@ -44,14 +46,17 @@ class MCDrop(tune.Trainable):
         self.train_loader, self.val_loader = train_loader, val_loader
         # make a new model
         self.model = self.config["model"](**self.config["model_config"]) # todo: reset?
+        self.optim = self.config["optimizer"](self.model.parameters(), **self.config["optimizer_config"])
         self.model.to(self.device)
 
         # todo allow ray native stopping
         all_scores = []
-        for i in range(10): # 50 epochs
+        for i in range(61): # 50 epochs
             scores = self._train()
             all_scores.append(scores)
-            return all_scores
+            #print("score", scores)
+            #print("all scores", all_scores)
+        return all_scores
 
     def get_mean_variance(self, loader):
         N = len(self.train_loader.dataset)
@@ -121,10 +126,10 @@ if __name__ == "__main__":
     config = merge_dicts(DEFAULT_CONFIG, config)
     ray.init(memory=config["memory"])
     # this will run train the model with tune scheduler
-    tune.run(**config["regressor_config"])
+    #tune.run(**config["regressor_config"])
 #     # this will fit the model outside of tune
-#     mcdrop = MCDrop(config["regressor_config"]["config"])
-#     print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
+    mcdrop = MCDrop(config["regressor_config"]["config"])
+    print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
 #
 
 

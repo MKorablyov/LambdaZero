@@ -81,7 +81,7 @@ regressor_config = {
         "T": 20,
         "drop_p": 0.1,
         "lengthscale": 1e-2,
-        "uncertainty_eval_freq": 15,
+        "uncertainty_eval_freq": 60,
         "model": LambdaZero.models.MPNNetDrop,
         "model_config": {},
         "optimizer": torch.optim.Adam,
@@ -100,7 +100,7 @@ DEFAULT_CONFIG = {
             "dataset_creator": LambdaZero.utils.dataset_creator_v1,
             "dataset_split_path": osp.join(datasets_dir,
                                            "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-            # "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+                                            #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "dataset": LambdaZero.inputs.BrutalDock,
             "dataset_config": {
                 "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
@@ -108,7 +108,7 @@ DEFAULT_CONFIG = {
                 "transform": transform,
                 "file_names":
                     ["Zinc15_2k"],
-                # ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+                    #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
             },
             "regressor": MCDrop,
             "regressor_config": regressor_config,
