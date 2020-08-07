@@ -157,7 +157,7 @@ def eval_epoch(loader, model, device, config):
         ) / max(1, metrics.get("n_angles", 0) + n_angle)
         # we have to do the same for the MAE
         metrics["angle_mae"] = (
-            metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item()
+            metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item() * n_angle
         ) / max(1, metrics.get("n_angles", 0) + n_angle)
 
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
