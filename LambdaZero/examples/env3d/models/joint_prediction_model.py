@@ -128,7 +128,10 @@ class BlockAngleModel(nn.Module):
 
         cumulative_counts = torch.cumsum(counts, dim=0)
 
-        zero = torch.tensor([0], requires_grad=False, device=node_representations.get_device())
+        zero = torch.tensor([0], requires_grad=False)
+        if node_representations.is_cuda:
+            zero = zero.to(node_representations.get_device())
+
         sum_of_all_nodes_up_to_graph_nm1 = torch.cat([zero, cumulative_counts[:-1]])
 
         global_indices = sum_of_all_nodes_up_to_graph_nm1 + attachment_indices
@@ -155,7 +158,9 @@ class BlockAngleModel(nn.Module):
         )
 
         # change type to float32 to harmonize with the other arrays
-        n_axis = data.n_axis.type(torch.Tensor).to(node_representations.get_device())
+        n_axis = data.n_axis.type(torch.Tensor)
+        if node_representations.is_cuda:
+            n_axis = n_axis.to(node_representations.get_device())
 
         concatenated_representation = torch.cat(
             [attachment_node_representations, graph_representation, n_axis], axis=1

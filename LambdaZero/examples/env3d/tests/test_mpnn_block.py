@@ -1,6 +1,11 @@
+import pytest
 import torch
 
 from LambdaZero.examples.env3d.models.mpnn_block import MPNNBlock
+
+list_devices = [torch.device("cpu")]
+if torch.cuda.is_available():
+    list_devices.append(torch.device("cuda"))
 
 
 def test_mpnn_model_imbed_node_features():
@@ -23,7 +28,8 @@ def test_mpnn_model_imbed_node_features():
     assert torch.all(torch.eq(expected_hidden_features, computed_hidden_features))
 
 
-def test_smoke_mpnn_model(local_ray, dataloader):
+@pytest.mark.parametrize("device", list_devices)
+def test_smoke_mpnn_model(local_ray, dataloader, device):
     """
     A simple "smoke test", ie will the model even run given expected input data.
     """
@@ -35,7 +41,10 @@ def test_smoke_mpnn_model(local_ray, dataloader):
         num_edge_network_hidden_features=16,
     )
 
+    mpnn_model.to(device)
+
     for batch in dataloader:
+        batch = batch.to(device)
         node_representations, graph_representation = mpnn_model.forward(batch)
 
         expected_graph_representation_shape = torch.Size(

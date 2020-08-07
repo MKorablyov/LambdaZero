@@ -16,7 +16,7 @@
         "learning_rate": 0.001,
         "train_ratio": 0.8,
         "valid_ratio": 0.1,
-        "patience": 1 
+        "patience": 5
     },
     "model_config": {
         "num_hidden_features": 64,
