@@ -111,7 +111,7 @@ class MPNNBlock(nn.Module):
         # embed the node features into the hidden representation space
         #   data.x is of dimensions [total number of nodes in batch, number of node features]
         #   node_embeddings  is of dimensions [total number of nodes, hidden representation dimension]
-        node_embeddings = self._embed_node_features(data.x, self.num_hidden_features)
+        node_embeddings = self._embed_node_features(data.x, self.num_hidden_features).to(data.x.get_device())
 
         # There is a bit of tediousness below with squeezes and unsqueezes. This is caused by the GRU
         # update function that requires a "sequence length" dimension.

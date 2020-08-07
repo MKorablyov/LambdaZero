@@ -16,4 +16,4 @@ def get_angle_between_zero_and_two_pi(angle_in_radian: float):
         angle: angle between zero and 2 pi.
 
     """
-    return np.mod(angle_in_radian, 2*np.pi)
+    return np.mod(angle_in_radian, 2 * np.pi)
