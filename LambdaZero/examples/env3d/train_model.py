@@ -46,6 +46,7 @@ if __name__ == "__main__":
             "angle_loss_weight": input_config["trainer_config"]["angle_loss_weight"],
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
+            "patience": input_config["trainer_config"]["patience"],
             "dataset_config": {
                 "root": args.root_path,
                 "props": ENV3D_DATA_PROPERTIES,
@@ -55,7 +56,8 @@ if __name__ == "__main__":
             },
         },
         "summaries_dir": summaries_dir,
-        "stop": {"training_iteration": input_config["trainer_config"]["num_epochs"]},
+        "stop": {"training_iteration": input_config["trainer_config"]["num_epochs"],
+            "early_stopping": True},
         "resources_per_trial": input_config["resources_per_trial"],
         "keep_checkpoint_num": 2,
         "checkpoint_score_attr": "train_loss",
