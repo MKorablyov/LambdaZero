@@ -37,8 +37,6 @@ class MCDrop(tune.Trainable):
     def _train(self):
         scores = self._train_ref(
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
-
-        print(scores)
         return scores
 
     def fit(self, train_loader, val_loader):
@@ -51,7 +49,7 @@ class MCDrop(tune.Trainable):
 
         # todo allow ray native stopping
         all_scores = []
-        for i in range(61): # 50 epochs
+        for i in range(self.config["train_iterations"]): # 61 epochs
             scores = self._train()
             all_scores.append(scores)
             #print("score", scores)
@@ -90,7 +88,7 @@ DEFAULT_CONFIG = {
             "drop_p": 0.1,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-
+            "train_iterations":61,
             "model": LambdaZero.models.MPNNetDrop,
             "model_config": {},
 
@@ -104,7 +102,7 @@ DEFAULT_CONFIG = {
             "train": train_mcdrop,
         },
         "local_dir": summaries_dir,
-        "stop": {"training_iteration": 200},
+        "stop": {"training_iteration": 61},
         "resources_per_trial": {
             "cpu": 4,
             "gpu": 1.0

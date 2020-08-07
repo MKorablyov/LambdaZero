@@ -11,9 +11,24 @@ import LambdaZero.utils
 import LambdaZero.models
 import LambdaZero.inputs
 from LambdaZero.examples.bayesian_models.bayes_tune.example_mcdrop import MCDrop
-from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
+    sample_targets
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+
+
+def aq_regret(train_loader, ul_loader, config):
+    train_targets = np.concatenate([getattr(d, config["target"]).cpu().numpy() for d in train_loader.dataset],0)
+    ul_targets = np.concatenate([getattr(d, config["target"]).cpu().numpy() for d in ul_loader.dataset],0)
+    all_targets = np.concatenate([train_targets, ul_targets],0)
+    train_sorted = train_targets[np.argsort(train_targets)]
+    all_sorted = all_targets[np.argsort(all_targets)]
+
+    top15_regret = np.median(train_sorted[:15]) - np.median(all_sorted[:15])
+    top50_regret = np.median(train_sorted[:50]) - np.median(all_sorted[:50])
+    aq_top15 = np.median(train_sorted[:15])
+    aq_top50 = np.median(train_sorted[:15])
+    return {"aq_top15_regret":top15_regret, "aq_top50_regret":top50_regret, "aq_top15":aq_top15, "aq_top50":aq_top50}
 
 
 class UCT(tune.Trainable):
@@ -45,8 +60,6 @@ class UCT(tune.Trainable):
         return scores
 
     def update_with_seen(self, idxs):
-        print(len(self.train_loader.dataset), len(self.ul_loader.dataset), len(self.val_loader.dataset))
-
         # update train/unlabeled datasets
         aq_mask = np.zeros(len(self.ul_loader.dataset.indices),dtype=np.bool)
         aq_mask[idxs] = True
@@ -59,8 +72,13 @@ class UCT(tune.Trainable):
                                        batch_size=self.config["regressor_config"]["config"]["b_size"])
         self.ul_loader = DataLoader(ul_set, batch_size=self.config["regressor_config"]["config"]["b_size"])
         # fit model to the data
-        scores = self.regressor.fit(self.train_loader, self.val_loader)
-        return scores[-1]
+        scores = self.regressor.fit(self.train_loader, self.val_loader)[-1]
+
+        # compute acquisition metrics
+        _scores = aq_regret(self.train_loader, self.ul_loader, self.config["regressor_config"]["config"])
+        print(scores)
+        scores = {**scores, **_scores}
+        return scores
 
     def acquire_batch(self):
         mean, var = self.regressor.get_mean_variance(self.ul_loader)
@@ -82,6 +100,7 @@ regressor_config = {
         "drop_p": 0.1,
         "lengthscale": 1e-2,
         "uncertainty_eval_freq": 60,
+        "train_iterations":61,
         "model": LambdaZero.models.MPNNetDrop,
         "model_config": {},
         "optimizer": torch.optim.Adam,
