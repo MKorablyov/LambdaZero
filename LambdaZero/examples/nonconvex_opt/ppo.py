@@ -61,17 +61,24 @@ if __name__ == "__main__":
     #     if done: env.reset()
     #     print(reward)
 
-# def plot_traj():
-#     x = th.tensor((np.mgrid[-100:100,-100:100] / 100).reshape(2,-1).T)
-#     y = schwefel(x)
-#     x = x.numpy().T.reshape(2, 2*100, 2*100)
-#     y = y.numpy().reshape(2*100, 2*100)
-#     plt.subplot(2,2,1, projection="3d")
-#     ax = plt.gca()
-#     ax.plot_surface(x[0], x[1], y, cmap='coolwarm', edgecolor='none',
-#                     rstride=1, cstride=1, color='c', alpha=0.3, linewidth=0)
-#
-#     plt.savefig("/home/maksym/Desktop/traj.png",dpi=400)
+
+    #from LambdaZero.environments.dummy_nonconvex import schwefel
+
+
+    # def plot_traj():
+    #     x = th.tensor((np.mgrid[-100:100, -100:100] / 100).reshape(2, -1).T)
+    #     y = schwefel(x)
+    #     x = x.numpy().T.reshape(2, 2 * 100, 2 * 100)
+    #     y = y.numpy().reshape(2 * 100, 2 * 100)
+    #     plt.subplot(1, 1, 1, projection="3d")
+    #     ax = plt.gca()
+    #     ax.plot_surface(x[0], x[1], y, cmap='coolwarm', edgecolor='none',
+    #                     rstride=1, cstride=1, color='c', alpha=0.5, linewidth=0)
+    #
+    #     plt.savefig("/home/maksym/Desktop/traj.png", dpi=400)
+    #
+    #
+    # plot_traj()
 
     #def embedding_distribution(self):
     #    pass

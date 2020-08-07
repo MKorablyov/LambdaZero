@@ -11,6 +11,8 @@ import pickle as pk
 from  rdkit import Chem
 import LambdaZero.utils
 import LambdaZero.chem
+from torch.utils.data import Subset
+from torch_geometric.data import DataLoader
 
 def get_external_dirs():
     """Locate in the filesystem external programs/folders essensial for LambdaZero execution
@@ -47,8 +49,6 @@ def get_external_dirs():
     return datasets_dir, programs_dir, summaries_dir
 
 
-
-# log_env_info
 def dock_metrics(info):
     """ Report custom metrics for each episode in RayRllib
     :param info: episode info
@@ -67,11 +67,13 @@ class MeanVarianceNormalizer:
         self.mean = mean_and_variance[0]
         self.variance = mean_and_variance[1]
 
-    def forward_transform(self, x):
+    def tfm(self, x):
+        "normalize x"
         x_norm = (x - self.mean) / self.variance
         return x_norm
 
-    def backward_transform(self, x_norm):
+    def itfm(self, x_norm):
+        "unnormalize x"
         x = (x_norm * self.variance) + self.mean
         return x
 
@@ -175,3 +177,14 @@ def logP(mu, sigma, x):
     :return:
     """
     return (-np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) **2))
+
+def dataset_creator_v1(config):
+    # make dataset
+    dataset = config["dataset"](**config["dataset_config"])
+    train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
+
+    train_set = Subset(dataset, train_idxs.tolist())
+    val_set = Subset(dataset, val_idxs.tolist())
+    train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
+    val_loader = DataLoader(val_set, batch_size=config["b_size"])
+    return train_loader, val_loader

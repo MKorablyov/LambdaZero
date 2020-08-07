@@ -220,7 +220,19 @@ class MPNNetDrop(nn.Module):
         out = self.lin2(out)
         return out.view(-1)
 
+    def get_embed(self, data, do_dropout, drop_p):
+        out = nn.functional.relu(self.lin0(data.x))
+        h = out.unsqueeze(0)
 
+        for i in range(3):
+            m = nn.functional.relu(self.conv(out, data.edge_index, data.edge_attr))
+            out, h = self.gru(m.unsqueeze(0), h)
+            out = out.squeeze(0)
+
+        out = self.set2set(out, data.batch)
+        out = nn.functional.relu(self.lin1(out))
+        out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
+        return out
 
 class GraphIsomorphismNet(nn.Module):
     def __init__(self,
