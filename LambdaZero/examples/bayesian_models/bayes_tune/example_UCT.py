@@ -138,7 +138,7 @@ DEFAULT_CONFIG = {
             "b_size0": 200,
             "b_size": 50,
             "kappa": 0.2,
-            "epsilon":0.0,
+            "epsilon": 0.0,
             "minimize_objective":True,
         },
         "local_dir": summaries_dir,

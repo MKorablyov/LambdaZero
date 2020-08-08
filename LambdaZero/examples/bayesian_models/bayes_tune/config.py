@@ -26,11 +26,7 @@ mcdrop003 = {"regressor_config":
                   },
              }
 
-
-# "regressor_config":{
-#         "run_or_experiment": MCDrop,
-#         "config": {
-#             "target": "gridscore",
-#             "dataset_creator": _dataset_creator,
-#             "dataset_split_path": osp.join(datasets_dir,
-#                                            "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+# todo:
+# (1) mpnn_brr large & small datasets
+# (2) mpnn + drop; adjust alpha on small + large datasets
+# (3) mpnn + make dropout in all layers a hyperparameter

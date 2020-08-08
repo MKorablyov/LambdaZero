@@ -18,3 +18,9 @@ uct002 = {
         "config":{
             "epsilon":1000
         }}}
+
+
+# todo
+# (1) mpnn bll + UCT + find kappa on small and large datasets
+# (2) with the best kappa try different amounts of noise
+# (3) find the best kappa for mpnn + mcdrop
