@@ -16,7 +16,7 @@ uct001 = {
 uct002 = {
     "acquirer_config":{
         "config":{
-            "epsilon":1000
+            "epsilon": grid_search([0, 1000, np.linspace(start=0.01,stop=1,num=50)])
         }}}
 
 # todo
@@ -32,22 +32,9 @@ uct003 = {"acquirer_config":
              }
 
 # (2) with the best kappa try different amounts of noise
-# baseline without noise
-# python uct004
-uct004 = {
-    "acquirer_config":{
-        "config":{
-            "epsilon":0
-        }}}
+# baseline without noise, random (epislon = 1000), greedy/egreedy (epislon between 0 and 1)
+# python uct002
 
-# grid search on noise 
-# python example_UCT uct005
-uct005 = {
-    "acquirer_config":{
-        "config":{
-            "epsilon":grid_search(list(np.linspace(start=0,stop=100,num=20)))
-        }}}
-
-# (3) find the best kappa for mpnn + mcdrop
-# ?
+# (3) find the best alpha for mpnn + mcdrop
+# see config.py
 
