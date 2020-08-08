@@ -27,6 +27,24 @@ mcdrop003 = {"regressor_config":
              }
 
 # todo:
-# (1) mpnn_brr large & small datasets
-# (2) mpnn + drop; adjust alpha on small + large datasets
+# (1) mpnn_brr large & small datasets 
+#  python example_mcdrop.py mcdrop003
+mcdrop003 = {"regressor_config":
+                 {"config":
+                      {"train":train_mpnn_brr,
+                       "get_mean_variance": mpnn_brr_mean_variance,
+
+                       }
+                  },
+             }
+
+# (2) mpnn + drop; adjust lambda on small + large datasets
+# python example_mcdrop.py mcdrop004
+mcdrop004= {"regressor_config":
+                 {"config":
+                      {"lambda":grid_search(list(np.linspace(start=1e-12,stop=1e-5,num=8)))}
+                  },
+             }
+             
 # (3) mpnn + make dropout in all layers a hyperparameter
+# add dropout layer on input and all layers in torch_models.py. Hyperparameter drop_p already exists
