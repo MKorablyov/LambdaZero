@@ -121,6 +121,7 @@ if __name__ == "__main__":
     else: config_name = "mcdrop000"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
+    config["regressor_config"]["name"] = config_name
     ray.init(memory=config["memory"])
     # this will run train the model with tune scheduler
     #tune.run(**config["regressor_config"])

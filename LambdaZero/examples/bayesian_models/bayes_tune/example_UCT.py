@@ -151,8 +151,9 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "uct001"
+    else: config_name = "uct002"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
+    config["acquirer_config"]["name"] = config_name
     ray.init(memory=config["memory"])
     tune.run(**config["acquirer_config"])
