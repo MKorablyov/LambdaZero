@@ -16,11 +16,25 @@ uct001 = {
 uct002 = {
     "acquirer_config":{
         "config":{
-            "epsilon":1000
+            "epsilon": grid_search([0, 1000, np.linspace(start=0.01,stop=1,num=50)])
         }}}
-
 
 # todo
 # (1) mpnn bll + UCT + find kappa on small and large datasets
+# python example_UCT uct003
+uct003 = {"acquirer_config":
+                 {"config":
+                      {"train":train_mpnn_brr,
+                       "get_mean_variance": mpnn_brr_mean_variance,
+                         "kappa":grid_search(list(np.linspace(start=0.01,stop=100,num=20)))
+                       }
+                  },
+             }
+
 # (2) with the best kappa try different amounts of noise
-# (3) find the best kappa for mpnn + mcdrop
+# baseline without noise, random (epislon = 1000), greedy/egreedy (epislon between 0 and 1)
+# python uct002
+
+# (3) find the best alpha for mpnn + mcdrop
+# see config.py
+
