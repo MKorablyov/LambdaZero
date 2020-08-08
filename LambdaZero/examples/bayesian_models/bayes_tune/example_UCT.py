@@ -1,9 +1,10 @@
-import time, random
+import time, random, sys
 import os.path as osp
 import numpy as np
 import torch
 import ray
 from ray import tune
+from ray.rllib.utils import merge_dicts
 from torch_geometric.data import DataLoader
 from torch_geometric import transforms as T
 from torch.utils.data import Subset, ConcatDataset
@@ -12,8 +13,8 @@ import LambdaZero.models
 import LambdaZero.inputs
 from LambdaZero.examples.bayesian_models.bayes_tune.example_mcdrop import MCDrop
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
-    sample_targets
-
+    mcdrop_mean_variance
+from LambdaZero.examples.bayesian_models.bayes_tune import aq_config
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
@@ -76,14 +77,16 @@ class UCT(tune.Trainable):
 
         # compute acquisition metrics
         _scores = aq_regret(self.train_loader, self.ul_loader, self.config["regressor_config"]["config"])
-        print(scores)
         scores = {**scores, **_scores}
         return scores
 
     def acquire_batch(self):
         mean, var = self.regressor.get_mean_variance(self.ul_loader)
         scores = mean + (self.config["kappa"] * var)
-        if self.config["invert_objective"]: scores = -scores
+        # noise is not a part of original UCT but is added here
+        noise = self.config["epsilon"] * np.random.uniform(size=mean.shape[0])
+        scores = scores + noise
+        if self.config["minimize_objective"]: scores = -scores
         idxs = np.argsort(-scores)[:self.config["b_size"]]
         return idxs
 
@@ -100,7 +103,7 @@ regressor_config = {
         "drop_p": 0.1,
         "lengthscale": 1e-2,
         "uncertainty_eval_freq": 60,
-        "train_iterations":61,
+        "train_iterations": 61,
         "model": LambdaZero.models.MPNNetDrop,
         "model_config": {},
         "optimizer": torch.optim.Adam,
@@ -109,7 +112,8 @@ regressor_config = {
         },
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
-        "train": train_mcdrop
+        "train": train_mcdrop,
+        "get_mean_variance":mcdrop_mean_variance,
     }
 }
 DEFAULT_CONFIG = {
@@ -134,7 +138,8 @@ DEFAULT_CONFIG = {
             "b_size0": 200,
             "b_size": 50,
             "kappa": 0.2,
-            "invert_objective":True,
+            "epsilon":0.0,
+            "minimize_objective":True,
         },
         "local_dir": summaries_dir,
         "stop": {"training_iteration": 20},
@@ -144,7 +149,10 @@ DEFAULT_CONFIG = {
 }
 
 
-config = DEFAULT_CONFIG
 if __name__ == "__main__":
+    if len(sys.argv) >= 2: config_name = sys.argv[1]
+    else: config_name = "uct001"
+    config = getattr(aq_config, config_name)
+    config = merge_dicts(DEFAULT_CONFIG, config)
     ray.init(memory=config["memory"])
     tune.run(**config["acquirer_config"])

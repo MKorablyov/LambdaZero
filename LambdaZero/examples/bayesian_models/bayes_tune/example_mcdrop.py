@@ -32,10 +32,11 @@ class MCDrop(tune.Trainable):
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
 
         # todo: I am not sure if it makes sense to make a copy here
-        self._train_ref = self.config["train"]
+        #self._train_ref = self.config["train"]
+
 
     def _train(self):
-        scores = self._train_ref(
+        scores = self.config["train"](
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
         return scores
 
@@ -46,19 +47,16 @@ class MCDrop(tune.Trainable):
         self.model = self.config["model"](**self.config["model_config"]) # todo: reset?
         self.optim = self.config["optimizer"](self.model.parameters(), **self.config["optimizer_config"])
         self.model.to(self.device)
-
         # todo allow ray native stopping
         all_scores = []
-        for i in range(self.config["train_iterations"]): # 61 epochs
+        for i in range(self.config["train_iterations"]):
             scores = self._train()
             all_scores.append(scores)
-            #print("score", scores)
-            #print("all scores", all_scores)
         return all_scores
 
     def get_mean_variance(self, loader):
-        N = len(self.train_loader.dataset)
-        return mcdrop_mean_variance(loader, self.model, self.device, self.config, N)
+        mean,var = self.config["get_mean_variance"](self.train_loader, loader, self.model, self.device, self.config)
+        return mean, var
 
 
 DEFAULT_CONFIG = {
@@ -100,6 +98,7 @@ DEFAULT_CONFIG = {
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
             "train": train_mcdrop,
+            "get_mean_variance":mcdrop_mean_variance,
         },
         "local_dir": summaries_dir,
         "stop": {"training_iteration": 61},
@@ -119,7 +118,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "mcdrop003"
+    else: config_name = "mcdrop000"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     ray.init(memory=config["memory"])
@@ -128,6 +127,7 @@ if __name__ == "__main__":
 #     # this will fit the model outside of tune
     mcdrop = MCDrop(config["regressor_config"]["config"])
     print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
-#
+    print(mcdrop.get_mean_variance(mcdrop.train_loader))
+
 
 

@@ -41,7 +41,7 @@ def bll_on_fps(config):
     val_fps = np.stack([d.fp for d in val_loader.dataset], axis=0)
     train_targets_norm = config["normalizer"].tfm(train_targets)
     val_targets_norm = config["normalizer"].tfm(val_targets)
-    scores = bayesian_ridge(train_fps ,val_fps ,train_targets_norm, val_targets_norm, config)
+    scores = bayesian_ridge(train_fps,val_fps, train_targets_norm, val_targets_norm, config)
     print(scores)
 
 bll_on_fps(config)
