@@ -56,21 +56,19 @@ class FPBaselineTrainer(tune.Trainable):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.data = DrugCombDbFingerprints(transform=config["transform"])
-        self.data.fingerprints = self.data.fingerprints.to(self.device)
+        self.data = DrugCombDbFingerprints(transform=config["transform"]).to(self.device)
 
         train_idxs, val_idxs, test_idxs = self.data.random_split(config["test_set_prop"], config["val_set_prop"])
-        import pdb; pdb.set_trace()
 
         # Train loader
-        train_ddi_dataset = TensorDataset(*self.data[train_idxs]).to(self.device)
+        train_ddi_dataset = TensorDataset(*self.data[train_idxs])
 
         self.train_loader = DataLoader(train_ddi_dataset,
                                        batch_size=config["batch_size"],
                                        pin_memory=(self.device == 'cpu'))
 
         # Valid loader
-        valid_ddi_dataset = TensorDataset(*self.data[val_idxs]).to(self.device)
+        valid_ddi_dataset = TensorDataset(*self.data[val_idxs])
 
         self.valid_loader = DataLoader(valid_ddi_dataset, batch_size=config["batch_size"],
                                        pin_memory=(self.device == 'cpu'))
@@ -78,7 +76,7 @@ class FPBaselineTrainer(tune.Trainable):
         config["device"] = self.device
 
         # Initialize model and optimizer
-        self.model = ResponseBaselineFP(config, self.data.fingeprints).to(self.device)
+        self.model = ResponseBaselineFP(config, self.data.fingerprints.shape[1]).to(self.device)
         # self.model = GCN(config).to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
 
@@ -130,7 +128,7 @@ if __name__ == '__main__':
         "checkpoint_freq": 200,
         "stop": {"training_iteration": 600},
         "checkpoint_at_end": False,
-        "resources_per_trial": {},#{"gpu": 1},
+        "resources_per_trial": {"gpu": 1},
         "name": "SimpleBaselineProtOneCellLine"
     }
 

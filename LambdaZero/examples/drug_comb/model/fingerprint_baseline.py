@@ -19,7 +19,7 @@ class ResponseBaselineFP(torch.nn.Module):
         self.activation = torch.nn.ReLU()
         self.criterion = torch.nn.MSELoss()
 
-    def forward(self, data, drug_drug_batch):
+    def forward(self, fingerprints, drug_drug_batch):
 
         #####################################################
         # Build batch data
@@ -32,8 +32,8 @@ class ResponseBaselineFP(torch.nn.Module):
         x_drug_1s = fingerprints[drug_1s]
         x_drug_2s = fingerprints[drug_2s]
 
-        batch_data_1 = torch.cat((x_drug_1s, drug_drug_batch[2]), dim=1)
-        batch_data_2 = torch.cat((x_drug_2s, drug_drug_batch[3]), dim=1)
+        batch_data_1 = torch.cat((x_drug_1s, drug_drug_batch[2].reshape(-1, 1)), dim=1)
+        batch_data_2 = torch.cat((x_drug_2s, drug_drug_batch[3].reshape(-1, 1)), dim=1)
 
         #####################################################
         # Forward

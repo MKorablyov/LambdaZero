@@ -1,7 +1,7 @@
 from LambdaZero.utils import get_external_dirs
 from torch.utils.data import Dataset
 from torch_geometric.data import download_url
-from unrar import rarfile
+#from unrar import rarfile
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import numpy as np
@@ -38,6 +38,14 @@ class DrugCombDbFingerprints(Dataset):
 
         self.ddi_edge_idx, self.ddi_edge_attr, self.ddi_edge_trgt, self.fingerprints = \
             torch.load(self.processed_path)
+
+    def to(self, device):
+        self.ddi_edge_idx = self.ddi_edge_idx.to(device)
+        self.ddi_edge_attr = self.ddi_edge_attr.to(device)
+        self.ddi_edge_trgt = self.ddi_edge_trgt.to(device)
+        self.fingerprints = self.fingerprints.to(device)
+
+        return self
 
     def __len__(self):
         return self.ddi_edge_idx.shape[1]
@@ -124,7 +132,7 @@ class DrugCombDbFingerprints(Dataset):
         ddi_edge_idx = torch.tensor(ddi_edge_idx, dtype=torch.long)
         ddi_edge_attr = torch.tensor(ddi_edge_attr, dtype=torch.float)
         ddi_edge_trgt = torch.tensor(ddi_edge_trgt, dtype=torch.float)
-        fingerprints = torch.tensor(x_drugs.to_numpy(), dtype=torch.long)
+        fingerprints = torch.tensor(x_drugs.to_numpy(), dtype=torch.float)
 
         torch.save((ddi_edge_idx, ddi_edge_attr, ddi_edge_trgt, fingerprints), self.processed_path)
 
