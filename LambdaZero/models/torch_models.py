@@ -206,15 +206,17 @@ class MPNNetDrop(nn.Module):
         self.lin2 = nn.Linear(dim, 1)
 
     def forward(self, data, do_dropout, drop_p):
-        out = nn.functional.relu(self.lin0(data.x))
+        x = nn.functional.dropout(data.x, training = do_dropout, p = drop_p)
+        out = nn.functional.relu(nn.functional.dropout(self.lin0(x),training=do_dropout, p=drop_p))
         h = out.unsqueeze(0)
 
         for i in range(3):
-            m = nn.functional.relu(self.conv(out, data.edge_index, data.edge_attr))
+            m = nn.functional.relu(nn.functional.dropout(self.conv(out, data.edge_index, data.edge_attr),training=do_dropout, p=drop_p))
             out, h = self.gru(m.unsqueeze(0), h)
+            out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
             out = out.squeeze(0)
 
-        out = self.set2set(out, data.batch)
+        out = nn.functional.dropout(self.set2set(out, data.batch), training=do_dropout, p=drop_p)
         out = nn.functional.relu(self.lin1(out))
         out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
         out = self.lin2(out)
