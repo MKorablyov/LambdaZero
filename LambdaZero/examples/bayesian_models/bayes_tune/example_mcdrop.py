@@ -6,6 +6,7 @@ from torch_geometric import transforms as T
 
 import ray
 from ray import tune
+from ray.tune import grid_search
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models.catalog import ModelCatalog
 import LambdaZero.inputs
@@ -80,7 +81,6 @@ DEFAULT_CONFIG = {
             },
             "b_size": 40,
             "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
-
             "lambda": 1e-8,
             "T": 20,
             "drop_p": 0.1,
@@ -118,17 +118,18 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "mcdrop000"
+    else: config_name = "mcdrop001"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
+
     ray.init(memory=config["memory"])
     # this will run train the model with tune scheduler
-    #tune.run(**config["regressor_config"])
+    tune.run(**config["regressor_config"])
 #     # this will fit the model outside of tune
-    mcdrop = MCDrop(config["regressor_config"]["config"])
-    print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
-    print(mcdrop.get_mean_variance(mcdrop.train_loader))
+    #mcdrop = MCDrop(config["regressor_config"]["config"])
+    #print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
+    #print(mcdrop.get_mean_variance(mcdrop.train_loader))
 
 
 

@@ -7,7 +7,7 @@ mcdrop000 = {}
 
 mcdrop001 = {"regressor_config":
                  {"config":
-                      {"lambda":grid_search(list(0.1**np.linspace(start=7,stop=9,num=10)))}
+                      {"lambda": grid_search(list(0.1**np.linspace(start=7,stop=9,num=10)))}
                   },
              }
 
