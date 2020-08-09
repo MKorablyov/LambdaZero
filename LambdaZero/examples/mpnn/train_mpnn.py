@@ -45,7 +45,7 @@ def train_epoch(loader, model, optimizer, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.train()
 
-    metrics = {"loss":0,}
+    metrics = {"loss":0,"mae":0,"mse":0,"top15_regret":0,"top50_regret":0}
     epoch_targets = []
     epoch_preds = []
 
@@ -89,15 +89,19 @@ def train_epoch(loader, model, optimizer, device, config):
 def eval_epoch(loader, model, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.eval()
-    metrics = {"loss":0,}
+    metrics = {"loss":0,"mae":0,"mse":0,"top15_regret":0,"top50_regret":0}
     epoch_targets = []
     epoch_preds = []
 
     for bidx,data in enumerate(loader):
         data = data.to(device)
         targets = getattr(data, config["target"])
+        
+        if config["model_type"] == "dime":
+            logits = model(z=data.z,pos=data.pos,batch=data.batch).squeeze(1)
+        else:
+            logits = model(data)
 
-        logits = model(z=data.z,pos=data.pos,batch=data.batch)
         loss = F.mse_loss(logits, normalizer.normalize(targets))
 
         # log stuff
@@ -114,10 +118,15 @@ def eval_epoch(loader, model, device, config):
     ranked_targets = epoch_targets[np.argsort(epoch_targets)]
     predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
     metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
+    print("difference:")
+    print(np.median(predsranked_targets[:50]))
+    print(np.median(ranked_targets[:50]))
+    print(np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50]))
+
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
 
-loaded_model = DimeNet(hidden_channels=128, out_channels=1, num_blocks=6,
+loaded_model = DimeNet(hidden_channels=256, out_channels=1, num_blocks=6,
                         num_bilinear=8, num_spherical=7, num_radial=6,
                         cutoff=5.0, envelope_exponent=5, num_before_skip=1,
                         num_after_skip=2, num_output_layers=3) if model_type == "dime" else LambdaZero.models.MPNNet()
@@ -130,7 +139,7 @@ DEFAULT_CONFIG = {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
         "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/" + split_file),
-        "b_size": 8,
+        "b_size": 32,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
@@ -156,10 +165,10 @@ DEFAULT_CONFIG = {
 
     "stop": {"training_iteration": 100},
     "resources_per_trial": {
-        "cpu": 4,  # fixme - calling ray.remote would request resources outside of tune allocation
+        "cpu": 12,  # fixme - calling ray.remote would request resources outside of tune allocation
         "gpu": 1.0
     },
-    "keep_checkpoint_num": 2,
+    "keep_checkpoint_num": 1,
     "checkpoint_score_attr":"train_loss",
     "num_samples":1,
     "checkpoint_at_end": True,
