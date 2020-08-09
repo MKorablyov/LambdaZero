@@ -137,7 +137,7 @@ def sample_embeds(loader, model, device, config):
     epoch_embeds = []
     for bidx, data in enumerate(loader):
         data = data.to(device)
-        embeds = model.get_embed(data, do_dropout=False, drop_p=config["model_config"]["drop_prob"])
+        embeds = model.get_embed(data, do_dropout=False)
         epoch_embeds.append(embeds.detach().cpu().numpy())
     epoch_embeds = np.concatenate(epoch_embeds,axis=0)
     return epoch_embeds

@@ -32,10 +32,6 @@ class MCDrop(tune.Trainable):
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
 
-        # todo: I am not sure if it makes sense to make a copy here
-        #self._train_ref = self.config["train"]
-
-
     def _train(self):
         scores = self.config["train"](
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
@@ -117,7 +113,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "mcdrop003"
+    else: config_name = "mcdrop001"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
