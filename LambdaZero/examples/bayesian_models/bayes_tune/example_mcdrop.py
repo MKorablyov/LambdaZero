@@ -66,29 +66,29 @@ DEFAULT_CONFIG = {
         "config": {
             "target": "gridscore",
             "dataset_creator": LambdaZero.utils.dataset_creator_v1,
-            "dataset_split_path": osp.join(datasets_dir,
-                                           "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-                                           #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+            # "dataset_split_path": osp.join(datasets_dir,
+            #                                "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+            #                                #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "dataset": LambdaZero.inputs.BrutalDock,
             "dataset_config": {
                 "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
                 "props": ["gridscore", "smi"],
                 "transform": transform,
-                "file_names":
-                 ["Zinc15_2k"],
-                #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+                # "file_names":
+                #  ["Zinc15_2k"],
+                # #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
 
             },
             "b_size": 40,
             "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
             "lambda": 1e-8,
             "T": 20,
-            "drop_p": 0.1,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
             "train_iterations":61,
             "model": LambdaZero.models.MPNNetDrop,
-            "model_config": {},
+            # "model_config": {"do_dropout" = True, "dropout_in_data" = True, "drop_etc" = True},
+            # "model_config": {},
 
             "optimizer": torch.optim.Adam,
             "optimizer_config": {
@@ -118,18 +118,19 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "mcdrop001"
+    else: config_name = "mcdrop000"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
 
     ray.init(memory=config["memory"])
     # this will run train the model with tune scheduler
+    #tune.run(**config["regressor_config"])
     tune.run(**config["regressor_config"])
 #     # this will fit the model outside of tune
-    #mcdrop = MCDrop(config["regressor_config"]["config"])
-    #print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
-    #print(mcdrop.get_mean_variance(mcdrop.train_loader))
+    # mcdrop = MCDrop(config["regressor_config"]["config"])
+    # print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
+    # print(mcdrop.get_mean_variance(mcdrop.train_loader))
 
 
 

@@ -23,7 +23,7 @@ def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer, scope):
     return metrics
 
 def get_tau(config, N):
-    tau = (1 - config["drop_p"]) * (config["lengthscale"]**2) / (2 * N * config["lambda"])
+    tau = (1 - config["model_config"]["drop_prob"]) * (config["lengthscale"]**2) / (2 * N * config["lambda"])
     return tau
 
 def _log_lik(y, Yt_hat, config, N):
@@ -49,7 +49,7 @@ def train_epoch(loader, model, optimizer, device, config, scope):
         targets = getattr(data, config["target"])
 
         optimizer.zero_grad()
-        logits = model(data, do_dropout=True, drop_p=config["drop_p"])
+        logits = model(data, do_dropout = True)#, drop_p=config["drop_p"])
         targets_norm = config["normalizer"].tfm(targets)
         reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
         loss = F.mse_loss(logits, targets_norm) + reg_loss
@@ -71,7 +71,7 @@ def sample_logits(loader, model, device, config, num_samples, do_dropout):
         epoch_logits = []
         for bidx, data in enumerate(loader):
             data = data.to(device)
-            logit = model(data, do_dropout=do_dropout, drop_p=config["drop_p"])
+            logit = model(data, do_dropout = do_dropout)#, drop_p=config["drop_p"])
             epoch_logits.append(logit.detach().cpu().numpy())
         sample_logits.append(np.concatenate(epoch_logits, 0))
     return np.stack(sample_logits,0)
@@ -137,7 +137,7 @@ def sample_embeds(loader, model, device, config):
     epoch_embeds = []
     for bidx, data in enumerate(loader):
         data = data.to(device)
-        embeds = model.get_embed(data, do_dropout=False, drop_p=config["drop_p"])
+        embeds = model.get_embed(data, do_dropout=False, drop_p=config["model_config"]["drop_prob"])
         epoch_embeds.append(embeds.detach().cpu().numpy())
     epoch_embeds = np.concatenate(epoch_embeds,axis=0)
     return epoch_embeds
