@@ -86,7 +86,7 @@ DEFAULT_CONFIG = {
             "drop_p": 0.1,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations":61,
+            "train_iterations":200,
             "model": LambdaZero.models.MPNNetDrop,
             "model_config": {},
 
