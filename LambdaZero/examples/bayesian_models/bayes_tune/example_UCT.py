@@ -105,7 +105,7 @@ regressor_config = {
         "uncertainty_eval_freq": 60,
         "train_iterations": 61,
         "model": LambdaZero.models.MPNNetDrop,
-        "model_config": {},
+        # "model_config": {},
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
             "lr": 0.001

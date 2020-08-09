@@ -192,8 +192,11 @@ class MPNNetDrop(nn.Module):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
     """
-    def __init__(self, num_feat=14, dim=64):
+    def __init__(self, do_dropout = True, dropout_in_data = True, drop_etc = True, num_feat=14, dim=64):
         super(MPNNetDrop, self).__init__()
+        self.do_dropout_last_layer = do_dropout
+        self.dropout_in_data = dropout_in_data
+        self.drop_weights = drop_etc
         self.lin0 = nn.Linear(num_feat, dim)
 
         h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
@@ -205,21 +208,20 @@ class MPNNetDrop(nn.Module):
         self.lin1 = nn.Linear(2 * dim, dim)
         self.lin2 = nn.Linear(dim, 1)
 
-    def forward(self, data, do_dropout, drop_p, dropout_in_data=True,
-                drop_in_gru=True,  dropout_in_conv=True, dropout_in_set2set=True):
-        x = nn.functional.dropout(data.x, training = dropout_in_data, p = drop_p)
-        out = nn.functional.relu(nn.functional.dropout(self.lin0(x),training=do_dropout, p=drop_p))
+    def forward(self, data, drop_p):
+        x = nn.functional.dropout(data.x, training = self.dropout_in_data, p = drop_p)
+        out = nn.functional.relu(nn.functional.dropout(self.lin0(x),training=self.drop_weights, p=drop_p))
         h = out.unsqueeze(0)
 
         for i in range(3):
-            m = nn.functional.relu(nn.functional.dropout(self.conv(out, data.edge_index, data.edge_attr),training=dropout_in_conv, p=drop_p))
+            m = nn.functional.relu(nn.functional.dropout(self.conv(out, data.edge_index, data.edge_attr),training=self.drop_weights, p=drop_p))
             out, h = self.gru(m.unsqueeze(0), h)
-            out = nn.functional.dropout(out, training=drop_in_gru, p=drop_p)
+            out = nn.functional.dropout(out, training=self.drop_weights, p=drop_p)
             out = out.squeeze(0)
 
-        out = nn.functional.dropout(self.set2set(out, data.batch), training=dropout_in_set2set, p=drop_p)
+        out = nn.functional.dropout(self.set2set(out, data.batch), training=self.drop_weights, p=drop_p)
         out = nn.functional.relu(self.lin1(out))
-        out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
+        out = nn.functional.dropout(out, training=self.do_dropout_last_layer, p=drop_p)
         out = self.lin2(out)
         return out.view(-1)
 
