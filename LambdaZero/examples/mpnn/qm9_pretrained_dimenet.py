@@ -25,14 +25,19 @@ for target in range(12):
     train_dataset, val_dataset, test_dataset = datasets
 
     model = model.to(device)
-    loader = DataLoader(test_dataset, batch_size=64)
+    loader = DataLoader(test_dataset, batch_size=1)
 
+    i = 0
     maes = []
     for data in loader:
+        i += 1
         data = data.to(device)
         with torch.no_grad():
             pred = model(data.z, data.pos, data.batch)
         mae = (pred.view(-1) - data.y[:, target]).abs()
+
+        print("mae: " + str(mae))
+
         maes.append(mae)
 
     mae = torch.cat(maes, dim=0)

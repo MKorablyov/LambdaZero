@@ -221,9 +221,6 @@ class QM9(InMemoryDataset):
             num_hs = []
 
             for atom in mol.GetAtoms():
-                print(atom.GetAtomicNum())
-
-            for atom in mol.GetAtoms():
                 type_idx.append(self.types[atom.GetSymbol()])
                 atomic_number.append(atom.GetAtomicNum())
                 aromatic.append(1 if atom.GetIsAromatic() else 0)

@@ -511,4 +511,7 @@ class DimeNet(torch.nn.Module):
             x = interaction_block(x, rbf, sbf, idx_kj, idx_ji)
             P += output_block(x, rbf, i)
 
+        print("batch: ")
+        print(batch)
+
         return P.sum(dim=0) if batch is None else scatter(P, batch, dim=0)
