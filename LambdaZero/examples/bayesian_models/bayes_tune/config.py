@@ -28,22 +28,22 @@ mcdrop002 = {"regressor_config":
                           "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]}
                        }}}
 # adjust lambda; and figure out where do dropout on large/small dataset
-mcdrop005= {"regressor_config":
+mcdrop003= {"regressor_config":
                  {"config":
                       {"lambda":grid_search(list(10 ** np.linspace(-4,-12,num=10))),
                        }}}
-mcdrop006= {"regressor_config":
+mcdrop004= {"regressor_config":
                  {"config":
                       {"lambda":grid_search(list(10 ** np.linspace(-4,-12,num=10))),
                        "model_config": {"drop_data":False, "drop_weights":True, "drop_last":True}
                        }}}
-mcdrop007= {"regressor_config":
+mcdrop005= {"regressor_config":
                  {"config":
                       {"lambda":grid_search(list(10 ** np.linspace(-4,-12,num=10))),
                        "model_config": {"drop_data":True, "drop_weights":True, "drop_last":True}
                        }}}
 
-mcdrop008= {"regressor_config":
+mcdrop006= {"regressor_config":
                  {"config":
                       {"lambda":grid_search(list(10 ** np.linspace(-4,-12,num=10))),
                        "dataset_split_path":
@@ -51,7 +51,7 @@ mcdrop008= {"regressor_config":
                        "dataset_config": {
                            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]}
                       }}}
-mcdrop009= {"regressor_config":
+mcdrop007= {"regressor_config":
                  {"config":
                       {"lambda":grid_search(list(10 ** np.linspace(-4,-12,num=10))),
                        "model_config": {"drop_last":True, "drop_data":True, "drop_weights":True},
