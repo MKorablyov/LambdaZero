@@ -100,7 +100,6 @@ regressor_config = {
         "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
         "lambda": 1e-8,
         "T": 20,
-        "drop_p": 0.1,
         "lengthscale": 1e-2,
         "uncertainty_eval_freq": 60,
         "train_iterations": 61,
@@ -121,16 +120,16 @@ DEFAULT_CONFIG = {
         "run_or_experiment": UCT,
         "config":{
             "dataset_creator": LambdaZero.utils.dataset_creator_v1,
-            "dataset_split_path": osp.join(datasets_dir,
-                                           "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-                                            #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+            # "dataset_split_path": osp.join(datasets_dir,
+            #                                "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+            #                                 #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "dataset": LambdaZero.inputs.BrutalDock,
             "dataset_config": {
                 "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
                 "props": ["gridscore", "smi"],
                 "transform": transform,
-                "file_names":
-                    ["Zinc15_2k"],
+                # "file_names":
+                #     ["Zinc15_2k"],
                     #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
             },
             "regressor": MCDrop,

@@ -19,16 +19,14 @@ uct000 = {}
 uct001 = {
     "acquirer_config":{
         "config":{
+            "dataset_split_path": small_path,
+            "dataset_config": {
+                "file_names": small_file_name},
             "regressor_config":{
                 "config":
                     {"train": train_mpnn_brr,
                      "get_mean_variance": mpnn_brr_mean_variance,
-                     "model_config": {"do_dropout" : False, "dropout_in_data" : False, "drop_etc" : False},
-                     "dataset_split_path": small_path,
-                     "dataset_config": {
-                        "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                        "props": ["gridscore", "smi"],
-                        "file_names": small_file_name}
+                     "model_config": {"do_dropout_last_layer" : False, "dropout_in_data" : False, "drop_weights" : False, 'drop_prob': 0.1},
                 }
             }
         }
@@ -46,15 +44,12 @@ uct002 = {
                 "train":train_mpnn_brr,
                 "get_mean_variance": mpnn_brr_mean_variance,
                 "kappa":grid_search(list(np.linspace(start=0.01,stop=100,num=20))),
-                #"model_config": {"do_dropout": False, "dropout_in_data": False, "drop_etc": False},
                 "dataset_split_path": small_path,
                 "dataset_config": {
-                    "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                    "props": ["gridscore", "smi"],
                     "file_names": small_file_name},
                 "regressor_config":{
                     "config":{
-                        "model_config": {"do_dropout" : False, "dropout_in_data" : False, "drop_etc" : False}
+                        "model_config": {"do_dropout_last_layer" : False, "dropout_in_data" : False, "drop_weights" : False, 'drop_prob': 0.1}
                     }
                 }
         }
@@ -66,15 +61,13 @@ uct003 = {
             "config":{
                 "train":train_mpnn_brr,
                 "get_mean_variance": mpnn_brr_mean_variance,
-                "kappa":grid_search(list(np.linspace(start=0.01,stop=100,num=20))),
+                "kappa":grid_search(list(np.linspace(start=0.01,stop=100,num=5))),
                 "dataset_split_path": big_path,
                 "dataset_config": {
-                    "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                    "props": ["gridscore", "smi"],
                     "file_names": big_file_name},
                 "regressor_config":{
                     "config":{
-                        "model_config": {"do_dropout" : False, "dropout_in_data" : False, "drop_etc" : False}
+                        "model_config": {"do_dropout_last_layer" : False, "dropout_in_data" : False, "drop_weights" : False, 'drop_prob': 0.1}
                     }
                 }
         }
@@ -92,12 +85,10 @@ uct004 = {
           # "kappa": using the best kappa found
             "dataset_split_path": small_path,
                 "dataset_config": {
-                    "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                    "props": ["gridscore", "smi"],
                     "file_names": small_file_name},
                 "regressor_config":{
                     "config":{
-                        "model_config": {"do_dropout" : False, "dropout_in_data" : False, "drop_etc" : False}
+                        "model_config": {"do_dropout_last_layer" : False, "dropout_in_data" : False, "drop_weights" : False, 'drop_prob': 0.1}
                     }
                 }
         }
@@ -111,12 +102,10 @@ uct005 = {
           # "kappa": using the best kappa found
             "dataset_split_path": big_path,
                 "dataset_config": {
-                    "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                    "props": ["gridscore", "smi"],
                     "file_names": big_file_name},
                 "regressor_config":{
                     "config":{
-                        "model_config": {"do_dropout" : False, "dropout_in_data" : False, "drop_etc" : False}
+                        "model_config": {"do_dropout_last_layer" : False, "dropout_in_data" : False, "drop_weights" : False, 'drop_prob': 0.1}
                     }
                 }
         }

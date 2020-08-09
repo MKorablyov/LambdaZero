@@ -18,11 +18,9 @@ mcdrop000 = {}
 # mcdrop001 = {"regressor_config":
 #                  {"config":
 #                       {"lambda":grid_search(list(0.1**np.linspace(start=7,stop=9,num=10))),
-#                       "model_config": {"do_dropout": True, "dropout_in_data": True, "drop_etc": True},
+#                       "model_config": {"do_dropout_last_layer": True, "dropout_in_data": True, "drop_weights": True, 'drop_prob': 0.1},
 #                       "dataset_split_path": small_path,
 #                        "dataset_config": {
-#                          "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-#                          "props": ["gridscore", "smi"],
 #                          "file_names": small_file_name}
 #                       }
 #                   },
@@ -31,11 +29,9 @@ mcdrop000 = {}
 # mcdrop002 = {"regressor_config":
 #                  {"config":
 #                       {"T":50,
-#                       "model_config": {"do_dropout": True, "dropout_in_data": True, "drop_etc": True},
+#                       "model_config": {"do_dropout_last_layer": True, "dropout_in_data": True, "drop_weights": True, 'drop_prob': 0.1},
 #                       "dataset_split_path": small_path,
 #                        "dataset_config": {
-#                          "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-#                          "props": ["gridscore", "smi"],
 #                          "file_names": small_file_name}
 #                       }
 #                   },
@@ -49,13 +45,10 @@ mcdrop003 = {"regressor_config":
                  {"config":
                       {"train":train_mpnn_brr,
                        "get_mean_variance": mpnn_brr_mean_variance,
-                       "model_config": {"do_dropout" : True, "dropout_in_data" : True, "drop_etc" : True},
+                       "model_config": {"do_dropout_last_layer" : True, "dropout_in_data" : True, "drop_weights" : True, 'drop_prob': 0.1},
                        "dataset_split_path": small_path,
                        "dataset_config": {
-                         "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                         "props": ["gridscore", "smi"],
                          "file_names": small_file_name}
-                       
                        }
                   },
              }
@@ -64,11 +57,9 @@ mcdrop004 = {"regressor_config":
                  {"config":
                       {"train":train_mpnn_brr,
                        "get_mean_variance": mpnn_brr_mean_variance,
-                       "model_config": {"do_dropout" : True, "dropout_in_data" : True, "drop_etc" : True},
+                       "model_config": {"do_dropout_last_layer" : True, "dropout_in_data" : True, "drop_weights" : True, 'drop_prob': 0.1},
                        "dataset_split_path": big_path,
                        "dataset_config": {
-                         "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                         "props": ["gridscore", "smi"],
                          "file_names": big_file_name}
                        
                        }
@@ -81,11 +72,9 @@ mcdrop004 = {"regressor_config":
 mcdrop005= {"regressor_config":
                  {"config":
                       {"lambda":grid_search(list(10 ** np.linspace(-1,-12,num=13))),
-                       "model_config": {"do_dropout" : True, "dropout_in_data" : True, "drop_etc" : True},
+                       "model_config": {"do_dropout_last_layer" : True, "dropout_in_data" : True, "drop_weights" : True, 'drop_prob': 0.1},
                        "dataset_split_path": small_path,
                        "dataset_config": {
-                         "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                         "props": ["gridscore", "smi"],
                          "file_names": small_file_name}
                       }
                   },
@@ -94,11 +83,9 @@ mcdrop005= {"regressor_config":
 mcdrop006= {"regressor_config":
                  {"config":
                       {"lambda":grid_search(list(10 ** np.linspace(-1,-12,num=13))),
-                       "model_config": {"do_dropout" : True, "dropout_in_data" : True, "drop_etc" : True},
+                       "model_config": {"do_dropout_last_layer" : True, "dropout_in_data" : True, "drop_weights" : True, 'drop_prob': 0.1},
                        "dataset_split_path": big_path,
                        "dataset_config": {
-                         "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                         "props": ["gridscore", "smi"],
                          "file_names": big_file_name}
                       }
                   },
@@ -114,11 +101,9 @@ mcdrop006= {"regressor_config":
 #  dropout only on last layer: python example_mcdrop.py mcdrop010
 mcdrop007= {"regressor_config":
                  {"config":
-                      {"model_config": {"do_dropout" : True, "dropout_in_data" : True, "drop_etc" : True},
+                      {"model_config": {"do_dropout_last_layer" : True, "dropout_in_data" : True, "drop_weights" : True, 'drop_prob': 0.1},
                        "dataset_split_path": small_path,
                        "dataset_config": {
-                         "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                         "props": ["gridscore", "smi"],
                          "file_names": small_file_name}
                       }
                   },
@@ -126,11 +111,9 @@ mcdrop007= {"regressor_config":
  
 mcdrop008= {"regressor_config":
                  {"config":
-                      {"model_config": {"do_dropout" : False, "dropout_in_data" : False, "drop_etc" : True},
+                      {"model_config": {"do_dropout_last_layer" : False, "dropout_in_data" : False, "drop_weights" : True, 'drop_prob': 0.1},
                        "dataset_split_path": small_path,
                        "dataset_config": {
-                         "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                         "props": ["gridscore", "smi"],
                          "file_names": small_file_name}
                       }
                   },
@@ -138,11 +121,9 @@ mcdrop008= {"regressor_config":
 
 mcdrop009= {"regressor_config":
                  {"config":
-                      {"model_config": {"do_dropout" : False, "dropout_in_data" : True, "drop_etc" : False},
+                      {"model_config": {"do_dropout_last_layer" : False, "dropout_in_data" : True, "drop_weights" : False, 'drop_prob': 0.1},
                        "dataset_split_path": small_path,
                        "dataset_config": {
-                         "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                         "props": ["gridscore", "smi"],
                          "file_names": small_file_name}
                       }
                   },
@@ -150,11 +131,9 @@ mcdrop009= {"regressor_config":
 
 mcdrop010= {"regressor_config":
                  {"config":
-                      {"model_config": {"do_dropout" : True, "dropout_in_data" : False, "drop_etc" : False},
+                      {"model_config": {"do_dropout_last_layer" : True, "dropout_in_data" : False, "drop_weights" : False, 'drop_prob': 0.1},
                        "dataset_split_path": small_path,
                        "dataset_config": {
-                         "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                         "props": ["gridscore", "smi"],
                          "file_names": small_file_name}
                       }
                   },

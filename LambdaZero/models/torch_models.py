@@ -192,11 +192,12 @@ class MPNNetDrop(nn.Module):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
     """
-    def __init__(self, do_dropout = True, dropout_in_data = True, drop_etc = True, num_feat=14, dim=64):
+    def __init__(self, do_dropout_last_layer, dropout_in_data, drop_weights, drop_prob, num_feat=14, dim=64):
         super(MPNNetDrop, self).__init__()
-        self.do_dropout_last_layer = do_dropout
+        self.do_dropout_last_layer = do_dropout_last_layer
         self.dropout_in_data = dropout_in_data
-        self.drop_weights = drop_etc
+        self.drop_weights = drop_weights
+        self.drop_prob = drop_prob
         self.lin0 = nn.Linear(num_feat, dim)
 
         h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
@@ -208,21 +209,28 @@ class MPNNetDrop(nn.Module):
         self.lin1 = nn.Linear(2 * dim, dim)
         self.lin2 = nn.Linear(dim, 1)
 
-    def forward(self, data, drop_p):
-        x = nn.functional.dropout(data.x, training = self.dropout_in_data, p = drop_p)
-        out = nn.functional.relu(nn.functional.dropout(self.lin0(x),training=self.drop_weights, p=drop_p))
+    def forward(self, data, do_dropout):
+        x = nn.functional.dropout(data.x, training = self.dropout_in_data, p = self.drop_prob) if do_dropout \
+            else nn.functional.dropout(data.x, training = False, p = self.drop_prob)
+        out = nn.functional.relu(nn.functional.dropout(self.lin0(x),training=self.drop_weights, p=self.drop_prob)) if do_dropout \
+            else nn.functional.relu(nn.functional.dropout(self.lin0(x),training=False, p=self.drop_prob))
         h = out.unsqueeze(0)
 
         for i in range(3):
-            m = nn.functional.relu(nn.functional.dropout(self.conv(out, data.edge_index, data.edge_attr),training=self.drop_weights, p=drop_p))
+            m = nn.functional.relu(nn.functional.dropout(self.conv(out, data.edge_index, data.edge_attr),training=self.drop_weights, p=self.drop_prob)) if do_dropout \
+                else nn.functional.relu(nn.functional.dropout(self.conv(out, data.edge_index, data.edge_attr),training=False, p=self.drop_prob))
             out, h = self.gru(m.unsqueeze(0), h)
-            out = nn.functional.dropout(out, training=self.drop_weights, p=drop_p)
+            out = nn.functional.dropout(out, training=self.drop_weights, p=self.drop_prob) if do_dropout \
+                  else nn.functional.dropout(out, training=False, p=self.drop_prob)
             out = out.squeeze(0)
 
-        out = nn.functional.dropout(self.set2set(out, data.batch), training=self.drop_weights, p=drop_p)
+        out = nn.functional.dropout(self.set2set(out, data.batch), training=self.drop_weights, p=self.drop_prob) if do_dropout \
+              else nn.functional.dropout(self.set2set(out, data.batch), training=False, p=self.drop_prob)
         out = nn.functional.relu(self.lin1(out))
-        out = nn.functional.dropout(out, training=self.do_dropout_last_layer, p=drop_p)
+        out = nn.functional.dropout(out, training=self.do_dropout_last_layer, p=self.drop_prob) if do_dropout \
+              else nn.functional.dropout(out, training=False, p=self.drop_prob)
         out = self.lin2(out)
+
         return out.view(-1)
 
     def get_embed(self, data, do_dropout, drop_p):

@@ -71,8 +71,8 @@ DEFAULT_CONFIG = {
             #                                #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "dataset": LambdaZero.inputs.BrutalDock,
             "dataset_config": {
-                # "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                # "props": ["gridscore", "smi"],
+                "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
+                "props": ["gridscore", "smi"],
                 "transform": transform,
                 # "file_names":
                 #  ["Zinc15_2k"],
@@ -83,7 +83,6 @@ DEFAULT_CONFIG = {
             "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
             "lambda": 1e-8,
             "T": 20,
-            "drop_p": 0.1,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
             "train_iterations":61,
