@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from LambdaZero.examples.env3d.loss import class_and_angle_loss
 
@@ -28,7 +29,7 @@ def train_epoch(loader, model, optimizer, device, config):
 
     metrics = {}
 
-    for data in loader:
+    for data in tqdm(loader, desc="TRAIN"):
 
         data = data.to(device)
 
@@ -111,7 +112,7 @@ def eval_epoch(loader, model, device, config):
     model.eval()
     metrics = {}
 
-    for data in loader:
+    for data in tqdm(loader, desc="EVAL"):
         data = data.to(device)
 
         class_target = data.attachment_block_class
@@ -156,7 +157,7 @@ def eval_epoch(loader, model, device, config):
         ) / max(1, metrics.get("n_angles", 0) + n_angle)
         # we have to do the same for the MAE
         metrics["angle_mae"] = (
-            metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item()
+            metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item() * n_angle
         ) / max(1, metrics.get("n_angles", 0) + n_angle)
 
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
