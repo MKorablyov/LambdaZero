@@ -104,6 +104,25 @@ uct004 = {
     }
 }
 
+uct005 = {
+    "acquirer_config":{
+        "config":{
+            "epsilon": grid_search([0, 1000]),
+          # "kappa": using the best kappa found
+            "dataset_split_path": big_path,
+                "dataset_config": {
+                    "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
+                    "props": ["gridscore", "smi"],
+                    "file_names": big_file_name},
+                "regressor_config":{
+                    "config":{
+                        "model_config": {"do_dropout" : False, "dropout_in_data" : False, "drop_etc" : False}
+                    }
+                }
+        }
+    }
+}
+
 # # # (3) find the best alpha for mpnn + mcdrop
 # # # see config.py
 
