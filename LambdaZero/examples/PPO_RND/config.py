@@ -43,7 +43,7 @@ ppo_graph_rnd_001 = {
             "custom_options":{
                 "num_hidden": 64, # does a **kw to __init__
                 "rnd_weight": 1,
-                "rnd_output_dim": 16
+                "rnd_output_dim": 64
             }
         },
         "lr": 5e-5,
@@ -69,7 +69,7 @@ ppo_graph_rnd_002 = {
             "custom_options":{
                 "num_hidden": 64, # does a **kw to __init__
                 "rnd_weight": 1,
-                "rnd_output_dim": 16,
+                "rnd_output_dim": 64,
                 "rnd_adv_weight": 0.5,
                 "rnd_vf_loss_weight": 0.5,
             }
@@ -97,7 +97,7 @@ ppo_graph_rnd_003 = {
             "custom_options":{
                 "num_hidden": 64, # does a **kw to __init__
                 "rnd_weight": 1,
-                "rnd_output_dim": 16,
+                "rnd_output_dim": 64,
                 "rnd_adv_weight": 0.1,
                 "rnd_vf_loss_weight": 0.1,
             }
@@ -125,9 +125,9 @@ ppo_graph_rnd_004 = {
             "custom_options":{
                 "num_hidden": 64, # does a **kw to __init__
                 "rnd_weight": 1,
-                "rnd_output_dim": 32,
-                "rnd_adv_weight": 0.5,
-                "rnd_vf_loss_weight": 0.5,
+                "rnd_output_dim": 64,
+                "rnd_adv_weight": 2,
+                "rnd_vf_loss_weight": 2,
             }
         },
         "lr": 5e-5,
@@ -153,7 +153,9 @@ ppo_graph_rnd_005 = {
             "custom_options":{
                 "num_hidden": 64, # does a **kw to __init__
                 "rnd_weight": 1,
-                "rnd_output_dim": 32
+                "rnd_output_dim": 64,
+                "rnd_adv_weight": 0.01,
+                "rnd_vf_loss_weight": 0.01,
             }
         },
         "lr": 5e-5,
@@ -185,7 +187,7 @@ ppo001_graph_buf = {
         #"entropy_coeff": 1e-5,
         "framework": "torch",
     },
-    "buffer_size": 100_000,
+    "buffer_size": 500_000,
 }
 
 ppo002_graph_buf = {
@@ -211,7 +213,7 @@ ppo002_graph_buf = {
         # "entropy_coeff": 1e-5,
         "framework": "torch",
     },
-    "buffer_size": 100_000,
+    "buffer_size": 500_000,
 }
 
 ppo003_graph_buf = {
@@ -237,7 +239,7 @@ ppo003_graph_buf = {
         #"entropy_coeff": 1e-5,
         "framework": "torch",
     },
-    "buffer_size": 100_000,
+    "buffer_size": 500_000,
 }
 
 ppo004_graph_buf = {
@@ -263,7 +265,7 @@ ppo004_graph_buf = {
         #"entropy_coeff": 1e-5,
         "framework": "torch",
     },
-    "buffer_size": 100_000,
+    "buffer_size": 500_000,
 }
 
 ppo005_graph_buf = {
@@ -289,7 +291,7 @@ ppo005_graph_buf = {
         #"entropy_coeff": 1e-5,
         "framework": "torch",
     },
-    "buffer_size": 100_000,
+    "buffer_size": 500_000,
 }
 
 ppo006_graph_buf = {
@@ -315,7 +317,7 @@ ppo006_graph_buf = {
         #"entropy_coeff": 1e-5,
         "framework": "torch",
     },
-    "buffer_size": 100_000,
+    "buffer_size": 500_000,
 }
 
 

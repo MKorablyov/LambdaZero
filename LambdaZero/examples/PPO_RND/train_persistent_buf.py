@@ -25,8 +25,9 @@ DEFAULT_CONFIG = {
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
         "num_workers": 11,
-        "num_gpus_per_worker": 0.075,
-        "num_gpus": 3,
+        "num_envs_per_worker": 2,
+        "num_gpus_per_worker": 0.1,
+        "num_gpus": 2,
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
         },

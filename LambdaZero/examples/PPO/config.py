@@ -319,6 +319,7 @@ ppo_graph_002 = {
             },
             "max_steps": 15,
             "max_blocks": 10,
+            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -327,7 +328,7 @@ ppo_graph_002 = {
         "lr": 5e-5,
         "framework": "torch",
     },
-    "checkpoint_freq": 25,
+    "checkpoint_freq": 50,
 }
 
 ppo_graph_003 = {
@@ -344,6 +345,7 @@ ppo_graph_003 = {
             },
             "max_steps": 10,
             "max_blocks": 10,
+            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -352,10 +354,56 @@ ppo_graph_003 = {
         "lr": 5e-5,
         "framework": "torch",
     },
-    "checkpoint_freq": 25,
+    "checkpoint_freq": 50,
 }
 
 ppo_graph_004 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "max_steps": 15,
+            "max_blocks": 10,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "framework": "torch",
+    },
+    "checkpoint_freq": 50,
+}
+
+ppo_graph_005 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "max_steps": 10,
+            "max_blocks": 10,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "framework": "torch",
+    },
+    "checkpoint_freq": 50,
+}
+
+ppo_graph_006 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {
@@ -374,28 +422,7 @@ ppo_graph_004 = {
         "lr": 5e-5,
         "framework": "torch",
     },
-    "checkpoint_freq": 25,
-}
-
-ppo_graph_005 = {
-    "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v3,
-            "reward_config": {
-                "synth_config": synth_config,
-                "dockscore_config": binding_config,
-            },
-        },
-        "model": {
-            "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
-        },
-        "lr": 5e-4,
-        "framework": "torch",
-    },
-    "checkpoint_freq": 25,
+    "checkpoint_freq": 50,
 }
 
 # "reward_config": {
