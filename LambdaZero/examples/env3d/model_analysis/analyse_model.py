@@ -2,12 +2,12 @@ import logging
 from copy import copy
 from pathlib import Path
 
-import seaborn as sns
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import torch
 from sklearn.metrics import ConfusionMatrixDisplay
-from torch.nn import Softmax
 from torch_geometric.data import DataLoader
 
 from LambdaZero.examples.dataset_splitting import RandomDatasetSplitter
@@ -24,12 +24,12 @@ sns.set(font_scale=1.5)
 model_dir = Path("/Users/bruno/Desktop/model/")
 model_path = model_dir.joinpath("model.pth")
 
-model_config = {"num_angle_prediction_hidden_features": 64,
+model_config = {"num_angle_prediction_hidden_features": 128,
                 "num_block_prediction_hidden_features": 256,
                 "num_edge_network_hidden_features": 32,
-                "num_hidden_features": 128,
+                "num_hidden_features": 64,
                 "number_of_block_classes": 105,
-                "number_of_layers": 2,
+                "number_of_layers": 4,
                 "set2set_steps": 3,
                 }
 
@@ -46,16 +46,13 @@ _, _, summaries_dir = get_external_dirs()
 dataset_pickle_path = Path(summaries_dir).joinpath("debug/forecast.pkl")
 dataset_pickle_path.parent.mkdir(exist_ok=True)
 
-
-softmax = Softmax(dim=1)
-
 if __name__ == '__main__':
     if not dataset_pickle_path.is_file():
         # generate the forecast if it doesn't exist already
         # This is DANGEROUS. It is VERY EASY to forget to delete the pickle
         # to regenerate. Handle with care!
         model = BlockAngleModel(**model_config)
-        # model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
         model.eval()
 
         dataset = BrutalDock(**dataset_config)
@@ -95,9 +92,9 @@ if __name__ == '__main__':
     # Plot angle error
     angle_df = copy(df[df['actual angle'] >= 0.])
 
-    for type in ['actual', 'predicted']:
-        angle_df[f'{type} cos'] = angle_df[f'{type} angle'].apply(np.cos)
-        angle_df[f'{type} sin'] = angle_df[f'{type} angle'].apply(np.sin)
+    for kind in ['actual', 'predicted']:
+        angle_df[f'{kind} cos'] = angle_df[f'{kind} angle'].apply(np.cos)
+        angle_df[f'{kind} sin'] = angle_df[f'{kind} angle'].apply(np.sin)
 
     actual_vectors = angle_df[['actual cos', 'actual sin']].values
     predicted_vectors = angle_df[['predicted cos', 'predicted sin']].values
