@@ -64,8 +64,7 @@ class PersistentSearchBuffer:
             fp_buff = np.asarray(self.mol_fps)
             dist = np.sum(np.abs(fp_buff - mol_fp[None, :]), axis=1)
             dist = 1 - (dist / (np.sum(np.abs(fp_buff),1) + np.sum(np.abs(mol_fp[None,:]),1)))
-            return (dist > threshold).any()
-            # print("min dist", np.max(dist), "mean dist",  np.mean(dist))
+            return (dist < threshold).any()
 
     def add(self, mol, mol_info, mol_fp):
         if len(self.mols) >= self.max_size:
