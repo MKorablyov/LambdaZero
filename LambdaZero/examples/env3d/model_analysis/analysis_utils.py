@@ -64,7 +64,6 @@ def get_actual_and_predictions(model, training_dataloader):
 
     Returns:
         actual_and_predictions (pd.DataFrame): datafame with the actual and predicted values
-
     """
     softmax = Softmax(dim=1)
     list_df = []
