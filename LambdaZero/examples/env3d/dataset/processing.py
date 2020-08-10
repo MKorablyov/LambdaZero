@@ -102,3 +102,10 @@ def transform_concatenate_positions_to_node_features(graph: Data) -> Data:
     transformed_graph.x = torch.cat([graph.x, graph.pos], axis=1)
 
     return transformed_graph
+
+
+def class_filter_generator(class_label: int):
+    def class_filter(graph: Data) -> bool:
+        return graph.attachment_block_class == class_label
+
+    return class_filter
