@@ -5,7 +5,7 @@ from ray import tune
 from LambdaZero.examples.env3d.dataset import ENV3D_DATA_PROPERTIES
 from LambdaZero.examples.env3d.dataset.processing import (
     env3d_proc,
-    transform_concatenate_positions_to_node_features,
+    transform_concatenate_positions_to_node_features, class_filter_generator,
 )
 from LambdaZero.examples.env3d.env3d_model_trainer import Env3dModelTrainer
 from LambdaZero.examples.env3d.epoch_stepper import train_epoch, eval_epoch
@@ -28,7 +28,7 @@ if __name__ == "__main__":
                                 )
 
     ray.init()
-
+    special_class = 28
     env3d_config = {
         "trainer": Env3dModelTrainer,
         "trainer_config": {
@@ -52,6 +52,7 @@ if __name__ == "__main__":
                 "props": ENV3D_DATA_PROPERTIES,
                 "proc_func": env3d_proc,
                 "transform": transform_concatenate_positions_to_node_features,
+                "pre_filter":class_filter_generator(special_class),
                 "file_names": [args.data_file_name.replace(".feather", "")], # remove suffix in case it is there
             },
         },
