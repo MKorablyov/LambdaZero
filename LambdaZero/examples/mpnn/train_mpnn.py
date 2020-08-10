@@ -26,17 +26,11 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 if len(sys.argv) >= 2:
     config_name = sys.argv[1]
     if len(sys.argv) > 2:
-        if len(sys.argv) > 3:
-            split_type = model_type = sys.argv[3]
-        else:
-            split_type = "rand"
-        model_type = sys.argv[2]
+        split_type = sys.argv[2]
     else:
-        model_type = "mpnn"
         split_type = "rand"
 else:
     config_name = "mpnn000"
-    model_type = "mpnn"
     split_type = "rand"
 
 config = getattr(config, config_name)
@@ -55,10 +49,7 @@ def train_epoch(loader, model, optimizer, device, config):
 
         optimizer.zero_grad()
 
-        if config["model_type"] == "dime":
-            logits = model(z=data.z,pos=data.pos,batch=data.batch).squeeze(1)
-        else:
-            logits = model(data)
+        logits = model(data)
 
         if config["loss"] == "L2":
             loss = F.mse_loss(logits, normalizer.normalize(targets))
@@ -97,10 +88,7 @@ def eval_epoch(loader, model, device, config):
         data = data.to(device)
         targets = getattr(data, config["target"])
         
-        if config["model_type"] == "dime":
-            logits = model(z=data.z,pos=data.pos,batch=data.batch).squeeze(1)
-        else:
-            logits = model(data)
+        logits = model(data)
 
         loss = F.mse_loss(logits, normalizer.normalize(targets))
 
@@ -118,18 +106,10 @@ def eval_epoch(loader, model, device, config):
     ranked_targets = epoch_targets[np.argsort(epoch_targets)]
     predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
     metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
-    print("difference:")
-    print(np.median(predsranked_targets[:50]))
-    print(np.median(ranked_targets[:50]))
-    print(np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50]))
-
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
 
-loaded_model = DimeNet(hidden_channels=256, out_channels=1, num_blocks=6,
-                        num_bilinear=8, num_spherical=7, num_radial=6,
-                        cutoff=5.0, envelope_exponent=5, num_before_skip=1,
-                        num_after_skip=2, num_output_layers=3) if model_type == "dime" else LambdaZero.models.MPNNet()
+loaded_model = LambdaZero.models.MPNNet()
 
 split_file = "ksplit_Zinc15_260k.npy" if split_type == "KNN" else "randsplit_Zinc15_260k.npy"
 
