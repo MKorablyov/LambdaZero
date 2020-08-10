@@ -26,7 +26,7 @@ from torch_geometric.nn import radius_graph
 from torch_geometric.data import download_url
 from torch_geometric.data.makedirs import makedirs
 
-from dimenet_utils import bessel_basis, real_sph_harm
+from LambdaZero.models import bessel_basis, real_sph_harm
 from math import sqrt, pi as PI
 
 def convert_to_tensor(arr):
