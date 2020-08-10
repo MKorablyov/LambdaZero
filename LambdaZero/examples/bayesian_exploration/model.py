@@ -6,15 +6,33 @@ from ray.rllib.utils.annotations import override
 from ray.rllib.utils.framework import get_activation_fn
 from ray.rllib.utils import try_import_torch
 import numpy as np
+from ray.rllib.models.model import restore_original_dimensions
+from gym.spaces import Discrete, Dict, Box
+from env import Preprocessor
+
 
 import torch.nn.functional as F
 from torch.nn import init
 import torch.nn as nn
 
 # from blitz.module import BayesianLinear
-from LambdaZero.utils import RunningMeanStd
+# from LambdaZero.utils import RunningMeanStd
 
 torch, nn = try_import_torch()
+
+def convert_to_tensor(arr):
+    tensor = torch.from_numpy(np.asarray(arr))
+    if tensor.dtype == torch.double:
+        tensor = tensor.float()
+    return tensor
+
+def get_filter_config(shape):
+    filters_84x84 = [
+        [16, [8, 8], 4],
+        [32, [4, 4], 2],
+        [256, [11, 11], 1],
+    ]
+    return filters_84x84
 
 
 class BayesianVisionNetwork(TorchModelV2, nn.Module):
@@ -196,55 +214,117 @@ class BayesianVisionNetwork(TorchModelV2, nn.Module):
         res = res.squeeze(2)
         return res
 
-class Flatten(nn.Module):
-    def forward(self, input):
-        return input.view(input.size(0), -1)
 
-class RNDModel(nn.Module):
-    def __init__(self):
-        super(RNDModel, self).__init__()
-        # self.input_size = input_size
-        # self.output_size = output_size
-        feature_output = 7 * 7 * 64
+class AZNetwork(TorchModelV2, nn.Module):
+    """Generic vision network."""
 
-        self.target = nn.Sequential(
-            nn.Conv2d(4, 32, kernel_size=8, stride=4),
-            nn.LeakyReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2),
-            nn.LeakyReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1),
-            nn.LeakyReLU(),
-            Flatten(),
-            nn.Linear(feature_output, 512)
-        )
+    def __init__(self, obs_space, action_space, num_outputs, model_config,
+                 name, **kw):
+        TorchModelV2.__init__(self, obs_space, action_space, num_outputs,
+                              model_config, name)
+        nn.Module.__init__(self)
+        # import pdb; pdb.set_trace();
+        observation_space = Dict({
+            "obs": Box(low=0, high=255, shape=(210, 160, 3)),
+            "action_mask": Box(low=0, high=1, shape=(4,))
+        })
+        self.preprocessor = Preprocessor(observation_space, options={
+            "grayscale": model_config.get("grayscale"),
+            "zero_mean": model_config.get("zero_mean"),
+            "dim": 84
+        })
+        
+        activation = get_activation_fn(
+            model_config.get("conv_activation"), framework="torch")
+        filters = model_config.get("conv_filters")
+        if not filters:
+            filters = get_filter_config(obs_space.shape)
+        # no_final_linear = model_config.get("no_final_linear")
+        # vf_share_layers = model_config.get("vf_share_layers")
 
-        self.predictor = nn.Sequential(
-            nn.Conv2d(4, 32, kernel_size=8, stride=4),
-            nn.LeakyReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2),
-            nn.LeakyReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1),
-            nn.LeakyReLU(),
-            Flatten(),
-            nn.Linear(feature_output, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512)
-        )
+        layers = []
+        if model_config.get("grayscale"):
+            (w, h, in_channels) = (84, 84, 1)
+        else:
+            (w, h, in_channels) = (84, 84, 3)
 
-        # Initialize weights    
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-                init.orthogonal_(m.weight, np.sqrt(2))
-                m.bias.data.zero_()
+        if model_config.get("zero_mean"):
+            self.obs_space.original_space = Dict({
+                "obs": Box(low=-1.0, high=1.0, shape=(w, h, in_channels)),
+                "action_mask": Box(low=0, high=1, shape=(4,))
+            })
+        else:
+            self.obs_space.original_space =  Dict({
+                "obs": Box(low=0, high=255, shape=(w, h, in_channels)),
+                "action_mask": Box(low=0, high=1, shape=(4,))
+            })
+        in_size = [w, h]
+        for out_channels, kernel, stride in filters[:-1]:
+            padding, out_size = valid_padding(in_size, kernel,
+                                              [stride, stride])
+            layers.append(
+                SlimConv2d(
+                    in_channels,
+                    out_channels,
+                    kernel,
+                    stride,
+                    padding,
+                    activation_fn=activation))
+            in_channels = out_channels
+            in_size = out_size
 
-        # Set target parameters as untrainable
-        for param in self.target.parameters():
-            param.requires_grad = False
+        out_channels, kernel, stride = filters[-1]
+        layers.append(
+            SlimConv2d(
+                in_channels,
+                out_channels,
+                kernel,
+                stride,
+                None,
+                activation_fn=activation))
+        self._convs = nn.Sequential(*layers)
 
-    def forward(self, next_obs):
-        target_feature = self.target(next_obs)
-        predict_feature = self.predictor(next_obs)
+        self._logits = SlimFC(
+            out_channels, num_outputs, initializer=nn.init.xavier_uniform_)
+        self._value_branch = SlimFC(
+            out_channels, 1, initializer=normc_initializer())
+        # Holds the current "base" output (before logits layer).
+        self._features = None
 
-        return predict_feature, target_feature
+
+    def compute_priors_and_value(self, obs):
+        obs = convert_to_tensor([self.preprocessor.transform(obs)])
+        input_dict = restore_original_dimensions(obs, self.obs_space, "torch")
+        
+        # import pdb; pdb.set_trace();
+
+        with torch.no_grad():
+            model_out = self.forward(input_dict, None, [1])
+            logits, _ = model_out
+            value = self.value_function()
+            logits, value = torch.squeeze(logits), torch.squeeze(value)
+            priors = nn.Softmax(dim=-1)(logits)
+
+            priors = priors.cpu().numpy()
+            value = value.cpu().numpy()
+
+            return priors, value
+
+    @override(TorchModelV2)
+    def forward(self, input_dict, state, seq_lens):
+        device = next(self._convs.parameters()).device
+        import pdb; pdb.set_trace();
+        self._features = self._hidden_layers(input_dict["obs"].to(device).float())
+        logits = self._logits(self._features)
+        return logits, state
+
+    @override(TorchModelV2)
+    def value_function(self):
+        assert self._features is not None, "must call forward() first"
+        return self._value_branch(self._features).squeeze(1)
+
+    def _hidden_layers(self, obs):
+        res = self._convs(obs.permute(0, 3, 1, 2))  # switch to channel-major
+        res = res.squeeze(3)
+        res = res.squeeze(2)
+        return res
