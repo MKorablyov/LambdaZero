@@ -1,9 +1,10 @@
-import time, random
+import time, random, sys
 import os.path as osp
 import numpy as np
 import torch
 import ray
 from ray import tune
+from ray.rllib.utils import merge_dicts
 from torch_geometric.data import DataLoader
 from torch_geometric import transforms as T
 from torch.utils.data import Subset, ConcatDataset
@@ -11,9 +12,24 @@ import LambdaZero.utils
 import LambdaZero.models
 import LambdaZero.inputs
 from LambdaZero.examples.bayesian_models.bayes_tune.example_mcdrop import MCDrop
-from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop
-
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
+    mcdrop_mean_variance
+from LambdaZero.examples.bayesian_models.bayes_tune import aq_config
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+
+
+def aq_regret(train_loader, ul_loader, config):
+    train_targets = np.concatenate([getattr(d, config["target"]).cpu().numpy() for d in train_loader.dataset],0)
+    ul_targets = np.concatenate([getattr(d, config["target"]).cpu().numpy() for d in ul_loader.dataset],0)
+    all_targets = np.concatenate([train_targets, ul_targets],0)
+    train_sorted = train_targets[np.argsort(train_targets)]
+    all_sorted = all_targets[np.argsort(all_targets)]
+
+    top15_regret = np.median(train_sorted[:15]) - np.median(all_sorted[:15])
+    top50_regret = np.median(train_sorted[:50]) - np.median(all_sorted[:50])
+    aq_top15 = np.median(train_sorted[:15])
+    aq_top50 = np.median(train_sorted[:15])
+    return {"aq_top15_regret":top15_regret, "aq_top50_regret":top50_regret, "aq_top15":aq_top15, "aq_top50":aq_top50}
 
 
 class UCT(tune.Trainable):
@@ -45,8 +61,6 @@ class UCT(tune.Trainable):
         return scores
 
     def update_with_seen(self, idxs):
-        print(len(self.train_loader.dataset), len(self.ul_loader.dataset), len(self.val_loader.dataset))
-
         # update train/unlabeled datasets
         aq_mask = np.zeros(len(self.ul_loader.dataset.indices),dtype=np.bool)
         aq_mask[idxs] = True
@@ -59,13 +73,20 @@ class UCT(tune.Trainable):
                                        batch_size=self.config["regressor_config"]["config"]["b_size"])
         self.ul_loader = DataLoader(ul_set, batch_size=self.config["regressor_config"]["config"]["b_size"])
         # fit model to the data
-        scores = self.regressor.fit(self.train_loader, self.val_loader)
-        return scores[-1]
+        scores = self.regressor.fit(self.train_loader, self.val_loader)[-1]
+
+        # compute acquisition metrics
+        _scores = aq_regret(self.train_loader, self.ul_loader, self.config["regressor_config"]["config"])
+        scores = {**scores, **_scores}
+        return scores
 
     def acquire_batch(self):
         mean, var = self.regressor.get_mean_variance(self.ul_loader)
         scores = mean + (self.config["kappa"] * var)
-        if self.config["invert_objective"]: scores = -scores
+        # noise is not a part of original UCT but is added here
+        noise = self.config["epsilon"] * np.random.uniform(size=mean.shape[0])
+        scores = scores + noise
+        if self.config["minimize_objective"]: scores = -scores
         idxs = np.argsort(-scores)[:self.config["b_size"]]
         return idxs
 
@@ -79,18 +100,19 @@ regressor_config = {
         "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
         "lambda": 1e-8,
         "T": 20,
-        "drop_p": 0.1,
         "lengthscale": 1e-2,
-        "uncertainty_eval_freq": 15,
+        "uncertainty_eval_freq": 60,
+        "train_iterations": 61,
         "model": LambdaZero.models.MPNNetDrop,
-        "model_config": {},
+        # "model_config": {},
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
             "lr": 0.001
         },
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
-        "train": train_mcdrop
+        "train": train_mcdrop,
+        "get_mean_variance":mcdrop_mean_variance,
     }
 }
 DEFAULT_CONFIG = {
@@ -99,23 +121,24 @@ DEFAULT_CONFIG = {
         "config":{
             "dataset_creator": LambdaZero.utils.dataset_creator_v1,
             "dataset_split_path": osp.join(datasets_dir,
-                                           "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-            # "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+                                            "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+            #                                 #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
             "dataset": LambdaZero.inputs.BrutalDock,
             "dataset_config": {
                 "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
                 "props": ["gridscore", "smi"],
                 "transform": transform,
-                "file_names":
-                    ["Zinc15_2k"],
-                # ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+            "file_names":
+            ["Zinc15_2k"],
+            #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
             },
             "regressor": MCDrop,
             "regressor_config": regressor_config,
             "b_size0": 200,
             "b_size": 50,
             "kappa": 0.2,
-            "invert_objective":True,
+            "epsilon": 0.0,
+            "minimize_objective":True,
         },
         "local_dir": summaries_dir,
         "stop": {"training_iteration": 20},
@@ -125,7 +148,11 @@ DEFAULT_CONFIG = {
 }
 
 
-config = DEFAULT_CONFIG
 if __name__ == "__main__":
+    if len(sys.argv) >= 2: config_name = sys.argv[1]
+    else: config_name = "uct001"
+    config = getattr(aq_config, config_name)
+    config = merge_dicts(DEFAULT_CONFIG, config)
+    config["acquirer_config"]["name"] = config_name
     ray.init(memory=config["memory"])
     tune.run(**config["acquirer_config"])
