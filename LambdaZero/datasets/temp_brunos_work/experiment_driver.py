@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
 from LambdaZero.datasets.temp_brunos_work import set_logging_directory
-from LambdaZero.datasets.temp_brunos_work.dataset_splitting import KnnDatasetSplitter
+from LambdaZero.examples.dataset_splitting import KnnDatasetSplitter
 from LambdaZero.datasets.temp_brunos_work.dataset_utils import get_scores_statistics
 from LambdaZero.datasets.temp_brunos_work.datasets import MoleculesDatasetBase
 from LambdaZero.datasets.temp_brunos_work.loggers.experiment_logger import ExperimentLogger

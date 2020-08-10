@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 import pytest
 
-from LambdaZero.datasets.temp_brunos_work.dataset_splitting import KnnDatasetSplitter, RandomDatasetSplitter
+from LambdaZero.examples.dataset_splitting import KnnDatasetSplitter, RandomDatasetSplitter
 
 
 @pytest.fixture
