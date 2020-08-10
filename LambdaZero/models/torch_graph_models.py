@@ -28,7 +28,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kw):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
-
+        self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         self.max_steps = obs_space.original_space["num_steps"].n
         self.max_blocks = action_space.max_blocks
         self.max_branches = action_space.max_branches
@@ -113,10 +113,13 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         return self._value_int
 
     def compute_priors_and_value(self, obs):
-        raise NotImplementedError()
-        obs = torch.tensor([self.preprocessor.transform(obs)]).float().cuda()
-        input_dict = restore_original_dimensions(obs, self.obs_space, "torch")
-
+        # import pdb; pdb.set_trace();
+        obs = torch.tensor([self.preprocessor.transform(obs)]).float()
+        obs = obs.to(next(self.parameters()).device)
+        input_dict = {
+            'obs': restore_original_dimensions(obs, self.obs_space, "torch")
+        }
+    
         with torch.no_grad():
             model_out = self.forward(input_dict, None, [1])
             logits, _ = model_out

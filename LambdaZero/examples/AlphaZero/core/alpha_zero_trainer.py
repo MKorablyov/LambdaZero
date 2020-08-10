@@ -66,6 +66,7 @@ DEFAULT_CONFIG = with_common_config({
         "dirichlet_noise": 0.03,
         "argmax_tree_policy": False,
         "add_dirichlet_noise": True,
+        "policy_optimization": False
     },
 
     # === Ranked Rewards ===
@@ -118,7 +119,9 @@ def choose_policy_optimizer(workers, config):
 
 def alpha_zero_loss(policy, model, dist_class, train_batch):
     # get inputs unflattened inputs
-    input_dict = restore_original_dimensions(train_batch["obs"], policy.observation_space, "torch")
+    input_dict = {
+        'obs': restore_original_dimensions(train_batch["obs"], policy.observation_space, "torch")
+    }
     # forward pass in model
     model_out = model.forward(input_dict, None, [1])
     logits, _ = model_out

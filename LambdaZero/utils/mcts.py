@@ -7,6 +7,30 @@ import collections
 import math
 import numpy as np
 
+def compute_alpha(value_scores, priors, multiplier):
+    alpha_max = np.max(value_scores) + multiplier
+    alpha_min = np.max(value_scores + multiplier * priors)
+
+    pr_sum = lambda alpha: np.sum(multiplier * priors / (alpha - value_scores))
+    is_match = lambda alpha: np.isclose(pr_sum(alpha), 1, rtol=1e-8)
+
+    if is_match(alpha_max):
+        return alpha_max
+    if is_match(alpha_min):
+        return alpha_min 
+    # print(alpha_min, alpha_max)
+    # print(pr_sum(alpha_min), pr_sum(alpha_max))
+    while (alpha_max - alpha_min) >= 1e-7:
+        # print(alpha_min, alpha_max)
+        curr_alpha = (alpha_min + alpha_max) * 0.5
+        if is_match(curr_alpha):
+            return curr_alpha
+
+        if pr_sum(curr_alpha) > 1:
+            alpha_min = curr_alpha
+        else:
+            alpha_max = curr_alpha
+    return (alpha_min + alpha_max) * 0.5
 
 class Node:
     def __init__(self, action, obs, done, reward, state, mcts, parent=None):
@@ -54,21 +78,43 @@ class Node:
     def child_U(self):
         return math.sqrt(self.number_visits) * self.child_priors / (1 + self.child_number_visits)
 
-    def best_action(self):
+    def best_action(self, po=False, return_pol=False):
         """
         :return: action
         """
-        child_score = self.child_Q() + self.mcts.c_puct * self.child_U()
-        masked_child_score = child_score
-        masked_child_score[~self.valid_actions] = -np.inf
+        if not po:
+            child_score = self.child_Q() + self.mcts.c_puct * self.child_U()
+            masked_child_score = child_score
+            masked_child_score[~self.valid_actions] = -np.inf
 
-        return np.argmax(masked_child_score)
+            return np.argmax(masked_child_score)
+        else:
+            # print('Computing Values') 
+            values = self.child_Q()
+            priors = self.child_priors
 
-    def select(self):
+            multiplier = self.mcts.c_puct * np.sqrt(self.number_visits) / (self.number_visits + len(values))
+            # print('Computing Alpha') 
+            alpha = compute_alpha(values, priors, multiplier)
+            # print('Getting Policy')
+            pi = np.around(multiplier * priors / (alpha - values + 1e-8), 6)
+            pi[np.isnan(pi)] = 1e-8
+            rem = np.sum(pi[~self.valid_actions])
+            pi[~self.valid_actions] = 0 
+            pi[self.valid_actions] += (rem / self.valid_actions.sum())
+            pi /= pi.sum()
+            if np.isnan(pi).any():
+                pi[:] = 0
+                pi[self.valid_actions] = (1 / self.valid_actions.sum())
+            if return_pol:
+                return pi
+            return np.random.choice(len(pi), 1, p=pi)[0]
+
+    def select(self, po=False):
         current_node = self
         while current_node.is_expanded:
 
-            best_action = current_node.best_action()
+            best_action = current_node.best_action(po=po)
             current_node = current_node.get_child(best_action)
         return current_node
 
@@ -118,11 +164,14 @@ class MCTS:
         self.exploit = mcts_param["argmax_tree_policy"]
         self.add_dirichlet_noise = mcts_param["add_dirichlet_noise"]
         self.c_puct = mcts_param["puct_coefficient"]
+        self.policy_optimization = mcts_param["policy_optimization"]
 
     def compute_action(self, node):
 
-        for _ in range(self.num_sims):
-            leaf = node.select()
+        for sim in range(self.num_sims):
+            # print('In Simulation', sim)
+            # import pdb; pdb.set_trace();
+            leaf = node.select(po=self.policy_optimization)
             if leaf.done:
                 value = leaf.reward
             else:
@@ -134,17 +183,25 @@ class MCTS:
 
                 leaf.expand(child_priors)
             leaf.backup(value)
-
-        # Tree policy target (TPT)
-        tree_policy = node.child_number_visits / node.number_visits
-        tree_policy = tree_policy / np.max(tree_policy)  # to avoid overflows when computing softmax
-        tree_policy = np.power(tree_policy, self.temperature)
-        tree_policy = tree_policy / np.sum(tree_policy)
-        if self.exploit:
-            # if exploit then choose action that has the maximum
-            # tree policy probability
-            action = np.argmax(tree_policy)
+        # import pdb; pdb.set_trace();
+        # print('Out Simulation')
+        
+        if not self.policy_optimization:
+            # Tree policy target (TPT)
+            tree_policy = node.child_number_visits / node.number_visits
+            tree_policy = tree_policy / np.max(tree_policy)  # to avoid overflows when computing softmax
+            tree_policy = np.power(tree_policy, self.temperature)
+            tree_policy = tree_policy / np.sum(tree_policy)
+            if self.exploit:
+                # if exploit then choose action that has the maximum
+                # tree policy probability
+                action = np.argmax(tree_policy)
+            else:
+                # otherwise sample an action according to tree policy probabilities
+                action = np.random.choice(np.arange(node.action_space_size), p=tree_policy)
         else:
-            # otherwise sample an action according to tree policy probabilities
+            # print('Picking policy')
+            tree_policy = node.best_action(po=True, return_pol=True)
+            # print('Policy Picked')
             action = np.random.choice(np.arange(node.action_space_size), p=tree_policy)
-        return tree_policy, action, node.children[action]
+        return tree_policy, action, node.get_child(action)

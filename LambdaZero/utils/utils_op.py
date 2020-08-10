@@ -168,19 +168,20 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
 
 def molecule_pca(mol):
-    fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
-    mat = []
-    for fp in fps:
-        bits = fp.ToBitString()
-        bitsvec = [int(bit) for bit in bits]
-        mat.append(bitsvec)
-    mat = np.array(mat)
+    # fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
+    # mat = []
+    # for fp in fps:
+    #     bits = fp.ToBitString()
+    #     bitsvec = [int(bit) for bit in bits]
+    #     mat.append(bitsvec)
+    # mat = np.array(mat)
 
-    pca = pk.load(open(pca_path, 'rb'))
-    scaled_data = pca.transform(mat)
-    log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
-    return (log_vals)
-
+    # pca = pk.load(open(pca_path, 'rb'))
+    # scaled_data = pca.transform(mat)
+    # log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
+    # return (log_vals)
+    return {}
+    
 def logP(mu, sigma, x):
     """
     Estimate log likelihood of an estimator

@@ -8,8 +8,9 @@ from LambdaZero.examples.AlphaZero.core.alpha_zero_trainer import AlphaZeroTrain
 from ray.rllib.utils import merge_dicts
 from ray.rllib.agents.callbacks import DefaultCallbacks
 
+from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 from LambdaZero.models.torch_models import MolActorCritic_thv1
-from LambdaZero.models.tf_models import MolActorCritic_tfv1
+# from LambdaZero.models.tf_models import MolActorCritic_tfv1
 import LambdaZero.utils
 
 from LambdaZero.examples.AlphaZero import config
@@ -36,9 +37,9 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 15,
+        "num_workers": 11,
         "sample_batch_size": 200,
-        "train_batch_size": 4000,
+        "train_batch_size": 2048,
         "sgd_minibatch_size": 128,
         "lr": 1e-3,
         "num_sgd_iter": 1,
@@ -50,6 +51,7 @@ DEFAULT_CONFIG = {
             "dirichlet_noise": 0.003,
             "argmax_tree_policy": False,
             "add_dirichlet_noise": True,
+            "policy_optimization": False,
         },
         "ranked_rewards": {
             "enable": True,
@@ -61,17 +63,14 @@ DEFAULT_CONFIG = {
             "num_init_rewards": 100,
         },
         "model": {
-            "custom_model": "MolActorCritic_thv1",
-            "custom_options": {
-                "rnd_weight": 0
-            }
+            "custom_model": "GraphMolActorCritic_thv1",
         },
         "evaluation_interval": 1,
         # Number of episodes to run per evaluation period.
         "evaluation_num_episodes": 1,
         "num_cpus_per_worker": 1,
         "num_gpus": 2,
-        "num_gpus_per_worker": 0.075,
+        "num_gpus_per_worker": 0.1,
         "callbacks": AZCallbacks # {"on_episode_end": LambdaZero.utils.dock_metrics},
     },
     "summaries_dir": summaries_dir,
@@ -93,10 +92,11 @@ if machine == "Ikarus":
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
-    time.sleep(60)
+    # time.sleep(60)
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
+    ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     #ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
-    time.sleep(60)
+    # time.sleep(60)
     tune.run(config["trainer"],
         stop=config["stop"],
         max_failures=0,
