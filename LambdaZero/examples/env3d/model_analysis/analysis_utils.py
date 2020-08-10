@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-import torch
 from sklearn.metrics import confusion_matrix
+import torch
 from torch.nn import Softmax
 from tqdm import tqdm
 
