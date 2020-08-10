@@ -21,7 +21,8 @@ from LambdaZero.utils import get_external_dirs
 
 sns.set(font_scale=1.5)
 
-model_path = Path("/Users/bruno/Desktop/model/Env3dModelTrainer_0_num_angle_prediction_hidden_features=128,num_block_prediction_hidden_features=128,num_edge_network_hidden_feat_2020-08-10_07-55-00rpef7txk//checkpoint_20/model.pth")
+model_dir = Path("/Users/bruno/Desktop/model/")
+model_path = model_dir.joinpath("model.pth")
 
 model_config = {"num_angle_prediction_hidden_features": 64,
                 "num_block_prediction_hidden_features": 256,
