@@ -1,8 +1,8 @@
 import logging
 from copy import copy
 from pathlib import Path
-import seaborn as sns
 
+import seaborn as sns
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
