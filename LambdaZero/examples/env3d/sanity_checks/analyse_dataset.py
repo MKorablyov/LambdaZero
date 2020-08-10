@@ -103,7 +103,8 @@ if __name__ == "__main__":
 
     #  Plot the sorted count distribution and cumulative sum; is there a natural cutoff?
     value_count_series = df['attachment_block_class'].value_counts()
-    cumulative_counts_series = value_count_series.cumsum()
+    normalized_value_count_series = df['attachment_block_class'].value_counts(normalize=True)
+    cumulative_counts_series = normalized_value_count_series.cumsum()
 
     fig = plt.figure(figsize=(16, 8))
     fig.suptitle(f"Sorted counts and cumulative sum over blocks\n{subtitle}")
@@ -120,9 +121,9 @@ if __name__ == "__main__":
     cumulative_counts_series.reset_index(drop=True).plot.line(drawstyle='steps', color='orange', lw=4, ax=ax2)
     ax1.set_xlabel('block index sorted by count')
     ax1.set_ylabel('block count')
-    ax2.set_ylabel('count cumulative sum')
+    ax2.set_ylabel('normalized count cumulative sum (%)')
     ax1.grid(False)
-    ax2.grid(False)
+    #ax2.grid(False)
     for label in ax1.get_xticklabels():
         label.set_fontsize(10)
     ax1.semilogy()
