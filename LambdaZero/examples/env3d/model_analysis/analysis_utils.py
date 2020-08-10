@@ -9,6 +9,20 @@ from tqdm import tqdm
 def get_truncated_confusion_matrix_and_labels(
     y_true: np.array, y_predicted: np.array, top_k: int = 3
 ):
+    """
+    Computes the confusion matrix, truncating classes to top k. All other classes
+    are aggregated into "other". If the classes in "other" match between the true and
+    predicted arrays, they are labelled "other match".
+
+    Args:
+        y_true (np.array): array of true classes
+        y_predicted (np.array): array of predicted classes
+        top_k (int): number of classes to consider explicitly, by frequency of occurrence.
+
+    Returns:
+       confusion matrix (nd.array): 2D array containing the confusion matrix
+       labels (np.array): array of labels, augmented with "other" and "other match".
+    """
     number_of_values = len(y_true)
     assert number_of_values == len(y_predicted), "the array size are not the same"
 
@@ -40,6 +54,18 @@ def get_truncated_confusion_matrix_and_labels(
 
 
 def get_actual_and_predictions(model, training_dataloader):
+    """
+    Compute the classes and angles from the model, and extract the actual values
+    for easy post-processing.
+
+    Args:
+        model (nn.Module):  instantiated model
+        training_dataloader (Dataloader): instantiated dataloader
+
+    Returns:
+        actual_and_predictions (pd.DataFrame): datafame with the actual and predicted values
+
+    """
     softmax = Softmax(dim=1)
     list_df = []
     with torch.no_grad():
@@ -69,5 +95,16 @@ def get_actual_and_predictions(model, training_dataloader):
 
 
 def get_predicted_angle(x: np.array, y: np.array):
+    """
+    compute angles in radian.
+
+    Args:
+        x (nd.array): x coordinates of points
+        y (nd.array): y coordinates of points.
+
+    Returns:
+        angles (nd.array): angles in radian, in range 0 to 2 pi.
+
+    """
     angles = np.arctan2(y, x)
     return np.mod(angles, 2 * np.pi)
