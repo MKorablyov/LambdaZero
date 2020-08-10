@@ -47,7 +47,6 @@ class Env3dModelTrainer(tune.Trainable):
         self.patience = config["patience"]
         self.epoch_since_best_valid = 0
 
-
     def _train(self):
         train_scores = self.train_epoch(
             self.train_set, self.model, self.optim, self.device, self.config
