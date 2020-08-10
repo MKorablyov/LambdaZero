@@ -5,6 +5,8 @@ import torch
 from ray import tune
 from torch_geometric.data import DataLoader
 
+from LambdaZero.examples.dataset_splitting import RandomDatasetSplitter
+
 
 class Env3dModelTrainer(tune.Trainable):
     def _setup(self, config: dict):
@@ -16,26 +18,19 @@ class Env3dModelTrainer(tune.Trainable):
         assert (
             config.get("train_ratio", 0.8) + config.get("valid_ratio", 0.1) <= 1.0
         ), "Train and validation data ratio should be less than 1."
-        np.random.seed(config.get("seed_for_dataset_split", 0))
+
+        dataset_splitter = RandomDatasetSplitter(train_fraction=config.get("train_ratio", 0.8),
+                                                 validation_fraction=config.get("valid_ratio", 0.1),
+                                                 random_seed=config.get("seed_for_dataset_split", 0))
 
         dataset = self.config["dataset"](**self.config["dataset_config"])
-        ndata = len(dataset)
-        shuffle_idx = np.arange(ndata)
-        np.random.shuffle(shuffle_idx)
-        n_train = int(config.get("train_ratio", 0.8) * ndata)
-        n_valid = int(config.get("valid_ratio", 0.1) * ndata)
-        train_idxs = shuffle_idx[:n_train]
-        val_idxs = shuffle_idx[n_train : n_train + n_valid]
-        test_idxs = shuffle_idx[n_valid:]
+        training_dataset, validation_dataset, test_dataset = dataset_splitter.get_split_datasets(dataset)
+
         batchsize = config.get("batchsize", 32)
 
-        self.train_set = DataLoader(
-            dataset[torch.tensor(train_idxs)], shuffle=True, batch_size=batchsize
-        )
-        self.val_set = DataLoader(dataset[torch.tensor(val_idxs)], batch_size=batchsize)
-        self.test_set = DataLoader(
-            dataset[torch.tensor(test_idxs)], batch_size=batchsize
-        )
+        self.train_set = DataLoader(training_dataset, shuffle=True, batch_size=batchsize)
+        self.val_set = DataLoader(validation_dataset, batch_size=batchsize)
+        self.test_set = DataLoader(test_dataset, batch_size=batchsize)
 
         # make model
         self.model = config["model"](**config["model_config"])
