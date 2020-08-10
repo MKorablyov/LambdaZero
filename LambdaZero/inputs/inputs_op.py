@@ -769,7 +769,8 @@ def tpnn_transform(data):
     
     data = data.clone()
     data.x = _one_hot_group_period(*_group_period(data.x))
-    data.edge_attr = _rel_vectors(data.pos, data.edge_index)
+    data.rel_vec = _rel_vectors(data.pos, data.edge_index)	# relative vectors (not normalized)
+    data.edge_attr = data.rel_vec.norm(dim=1)			# absolute distances
 
     return data
 

@@ -23,7 +23,7 @@ def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer, scope):
     return metrics
 
 def get_tau(config, N):
-    tau = (1 - config["drop_p"]) * (config["lengthscale"]**2) / (2 * N * config["lambda"])
+    tau = (1 - config["model_config"]["drop_prob"]) * (config["lengthscale"]**2) / (2 * N * config["lambda"])
     return tau
 
 def _log_lik(y, Yt_hat, config, N):
@@ -49,7 +49,7 @@ def train_epoch(loader, model, optimizer, device, config, scope):
         targets = getattr(data, config["target"])
 
         optimizer.zero_grad()
-        logits = model(data, do_dropout=True, drop_p=config["drop_p"])
+        logits = model(data, do_dropout=True)
         targets_norm = config["normalizer"].tfm(targets)
         reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
         loss = F.mse_loss(logits, targets_norm) + reg_loss
@@ -71,7 +71,7 @@ def sample_logits(loader, model, device, config, num_samples, do_dropout):
         epoch_logits = []
         for bidx, data in enumerate(loader):
             data = data.to(device)
-            logit = model(data, do_dropout=do_dropout, drop_p=config["drop_p"])
+            logit = model(data, do_dropout=do_dropout)
             epoch_logits.append(logit.detach().cpu().numpy())
         sample_logits.append(np.concatenate(epoch_logits, 0))
     return np.stack(sample_logits,0)
@@ -111,8 +111,9 @@ def train_mcdrop(train_loader, val_loader, model, device, config, optim, iterati
     return scores
 
 
-def mcdrop_mean_variance(loader, model, device, config, N):
+def mcdrop_mean_variance(train_loader, loader, model, device, config):
     # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
+    N = len(train_loader.dataset)
     Yt_hat = sample_logits(loader, model, device, config, config["T"], do_dropout=True)
     tau = get_tau(config, N)
     sigma_sqr = 1. / tau
@@ -136,13 +137,13 @@ def sample_embeds(loader, model, device, config):
     epoch_embeds = []
     for bidx, data in enumerate(loader):
         data = data.to(device)
-        embeds = model.get_embed(data, do_dropout=False, drop_p=config["drop_p"])
+        embeds = model.get_embed(data, do_dropout=False)
         epoch_embeds.append(embeds.detach().cpu().numpy())
     epoch_embeds = np.concatenate(epoch_embeds,axis=0)
     return epoch_embeds
 
 
-def eval_mcdrop_brr(train_loader, val_loader, model, device, config, N):
+def eval_mpnn_brr(train_loader, val_loader, model, device, config, N):
     # todo(maksym) I am not sure what is the best way to keep order
     train_loader = DataLoader(train_loader.dataset, batch_size=config["b_size"])
     val_loader = DataLoader(val_loader.dataset, batch_size=config["b_size"])
@@ -161,6 +162,19 @@ def train_mpnn_brr(train_loader, val_loader, model, device, config, optim, itera
     scores = {**train_scores, **val_scores}
 
     if iteration % config["uncertainty_eval_freq"] == 1:
-        _scores = eval_mcdrop_brr(train_loader, val_loader, model, device, config, N)
+        _scores = eval_mpnn_brr(train_loader, val_loader, model, device, config, N)
         scores = {**scores, **_scores}
     return scores
+
+
+def mpnn_brr_mean_variance(train_loader, loader, model, device, config):
+    # train model on the train_set (should be fast)
+    train_loader = DataLoader(train_loader.dataset, batch_size=config["b_size"])
+    train_embeds = sample_embeds(train_loader, model, device, config)
+    train_targets_norm = sample_targets(train_loader, config)
+    embeds = sample_embeds(loader, model, device, config)
+
+    clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
+    clf.fit(train_embeds, train_targets_norm)
+    mean, std = clf.predict(embeds, return_std=True)
+    return mean, std
