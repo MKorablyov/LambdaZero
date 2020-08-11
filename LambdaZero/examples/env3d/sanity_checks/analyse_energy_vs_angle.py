@@ -7,7 +7,6 @@ the energy following a ConstrainEmbed.
 """
 import os
 from pathlib import Path
-from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,7 +18,6 @@ import LambdaZero.utils
 from LambdaZero.chem import mol_from_frag, Chem
 from LambdaZero.environments.molMDP import MolMDP
 from LambdaZero.examples.env3d.geometry import (
-    get_center_of_mass,
     rotate_points_about_axis, get_angle_between_parent_and_child,
     get_molecular_orientation_vector_from_positions_and_masses,
 )
@@ -30,6 +28,7 @@ from LambdaZero.examples.env3d.rdkit_utilities import (
     get_mmff_energy, get_lowest_energy_and_mol_with_conformer,
 )
 from LambdaZero.examples.env3d.molecular_connection import MolecularConnection
+from LambdaZero.examples.env3d.sanity_checks.molecule_plotting import plot_molecule_and_block_with_rotation_axis
 from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -37,90 +36,6 @@ blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 chimera_bin = os.path.join(programs_dir, "chimera/bin/chimera")
 
 results_dir = Path(summaries_dir).joinpath("env3d")
-
-
-def plot_molecule_and_block_with_rotation_axis(
-    mol: Mol, parent_size: int, anchor_indices: Tuple
-):
-    """
-    Ugly kluge to see what the molecule looks like, as well as the orientation vectors  decorating it.
-    """
-    connection = MolecularConnection(mol)
-
-    all_positions = mol.GetConformer().GetPositions()
-    all_masses = get_atomic_masses(mol)
-
-    parent_anchor_index, child_anchor_index = anchor_indices
-    parent_anchor = all_positions[parent_anchor_index]
-    child_anchor = all_positions[child_anchor_index]
-
-    n_axis = child_anchor - parent_anchor
-    n_axis /= np.linalg.norm(n_axis)
-
-    parent_positions = all_positions[:parent_size]
-    parent_masses = all_masses[:parent_size]
-    parent_cm = get_center_of_mass(parent_masses, parent_positions)
-
-    parent_vector = get_molecular_orientation_vector_from_positions_and_masses(
-        parent_masses, parent_positions, parent_anchor, n_axis
-    )
-
-    child_positions = all_positions[parent_size:]
-    child_masses = all_masses[parent_size:]
-    child_cm = get_center_of_mass(child_masses, child_positions)
-    child_vector = get_molecular_orientation_vector_from_positions_and_masses(
-        child_masses, child_positions, child_anchor, n_axis
-    )
-
-    color_dict = {1: 'white', 6: "black", 7: "yellow", 8: "blue"}
-    colors = [color_dict[a.GetAtomicNum()] for a in mol.GetAtoms()]
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-
-    ax.scatter(
-        all_positions[:, 0],
-        all_positions[:, 1],
-        all_positions[:, 2],
-        "o",
-        color=colors,
-        s=50,
-    )
-
-    for node_index in connection.nodes:
-        p1 = all_positions[node_index]
-        for neighbor_index in connection.neighbors[node_index]:
-            p2 = all_positions[neighbor_index]
-
-            v = np.stack([p1, p2], axis=0)
-            ax.plot(v[:, 0], v[:, 1], v[:, 2], "-", color="k")
-
-    ax.scatter(*parent_cm, marker="x", color="red")
-    ax.scatter(*child_cm, marker="x", color="green")
-
-    ax.quiver(*parent_anchor, *parent_vector, color="red", lw=2)
-    ax.quiver(*child_anchor, *child_vector, color="green", lw=2)
-
-    ax.quiver(*parent_anchor, *n_axis, color="black", lw=1)
-
-    x1 = parent_anchor - 3 * n_axis
-    x2 = parent_anchor + 3 * n_axis
-    v = np.stack([x1, x2], axis=0)
-    ax.plot(v[:, 0], v[:, 1], v[:, 2], "-", color="k")
-
-    min = np.min(all_positions.flatten())
-    max = np.max(all_positions.flatten())
-
-    ax.set_xlim(min, max)
-    ax.set_ylim(min, max)
-    ax.set_zlim(min, max)
-
-    ax.set_xlabel("X Label")
-    ax.set_ylabel("Y Label")
-    ax.set_zlabel("Z Label")
-
-    return fig
-
 
 number_of_blocks = 5
 number_of_iterations = 100
