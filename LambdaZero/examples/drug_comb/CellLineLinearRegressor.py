@@ -81,7 +81,7 @@ class CellLineRegressor(tune.Trainable):
 def _get_cell_line_names(datasets_dir):
     raw_dir = os.path.join(datasets_dir, 'NewDrugComb/raw')
 
-    cell_line_path = os.path.join(raw_dir, 'cell_lines_corr2.csv')
+    cell_line_path = os.path.join(raw_dir, 'cell_lines.csv')
     if not os.path.exists(cell_line_path):
         summary_csv = pd.read_csv(
             os.path.join(datasets_dir, 'NewDrugComb/raw/summary_table_v1.4.csv')
