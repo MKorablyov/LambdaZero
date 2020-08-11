@@ -184,10 +184,7 @@ class NewDrugComb(InMemoryDataset):
         match_idxs = torch.full((self.data.ddi_edge_idx.shape[1],), False, dtype=torch.bool)
         try:
             cell_line_idx = self.data.cell_line_name_to_name_idx[0][cell_line_name]
-            pre_match_idxs = self.data.ddi_edge_classes[:, cell_line_idx] == 1
-
-            if pre_match_idxs.sum() > 2000:
-                match_idxs = pre_match_idxs
+            match_idxs = self.data.ddi_edge_classes[:, cell_line_idx] == 1
 
         except KeyError:
             pass
