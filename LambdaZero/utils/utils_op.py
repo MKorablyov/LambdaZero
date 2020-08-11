@@ -188,7 +188,6 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
 pca_cache = [None]
 def molecule_pca(mol):
-<<<<<<< HEAD
     # fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
     # mat = []
     # for fp in fps:
@@ -203,24 +202,6 @@ def molecule_pca(mol):
     # return (log_vals)
     return {}
     
-=======
-    fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
-    mat = []
-    for fp in fps:
-        bits = fp.ToBitString()
-        bitsvec = [int(bit) for bit in bits]
-        mat.append(bitsvec)
-    mat = np.array(mat)
-    if pca_cache[0] is None:
-        pca = pk.load(open(pca_path, 'rb'))
-        pca_cache[0] = pca
-    else:
-        pca = pca_cache[0]
-    scaled_data = pca.transform(mat)
-    log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
-    return (log_vals)
-
->>>>>>> 7588db194a10b1c182dec37004281d11841d8fa3
 def logP(mu, sigma, x):
     """
     Estimate log likelihood of an estimator
@@ -230,8 +211,6 @@ def logP(mu, sigma, x):
     :return:
     """
     return (-np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) **2))
-<<<<<<< HEAD
-=======
 
 def dataset_creator_v1(config):
     # make dataset
@@ -244,4 +223,3 @@ def dataset_creator_v1(config):
     val_loader = DataLoader(val_set, batch_size=config["b_size"])
     return train_loader, val_loader
 
->>>>>>> 7588db194a10b1c182dec37004281d11841d8fa3
