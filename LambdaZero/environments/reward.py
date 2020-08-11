@@ -40,14 +40,15 @@ class PredDockReward:
         qed = QED.qed(mol)
         qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
         qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
-        disc_reward = min(reward, reward * natm_discount * qed_discount) # don't appy to negative rewards
+        discount = natm_discount * qed_discount
+        disc_reward = min(reward, reward * discount) # don't appy to negative rewards
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, qed
+        return disc_reward, qed, discount
 
     def _simulation(self, molecule):
         mol = molecule.mol
@@ -68,15 +69,16 @@ class PredDockReward:
         else:
             simulate = simulate
 
+        discount = 0
         if simulate:
             reward = self._simulation(molecule)
             if reward is not None:
-                discounted_reward, qed = self._discount(molecule.mol, reward)
+                discounted_reward, qed, discount = self._discount(molecule.mol, reward)
             else:
                 reward, discounted_reward, qed = -0.5, -0.5, -0.5
         else:
             reward, discounted_reward, qed = 0.0, 0.0, 0.0
-        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed}
+        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed, "discount": discount}
 
 class PredDockReward_v2:
     def __init__(self, binding_model, qed_cutoff, synth_cutoff, synth_config,
@@ -163,7 +165,7 @@ class PredDockReward_v2:
 
 class PredDockReward_v3:
     def __init__(self, qed_cutoff, synth_config, dockscore_config,
-                 soft_stop, exp, delta, simulation_cost, device, transform=T.Compose([LambdaZero.utils.Complete()])):
+                 soft_stop, exp, delta, simulation_cost, device, transform=T.Compose([LambdaZero.utils.Complete()]), **unused):
 
         self.qed_cutoff = qed_cutoff
         self.soft_stop = soft_stop
@@ -193,17 +195,19 @@ class PredDockReward_v3:
 
         # Binding energy prediction
         dockscore = self.binding_net(mol=mol)
-        dockscore_reward = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
+        dockscore_normalized = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
 
         # combine rewards
-        disc_reward = dockscore_reward * qed_discount * synth_discount
+        discount = qed_discount * synth_discount
+        disc_reward = dockscore_normalized * discount
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"dockscore_reward": dockscore_reward, "qed": qed, "synth": synth}
+        return disc_reward, {"dockscore": dockscore_normalized, "qed": qed, "synth": synth,
+                             "discount": discount}
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:

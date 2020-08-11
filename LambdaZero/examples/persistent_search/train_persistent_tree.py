@@ -8,6 +8,7 @@ import os.path as osp
 import pickle
 import gzip
 import psutil
+import subprocess
 
 import ray
 import numpy as np
@@ -91,26 +92,38 @@ class MolAC_GCN(nn.Module):
 
 
 def guided_search(exp_hps):
-    device = torch.device('cuda')
+    device = 'cuda'#torch.device('cuda')
+    print("ray.get_gpu_ids(): {}".format(ray.get_gpu_ids()))
+    print("CUDA_VISIBLE_DEVICES: {}".format(os.environ["CUDA_VISIBLE_DEVICES"]))
 
 
     salt = hex(abs(hash(str(exp_hps))))[2:6]
-    exp_path = time.strftime(f'{exp_hps["save_path"]}/guided_search_max_%m%b_%d_%H_%M_{salt}')
+    exp_path = exp_hps.get(
+        'exp_path_override',
+        time.strftime(f'{exp_hps["save_path"]}/guided_search_max_%m%b_%d_%H_%M_{salt}'))
 
     hyperparameters = {
         'actor_temperature': 1, # temperature of the boltzmann Q policy
         'score_temperature': 1.5, # priority temperature for sampling nodes
-        'priority_pred': 'greedy_q', # greedy or boltzmann
+        'priority_pred': 'greedy_q', # greedy or boltzmann or max_desc_r
         'return_type': 'montecarlo', # MonteCarlo vs Max descendant reward
         'num_molecules': int(10e3), # Total number of molecules to try
         'prune_at': int(5e3), # Prune the search tree when it is this big
         'update_prio_on_refresh': False,
         'num_rollout_actors': 0,
         'num_docking_threads': 1,
+        'learning_rate': 1e-3,
+        'restore_nodes': None,
+        'restore_params': None,
     }
     hyperparameters.update(exp_hps)
 
 
+    if not os.path.exists(os.environ["SLURM_TMPDIR"]+"/Programs"):
+        print("Running Programs rsync...")
+        subprocess.run(["cp", "-R", programs_dir, os.environ["SLURM_TMPDIR"]])
+        print("Done")
+    programs_dir_tmp = os.environ["SLURM_TMPDIR"]+"/Programs"
 
     obs_config = {"mol_fp_len": 512,
                   "mol_fp_radiis": [3],
@@ -118,7 +131,6 @@ def guided_search(exp_hps):
                   "stem_fp_radiis": [4, 3, 2],
     }
 
-    from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
 
     reward_config = {
         "soft_stop": True,
@@ -130,7 +142,6 @@ def guided_search(exp_hps):
         "delta": False,
         "simulation_cost": 0.00,
         "device": device,
-        "synth_config": chemprop_cfg,
     }
 
     score_temperature = hyperparameters['score_temperature']
@@ -153,6 +164,7 @@ def guided_search(exp_hps):
         #'seeding_nodes': 'top_mols_50k_05_May_02_00_10_22.pkl.gz',
         #'seeding_nodes': 'top_mols_5k_04_Apr_22.pkl.gz',
         #'seeding_nodes': 'top_mols_50k_04_Apr_27.pkl.gz',
+        'restore_nodes': hyperparameters.get('restore_nodes', None),
         'graph_add_stem_mask': True,
         'return_type': hyperparameters['return_type'],
         'prune_at': hyperparameters['prune_at'],
@@ -164,7 +176,6 @@ def guided_search(exp_hps):
         'update_prio_on_refresh': hyperparameters['update_prio_on_refresh'],
     }
     env_config['num_actions'] = env_config['num_blocks'] * env_config['max_branches']
-
 
     # Todo: incorporate this into persistent_search
     class DataBatchers:
@@ -180,51 +191,61 @@ def guided_search(exp_hps):
 
     obs_config['num_blocks'] = env_config['num_blocks']
     obs_config['max_branches'] = env_config['max_branches']
-    mbsize = 64
+    mbsize = 32 # 64
 
-    pred_dock_actor = PredDockRewardActor.options(max_concurrency=2).remote(**reward_config)
+    pred_dock_actor = PredDockRewardActor.options(max_concurrency=2).remote()
     sim_dock_actor = SimDockRewardActor.options(max_concurrency=2).remote(
         os.environ['SLURM_TMPDIR'],
-        programs_dir, datasets_dir,
+        programs_dir_tmp, datasets_dir,
         hyperparameters['num_docking_threads'],
     )
 
     tree = ray.remote(PersistentSearchTree).options(max_concurrency=mbsize * 2).remote(env_config)
 
-    time.sleep(0.5)
+    #time.sleep(20)
     avg_q_loss = avg_r_loss = 0
     num_actions = env_config['num_actions']
     ray.get(tree.update_values.remote())
+    print("tree done updating")
+
 
     train_batchers = DataBatchers([MBPrep.remote(env_config, tree, mbsize * 2)
                                   for i in range(2)])
     act_batcher = MBPrep.remote(env_config, tree, mbsize)
+    #time.sleep(30)
 
     rl_actor = RLActor.options(max_concurrency=2).remote(
-        MolAC_GCN, obs_config,
+        MolAC_GCN, hyperparameters['learning_rate'],
+        obs_config,
         device, train_batchers, act_batcher, tree,
         hyperparameters['actor_temperature'],
         hyperparameters['priority_pred'])
+    if hyperparameters['restore_params']:
+        rl_actor.load_parameters.remote(hyperparameters['restore_params'])
+    #time.sleep(20)
 
     rollout_actors = [rl_actor]
     batch_actors = []
     for i in range(hyperparameters['num_rollout_actors']):
         act_batcher_i = MBPrep.remote(env_config, tree, mbsize)
         rl_actor_i = RLActor.options(max_concurrency=2).remote(
-            MolAC_GCN, obs_config,
+            MolAC_GCN, hyperparameters['learning_rate'],
+            obs_config,
             device, [], act_batcher_i, tree,
             hyperparameters['actor_temperature'],
             hyperparameters['priority_pred'])
         batch_actors.append(act_batcher_i)
         rollout_actors.append(rl_actor_i)
+        #time.sleep(20)
 
+    print("Waiting for actors to init")
 
-    time.sleep(0.5)
+    #time.sleep(30)
     print("Starting reward threads")
     pred_dock_actor_thread = pred_dock_actor.run.remote(tree, 256)
-    sim_dock_actor_thread = sim_dock_actor.run.remote(tree, 12)
+    sim_dock_actor_thread = sim_dock_actor.run.remote(tree, 32)
 
-    idxs_available_actions = [list(zip(*ray.get(tree.sample_many.remote(mbsize, idxs_and_aa=True))))
+    idxs_available_actions = [list(zip(*ray.get(tree.sample_many.remote(mbsize * 2, idxs_and_aa=True))))
                               for i in range(len(rollout_actors))]
 
     logs = {
@@ -233,6 +254,10 @@ def guided_search(exp_hps):
         'top_10': [],
         'hps': hyperparameters,
     }
+
+    if os.path.exists(f'{exp_path}/logs.pkl.gz'):
+        logs = pickle.load(gzip.open(f'{exp_path}/logs.pkl.gz', 'rb'))
+
     for step in range(env_config['num_molecules'] // mbsize):
         t0 = time.time()
         train_cb = rl_actor.train.remote()
@@ -253,7 +278,14 @@ def guided_search(exp_hps):
                 p = np.zeros(pol.shape, dtype=np.float64) # Necessary because of how np.random works
                 p[aa] = pol[aa]
                 p /= p.sum()
-                actions.append(np.random.multinomial(1, p).argmax())
+                if not np.isfinite(p).all():
+                    print("I had to reject an action")
+                    print(aa.shape)
+                    print(pol)
+                    print(aa)
+                    actions.append(0)
+                else:
+                    actions.append(np.random.multinomial(1, p).argmax())
             new_iaa.append(tree.take_actions.remote(idxs, actions, do_restart=True))
         idxs_available_actions = ray.get(new_iaa)
         q_loss, r_loss = ray.get(train_cb)
@@ -283,15 +315,20 @@ def guided_search(exp_hps):
             tree.update_values.remote()
             if ray.get(tree.is_full.remote()):
                 break
+            try:
+                tot_mem = sum([
+                    p.memory_info().rss
+                    for p in psutil.process_iter(['name', 'username', 'memory_info'])
+                    if p.username() == psutil.Process(os.getpid()).username()]) / 1024 / 1024
+                print(f'{tot_mem:.1f}M, {tot_mem/1024:.3f}G')
+            except Exception as e:
+                print(e, 'computing tot_mem')
 
-            tot_mem = sum([p.memory_info().rss
-                           for p in psutil.process_iter(['name', 'username', 'memory_info'])
-                           if p.username() == psutil.Process(os.getpid()).username()]) / 1024 / 1024
-            print(f'{tot_mem:.1f}M, {tot_mem/1024:.3f}G')
-
-        if step and not step % 2000:
+        if step and not step % 500:
             ray.get(tree.save.remote(exp_path))
             pickle.dump(logs, gzip.open(f'{exp_path}/logs.pkl.gz', 'wb'))
+            ray.get(rl_actor.save_parameters.remote(f'{exp_path}/params.pkl.gz'))
+
     print('Saving final tree and stopping actors...')
     save = tree.save.remote(exp_path)
     pickle.dump(logs, gzip.open(f'{exp_path}/logs.pkl.gz', 'wb'))
@@ -300,7 +337,9 @@ def guided_search(exp_hps):
     ray.get(save)
 
 if __name__ == '__main__':
-    ray.init(num_cpus=12)
+    ray.init(num_cpus=16, num_gpus=1)
+    time.sleep(10)
+    print("Starting search")
 
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
         for priority_pred in ['greedy_q', 'boltzmann']:
@@ -350,13 +389,25 @@ if __name__ == '__main__':
         array_id = int(os.environ['SLURM_ARRAY_TASK_ID'])
         guided_search(configs[array_id])
     elif 1:
+        restore = 'guided_search_max_07Jul_16_09_03_2643'
+        restore = 'guided_search_max_07Jul_16_20_01_b64d'
+        restore = 'guided_search_max_07Jul_17_17_37_186a'
+        restore = 'guided_search_max_07Jul_20_23_28_64a9' # 400k
+        #restore = 'guided_search_max_07Jul_21_14_37_6b43' # 100k
+        #restore = 'guided_search_max_07Jul_21_14_38_63ce' # 400k
+        #restore = 'guided_search_max_07Jul_20_20_44_6c85' # 100k
 
-        guided_search({'priority_pred': 'max_desc_r', #'greedy_q',
-                       'update_prio_on_refresh': True,
-                       'return_type':'max_desc_r',
-                       'save_path': os.path.join(summaries_dir, 'persistent_search_tree'),
-                       'num_molecules': int(10e6),
-                       'prune_at': int(200e3),
-                       'num_rollout_actors': 1,
-                       'num_docking_threads': 1,
-                       'score_temperature': 1.5})
+        guided_search({
+            'priority_pred': 'max_desc_r', #'greedy_q',
+            'update_prio_on_refresh': True,
+            'return_type':'max_desc_r',
+            'save_path': os.path.join(summaries_dir, 'persistent_search_tree'),
+            'exp_path_override': os.path.join(summaries_dir, 'persistent_search_tree', restore),
+            'num_molecules': int(50e6),
+            'prune_at': int(400e3),
+            'num_rollout_actors': 4,
+            'num_docking_threads': 8,
+            'learning_rate': 1e-4,
+            'restore_nodes': f'/home/mila/b/bengioe/tmp/lz_3/persistent_search_tree/{restore}/final_tree.pkl.gz',
+            'restore_params': f'/home/mila/b/bengioe/tmp/lz_3/persistent_search_tree/{restore}/params.pkl.gz',
+            'score_temperature': 1.5})
