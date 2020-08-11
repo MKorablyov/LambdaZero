@@ -87,5 +87,5 @@ def get_child_molecule(parent_mol: Mol, child_block_index: int, parent_anchor_in
     new_frags = [parent_mol, child_block]
 
     child_mol, bond = mol_from_frag(jun_bonds=new_jbonds, frags=new_frags)
-    anchor_indices = bond[-1]
+    anchor_indices = tuple(bond[-1])
     return child_mol, anchor_indices
