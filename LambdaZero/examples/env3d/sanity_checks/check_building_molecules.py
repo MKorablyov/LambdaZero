@@ -59,7 +59,7 @@ if __name__ == "__main__":
         )
         child_block_index = molMDP.molecule.blockidxs[-1]
 
-        computed_child_mol = get_child_molecule(child_block_index, parent_anchor_index, blocks_df)
+        computed_child_mol, bond = get_child_molecule(parent_mol, child_block_index, parent_anchor_index, blocks_df)
 
         computed_connection = MolecularConnection(computed_child_mol)
 
