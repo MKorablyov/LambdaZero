@@ -1,10 +1,10 @@
 from LambdaZero.examples.drug_comb.dataset.new_drugcomb_data import NewDrugComb
-import os
 from LambdaZero.utils import get_external_dirs
-import time
 from ray import tune
-import ray
 from sklearn.linear_model import LinearRegression
+import os
+import time
+import ray
 import torch
 import pandas as pd
 import torch.nn.functional as F
