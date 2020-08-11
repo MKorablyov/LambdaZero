@@ -1,7 +1,7 @@
 import numpy as np
 
 from LambdaZero.examples.env3d.geometry import get_center_of_mass, \
-    get_molecular_orientation_vector_from_positions_and_masses
+    get_molecular_orientation_vector_from_positions_and_masses, get_n_axis
 from LambdaZero.examples.env3d.rdkit_utilities import get_atomic_masses
 
 
@@ -36,8 +36,3 @@ def extract_mol_geometry(anchor_indices, mol, parent_size):
 
     return geometry_dict
 
-
-def get_n_axis(child_anchor, parent_anchor):
-    n_axis = child_anchor - parent_anchor
-    n_axis /= np.linalg.norm(n_axis)
-    return n_axis
