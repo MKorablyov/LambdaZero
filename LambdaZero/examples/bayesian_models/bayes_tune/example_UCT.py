@@ -29,6 +29,9 @@ def aq_regret(train_loader, ul_loader, config):
     top50_regret = np.median(train_sorted[:50]) - np.median(all_sorted[:50])
     aq_top15 = np.median(train_sorted[:15])
     aq_top50 = np.median(train_sorted[:15])
+
+    print("min train min ul targets", np.min(train_targets), np.min(ul_targets))
+
     return {"aq_top15_regret":top15_regret, "aq_top50_regret":top50_regret, "aq_top15":aq_top15, "aq_top50":aq_top50}
 
 
@@ -104,7 +107,7 @@ regressor_config = {
         "uncertainty_eval_freq": 60,
         "train_iterations": 61,
         "model": LambdaZero.models.MPNNetDrop,
-        # "model_config": {},
+        "model_config": {"drop_data":False, "drop_weights": False, "drop_last":True, "drop_prob":0.1},
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
             "lr": 0.001

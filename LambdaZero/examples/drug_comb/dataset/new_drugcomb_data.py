@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 
 class NewDrugComb(InMemoryDataset):
-    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4, n_laplace_feat=256, **kwargs):
+    def __init__(self, transform=None, pre_transform=None, fp_bits=2048, fp_radius=3, n_laplace_feat=256, **kwargs):
 
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
@@ -143,7 +143,6 @@ class NewDrugComb(InMemoryDataset):
 
     def _get_ddi_edges(self, cid_to_idx_dict):
         print('Processing drug drug interaction edges..')
-
         # Drop rows that do not have second drug
         self._summary_data = pd.read_csv(os.path.join(self.raw_dir, self.raw_file_names[1]), low_memory=False)
         self._summary_data = self._summary_data.dropna(axis=0, subset=['drug_col'])
@@ -181,12 +180,16 @@ class NewDrugComb(InMemoryDataset):
         return ddi_edge_idx, ddi_edge_attr, ddi_edge_classes, cell_line_name_to_name_idx
 
     def to_cell_line(self, cell_line_name):
+        print("cell line", cell_line_name)
         match_idxs = torch.full((self.data.ddi_edge_idx.shape[1],), False, dtype=torch.bool)
+        print("match idxs", match_idxs)
+
         try:
             cell_line_idx = self.data.cell_line_name_to_name_idx[0][cell_line_name]
             match_idxs = self.data.ddi_edge_classes[:, cell_line_idx] == 1
 
         except KeyError:
+            print("shit!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             pass
 
         self.data.ddi_edge_idx = self.data.ddi_edge_idx[:, match_idxs]
@@ -229,4 +232,5 @@ class NewDrugComb(InMemoryDataset):
 if __name__ == '__main__':
 
     dataset = NewDrugComb()
+    print(dataset)
 
