@@ -26,8 +26,6 @@ config = {"dataset": LambdaZero.inputs.BrutalDock,
                                          #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
           "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
           "target":"gridscore",
-
-
           }
 
 

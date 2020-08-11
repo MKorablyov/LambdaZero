@@ -1,4 +1,4 @@
-from LambdaZero.examples.drug_comb.dataset.new_drugcomb_data import NewDrugComb
+from LambdaZero.examples.drug_comb.dataset.new_drugcomb_data_v2 import NewDrugComb
 from LambdaZero.utils import get_external_dirs
 from ray import tune
 from sklearn.linear_model import LinearRegression
@@ -9,8 +9,70 @@ import torch
 import pandas as pd
 import torch.nn.functional as F
 
+
+def to_cell_line(self, cell_line_name):
+    print("cell line", cell_line_name)
+    match_idxs = torch.full((self.data.ddi_edge_idx.shape[1],), False, dtype=torch.bool)
+    print("match idxs", match_idxs)
+
+    # try:
+
+    print(self.cell_line_name_to_name_idx[0])
+
+    cell_line_idx = self.data.cell_line_name_to_name_idx[0][cell_line_name]
+    match_idxs = self.data.ddi_edge_classes[:, cell_line_idx] == 1
+
+    # except KeyError:
+    #    print("shit!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    #    pass
+
+    self.data.ddi_edge_idx = self.data.ddi_edge_idx[:, match_idxs]
+    self.data.ddi_edge_classes = self.data.ddi_edge_classes[match_idxs]
+    self.data.ddi_edge_attr = self.data.ddi_edge_attr[match_idxs]
+
+    return self
+
+
+def __len__(self):
+    return self.data.ddi_edge_idx.shape[1]
+
+
+def __getitem__(self, idx):
+    drug_row_idx = self.data.ddi_edge_idx[0, idx]
+    drug_col_idx = self.data.ddi_edge_idx[1, idx]
+
+    fp_row = self.data.x_drugs[drug_row_idx]
+    fp_col = self.data.x_drugs[drug_col_idx]
+
+    conc_row = self.data.ddi_edge_attr[idx, 0].reshape(-1, 1)
+    conc_col = self.data.ddi_edge_attr[idx, 1].reshape(-1, 1)
+
+    drug_x = torch.cat((fp_row, conc_row, fp_col, conc_col), dim=1)
+    drug_y = self.data.ddi_edge_attr[idx, 2]
+
+    return drug_x, drug_y
+
+
+def random_split(self, test_prob, valid_prob):
+    num_examples = self.data.ddi_edge_idx.shape[1]
+
+    nvalid = int(num_examples * valid_prob)
+    ntest = int(num_examples * test_prob)
+    idx = torch.randperm(num_examples)
+
+    train_idx = idx[ntest + nvalid:]
+    val_idx = idx[:nvalid]
+    test_idx = idx[:ntest]
+
+    return train_idx, val_idx, test_idx
+
+
 X_IDX = 0
 Y_IDX = 1
+
+
+
+
 
 def train(data, model):
 
