@@ -195,6 +195,9 @@ class NewDrugComb(InMemoryDataset):
 
         return self
 
+    def __len__(self):
+        return self.data.ddi_edge_idx.shape[1]
+
     def __getitem__(self, idx):
         drug_row_idx = self.data.ddi_edge_idx[0, idx]
         drug_col_idx = self.data.ddi_edge_idx[1, idx]
