@@ -71,6 +71,7 @@ def get_child_molecule(parent_mol: Mol, child_block_index: int, parent_anchor_in
     Returns:
 
         child_mol (Mol): the child molecule, ie parent + child block attached correctly.
+        anchor_indices (Tuple[int, int]): the indices of parent and child anchor nodes.
     """
 
     # get the child block info, direcly from the vocabulary
@@ -86,4 +87,5 @@ def get_child_molecule(parent_mol: Mol, child_block_index: int, parent_anchor_in
     new_frags = [parent_mol, child_block]
 
     child_mol, bond = mol_from_frag(jun_bonds=new_jbonds, frags=new_frags)
-    return child_mol, bond
+    anchor_indices = bond[-1]
+    return child_mol, anchor_indices
