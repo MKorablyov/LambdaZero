@@ -1,11 +1,26 @@
 import numpy as np
 
-from LambdaZero.examples.env3d.geometry import get_center_of_mass, \
-    get_molecular_orientation_vector_from_positions_and_masses, get_n_axis
+from LambdaZero.examples.env3d.geometry import (
+    get_center_of_mass,
+    get_molecular_orientation_vector_from_positions_and_masses,
+    get_n_axis,
+)
 from LambdaZero.examples.env3d.rdkit_utilities import get_atomic_masses
 
 
 def extract_mol_geometry(anchor_indices, mol, parent_size):
+    """
+    Extracts verious geometric vectors of interest such as centers of mass, directions, axis of rotation, etc...
+
+    Args:
+        anchor_indices (Tuple[int, int]): indices of parent and child atoms that bind the child block to parent
+        mol (Mol): Mol object for child molecule, assumed to have a conformer
+        parent_size (int): number of atoms in parent molecule
+
+    Returns:
+       geometry_dict (Dict): all relevant information in dict format.
+
+    """
     all_positions = mol.GetConformer().GetPositions()
     all_masses = get_atomic_masses(mol)
     parent_anchor_index, child_anchor_index = anchor_indices
@@ -25,14 +40,15 @@ def extract_mol_geometry(anchor_indices, mol, parent_size):
 
     geometry_dict = {
         "all_positions": all_positions,
+        "n_axis": n_axis,
         "child_anchor": child_anchor,
         "child_cm": child_cm,
         "child_vector": child_vector,
-        "n_axis": n_axis,
+        "child_positions": child_positions,
         "parent_anchor": parent_anchor,
         "parent_cm": parent_cm,
         "parent_vector": parent_vector,
+        "parent_positions": parent_positions,
     }
 
     return geometry_dict
-
