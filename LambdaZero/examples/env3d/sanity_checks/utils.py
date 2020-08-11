@@ -1,11 +1,15 @@
 import numpy as np
+import pandas as pd
+from rdkit import Chem
 
+from LambdaZero.chem import mol_from_frag
 from LambdaZero.examples.env3d.geometry import (
     get_center_of_mass,
     get_molecular_orientation_vector_from_positions_and_masses,
     get_n_axis,
 )
 from LambdaZero.examples.env3d.rdkit_utilities import get_atomic_masses
+from LambdaZero.examples.env3d.sanity_checks.check_building_molecules import parent_mol
 
 
 def extract_mol_geometry(anchor_indices, mol, parent_size):
@@ -52,3 +56,33 @@ def extract_mol_geometry(anchor_indices, mol, parent_size):
     }
 
     return geometry_dict
+
+
+def get_child_molecule(child_block_index: int, parent_anchor_index: int, blocks_df: pd.DataFrame):
+    """
+    This method reconstructs the child molecule given the parent molecule, the attachment node index
+    and the vocabulary from which to extract block information.
+    Args:
+        child_block_index (int): child block identifier
+        parent_anchor_index (int):  index of the parent node where the child block is attached
+        blocks_df (pd.DataFrame): vocabulary of blocks, in Dataframe form
+
+    Returns:
+
+        child_mol (Mol): the child molecule, ie parent + child block attached correctly.
+    """
+
+    # get the child block info, direcly from the vocabulary
+    child_block_smiles = blocks_df["block_smi"].values[child_block_index]
+    child_block_r = blocks_df["block_r"].values[child_block_index]
+    child_block = Chem.MolFromSmiles(child_block_smiles)
+
+    child_anchor_index = child_block_r[0]
+
+    # build the new input for mol_from_frags, with only 2 fragments: the parent molecule
+    # and the child block.
+    new_jbonds = [[0, 1, parent_anchor_index, child_anchor_index]]
+    new_frags = [parent_mol, child_block]
+
+    child_mol, _ = mol_from_frag(jun_bonds=new_jbonds, frags=new_frags)
+    return child_mol
