@@ -32,19 +32,22 @@ def get_angle_plot(angle_df: pd.DataFrame):
     ax2 = fig.add_subplot(132)
     ax3 = fig.add_subplot(133)
 
+    bins = np.linspace(0., 360., 61)
     angles_in_degree = get_angles_in_degrees(angle_df['actual angle'].values)
-    ax1.hist(angles_in_degree, bins=60)
+    ax1.hist(angles_in_degree, bins=bins)
     ax1.set_xlim(0, 360)
     ax1.set_ylabel('count')
     ax1.set_title("Actual angle distribution")
 
     angles_in_degree = get_angles_in_degrees(angle_df['predicted angle'].values)
-    ax2.hist(angles_in_degree, bins=60)
+    ax2.hist(angles_in_degree, bins=bins)
     ax2.set_xlim(0, 360)
     ax2.set_title("Predicted angle distribution")
 
     angle_errors_in_degree = get_angles_in_degrees(angle_df['angle error'].values)
-    ax3.hist(angle_errors_in_degree, bins=60)
+
+    error_bins = np.linspace(-180., 180., 61)
+    ax3.hist(angle_errors_in_degree, bins=error_bins)
     ax3.set_xlim([-180.0, 180.0])
     ax3.set_xticks([-180, -90, 0, 90, 180])
     ax3.set_xlabel('angle error (degree)')
@@ -55,7 +58,6 @@ def get_angle_plot(angle_df: pd.DataFrame):
         ax.set_xlabel('angle (degree)')
 
     return fig
-
 
 
 sns.set(font_scale=1.5)
