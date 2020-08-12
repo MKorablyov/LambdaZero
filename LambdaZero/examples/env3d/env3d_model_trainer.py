@@ -52,7 +52,7 @@ class Env3dModelTrainer(tune.Trainable):
             self.train_set, self.model, self.optim, self.device, self.config
         )
         eval_scores = self.eval_epoch(
-            self.train_set, self.model, self.device, self.config
+            self.val_set, self.model, self.device, self.config
         )
         # rename to make scope
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]
