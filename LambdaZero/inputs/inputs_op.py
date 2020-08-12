@@ -819,8 +819,6 @@ class BrutalDock(InMemoryDataset):
             torch.save(self.collate(graphs), processed_path)
 
 
-
-
 def dataset_creator_v1(config):
     # make dataset
     dataset = config["dataset"](**config["dataset_config"])

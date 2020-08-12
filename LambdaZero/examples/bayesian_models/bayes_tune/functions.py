@@ -46,11 +46,11 @@ def train_epoch(loader, model, optimizer, device, config, scope):
 
     for bidx,data in enumerate(loader):
         data = data.to(device)
-        targets = getattr(data, config["target"])
+        targets = getattr(data, config["data_config"]["target"])
 
         optimizer.zero_grad()
         logits = model(data, do_dropout=True)
-        targets_norm = config["normalizer"].tfm(targets)
+        targets_norm = config["data_config"]["normalizer"].tfm(targets)
         reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
         loss = F.mse_loss(logits, targets_norm) + reg_loss
         loss.backward()
@@ -61,7 +61,7 @@ def train_epoch(loader, model, optimizer, device, config, scope):
 
     epoch_targets_norm = np.concatenate(epoch_targets_norm,0)
     epoch_logits = np.concatenate(epoch_logits, 0)
-    scores = _epoch_metrics(epoch_targets_norm, epoch_logits, config["normalizer"], scope)
+    scores = _epoch_metrics(epoch_targets_norm, epoch_logits, config["data_config"]["normalizer"], scope)
     return scores
 
 
@@ -78,15 +78,15 @@ def sample_logits(loader, model, device, config, num_samples, do_dropout):
 
 
 def sample_targets(loader, config):
-    epoch_targets = [getattr(d, config["target"]).cpu().numpy() for d in loader.dataset]
-    norm_targets = config["normalizer"].tfm(np.concatenate(epoch_targets,0))
+    epoch_targets = [getattr(d, config["data_config"]["target"]).cpu().numpy() for d in loader.dataset]
+    norm_targets = config["data_config"]["normalizer"].tfm(np.concatenate(epoch_targets,0))
     return norm_targets
 
 
 def eval_epoch(loader, model, device, config, scope):
     logits = sample_logits(loader, model, device, config, 1, False)[0]
     norm_targets = sample_targets(loader, config)
-    scores = _epoch_metrics(norm_targets, logits, config["normalizer"], scope)
+    scores = _epoch_metrics(norm_targets, logits, config["data_config"]["normalizer"], scope)
     return scores
 
 
@@ -126,8 +126,8 @@ def bayesian_ridge(train_x, val_x, train_targets_norm, val_targets_norm, config)
     clf.fit(train_x, train_targets_norm)
     train_logits = clf.predict(train_x)
     val_logits, val_std = clf.predict(val_x, return_std=True)
-    train_scores = _epoch_metrics(train_targets_norm, train_logits, config["normalizer"], "train_ridge")
-    val_scores = _epoch_metrics(val_targets_norm, val_logits, config["normalizer"], "val_ridge")
+    train_scores = _epoch_metrics(train_targets_norm, train_logits, config["data_config"]["normalizer"], "train_ridge")
+    val_scores = _epoch_metrics(val_targets_norm, val_logits, config["data_config"]["normalizer"], "val_ridge")
     ll = -0.5 * np.mean(np.log(2 * np.pi * val_std ** 2) + ((val_targets_norm - val_logits) ** 2 / val_std ** 2))
     val_scores["val_ll"] = ll
     return {**train_scores, **val_scores}
@@ -145,8 +145,8 @@ def sample_embeds(loader, model, device, config):
 
 def eval_mpnn_brr(train_loader, val_loader, model, device, config, N):
     # todo(maksym) I am not sure what is the best way to keep order
-    train_loader = DataLoader(train_loader.dataset, batch_size=config["b_size"])
-    val_loader = DataLoader(val_loader.dataset, batch_size=config["b_size"])
+    train_loader = DataLoader(train_loader.dataset, batch_size=config["data_config"]["b_size"])
+    val_loader = DataLoader(val_loader.dataset, batch_size=config["data_config"]["b_size"])
 
     train_targets_norm = sample_targets(train_loader, config)
     val_targets_norm = sample_targets(val_loader, config)
@@ -169,7 +169,7 @@ def train_mpnn_brr(train_loader, val_loader, model, device, config, optim, itera
 
 def mpnn_brr_mean_variance(train_loader, loader, model, device, config):
     # train model on the train_set (should be fast)
-    train_loader = DataLoader(train_loader.dataset, batch_size=config["b_size"])
+    train_loader = DataLoader(train_loader.dataset, batch_size=config["data_config"]["b_size"])
     train_embeds = sample_embeds(train_loader, model, device, config)
     train_targets_norm = sample_targets(train_loader, config)
     embeds = sample_embeds(loader, model, device, config)
@@ -178,3 +178,4 @@ def mpnn_brr_mean_variance(train_loader, loader, model, device, config):
     clf.fit(train_embeds, train_targets_norm)
     mean, std = clf.predict(embeds, return_std=True)
     return mean, std
+

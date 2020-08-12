@@ -31,7 +31,6 @@ def aq_regret(train_loader, ul_loader, config):
     aq_top50 = np.median(train_sorted[:15])
 
     print("min train min ul targets", np.min(train_targets), np.min(ul_targets))
-
     return {"aq_top15_regret":top15_regret, "aq_top50_regret":top50_regret, "aq_top15":aq_top15, "aq_top50":aq_top50}
 
 
@@ -39,20 +38,19 @@ class UCT(tune.Trainable):
     def _setup(self, config):
         self.config = config
         # load dataset
-        self.dataset = config["dataset"](**config["dataset_config"])
-        ul_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
+        self.dataset = config["data_config"]["dataset"](**config["data_config"]["dataset_config"])
+        ul_idxs, val_idxs, test_idxs = np.load(config["data_config"]["dataset_split_path"], allow_pickle=True)
 
         np.random.shuffle(ul_idxs) # randomly acquire batch zero
-        train_idxs = ul_idxs[:self.config["b_size0"]]
-        ul_idxs = ul_idxs[self.config["b_size0"]:]
+        train_idxs = ul_idxs[:self.config["aq_size0"]]
+        ul_idxs = ul_idxs[self.config["aq_size0"]:]
 
         train_set = Subset(self.dataset, train_idxs.tolist())
         ul_set = Subset(self.dataset, ul_idxs.tolist())
         val_set = Subset(self.dataset, val_idxs.tolist())
-        self.train_loader = DataLoader(train_set, shuffle=True,
-                                       batch_size=config["regressor_config"]["config"]["b_size"])
-        self.ul_loader = DataLoader(ul_set, batch_size=config["regressor_config"]["config"]["b_size"])
-        self.val_loader = DataLoader(val_set, batch_size=config["b_size"])
+        self.train_loader = DataLoader(train_set, shuffle=True, batch_size=config["data_config"]["b_size"])
+        self.ul_loader = DataLoader(ul_set, batch_size=config["data_config"]["b_size"])
+        self.val_loader = DataLoader(val_set, batch_size=config["data_config"]["b_size"])
 
         # make model with uncertainty
         self.regressor = self.config["regressor"](**config["regressor_config"])
@@ -72,9 +70,8 @@ class UCT(tune.Trainable):
         train_idxs = self.train_loader.dataset.indices + aq_idxs
         train_set = Subset(self.dataset, train_idxs)
         ul_set = Subset(self.dataset, ul_idxs)
-        self.train_loader = DataLoader(train_set, shuffle=True,
-                                       batch_size=self.config["regressor_config"]["config"]["b_size"])
-        self.ul_loader = DataLoader(ul_set, batch_size=self.config["regressor_config"]["config"]["b_size"])
+        self.train_loader = DataLoader(train_set, shuffle=True, batch_size=self.config["data_config"]["b_size"])
+        self.ul_loader = DataLoader(ul_set, batch_size=self.config["data_config"]["b_size"])
         # fit model to the data
         scores = self.regressor.fit(self.train_loader, self.val_loader)[-1]
 
@@ -90,17 +87,38 @@ class UCT(tune.Trainable):
         noise = self.config["epsilon"] * np.random.uniform(size=mean.shape[0])
         scores = scores + noise
         if self.config["minimize_objective"]: scores = -scores
-        idxs = np.argsort(-scores)[:self.config["b_size"]]
+        idxs = np.argsort(-scores)[:self.config["aq_size"]]
         return idxs
 
 
 transform = T.Compose([LambdaZero.utils.Complete()])
+
+
+data_config = {
+    "target": "gridscore",
+    "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
+    "dataset_split_path": osp.join(datasets_dir,
+                                   "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+    # "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+    "dataset": LambdaZero.inputs.BrutalDock,
+    "dataset_config": {
+        "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
+        "props": ["gridscore", "smi"],
+        "transform": transform,
+        "file_names": ["Zinc15_2k"],
+        # ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+    },
+    "b_size": 40,
+    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057])
+}
+
+regressor_data_config = data_config
+regressor_data_config["dataset_creator"] = None
+
 regressor_config = {
     "config":{
-        "target": "gridscore",
-        "dataset_creator": None, #LambdaZero.utils.dataset_creator_v1,
-        "b_size": 40,
-        "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
+        "target": data_config["target"],
+        "data_config":regressor_data_config,
         "lambda": 1e-8,
         "T": 20,
         "lengthscale": 1e-2,
@@ -122,23 +140,11 @@ DEFAULT_CONFIG = {
     "acquirer_config": {
         "run_or_experiment": UCT,
         "config":{
-            "dataset_creator": LambdaZero.utils.dataset_creator_v1,
-            "dataset_split_path": osp.join(datasets_dir,
-                                            "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-            #                                 #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-            "dataset": LambdaZero.inputs.BrutalDock,
-            "dataset_config": {
-                "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                "props": ["gridscore", "smi"],
-                "transform": transform,
-            "file_names":
-            ["Zinc15_2k"],
-            #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
-            },
+            "data_config": data_config,
             "regressor": MCDrop,
             "regressor_config": regressor_config,
-            "b_size0": 200,
-            "b_size": 50,
+            "aq_size0": 200,
+            "aq_size": 50,
             "kappa": 0.2,
             "epsilon": 0.0,
             "minimize_objective":True,
@@ -153,7 +159,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "uct001"
+    else: config_name = "uct000"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["acquirer_config"]["name"] = config_name

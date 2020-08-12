@@ -12,7 +12,6 @@ import torch
 import os
 from tqdm import tqdm
 from sklearn.linear_model import Ridge
-
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.inputs import random_split
 
@@ -174,7 +173,6 @@ class NewDrugComb(InMemoryDataset):
 
 
 class DrugCombEdge(NewDrugComb):
-
     def __len__(self):
         return self.data.ddi_edge_idx.shape[1]
 
@@ -187,50 +185,51 @@ class DrugCombEdge(NewDrugComb):
         #    print(self.data.ddi_edge_attr[idx])
         #print(self.data.ddi_edge_attr[102913:102918])
         #print(self.data.ddi_edge_attr[100000:100020])
-        #time.sleep(1000)
         #print(idx, self.data.ddi_edge_attr[idx])
         return row_fp, col_fp, edge_attr
 
 
-def ridge_regression(dataset):
-    # make dataset
+def _sample_xy(dataset):
     x, y = [], []
     for i in range(len(dataset)):
         row_fp, col_fp, edge_attr = dataset[i]
-        x.append(np.concatenate([row_fp, col_fp]))#, edge_attr[5:6]])) #
+        x.append(np.concatenate([row_fp, col_fp,edge_attr[5:6]])) #
         y.append(edge_attr[0])
-        x.append(np.concatenate([col_fp, row_fp]))#, edge_attr[5:6].flip(dims=[0])]))
+        x.append(np.concatenate([col_fp, row_fp,edge_attr[5:6].flip(dims=[0])]))
         y.append(edge_attr[0])
+    return np.array(x,dtype=np.float), np.array(y,dtype=np.float)
 
-    # split
-    x,y = np.asarray(x),np.asarray(y)
-    train_idx, val_idx = random_split(len(dataset), [0.8, 0.2])
-    train_x, train_y = x[train_idx],y[train_idx]
-    val_x,val_y = x[val_idx], y[val_idx]
+def train_ridge_regression(dataset):
+    # load/split dataset
+    train_idx, val_idx = random_split(len(dataset), [0.9, 0.1])
+    train_set = Subset(dataset,train_idx)
+    val_set = Subset(dataset,val_idx)
+
+
+    train_x, train_y = _sample_xy(train_set)
+    val_x, val_y = _sample_xy(val_set)
+
     # do linear regression
     model = Ridge(alpha=0.001)
     model.fit(train_x, train_y)
     val_y_hat = model.predict(val_x)
     var0 = ((val_y - train_y.mean())**2).mean()
-    exp_var = (var0 - ((val_y - val_y_hat)**2).mean()) / var0
 
+    exp_var = (var0 - ((val_y - val_y_hat)**2).mean()) / var0
     rmse = ((val_y - val_y_hat) ** 2).mean()**0.5
     return exp_var, rmse
 
 
-
-
 if __name__ == '__main__':
     from matplotlib import pyplot as plt
-    dataset = NewDrugComb()
+    NewDrugComb()
     dataset = DrugCombEdge()
     cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
 
     for cell_line_idx in cell_line_idxs:
         idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idx)[0]
         cell_dataset = Subset(dataset,idxs)
-        exp_var, rmse = ridge_regression(cell_dataset)
-
+        exp_var, rmse = train_ridge_regression(cell_dataset)
         print("cell_line_idx", cell_line_idx, "explained variance", exp_var ,"rmse", rmse)
 
 
