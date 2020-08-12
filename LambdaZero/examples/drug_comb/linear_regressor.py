@@ -71,9 +71,6 @@ X_IDX = 0
 Y_IDX = 1
 
 
-
-
-
 def train(data, model):
 
 

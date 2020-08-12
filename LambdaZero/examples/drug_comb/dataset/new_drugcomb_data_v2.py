@@ -1,5 +1,4 @@
 import time
-from LambdaZero.utils import get_external_dirs
 from torch_geometric.data import Data, InMemoryDataset
 from pubchempy import Compound
 import urllib.request
@@ -8,10 +7,14 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 import numpy as np
 import pandas as pd
+from torch.utils.data import Dataset,DataLoader,Subset
 import torch
 import os
 from tqdm import tqdm
+from sklearn.linear_model import Ridge
 
+from LambdaZero.utils import get_external_dirs
+from LambdaZero.inputs import random_split
 
 
 def _cid_to_smiles(_drugcomb_data, raw_dir):
@@ -36,6 +39,7 @@ def _cid_to_smiles(_drugcomb_data, raw_dir):
 
 def _cell_line_to_idx(_drugcomb_data, raw_dir):
     cell_lines_names = _drugcomb_data[["cell_line_name"]].to_numpy()[:, 0]
+    cell_lines_names = np.unique(cell_lines_names)
     cell_line_to_idx = {na:i for i,na in enumerate(cell_lines_names)}
     return cell_line_to_idx
 
@@ -94,12 +98,13 @@ def _get_ddi_edges(_drugcomb_data, cid_to_idx, cell_line_to_idx,properties):
     ddi_edge_attr = _drugcomb_data[properties].to_numpy()
 
     cell_line_names = _drugcomb_data[["cell_line_name"]].to_numpy()[:,0]
-    ddi_edge_classes = np.asarray([cell_line_to_idx[na] for na in cell_line_names],dtype=np.int)
+    #print(cell_line_to_idx)
+    ddi_edge_classes = np.array([cell_line_to_idx[na] for na in cell_line_names],dtype=np.int32)
+    #print(ddi_edge_classes)
     return ddi_edge_idx, ddi_edge_attr, ddi_edge_classes
 
 class NewDrugComb(InMemoryDataset):
     def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=3, n_laplace_feat=256, **kwargs):
-
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
         self.n_laplace_feat = n_laplace_feat
@@ -162,7 +167,7 @@ class NewDrugComb(InMemoryDataset):
         # Add ddi attributes to data
         data.ddi_edge_idx = torch.tensor(ddi_edge_idx, dtype=torch.long)
         data.ddi_edge_attr = torch.tensor(ddi_edge_attr, dtype=torch.float)
-        data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.float)
+        data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.int32)
 
         data_list = [data]
         if self.pre_transform is not None:
@@ -172,15 +177,63 @@ class NewDrugComb(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[1])
 
 
+class DrugCombEdge(NewDrugComb):
+
+    def __len__(self):
+        return self.data.ddi_edge_idx.shape[1]
+
+    def __getitem__(self, idx):
+        ddi_idx = self.data.ddi_edge_idx[:, idx]
+        row_fp = self.data.x_drugs[ddi_idx[0]]
+        col_fp = self.data.x_drugs[ddi_idx[0]]
+        edge_attr = self.data.ddi_edge_attr[idx]
+        return row_fp, col_fp, edge_attr
+
+
+def ridge_regression(dataset):
+    # make dataset
+    x, y = [], []
+    for i in range(len(dataset)):
+        row_fp, col_fp, edge_attr = dataset[i]
+        x.append(np.concatenate([row_fp, col_fp, edge_attr[:1]]))
+        y.append(edge_attr[2])
+        x.append(np.concatenate([col_fp, row_fp, edge_attr[:1].flip(dims=[0])]))
+        y.append(edge_attr[2])
+
+    # split
+    x,y = np.asarray(x),np.asarray(y)
+    train_idx, val_idx = random_split(len(dataset), [0.8, 0.2])
+    train_x, train_y = x[train_idx],y[train_idx]
+    val_x,val_y = x[val_idx], y[val_idx]
+    # do linear regression
+    model = Ridge(alpha=0.001)
+    model.fit(train_x, train_y)
+    val_y_hat = model.predict(val_x)
+    var0 = ((val_y - train_y.mean())**2).mean()
+    exp_var = (var0 - ((val_y - val_y_hat)**2).mean()) / var0
+    return exp_var
+
+
 
 
 if __name__ == '__main__':
+    from matplotlib import pyplot as plt
+    dataset = DrugCombEdge()
+    cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
 
-    dataset = NewDrugComb()
-    print(dataset[0])
+    for cell_line_idx in cell_line_idxs:
+        idxs = np.where(dataset.data.ddi_edge_classes.numpy() == 1542)[0]
+        cell_dataset = Subset(dataset,idxs)
+        exp_var = ridge_regression(cell_dataset)
+
+        print("cell_line_idx", cell_line_idx, "explained variance", exp_var)
+
+
+
+
+
 
 # todo: log transform concentrations
-
 # ['block_id' 'conc_r' 'conc_c' 'inhibition' 'drug_row' 'drug_col'
 # 'conc_r_unit' 'conc_c_unit' 'cell_line_name' 'drug_row_cid'
 # 'drug_col_cid' 'cellosaurus_accession' 'study_name']
