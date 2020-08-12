@@ -44,10 +44,12 @@ def train_epoch(loader, model, optimizer, device, config):
 
         # prediction over classes in a straight-forward cross-entropy
         class_loss, angle_loss, angle_mae, n_angle = class_and_angle_loss(
-            class_predictions, class_target, angle_predictions, angle_target
+            class_predictions, class_target, angle_predictions, angle_target,
+            config.get("loss_mode", "cos")
         )
 
-        loss = class_loss + config.get("angle_loss_weight", 1) * angle_loss
+        # loss = class_loss + config.get("angle_loss_weight", 1) * angle_loss
+        loss = angle_loss
 
         loss.backward()
         optimizer.step()
@@ -125,7 +127,8 @@ def eval_epoch(loader, model, device, config):
 
         # prediction over classes in a straight-forward cross-entropy
         class_loss, angle_loss, angle_mae, n_angle = class_and_angle_loss(
-            class_predictions, class_target, angle_predictions, angle_target
+            class_predictions, class_target, angle_predictions, angle_target,
+            config.get("loss_mode", "cos")
         )
 
         loss = class_loss + config.get("angle_loss_weight", 1) * angle_loss

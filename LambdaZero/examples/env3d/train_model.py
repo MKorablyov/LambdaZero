@@ -43,6 +43,7 @@ if __name__ == "__main__":
             "model_config": input_config["model_config"],
             "optimizer": torch.optim.Adam,
             "optimizer_config": {"lr": input_config["trainer_config"]["learning_rate"]},
+            "loss_mode": input_config["trainer_config"]["loss_mode"],
             "angle_loss_weight": input_config["trainer_config"]["angle_loss_weight"],
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
