@@ -84,23 +84,20 @@ def _append_cid(_drugcomb_data, _summary_data):
     _summary_data = _summary_data[_summary_data['drug_col_cid'] != -1]
     return _summary_data
 
-def _get_ddi_edges(_drugcomb_data, cid_to_idx, cell_line_to_idx,properties):
+def _get_ddi_edges(_data, cid_to_idx, cell_line_to_idx,properties):
     print('Processing drug drug interaction edges..')
     # Drop rows that do not have second drug
-    _drugcomb_data = _drugcomb_data.dropna(axis=0, subset=['drug_col'])
+    _data = _data.dropna(axis=0, subset=['drug_col'])
+    _data['drug_row_idx'] = _data['drug_row_cid'].apply(lambda cid: cid_to_idx[cid])
+    _data['drug_col_idx'] = _data['drug_col_cid'].apply(lambda cid: cid_to_idx[cid])
+    is_pairs_of_diff_drugs = _data['drug_row_idx'] != _data['drug_col_idx']
+    _data = _data[is_pairs_of_diff_drugs]
 
-    _drugcomb_data['drug_row_idx'] = _drugcomb_data['drug_row_cid'].apply(lambda cid: cid_to_idx[cid])
-    _drugcomb_data['drug_col_idx'] = _drugcomb_data['drug_col_cid'].apply(lambda cid: cid_to_idx[cid])
-    is_pairs_of_diff_drugs = _drugcomb_data['drug_row_idx'] != _drugcomb_data['drug_col_idx']
-    _drugcomb_data = _drugcomb_data[is_pairs_of_diff_drugs]
+    ddi_edge_idx = _data[['drug_row_idx', 'drug_col_idx']].to_numpy().T
+    ddi_edge_attr = _data[properties].to_numpy()
 
-    ddi_edge_idx = _drugcomb_data[['drug_row_idx', 'drug_col_idx']].to_numpy().T
-    ddi_edge_attr = _drugcomb_data[properties].to_numpy()
-
-    cell_line_names = _drugcomb_data[["cell_line_name"]].to_numpy()[:,0]
-    #print(cell_line_to_idx)
+    cell_line_names = _data[["cell_line_name"]].to_numpy()[:,0]
     ddi_edge_classes = np.array([cell_line_to_idx[na] for na in cell_line_names],dtype=np.int32)
-    #print(ddi_edge_classes)
     return ddi_edge_idx, ddi_edge_attr, ddi_edge_classes
 
 class NewDrugComb(InMemoryDataset):
@@ -149,7 +146,6 @@ class NewDrugComb(InMemoryDataset):
         _drugcomb_data = pd.read_csv(os.path.join(self.raw_dir, self.raw_file_names[0]), low_memory=False)
         self.cid_to_smiles = _cid_to_smiles(_drugcomb_data, self.raw_dir)
         self.cell_line_to_idx = _cell_line_to_idx(_drugcomb_data, self.raw_dir)
-
         nodes, cid_to_idx = _get_nodes(_drugcomb_data, self.cid_to_smiles, self.fp_radius, self.fp_bits)
 
         # todo: save raw_data_table
@@ -158,10 +154,10 @@ class NewDrugComb(InMemoryDataset):
         torch.save(torch.tensor([0]), self.processed_paths[0])
 
         _summary_table = pd.read_csv(os.path.join(self.raw_dir, self.raw_file_names[1]), low_memory=False)
+        props = ["css", "synergy_zip" , "synergy_bliss", "synergy_loewe", "synergy_hsa", "ic50_row", "ic50_col"]
         _summary_table = _append_cid(_drugcomb_data, _summary_table)
         ddi_edge_idx, ddi_edge_attr, ddi_edge_classes = _get_ddi_edges(_summary_table, cid_to_idx,
-                                                                self.cell_line_to_idx, ["css_row","css_col", "css"])
-
+                                                                self.cell_line_to_idx, props)
         data = Data(x_drugs=torch.tensor(nodes.to_numpy(), dtype=torch.float))
 
         # Add ddi attributes to data
@@ -185,8 +181,14 @@ class DrugCombEdge(NewDrugComb):
     def __getitem__(self, idx):
         ddi_idx = self.data.ddi_edge_idx[:, idx]
         row_fp = self.data.x_drugs[ddi_idx[0]]
-        col_fp = self.data.x_drugs[ddi_idx[0]]
+        col_fp = self.data.x_drugs[ddi_idx[1]]
         edge_attr = self.data.ddi_edge_attr[idx]
+        #for idx in [102913,102914,102915, 102916]:
+        #    print(self.data.ddi_edge_attr[idx])
+        #print(self.data.ddi_edge_attr[102913:102918])
+        #print(self.data.ddi_edge_attr[100000:100020])
+        #time.sleep(1000)
+        #print(idx, self.data.ddi_edge_attr[idx])
         return row_fp, col_fp, edge_attr
 
 
@@ -195,10 +197,10 @@ def ridge_regression(dataset):
     x, y = [], []
     for i in range(len(dataset)):
         row_fp, col_fp, edge_attr = dataset[i]
-        x.append(np.concatenate([row_fp, col_fp, edge_attr[:1]]))
-        y.append(edge_attr[2])
-        x.append(np.concatenate([col_fp, row_fp, edge_attr[:1].flip(dims=[0])]))
-        y.append(edge_attr[2])
+        x.append(np.concatenate([row_fp, col_fp]))#, edge_attr[5:6]])) #
+        y.append(edge_attr[0])
+        x.append(np.concatenate([col_fp, row_fp]))#, edge_attr[5:6].flip(dims=[0])]))
+        y.append(edge_attr[0])
 
     # split
     x,y = np.asarray(x),np.asarray(y)
@@ -211,22 +213,25 @@ def ridge_regression(dataset):
     val_y_hat = model.predict(val_x)
     var0 = ((val_y - train_y.mean())**2).mean()
     exp_var = (var0 - ((val_y - val_y_hat)**2).mean()) / var0
-    return exp_var
+
+    rmse = ((val_y - val_y_hat) ** 2).mean()**0.5
+    return exp_var, rmse
 
 
 
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt
+    dataset = NewDrugComb()
     dataset = DrugCombEdge()
     cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
 
     for cell_line_idx in cell_line_idxs:
-        idxs = np.where(dataset.data.ddi_edge_classes.numpy() == 1542)[0]
+        idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idx)[0]
         cell_dataset = Subset(dataset,idxs)
-        exp_var = ridge_regression(cell_dataset)
+        exp_var, rmse = ridge_regression(cell_dataset)
 
-        print("cell_line_idx", cell_line_idx, "explained variance", exp_var)
+        print("cell_line_idx", cell_line_idx, "explained variance", exp_var ,"rmse", rmse)
 
 
 
