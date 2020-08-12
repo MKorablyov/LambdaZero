@@ -61,7 +61,7 @@ DEFAULT_CONFIG = {
         "run_or_experiment": MCDrop,
         "config": {
             "target": "gridscore",
-            "dataset_creator": LambdaZero.utils.dataset_creator_v1,
+            "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
             "dataset_split_path": osp.join(datasets_dir,
                                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                             #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
