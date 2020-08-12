@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
     ax2.plot(angles_in_degrees, list_rms, 'ro-')
     ax2.set_xlim(0, 360)
-    ax.set_ylabel("RMS")
+    ax2.set_ylabel("RMS")
     ax2.set_xlabel("angle (degrees)")
 
     plt.show()
