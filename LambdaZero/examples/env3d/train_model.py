@@ -52,7 +52,6 @@ if __name__ == "__main__":
                 "props": ENV3D_DATA_PROPERTIES,
                 "proc_func": env3d_proc,
                 "transform": transform_concatenate_positions_to_node_features,
-                "pre_filter": class_filter_generator(special_class),
                 "file_names": [args.data_file_name.replace(".feather", "")], # remove suffix in case it is there
             },
         },
