@@ -1,9 +1,6 @@
 """
-The goal of this script is to manipulate the orientation of the added block and to compute the
-energy vs. angle of block.
-
-The work is somewhat incomplete, and the energy of the original molecule is inconsistent with
-the energy following a ConstrainEmbed.
+The goal of this script is to reconstruct the child molecule from the env3d dataset and
+visualize it.
 """
 import os
 from pathlib import Path
@@ -60,7 +57,6 @@ if __name__ == "__main__":
     parent_anchor_index = data_row['attachment_node_idx']
 
     child_mol, anchor_indices = get_child_molecule(parent_mol, child_block_index, parent_anchor_index, blocks_df)
-
 
     min_child_energy, child_mol_with_hydrogens, _ = get_lowest_energy_and_mol_with_conformer(child_mol,
                                                                                                num_conf,
