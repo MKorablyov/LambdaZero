@@ -24,8 +24,8 @@ class MCDrop(tune.Trainable):
     def _setup(self, config):
         self.config = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if config["dataset_creator"] is not None:
-            self.train_loader, self.val_loader = config["dataset_creator"](config)
+        if config["data_config"]["dataset_creator"] is not None:
+            self.train_loader, self.val_loader = config["data_config"]["dataset_creator"](config["data_config"])
 
         # make model
         self.model = self.config["model"](**self.config["model_config"])
@@ -56,26 +56,31 @@ class MCDrop(tune.Trainable):
         return mean, var
 
 
+
+data_config = {
+    "target": "gridscore",
+    "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
+    "dataset_split_path": osp.join(datasets_dir,
+                                   "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+    # "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+    "dataset": LambdaZero.inputs.BrutalDock,
+    "dataset_config": {
+        "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
+        "props": ["gridscore", "smi"],
+        "transform": transform,
+        "file_names": ["Zinc15_2k"],
+        # ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+    },
+    "b_size": 40,
+    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057])
+}
+
+
 DEFAULT_CONFIG = {
     "regressor_config":{
         "run_or_experiment": MCDrop,
         "config": {
-            "target": "gridscore",
-            "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
-            "dataset_split_path": osp.join(datasets_dir,
-                                            "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-                                            #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-            "dataset": LambdaZero.inputs.BrutalDock,
-            "dataset_config": {
-                "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-                "props": ["gridscore", "smi"],
-                "transform": transform,
-                "file_names": ["Zinc15_2k"],
-                #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
-
-            },
-            "b_size": 40,
-            "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057]),
+            "data_config":data_config,
             "lambda": 1e-8,
             "T": 20,
             "lengthscale": 1e-2,
@@ -113,7 +118,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "mcdrop001"
+    else: config_name = "mcdrop003"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
