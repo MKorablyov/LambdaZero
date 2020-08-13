@@ -86,7 +86,7 @@ dataset_config = {
 model_analysis_path = Path(summaries_dir).joinpath("env3d/model_analysis/")
 model_path = model_analysis_path.joinpath("model.pth")
 
-dataset_pickle_path = model_analysis_path.joinpath("debug/model_forecast.pkl")
+dataset_pickle_path = model_analysis_path.joinpath("model_forecast.pkl")
 dataset_pickle_path.parent.mkdir(exist_ok=True)
 
 results_dir = model_analysis_path.joinpath("analysis/")
