@@ -48,16 +48,27 @@ def train_epoch(loader, model, optimizer, device, config):
     metrics = {"loss":0,"mae":0,"mse":0,"top15_regret":0,"top50_regret":0}
     epoch_targets = []
     epoch_preds = []
+    
+    i = 0
+    total_iters = int(len(loader.dataset)/config["b_size"])
 
     for bidx,data in enumerate(loader):
-        data = data.to(device)
-        targets = getattr(data, config["target"])
+
+        i += 1
+        print(str(i) + "/" + str(total_iters))
+
+        targets = getattr(data, config["target"]).to(device)
 
         optimizer.zero_grad()
 
         if config["model_type"] == "dime":
-            logits = model(z=data.z,pos=data.pos,batch=data.batch).squeeze(1)
+            z = data.z.to(device)
+            pos = data.pos.to(device)
+            batch = data.batch.to(device)
+
+            logits = model(z=z,pos=pos,batch=batch).squeeze(1)
         else:
+            data = data.to(device)
             logits = model(data)
 
         if config["loss"] == "L2":
@@ -94,12 +105,16 @@ def eval_epoch(loader, model, device, config):
     epoch_preds = []
 
     for bidx,data in enumerate(loader):
-        data = data.to(device)
-        targets = getattr(data, config["target"])
-        
+        targets = getattr(data, config["target"]).to(device)
         if config["model_type"] == "dime":
+            z = data.z.to(device)
+            pos = data.pos.to(device)
+            batch = data.batch.to(device)
+
             logits = model(z=data.z,pos=data.pos,batch=data.batch).squeeze(1)
         else:
+            data = data.to(device)
+
             logits = model(data)
 
         loss = F.mse_loss(logits, normalizer.normalize(targets))
@@ -118,15 +133,11 @@ def eval_epoch(loader, model, device, config):
     ranked_targets = epoch_targets[np.argsort(epoch_targets)]
     predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
     metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
-    print("difference:")
-    print(np.median(predsranked_targets[:50]))
-    print(np.median(ranked_targets[:50]))
-    print(np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50]))
 
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
 
-loaded_model = DimeNet(hidden_channels=256, out_channels=1, num_blocks=6,
+loaded_model = DimeNet(hidden_channels=128, out_channels=1, num_blocks=6,
                         num_bilinear=8, num_spherical=7, num_radial=6,
                         cutoff=5.0, envelope_exponent=5, num_before_skip=1,
                         num_after_skip=2, num_output_layers=3) if model_type == "dime" else LambdaZero.models.MPNNet()
@@ -139,7 +150,7 @@ DEFAULT_CONFIG = {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
         "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/" + split_file),
-        "b_size": 32,
+        "b_size": 128,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
