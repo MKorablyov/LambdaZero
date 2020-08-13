@@ -83,6 +83,8 @@ def train_epoch(loader, model, optimizer, device, config):
             metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item() * n_angle
         ) / max(1, metrics.get("n_angles", 0) + n_angle)
 
+        metrics["n_angles"] = metrics.get("n_angles", 0) + n_angle
+
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
     metrics["angle_rmse"] = np.sqrt(metrics["angle_rmse"].cpu().item())
