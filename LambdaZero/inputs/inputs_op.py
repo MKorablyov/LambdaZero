@@ -11,6 +11,8 @@ from rdkit.Chem.rdchem import HybridizationType
 from rdkit import RDConfig
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem.rdchem import BondType as BT
+from torch.utils.data import Subset
+from torch_geometric.data import DataLoader
 
 import ray
 rdBase.DisableLog('rdApp.error')
@@ -815,3 +817,15 @@ class BrutalDock(InMemoryDataset):
             graphs = [g for g in graphs if g is not None]
             # save to the disk
             torch.save(self.collate(graphs), processed_path)
+
+
+def dataset_creator_v1(config):
+    # make dataset
+    dataset = config["dataset"](**config["dataset_config"])
+    train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
+
+    train_set = Subset(dataset, train_idxs.tolist())
+    val_set = Subset(dataset, val_idxs.tolist())
+    train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
+    val_loader = DataLoader(val_set, batch_size=config["b_size"])
+    return train_loader, val_loader

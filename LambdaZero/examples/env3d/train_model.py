@@ -1,6 +1,6 @@
 import ray
 import torch
-from ray import tune
+from ray.tune import tune
 
 from LambdaZero.examples.env3d.dataset import ENV3D_DATA_PROPERTIES
 from LambdaZero.examples.env3d.dataset.processing import (
