@@ -44,14 +44,13 @@ def class_and_angle_loss(
         norm = norm.unsqueeze(-1).repeat(1, 2)
         angle_predictions = (
             angle_predictions / norm
-        )  # the idiom angle_predictions /= norm leas to a pytorch runtime error
+        )  # the idiom angle_predictions /= norm leads to a pytorch runtime error
         # angle_predictions[:, 0] is sin, [:, 1] is cos
         # now, convert the ground truth
         sin_target = torch.sin(angle_targets)
         cos_target = torch.cos(angle_targets)
         angle_target_sincos = torch.stack([sin_target, cos_target], dim=-1)
         # loss for the angle is the MSE
-        # we want to calculate only when angle_predictions > -1
         angle_loss = F.mse_loss(angle_target_sincos, angle_predictions, reduction="none")
         angle_mae = F.l1_loss(angle_target_sincos, angle_predictions, reduction="none")
     
@@ -61,8 +60,7 @@ def class_and_angle_loss(
 
     elif mode == 'angle':
         angle_predictions = torch.atan2(angle_predictions[:, 0], angle_predictions[:, 1])
-        # loss for the angle is the MSE
-        # we want to calculate only when angle_predictions > -1
+        # loss is the MSE for the angle
         angle_loss = F.mse_loss(angle_targets, angle_predictions, reduction="none")
         angle_loss_2pi = F.mse_loss(angle_targets + 2 * np.pi, angle_predictions, reduction="none")
         angle_loss_m2pi = F.mse_loss(angle_targets - 2 * np.pi, angle_predictions, reduction="none")
@@ -76,7 +74,7 @@ def class_and_angle_loss(
 
     # create a mask of 0 where angle_target is invalid (-1), and 1 elsewhere
     mask = torch.where(
-        angle_targets > 0,
+        angle_targets >= 0,
         torch.ones_like(angle_targets),
         torch.zeros_like(angle_targets),
     )
