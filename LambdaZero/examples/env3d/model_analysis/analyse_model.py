@@ -32,53 +32,48 @@ def get_angle_plot(angle_df: pd.DataFrame):
     ax2 = fig.add_subplot(132)
     ax3 = fig.add_subplot(133)
 
-    bins = np.linspace(0., 360., 61)
-    angles_in_degree = get_angles_in_degrees(angle_df['actual angle'].values)
+    bins = np.linspace(0.0, 360.0, 61)
+    angles_in_degree = get_angles_in_degrees(angle_df["actual angle"].values)
     ax1.hist(angles_in_degree, bins=bins)
     ax1.set_xlim(0, 360)
-    ax1.set_ylabel('count')
+    ax1.set_ylabel("count")
     ax1.set_title("Actual angle distribution")
 
-    angles_in_degree = get_angles_in_degrees(angle_df['predicted angle'].values)
+    angles_in_degree = get_angles_in_degrees(angle_df["predicted angle"].values)
     ax2.hist(angles_in_degree, bins=bins)
     ax2.set_xlim(0, 360)
     ax2.set_title("Predicted angle distribution")
 
-    angle_errors_in_degree = get_angles_in_degrees(angle_df['angle error'].values)
+    angle_errors_in_degree = get_angles_in_degrees(angle_df["angle error"].values)
 
-    error_bins = np.linspace(-180., 180., 61)
+    error_bins = np.linspace(-180.0, 180.0, 61)
     ax3.hist(angle_errors_in_degree, bins=error_bins)
     ax3.set_xlim([-180.0, 180.0])
     ax3.set_xticks([-180, -90, 0, 90, 180])
-    ax3.set_xlabel('angle error (degree)')
+    ax3.set_xlabel("angle error (degree)")
     ax3.set_title("Angle error distribution")
 
     for ax in [ax1, ax2]:
         ax.set_xticks([0, 90, 180, 270, 360])
-        ax.set_xlabel('angle (degree)')
+        ax.set_xlabel("angle (degree)")
 
     return fig
 
 
 sns.set(font_scale=1.5)
 
-model_dir = Path("/Users/bruno/Desktop/model/")
-model_path = model_dir.joinpath("model.pth")
-
 model_config = {
     "num_angle_prediction_hidden_features": 128,
-    "num_block_prediction_hidden_features": 256,
+    "num_block_prediction_hidden_features": 128,
     "num_edge_network_hidden_features": 32,
     "num_hidden_features": 64,
     "number_of_block_classes": 105,
-    "number_of_layers": 4,
+    "number_of_layers": 3,
     "set2set_steps": 3,
 }
 
-
 _, _, summaries_dir = get_external_dirs()
-root_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN4/data/")
-dataset_base_path = root_path.joinpath("raw/")
+root_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN5/data/")
 
 dataset_config = {
     "root": str(root_path),
@@ -88,11 +83,13 @@ dataset_config = {
     "file_names": ["combined_dataset"],
 }
 
+model_analysis_path = Path(summaries_dir).joinpath("env3d/model_analysis/")
+model_path = model_analysis_path.joinpath("model.pth")
 
-dataset_pickle_path = Path(summaries_dir).joinpath("debug/forecast.pkl")
+dataset_pickle_path = model_analysis_path.joinpath("debug/model_forecast.pkl")
 dataset_pickle_path.parent.mkdir(exist_ok=True)
 
-results_dir = dataset_base_path.parent.parent.joinpath("analysis/")
+results_dir = model_analysis_path.joinpath("analysis/")
 results_dir.mkdir(exist_ok=True)
 
 if __name__ == "__main__":
@@ -163,17 +160,20 @@ if __name__ == "__main__":
     x = np.einsum("ij, ij->i", actual_vectors, predicted_vectors)
     y = np.einsum("ij, ij->i", y_direction, predicted_vectors)
     angle_error = np.arctan2(y, x)
-    angle_df['angle error'] = angle_error
+    angle_df["angle error"] = angle_error
 
     fig = get_angle_plot(angle_df)
     fig.suptitle("Angle error")
     fig.savefig(results_dir.joinpath("actual_and_predicted_angles.png"))
 
-    for actual_block_class in angle_df['actual block'].value_counts().index[:5]:
+    for actual_block_class in angle_df["actual block"].value_counts().index[:5]:
         print(actual_block_class)
-        class_df = angle_df[angle_df['actual block'] == actual_block_class]
+        class_df = angle_df[angle_df["actual block"] == actual_block_class]
 
         fig = get_angle_plot(class_df)
         fig.suptitle(f"Angle error for block {actual_block_class}")
-        fig.savefig(results_dir.joinpath(f"actual_and_predicted_angles_block_{actual_block_class}.png"))
-
+        fig.savefig(
+            results_dir.joinpath(
+                f"actual_and_predicted_angles_block_{actual_block_class}.png"
+            )
+        )
