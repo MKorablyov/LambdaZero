@@ -39,9 +39,9 @@ def train_epoch(loader, model, optimizer, device, config):
 
         logits = model(z=z, pos=pos, batch=batch).squeeze(1)
         if config["loss"] == "L2":
-            loss = F.mse_loss(logits, normalizer.normalize(targets))
+            loss = F.mse_loss(logits, normalizer.tfm(targets))
         else:
-            loss = F.l1_loss(logits, normalizer.normalize(targets))
+            loss = F.l1_loss(logits, normalizer.tfm(targets))
 
         loss.backward()
         optimizer.step()
@@ -49,7 +49,7 @@ def train_epoch(loader, model, optimizer, device, config):
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
 
     epoch_targets = np.concatenate(epoch_targets,0)
     epoch_preds = np.concatenate(epoch_preds, 0)
@@ -78,14 +78,14 @@ def eval_epoch(loader, model, device, config):
         targets = getattr(data, config["target"]).to(device)
         logits = model(z=z, pos=pos, batch=batch).squeeze(1)
         if config["loss"] == "L2":
-            loss = F.mse_loss(logits, normalizer.normalize(targets))
+            loss = F.mse_loss(logits, normalizer.tfm(targets))
         else:
-            loss = F.l1_loss(logits, normalizer.normalize(targets))
+            loss = F.l1_loss(logits, normalizer.tfm(targets))
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
 
     epoch_targets = np.concatenate(epoch_targets,0)
     epoch_preds = np.concatenate(epoch_preds, 0)
@@ -106,7 +106,7 @@ DEFAULT_CONFIG = {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
         "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-        "b_size": 64,
+        "b_size": 32,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
@@ -140,7 +140,7 @@ DEFAULT_CONFIG = {
     "checkpoint_score_attr":"train_loss",
     "num_samples":1,
     "checkpoint_at_end": False,
-    #"checkpoint_freq": 1,
+    "checkpoint_freq": 100,
 }
 
 
