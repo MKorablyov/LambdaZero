@@ -3,14 +3,21 @@ from rdkit.Chem.rdForceFieldHelpers import UFFGetMoleculeForceField
 from rdkit.Chem.rdMolAlign import AlignMol
 
 
-def MyConstrainedEmbed(mol, core, coreConfId=-1, randomseed=2342,
-                       getForceField=UFFGetMoleculeForceField, **kwargs):
+def MyConstrainedEmbed(
+    mol,
+    core,
+    coreConfId=-1,
+    randomseed=2342,
+    getForceField=UFFGetMoleculeForceField,
+    **kwargs
+):
     """
     This is a copy of ConstrainedEmbed where I make the constraints more solid.
+    It is still WIP right now.
     """
     energy_tol = 1e-10
     force_tol = 1e-10
-    force_constant = 100000.
+    force_constant = 100000.0
 
     match = mol.GetSubstructMatch(core)
     if not match:
@@ -21,7 +28,9 @@ def MyConstrainedEmbed(mol, core, coreConfId=-1, randomseed=2342,
         corePtI = coreConf.GetAtomPosition(i)
         coordMap[idxI] = corePtI
 
-    ci = EmbedMultipleConfs(mol, numConfs=50, coordMap=coordMap, randomSeed=randomseed, **kwargs)
+    ci = EmbedMultipleConfs(
+        mol, numConfs=50, coordMap=coordMap, randomSeed=randomseed, **kwargs
+    )
 
     algMap = [(j, i) for i, j in enumerate(match)]
 
@@ -33,7 +42,7 @@ def MyConstrainedEmbed(mol, core, coreConfId=-1, randomseed=2342,
                 idxJ = match[j]
                 d = coordMap[idxI].Distance(coordMap[idxJ])
                 ff.AddDistanceConstraint(idxI, idxJ, d, d, force_constant)
-                #ff.MMFFAddDistanceConstraint(idxI, idxJ, d, d, force_constant)
+                # ff.MMFFAddDistanceConstraint(idxI, idxJ, d, d, force_constant)
 
         ff.Initialize()
         counter = 0
@@ -48,7 +57,5 @@ def MyConstrainedEmbed(mol, core, coreConfId=-1, randomseed=2342,
         rms = AlignMol(mol, core, prbCid=conf_id, refCid=coreConfId, atomMap=algMap)
         print(rms)
 
-
-
-    mol.SetProp('EmbedRMS', str(rms))
+    mol.SetProp("EmbedRMS", str(rms))
     return mol
