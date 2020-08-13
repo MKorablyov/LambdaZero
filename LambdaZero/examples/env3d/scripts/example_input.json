@@ -11,6 +11,7 @@
         "seed_for_dataset_split": 0,
         "loss_mode": "cos",
         "angle_loss_weight": 1.0,
+        "block_loss_weight": 1.0,
         "num_epochs": 500,
         "num_workers": 4,
         "batch_size": 256,

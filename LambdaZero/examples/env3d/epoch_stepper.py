@@ -48,8 +48,7 @@ def train_epoch(loader, model, optimizer, device, config):
             config.get("loss_mode", "cos")
         )
 
-        # loss = class_loss + config.get("angle_loss_weight", 1) * angle_loss
-        loss = angle_loss
+        loss = config.get("block_loss_weight", 1) * class_loss + config.get("angle_loss_weight", 1) * angle_loss
 
         loss.backward()
         optimizer.step()

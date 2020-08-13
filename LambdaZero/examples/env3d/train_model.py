@@ -45,6 +45,7 @@ if __name__ == "__main__":
             "optimizer_config": {"lr": input_config["trainer_config"]["learning_rate"]},
             "loss_mode": input_config["trainer_config"]["loss_mode"],
             "angle_loss_weight": input_config["trainer_config"]["angle_loss_weight"],
+            "block_loss_weight": input_config["trainer_config"]["block_loss_weight"],
             "train_epoch": train_epoch,
             "eval_epoch": eval_epoch,
             "patience": input_config["trainer_config"]["patience"],
