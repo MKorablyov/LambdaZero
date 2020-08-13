@@ -18,6 +18,7 @@ class MPNNBlock(nn.Module):
         num_edge_network_hidden_features: int = 128,
         number_of_layers: int = 3,
         set2set_steps: int = 3,
+        decouple_layers: bool = False
     ):
         """
 
@@ -29,6 +30,7 @@ class MPNNBlock(nn.Module):
             number_of_layers (int, optional): number of MPNN iterations. Defaults to 3.
             set2set_steps (int, optional): number of processing steps to take in the set2set readout function.
                                            Defaults to 3.
+            decouple_layers (bool, optional): if True, decouple the weights of the GCN layers. Defaults to False.
         """
         super(MPNNBlock, self).__init__()
 
@@ -45,12 +47,18 @@ class MPNNBlock(nn.Module):
             ),
         )
 
-        self.aggregated_message_function = nn.ModuleList(
-            [NNConv(in_channels=num_hidden_features, 
-                    out_channels=num_hidden_features,
-                    nn=edge_feature_net,
-                    aggr="add") for _ in range( self.number_of_layers)]
-        )
+        if decouple_layers is True:
+            gcn_list = [NNConv(in_channels=num_hidden_features, 
+                               out_channels=num_hidden_features,
+                               nn=edge_feature_net,
+                               aggr="add") for _ in range( self.number_of_layers)]
+        else:
+            gcn_list = [NNConv(in_channels=num_hidden_features, 
+                               out_channels=num_hidden_features,
+                               nn=edge_feature_net,
+                               aggr="add")]
+        
+        self.aggregated_message_function = nn.ModuleList(gcn_list)
 
         self.gru_update_function = nn.GRU(num_hidden_features, num_hidden_features)
 
@@ -126,7 +134,8 @@ class MPNNBlock(nn.Module):
         for i in range(self.number_of_layers):
 
             # dimension of aggregated_messages : [1, total number of nodes, hidden representation dimension]
-            aggregated_messages = self.aggregated_message_function[i](
+            layer_idx = min(i, len(self.aggregated_message_function))
+            aggregated_messages = self.aggregated_message_function[layer_idx](
                 h.squeeze(0), data.edge_index, data.edge_attr
             ).unsqueeze(0)
 
