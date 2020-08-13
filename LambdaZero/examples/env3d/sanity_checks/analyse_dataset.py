@@ -28,7 +28,7 @@ number_of_parent_blocks = 5
 
 dataset_base_path = Path(summaries_dir).joinpath("env3d/dataset/from_cluster/RUN5/")
 dataset_path = dataset_base_path.joinpath("data/raw/combined_dataset.feather")
-results_dir = dataset_base_path.parent.parent.joinpath("analysis/")
+results_dir = dataset_base_path.joinpath("analysis/")
 results_dir.mkdir(exist_ok=True)
 
 if __name__ == "__main__":
