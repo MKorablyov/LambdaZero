@@ -1,11 +1,12 @@
 {
     "logging": {
         "project": "env3d",
-        "name": "debugging4"
+        "name": "full_run_shallowmodel"
     },
+
     "resources_per_trial": {
-        "cpu": 4,
-        "gpu": 0.0
+        "cpu": 8,
+        "gpu": 1.0
     },
     "trainer_config": {
         "seed_for_dataset_split": 0,
@@ -14,19 +15,20 @@
         "block_loss_weight": 1.0,
         "num_epochs": 500,
         "num_workers": 4,
-        "batch_size": 256,
+        "batch_size": 128,
         "learning_rate": 0.001,
         "train_ratio": 0.8,
         "valid_ratio": 0.1,
-        "patience": 5
+        "patience": 10
     },
     "model_config": {
-        "num_hidden_features": 64,
-        "num_edge_network_hidden_features": 128,
-        "number_of_layers": 3,
+        "num_hidden_features": 128,
+        "num_edge_network_hidden_features": 256,
+        "number_of_layers": 1,
         "set2set_steps": 3,
-        "num_block_prediction_hidden_features": 128,
-        "num_angle_prediction_hidden_features": 128,
-        "number_of_block_classes": 105
+        "num_block_prediction_hidden_features": 256,
+        "num_angle_prediction_hidden_features": 256,
+        "number_of_block_classes": 105,
+        "decouple_layers": False
     }
 }
