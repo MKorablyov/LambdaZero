@@ -822,9 +822,6 @@ class BrutalDock(InMemoryDataset):
                     print("Task: " + str(j) + " | Out of: " + str(len(smis)))
                     tasks.append(self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props}, self.pre_filter, self.pre_transform))                    
 
-                    #tasks.append(self.proc_func(smis[j], {pr: props[pr][j] for pr in props}, self.pre_filter, self.pre_transform))
-
-                #tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props}, self.pre_filter, self.pre_transform) for j in range(len(smis))]
                 graphs = ray.get(tasks)
                 graphs = [g for g in graphs if g is not None]
                 # save to the disk
