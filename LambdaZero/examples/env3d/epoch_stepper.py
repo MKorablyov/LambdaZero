@@ -44,10 +44,11 @@ def train_epoch(loader, model, optimizer, device, config):
 
         # prediction over classes in a straight-forward cross-entropy
         class_loss, angle_loss, angle_mae, n_angle = class_and_angle_loss(
-            class_predictions, class_target, angle_predictions, angle_target
+            class_predictions, class_target, angle_predictions, angle_target,
+            config.get("loss_mode", "cos")
         )
 
-        loss = class_loss + config.get("angle_loss_weight", 1) * angle_loss
+        loss = config.get("block_loss_weight", 1) * class_loss + config.get("angle_loss_weight", 1) * angle_loss
 
         loss.backward()
         optimizer.step()
@@ -81,6 +82,8 @@ def train_epoch(loader, model, optimizer, device, config):
         metrics["angle_mae"] = (
             metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item() * n_angle
         ) / max(1, metrics.get("n_angles", 0) + n_angle)
+
+        metrics["n_angles"] = metrics.get("n_angles", 0) + n_angle
 
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
@@ -125,10 +128,11 @@ def eval_epoch(loader, model, device, config):
 
         # prediction over classes in a straight-forward cross-entropy
         class_loss, angle_loss, angle_mae, n_angle = class_and_angle_loss(
-            class_predictions, class_target, angle_predictions, angle_target
+            class_predictions, class_target, angle_predictions, angle_target,
+            config.get("loss_mode", "cos")
         )
 
-        loss = class_loss + config.get("angle_loss_weight", 1) * angle_loss
+        loss = config.get("block_loss_weight", 1) * class_loss + config.get("angle_loss_weight", 1) * angle_loss
 
         # log loss information
         # global cumulative losses on this epoch
@@ -159,6 +163,8 @@ def eval_epoch(loader, model, device, config):
         metrics["angle_mae"] = (
             metrics.get("angle_mae", 0) * metrics.get("n_angles", 0) + angle_mae.item() * n_angle
         ) / max(1, metrics.get("n_angles", 0) + n_angle)
+
+        metrics["n_angles"] = metrics.get("n_angles", 0) + n_angle
 
     # RMSE and MAE are possibly on gpu. Move to cpu and convert to numpy values (non-tensor)
     # also take the squareroot of the MSE to get the actual RMSE
