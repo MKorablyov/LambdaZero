@@ -51,17 +51,6 @@ class MPNNBlock(nn.Module):
                     nn=edge_feature_net,
                     aggr="add") for _ in range( self.number_of_layers)]
         )
-        """
-        gin_mlp = nn.Sequential(
-            nn.Linear(num_hidden_features, num_hidden_features),
-            nn.ReLU(),
-            nn.Linear(num_hidden_features)
-        )
-        self.aggregated_message_function = GINConv(
-            nn=gin_mlp,
-            train_eps=True
-        )
-        """
 
         self.gru_update_function = nn.GRU(num_hidden_features, num_hidden_features)
 
