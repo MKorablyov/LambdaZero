@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 from torch import nn
 from torch_geometric.data import Batch
-from torch_geometric.nn import NNConv, Set2Set
+from torch_geometric.nn import NNConv, Set2Set, GINConv
 
 
 class MPNNBlock(nn.Module):
@@ -45,12 +45,23 @@ class MPNNBlock(nn.Module):
             ),
         )
 
-        self.aggregated_message_function = NNConv(
-            in_channels=num_hidden_features,
-            out_channels=num_hidden_features,
-            nn=edge_feature_net,
-            aggr="mean",
+        self.aggregated_message_function = nn.ModuleList(
+            [NNConv(in_channels=num_hidden_features, 
+                    out_channels=num_hidden_features,
+                    nn=edge_feature_net,
+                    aggr="add") for _ in range( self.number_of_layers)]
         )
+        """
+        gin_mlp = nn.Sequential(
+            nn.Linear(num_hidden_features, num_hidden_features),
+            nn.ReLU(),
+            nn.Linear(num_hidden_features)
+        )
+        self.aggregated_message_function = GINConv(
+            nn=gin_mlp,
+            train_eps=True
+        )
+        """
 
         self.gru_update_function = nn.GRU(num_hidden_features, num_hidden_features)
 
@@ -123,10 +134,10 @@ class MPNNBlock(nn.Module):
         # h is of dimension [1, total number of nodes, hidden representation dimension]
         h = node_embeddings.unsqueeze(0)
 
-        for _ in range(self.number_of_layers):
+        for i in range(self.number_of_layers):
 
             # dimension of aggregated_messages : [1, total number of nodes, hidden representation dimension]
-            aggregated_messages = self.aggregated_message_function(
+            aggregated_messages = self.aggregated_message_function[i](
                 h.squeeze(0), data.edge_index, data.edge_attr
             ).unsqueeze(0)
 
