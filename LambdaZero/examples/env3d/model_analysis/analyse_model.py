@@ -65,7 +65,7 @@ sns.set(font_scale=1.5)
 model_config = {
     "num_angle_prediction_hidden_features": 128,
     "num_block_prediction_hidden_features": 128,
-    "num_edge_network_hidden_features": 32,
+    "num_edge_network_hidden_features": 128,
     "num_hidden_features": 64,
     "number_of_block_classes": 105,
     "number_of_layers": 3,
