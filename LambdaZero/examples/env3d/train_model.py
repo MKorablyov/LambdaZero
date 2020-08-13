@@ -28,7 +28,6 @@ if __name__ == "__main__":
                                 )
 
     ray.init()
-    special_class = 28
     env3d_config = {
         "trainer": Env3dModelTrainer,
         "trainer_config": {
