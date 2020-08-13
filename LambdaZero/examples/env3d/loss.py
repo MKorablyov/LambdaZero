@@ -26,7 +26,7 @@ def class_and_angle_loss(
         torch.Tensor: mae for sin and cos of the angle. size (1,)
         int: number of valid angles
     """
-    assert mode in ['cos', 'angle'], 'loss mode should be cos or angle'
+    assert loss_type in ['cos', 'angle'], 'loss mode should be cos or angle'
 
     # prediction over classes in a straight-forward cross-entropy
     class_loss = F.cross_entropy(block_predictions, block_targets)
@@ -35,7 +35,7 @@ def class_and_angle_loss(
     # sin = u / \sqrt{u² + v²}
     # cos = v / \sqrt{u² + v²}
     
-    if mode == 'cos':
+    if loss_type == 'cos':
         # get denominator
         norm = torch.norm(angle_predictions, dim=-1)
         # take max between norm and a small value to avoid division by zero
@@ -58,7 +58,7 @@ def class_and_angle_loss(
         angle_loss = torch.sum(angle_loss, dim=-1)
         angle_mae = torch.sum(angle_mae, dim=-1)
 
-    elif mode == 'angle':
+    elif loss_type == 'angle':
         angle_predictions = torch.atan2(angle_predictions[:, 0], angle_predictions[:, 1])
         # loss is the MSE for the angle
         angle_loss = F.mse_loss(angle_targets, angle_predictions, reduction="none")
