@@ -31,8 +31,11 @@ def aq_regret(train_loader, ul_loader, config):
     top50_regret = np.median(train_sorted[:50]) - np.median(all_sorted[:50])
     aq_top15 = np.median(train_sorted[:15])
     aq_top50 = np.median(train_sorted[:15])
-    #print("min train min ul targets", np.min(train_targets), np.min(ul_targets))
-    return {"aq_top15_regret":top15_regret, "aq_top50_regret":top50_regret, "aq_top15":aq_top15, "aq_top50":aq_top50}
+
+    n = int(all_targets.shape[0] * 0.01)
+    frac_top1percent = np.asarray(train_sorted[:n] <= all_sorted[n],dtype=np.float).mean()
+    return {"aq_top15_regret":top15_regret, "aq_top50_regret":top50_regret, "aq_top15":aq_top15, "aq_top50":aq_top50,
+            "aq_frac_top1_percent":frac_top1percent}
 
 
 class UCT(tune.Trainable):
@@ -119,11 +122,13 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "brr_config"
+    else: config_name = "uctComb001"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["acquirer_config"]["name"] = config_name
     ray.init(memory=config["memory"])
+
+    print(config)
     tune.run(**config["acquirer_config"])
 
     #tune.run(**brr_config["acquirer_config"])
