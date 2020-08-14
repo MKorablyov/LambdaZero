@@ -27,7 +27,7 @@ class LambdaZeroWandbLogger(WandbLogger):
     We have to derive the WandbLogger class because it cannot handle
     classes as configuration parameters.
 
-    The necessity of the kluge is a direct consequence of passing classes and
+    The necessity of this kluge is a direct consequence of passing classes and
     functions in what should be a config dictionary with strings and numbers as values.
     """
     def on_result(self, result):
