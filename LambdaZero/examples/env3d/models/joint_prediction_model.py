@@ -23,6 +23,7 @@ class BlockAngleModel(nn.Module):
         num_block_prediction_hidden_features: int = 128,
         num_angle_prediction_hidden_features: int = 128,
         number_of_block_classes: int = 105,
+        decouple_layers: bool = False,
     ):
         """
         Args:
@@ -41,6 +42,7 @@ class BlockAngleModel(nn.Module):
             number_of_block_classes (int, optional): number of target classes. Default to 105. This default
                                                      derives from the assumption that we are using the 105 blocks
                                                      vocabulary.
+            decouple_layers (bool, optional): if True, decouple the weights of the GCN layers. Defaults to False.
         """
         super(BlockAngleModel, self).__init__()
 
@@ -50,6 +52,7 @@ class BlockAngleModel(nn.Module):
             num_edge_network_hidden_features=num_edge_network_hidden_features,
             number_of_layers=number_of_layers,
             set2set_steps=set2set_steps,
+            decouple_layers=decouple_layers
         )
 
         # we concatenate the attachment node representation (dim num_hidden_features),
