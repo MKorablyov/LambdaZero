@@ -24,8 +24,8 @@ class MCDrop(tune.Trainable):
     def _setup(self, config):
         self.config = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if config["data_config"]["dataset_creator"] is not None:
-            self.train_loader, self.val_loader = config["data_config"]["dataset_creator"](config["data_config"])
+        if config["data"]["dataset_creator"] is not None:
+            self.train_loader, self.val_loader = config["data"]["dataset_creator"](config["data"])
 
         # make model
         self.model = self.config["model"](**self.config["model_config"])
@@ -80,7 +80,7 @@ DEFAULT_CONFIG = {
     "regressor_config":{
         "run_or_experiment": MCDrop,
         "config": {
-            "data_config":data_config,
+            "data":data_config,
             "lambda": 1e-8,
             "T": 20,
             "lengthscale": 1e-2,
