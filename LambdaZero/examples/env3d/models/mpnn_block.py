@@ -134,7 +134,7 @@ class MPNNBlock(nn.Module):
         for i in range(self.number_of_layers):
 
             # dimension of aggregated_messages : [1, total number of nodes, hidden representation dimension]
-            layer_idx = min(i, len(self.aggregated_message_function))
+            layer_idx = min(i, len(self.aggregated_message_function) - 1)
             aggregated_messages = self.aggregated_message_function[layer_idx](
                 h.squeeze(0), data.edge_index, data.edge_attr
             ).unsqueeze(0)
