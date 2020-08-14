@@ -1,4 +1,5 @@
 import time
+import os.path as osp
 from torch_geometric.data import Data, InMemoryDataset
 from pubchempy import Compound
 import urllib.request
@@ -172,6 +173,10 @@ class NewDrugComb(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[1])
 
 
+class EdgeData:
+    def __init__(self,data_dict):
+        for k,v in data_dict.items(): setattr(self,k,v)
+
 class DrugCombEdge(NewDrugComb):
     def __len__(self):
         return self.data.ddi_edge_idx.shape[1]
@@ -181,58 +186,76 @@ class DrugCombEdge(NewDrugComb):
         row_fp = self.data.x_drugs[ddi_idx[0]]
         col_fp = self.data.x_drugs[ddi_idx[1]]
         edge_attr = self.data.ddi_edge_attr[idx]
-        #for idx in [102913,102914,102915, 102916]:
-        #    print(self.data.ddi_edge_attr[idx])
-        #print(self.data.ddi_edge_attr[102913:102918])
-        #print(self.data.ddi_edge_attr[100000:100020])
-        #print(idx, self.data.ddi_edge_attr[idx])
-        return row_fp, col_fp, edge_attr
 
+        data_dict = {"row_fp": row_fp, # fixme??
+                     "col_fp": col_fp,
+                     "row_ic50": edge_attr[5][None],
+                     "col_ic50": edge_attr[6][None],
+                     "css": edge_attr[0][None],
+                     "negative_css": -edge_attr[0][None]
+                     }
+        return EdgeData(data_dict)
 
-def _sample_xy(dataset):
-    x, y = [], []
-    for i in range(len(dataset)):
-        row_fp, col_fp, edge_attr = dataset[i]
-        x.append(np.concatenate([row_fp, col_fp,edge_attr[5:6]])) #
-        y.append(edge_attr[0])
-        x.append(np.concatenate([col_fp, row_fp,edge_attr[5:6].flip(dims=[0])]))
-        y.append(edge_attr[0])
-    return np.array(x,dtype=np.float), np.array(y,dtype=np.float)
-
-def train_ridge_regression(dataset):
-    # load/split dataset
-    train_idx, val_idx = random_split(len(dataset), [0.9, 0.1])
-    train_set = Subset(dataset,train_idx)
-    val_set = Subset(dataset,val_idx)
-
-
-    train_x, train_y = _sample_xy(train_set)
-    val_x, val_y = _sample_xy(val_set)
-
-    # do linear regression
-    model = Ridge(alpha=0.001)
-    model.fit(train_x, train_y)
-    val_y_hat = model.predict(val_x)
-    var0 = ((val_y - train_y.mean())**2).mean()
-
-    exp_var = (var0 - ((val_y - val_y_hat)**2).mean()) / var0
-    rmse = ((val_y - val_y_hat) ** 2).mean()**0.5
-    return exp_var, rmse
 
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt
+    datasets_dir, _, _ = get_external_dirs()
+
+    def _sample_xy(dataset):
+        x, y = [], []
+        for i in range(len(dataset)):
+            d = dataset[i]
+            x.append(np.concatenate([d.row_fp,d.col_fp]))
+#            x.append(np.concatenate([d.col_fp,d.row_fp]))
+            y.append(d.css)
+#            y.append(d.css)
+
+        return np.array(x, dtype=np.float), np.array(y, dtype=np.float)
+
+
+    def train_ridge_regression(dataset):
+        # load/split dataset
+        train_idx, val_idx = random_split(len(dataset), [0.9, 0.1])
+        train_set = Subset(dataset, train_idx)
+        val_set = Subset(dataset, val_idx)
+
+        train_x, train_y = _sample_xy(train_set)
+        val_x, val_y = _sample_xy(val_set)
+
+        # do linear regression
+        model = Ridge(alpha=0.001)
+        model.fit(train_x, train_y)
+        val_y_hat = model.predict(val_x)
+
+        #plt.figure(dpi=300)
+        #plt.scatter(val_y,val_y_hat)
+        #plt.xlabel("CSS")
+        #plt.ylabel("predicted CSS")
+        #plt.show()
+        #plt.savefig("/home/maksym/Desktop/" +str(idx) +  ".png")
+        #print("saved fig")
+        #time.sleep(2)
+        var0 = ((val_y - train_y.mean()) ** 2).mean()
+
+        exp_var = (var0 - ((val_y - val_y_hat) ** 2).mean()) / var0
+        rmse = ((val_y - val_y_hat) ** 2).mean() ** 0.5
+        return exp_var, rmse
+
     NewDrugComb()
     dataset = DrugCombEdge()
     cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
 
     for cell_line_idx in cell_line_idxs:
         idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idx)[0]
-        cell_dataset = Subset(dataset,idxs)
-        exp_var, rmse = train_ridge_regression(cell_dataset)
-        print("cell_line_idx", cell_line_idx, "explained variance", exp_var ,"rmse", rmse)
+        #print("len idxs", len(idxs))
+        dataset_cell = Subset(dataset,idxs)
+        exp_var, rmse = train_ridge_regression(dataset_cell)
+        print("cell_line_idx", cell_line_idx, "explained variance", exp_var, "rmse", rmse)
 
-
+        splits = random_split(len(dataset_cell), [0.8, 0.1, 0.1])
+        split_path = osp.join(datasets_dir + "/NewDrugComb/raw", str(cell_line_idx) + "_split.npy")
+        np.save(split_path, splits)
 
 
 

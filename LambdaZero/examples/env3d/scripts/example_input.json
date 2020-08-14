@@ -1,7 +1,7 @@
 {
     "logging": {
         "project": "env3d",
-        "name": "debugging4"
+        "name": "example_run"
     },
     "resources_per_trial": {
         "cpu": 4,
@@ -27,6 +27,7 @@
         "set2set_steps": 3,
         "num_block_prediction_hidden_features": 128,
         "num_angle_prediction_hidden_features": 128,
-        "number_of_block_classes": 105
+        "number_of_block_classes": 105,
+        "decouple_layers": "False"
     }
 }
