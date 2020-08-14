@@ -362,9 +362,9 @@ class chemMDP:
         # for consistency as current reward functions uses molecule.mol; to be depreceated
         if self.molecule.GetNumAtoms() >= 1:
             return self.molecule.GetMol()
-        else
+        else:
             return None
-        
+
     # add_bond is useful for fixing up fragments, but difficult to determine how it is feasible.
     # for nested ring, this is fixed by the add_ring option
 
