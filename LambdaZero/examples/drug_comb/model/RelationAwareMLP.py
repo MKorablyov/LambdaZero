@@ -5,7 +5,8 @@ from torch_geometric.utils import degree, add_remaining_self_loops
 import time
 
 class RelationAwareMLP(torch.nn.Module):
-    def __init__(self, layer_channels, num_relations, num_relation_layers, dropout):
+    def __init__(self, layer_channels, num_relations,
+                 num_relation_layers, dropout, batch_norm = False):
         """
         Arguments
         ---------
@@ -16,6 +17,8 @@ class RelationAwareMLP(torch.nn.Module):
             in_channels_i  = layer_channels[i]
             out_channels_i = layer_channels[i + 1]
         """
+        super().__init__()
+
         modules = []
         num_layers = len(layer_channels) - 1
         for i in range(num_layers):
@@ -31,6 +34,8 @@ class RelationAwareMLP(torch.nn.Module):
             if i != num_layers - 1:
                 modules.append(torch.nn.ReLU())
                 modules.append(dropout)
+                if batch_norm:
+                    modules.append(torch.nn.BatchNorm1d(out_channels))
 
         self.pred = torch.nn.Sequential(*modules)
 
