@@ -15,6 +15,7 @@ from LambdaZero.examples.env3d.geometry import (
     get_positions_aligned_with_parent_inertia_tensor,
     get_angle_between_parent_and_child, get_molecular_perpendicular_ax_direction_from_inertia,
     get_molecular_orientation_vector_from_positions_and_masses, get_n_axis_and_angle, fix_orientation_vector,
+    get_n_axis,
 )
 
 
@@ -387,4 +388,18 @@ def test_get_n_axis_and_angle(expected_angle):
                                                            number_of_parents)
 
     np.testing.assert_almost_equal(computed_angle, expected_angle)
+    np.testing.assert_array_almost_equal(computed_n_axis, expected_n_axis)
+
+
+def test_get_n_axis(random_rotation, random_translation):
+    parent_anchor = np.array([0., 0., 0.])
+    child_anchor = np.array([10., 0., 0.])
+    expected_n_axis = np.array([1., 0., 0.])
+
+    parent_anchor = np.dot(random_rotation, parent_anchor) + random_translation
+    child_anchor = np.dot(random_rotation, child_anchor) + random_translation
+    expected_n_axis = np.dot(random_rotation, expected_n_axis)
+
+    computed_n_axis = get_n_axis(child_anchor, parent_anchor)
+    
     np.testing.assert_array_almost_equal(computed_n_axis, expected_n_axis)

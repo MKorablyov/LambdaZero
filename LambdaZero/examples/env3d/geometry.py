@@ -390,8 +390,7 @@ def get_n_axis_and_angle(
     parent_anchor = all_positions[anchor_indices[0]]
     child_anchor = all_positions[anchor_indices[1]]
 
-    n_axis = child_anchor - parent_anchor
-    n_axis /= np.linalg.norm(n_axis)
+    n_axis = get_n_axis(child_anchor, parent_anchor)
 
     if len(child_positions) == 1:
         # If the child block is a single atom, then the problem becomes ill-defined.
@@ -413,3 +412,15 @@ def get_n_axis_and_angle(
     )
 
     return n_axis, angle_in_radian
+
+
+def get_n_axis(child_anchor, parent_anchor):
+    n_axis = child_anchor - parent_anchor
+
+    norm = np.linalg.norm(n_axis)
+    assert norm > 1e-8, \
+        "the distance between child_anchor and parent_anchor is vanishingly small. " \
+        "There must be a problem somewhere."
+
+    n_axis /= norm
+    return n_axis

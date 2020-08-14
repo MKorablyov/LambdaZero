@@ -7,7 +7,6 @@ the energy following a ConstrainEmbed.
 """
 import os
 from pathlib import Path
-from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,18 +17,14 @@ from tqdm import tqdm
 import LambdaZero.utils
 from LambdaZero.chem import mol_from_frag, Chem
 from LambdaZero.environments.molMDP import MolMDP
-from LambdaZero.examples.env3d.geometry import (
-    get_center_of_mass,
-    rotate_points_about_axis, get_angle_between_parent_and_child,
-    get_molecular_orientation_vector_from_positions_and_masses,
-)
-from LambdaZero.examples.env3d.rdkit_utilities import (
-    get_atomic_masses,
-    set_positions_on_conformer,
-    get_mmff_force_field,
-    get_mmff_energy, get_lowest_energy_and_mol_with_conformer,
-)
+from LambdaZero.examples.env3d.geometry import get_angle_between_parent_and_child, rotate_points_about_axis
 from LambdaZero.examples.env3d.molecular_connection import MolecularConnection
+from LambdaZero.examples.env3d.rdkit_utilities import (
+    get_mmff_force_field,
+    get_mmff_energy, get_lowest_energy_and_mol_with_conformer, set_positions_on_conformer,
+)
+from LambdaZero.examples.env3d.sanity_checks.molecule_plotting import plot_molecule_and_block_with_rotation_axis
+from LambdaZero.examples.env3d.sanity_checks.utils import extract_mol_geometry
 from LambdaZero.examples.env3d.utilities import get_angles_in_degrees
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -37,90 +32,6 @@ blocks_file = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 chimera_bin = os.path.join(programs_dir, "chimera/bin/chimera")
 
 results_dir = Path(summaries_dir).joinpath("env3d")
-
-
-def plot_molecule_and_block_with_rotation_axis(
-    mol: Mol, parent_size: int, anchor_indices: Tuple
-):
-    """
-    Ugly kluge to see what the molecule looks like, as well as the orientation vectors  decorating it.
-    """
-    connection = MolecularConnection(mol)
-
-    all_positions = mol.GetConformer().GetPositions()
-    all_masses = get_atomic_masses(mol)
-
-    parent_anchor_index, child_anchor_index = anchor_indices
-    parent_anchor = all_positions[parent_anchor_index]
-    child_anchor = all_positions[child_anchor_index]
-
-    n_axis = child_anchor - parent_anchor
-    n_axis /= np.linalg.norm(n_axis)
-
-    parent_positions = all_positions[:parent_size]
-    parent_masses = all_masses[:parent_size]
-    parent_cm = get_center_of_mass(parent_masses, parent_positions)
-
-    parent_vector = get_molecular_orientation_vector_from_positions_and_masses(
-        parent_masses, parent_positions, parent_anchor, n_axis
-    )
-
-    child_positions = all_positions[parent_size:]
-    child_masses = all_masses[parent_size:]
-    child_cm = get_center_of_mass(child_masses, child_positions)
-    child_vector = get_molecular_orientation_vector_from_positions_and_masses(
-        child_masses, child_positions, child_anchor, n_axis
-    )
-
-    color_dict = {1: 'white', 6: "black", 7: "yellow", 8: "blue"}
-    colors = [color_dict[a.GetAtomicNum()] for a in mol.GetAtoms()]
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-
-    ax.scatter(
-        all_positions[:, 0],
-        all_positions[:, 1],
-        all_positions[:, 2],
-        "o",
-        color=colors,
-        s=50,
-    )
-
-    for node_index in connection.nodes:
-        p1 = all_positions[node_index]
-        for neighbor_index in connection.neighbors[node_index]:
-            p2 = all_positions[neighbor_index]
-
-            v = np.stack([p1, p2], axis=0)
-            ax.plot(v[:, 0], v[:, 1], v[:, 2], "-", color="k")
-
-    ax.scatter(*parent_cm, marker="x", color="red")
-    ax.scatter(*child_cm, marker="x", color="green")
-
-    ax.quiver(*parent_anchor, *parent_vector, color="red", lw=2)
-    ax.quiver(*child_anchor, *child_vector, color="green", lw=2)
-
-    ax.quiver(*parent_anchor, *n_axis, color="black", lw=1)
-
-    x1 = parent_anchor - 3 * n_axis
-    x2 = parent_anchor + 3 * n_axis
-    v = np.stack([x1, x2], axis=0)
-    ax.plot(v[:, 0], v[:, 1], v[:, 2], "-", color="k")
-
-    min = np.min(all_positions.flatten())
-    max = np.max(all_positions.flatten())
-
-    ax.set_xlim(min, max)
-    ax.set_ylim(min, max)
-    ax.set_zlim(min, max)
-
-    ax.set_xlabel("X Label")
-    ax.set_ylabel("Y Label")
-    ax.set_zlabel("Z Label")
-
-    return fig
-
 
 number_of_blocks = 5
 number_of_iterations = 100
@@ -136,7 +47,7 @@ if __name__ == "__main__":
     molMDP.reset()
     molMDP.random_walk(number_of_blocks)
 
-    n = 2
+    n = 4
     mol1, mol_bond1 = mol_from_frag(
         jun_bonds=molMDP.molecule.jbonds[: n - 1],
         frags=molMDP.molecule.blocks[:n],
@@ -146,14 +57,13 @@ if __name__ == "__main__":
     parent = MolecularConnection(mol1)
     parent_size = mol1.GetNumAtoms()
 
-    mol2, mol_bond2 = mol_from_frag(
+    mol_with_hydrogen, mol_bond2 = mol_from_frag(
         jun_bonds=molMDP.molecule.jbonds[:n],
         frags=molMDP.molecule.blocks[: n + 1],
         optimize=False,
     )
-    #optimize_mol_in_place(mol2)
 
-    min_energy, mol2, _ = get_lowest_energy_and_mol_with_conformer(mol2, num_conf, random_seed=random_seed)
+    min_energy, mol2, _ = get_lowest_energy_and_mol_with_conformer(mol_with_hydrogen, num_conf, random_seed=random_seed)
     mol2 = Chem.RemoveHs(mol2)
 
     anchor_indices = (mol_bond2[-1][0], mol_bond2[-1][1])
@@ -161,26 +71,16 @@ if __name__ == "__main__":
     fig1 = plot_molecule_and_block_with_rotation_axis(mol2, parent_size, anchor_indices)
     fig1.suptitle("original orientation")
 
-    all_positions = mol2.GetConformer().GetPositions()
-    all_masses = get_atomic_masses(mol2)
+    geometry_dict = extract_mol_geometry(anchor_indices, mol2, parent_size)
 
-    parent_anchor = all_positions[anchor_indices[0]]
-    child_anchor = all_positions[anchor_indices[1]]
+    all_positions = geometry_dict['all_positions']
+    n_axis = geometry_dict['n_axis']
 
-    n_axis = child_anchor - parent_anchor
-    n_axis /= np.linalg.norm(n_axis)
+    parent_vector = geometry_dict['parent_vector']
 
-    parent_positions = all_positions[:parent_size]
-    parent_masses = all_masses[:parent_size]
-    parent_vector = get_molecular_orientation_vector_from_positions_and_masses(
-        parent_masses, parent_positions, parent_anchor, n_axis
-    )
-
-    child_positions = all_positions[parent_size:]
-    child_masses = all_masses[parent_size:]
-    child_vector = get_molecular_orientation_vector_from_positions_and_masses(
-        child_masses, child_positions, child_anchor, n_axis
-    )
+    child_vector = geometry_dict['child_vector']
+    child_positions = geometry_dict['child_positions']
+    child_anchor = geometry_dict['child_anchor']
 
     original_angle = get_angle_between_parent_and_child(
         parent_vector, child_vector, n_axis
@@ -201,6 +101,7 @@ if __name__ == "__main__":
 
     list_angles = np.linspace(0, 2.0 * np.pi, 101)
     list_energies = []
+    list_rms = []
     for angle in tqdm(list_angles):
         rotated_child_positions = rotate_points_about_axis(
             zero_angle_child_positions, child_anchor, n_axis, angle
@@ -216,29 +117,39 @@ if __name__ == "__main__":
         ConstrainedEmbed(
             rotated_mol_with_hydrogens,
             rotated_mol,
-            useTethers=True,
             randomseed=2342,
             getForceField=get_mmff_force_field,
         )
         energy = get_mmff_energy(rotated_mol_with_hydrogens)
         list_energies.append(energy)
+        rms = float(rotated_mol_with_hydrogens.GetProp('EmbedRMS'))
+        list_rms.append(rms)
 
     fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(
-        get_angles_in_degrees(list_angles),
+    ax = fig.add_subplot(211)
+    ax2 = fig.add_subplot(212)
+
+    angles_in_degrees = get_angles_in_degrees(list_angles)
+    ax.plot(angles_in_degrees,
         list_energies,
         "bo-",
         label="constrained embedding energy",
     )
 
-    ylims = ax.set_ylim()
-    xlims = ax.set_xlim()
-    ax.vlines(original_angle_in_degrees, *ylims, color="r", label="original angle")
-    ax.hlines(min_energy, *ylims, color="g", label="original energy")
+    ymin, ymax = ax.set_ylim()
+    ymin = min(ymin, min_energy-2)
 
-    ax.set_xlabel("angle (degrees)")
+    ax.vlines(original_angle_in_degrees, ymin, ymax, color="r", label="original angle")
+    ax.hlines(min_energy, 0., 360., color="g", label="original energy")
+
     ax.set_ylabel("energy (kcal/mol)")
     ax.set_xlim(0, 360)
+    ax.set_ylim(ymin, ymax)
     ax.legend(loc=0)
+
+    ax2.plot(angles_in_degrees, list_rms, 'ro-')
+    ax2.set_xlim(0, 360)
+    ax2.set_ylabel("RMS")
+    ax2.set_xlabel("angle (degrees)")
+
     plt.show()
