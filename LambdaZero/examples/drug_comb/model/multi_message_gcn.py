@@ -3,7 +3,6 @@ from torch.nn import functional as F
 from torch.nn import Parameter
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
-import time
 
 
 class MultiMessageGraphConv(MessagePassing):
