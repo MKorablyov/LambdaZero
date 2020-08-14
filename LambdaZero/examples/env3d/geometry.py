@@ -416,5 +416,11 @@ def get_n_axis_and_angle(
 
 def get_n_axis(child_anchor, parent_anchor):
     n_axis = child_anchor - parent_anchor
-    n_axis /= np.linalg.norm(n_axis)
+
+    norm = np.linalg.norm(n_axis)
+    assert norm > 1e-8, \
+        "the distance between child_anchor and parent_anchor is vanishingly small. " \
+        "There must be a problem somewhere."
+
+    n_axis /= norm
     return n_axis
