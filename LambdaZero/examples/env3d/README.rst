@@ -11,51 +11,51 @@ possible to learn (next block, angle).
 Modules
 ------------
 
-- `env3d_model_trainer.py`
+- ``env3d_model_trainer.py``
 
-  Defines class `Env3dModelTrainer`, a class derived from `tune.Trainable` that drives the
+  Defines class ``Env3dModelTrainer``, a class derived from ``tune.Trainable`` that drives the
   model training.
 
-- `epoch_stepper.py`
+- ``epoch_stepper.py``
 
-  Contains the definitions of `train_epoch` and `eval_epoch`, to be passed to
-  tune.run.
+  Contains the definitions of ``train_epoch`` and ``eval_epoch``, to be passed to
+  ``tune.run``.
 
-- `geometry.py`
+- ``geometry.py``
 
   Functions to compute molecular moments of inertia and rotate molecules
   in 3D space.
 
-- `loss.py`
+- ``loss.py``
 
-  Defines `class_and_angle_loss`, the method that computes the model loss.
+  Defines ``class_and_angle_loss``, the method that computes the model loss.
 
-- `molecular_connection.py`
+- ``molecular_connection.py``
 
-  Defines the class `MolecularConnection`, a convenience object that helps to
-  decide if two molecules represented as RDKIT `Mol` objects are parent and child, or the same.
+  Defines the class ``MolecularConnection``, a convenience object that helps to
+  decide if two molecules represented as RDKIT ``Mol`` objects are parent and child, or the same.
 
-- `parameter_inputs.py`
+- ``parameter_inputs.py``
 
   Utility methods to parse input arguments.
 
-- `rdkit_utilities.py`
+- ``rdkit_utilities.py``
 
   Convenience functions that wrap together various RDKIT functionalities
   to achieve specific goals.
 
-- `train_model.py`
+- ``train_model.py``
 
-  Main script that builds the config dictionary from input and exeutes `tune.run`.
+  Main script that builds the config dictionary from input and exeutes ``tune.run``.
 
-- `utilities.py`
+- ``utilities.py``
 
   Ancillary code to perform useful generic things.
 
-- `wandb_logger.py`
+- ``wandb_logger.py``
 
-  Defines the class `LambdaZeroWandbLogger`, a wrapper for wandb's own ray-flavored `WandbLogger`.
-  The latter logger is not equiped to handle config arguments that are not strings or floats. Since
+  Defines the class ``LambdaZeroWandbLogger``, a wrapper for wandb's own ray-flavored ``WandbLogger``.
+  The latter logger is not equipped to handle config arguments that are not strings or floats. Since
   we are passing classes and functions in the config dictionary, these must be filtered out for
   wandb to work properly.
 
