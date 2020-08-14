@@ -18,6 +18,13 @@ class MolecularConnection(object):
     it does not constitute a proof that they are consistent, but it's a big hint that they are.
 
     """
+    def __eq__(self, other):
+        same_nodes = self.nodes == other.nodes
+        same_types = self.atomic_type == other.atomic_type
+        same_neighbors = self.neighbors == other.neighbors
+
+        return same_nodes and same_types and same_neighbors
+
     def __init__(self, mol: Mol):
         """
         Instantiates various data structures that will be used to compare two molecules for consistency.
