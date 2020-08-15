@@ -65,7 +65,7 @@ def _get_loaders(train_set, val_set, batch_size, device):
 def run_epoch(loader, model, x_drug, optim, is_train):
     model.train() if is_train else model.eval()
 
-    metrics = {"loss": 0, "mse": 0, "mae": 0}
+    metrics = {"loss": 0, "mse": 0, "mae": 0, "rmse": 0}
     for i, batch in enumerate(loader):
         edge_index, edge_classes, edge_attr, y = batch
 
@@ -74,6 +74,7 @@ def run_epoch(loader, model, x_drug, optim, is_train):
 
         metrics['loss'] += loss.item()
         metrics['mse'] += loss.item()
+        metrics['rmse'] += torch.sqrt(loss).item()
         metrics['mae'] += F.l1_loss(y, y_hat).item()
 
         if is_train:
@@ -135,28 +136,28 @@ config = {
     "trainer": DrugDrugGNNRegressor,
     "trainer_config": {
         "model": GNN,
-        "gcn_channels": [1024, 512, 512],
-        "rank": 124,
+        "gcn_channels": [1024, 256, 256, 256],
+        "rank": 128,
         "linear_channels": [1024, 512, 256, 128, 1],
         "num_relation_lin_lyrs": 2,
         "gcn_dropout_rate": .1,
-        "lin_dropout_rate": .3,
+        "lin_dropout_rate": .4,
         "num_residual_gcn_lyrs": 1,
         "aggr": "concat",
-        "num_examples_to_use": 100,
+        "num_examples_to_use": -1,
         "train_prop": .8,
         "val_prop": .2,
-        "lr": 1e-4,
-        "batch_size": 32,
-        "gnn_lyr_type": "GCNWithAttention", # Must be a str as we can't pickle modules
+        "lr": tune.grid_search([1e-3, 1e-4, 1e-5]),
+        "batch_size": tune.grid_search([128, 256, 64]),
+        "gnn_lyr_type": tune.grid_search(["GCNWithAttention", "InMemoryGCN"]) # Must be a str as we can't pickle modules
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
-    "stop": {"training_iteration": 1000},
+    "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
     "resources_per_trial": {"gpu": 1},
-    "name": "Testing"
+    "name": "FirstRuns"
 }
 
 if __name__ == "__main__":
