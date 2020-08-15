@@ -55,11 +55,17 @@ class GNNWithAttention(torch.nn.Module):
         row, col = edge_index
         z = self._aggregate(x[row], x[col])
 
-        return self.predictor(z)
+        return self.predictor(z, relations)
 
     def _aggregate(self, x_i, x_j):
         if self._aggr == 'concat':
-            return torch.cat((x_i, x_j), dim=1)
+            idx = torch.rand(x_i.shape[0]) >= .5
+
+            row = x_i[idx] + x_j[~idx]
+            col = x_i[~idx] + x_j[idx]
+
+            return torch.cat((row, col), dim=1)
+
         else if self._aggr == 'kroenecker':
             return x_i * x_j
 

@@ -21,15 +21,11 @@ class RelationAwareMLP(torch.nn.Module):
 
         modules = []
         num_layers = len(layer_channels) - 1
-        for i in range(num_layers):
+        for i in range(num_layers - num_relation_layers):
             in_channels  = layer_channels[i]
             out_channels = layer_channels[i + 1]
 
-            # Relation layers come at the end of the layers list
-            if i < num_layers - num_relation_layers:
-                modules.append(torch.nn.Linear(in_channels, out_channels))
-            else:
-                modules.append(RelationAwareLinear(num_relations, in_channels, out_channels))
+            modules.append(torch.nn.Linear(in_channels, out_channels))
 
             if i != num_layers - 1:
                 modules.append(torch.nn.ReLU())
@@ -37,8 +33,33 @@ class RelationAwareMLP(torch.nn.Module):
                 if batch_norm:
                     modules.append(torch.nn.BatchNorm1d(out_channels))
 
-        self.pred = torch.nn.Sequential(*modules)
+        self.dropout = dropout
+        self.non_relation_pred = torch.nn.Sequential(*modules)
+        self.relation_lyrs = [
+            RelationAwareLinear(num_relations, layer_channels[j], layer_channels[j + 1])
+            for j in range(i, num_layers)
+        ]
 
-    def forward(self, x):
-        return self.pred(x)
+        self.bn = None
+        if batch_norm:
+            self.bn = [
+                torch.nn.BatchNorm1d(layer_channels[j])
+                for k in range(num_layers - num_relation_layers, num_layers)
+            ]
+
+    def forward(self, x, relations):
+        x = self.non_relation_pred(x)
+
+        num_rel_lyrs = len(self.relation_lyrs)
+        for i in range(num_rel_lyrs):
+            x = self.relation_lyrs[i](x, relations)
+
+            if i != num_rel_lyrs - 1:
+                x = F.relu(x)
+                x = self.dropout(x)
+
+                if self.bn is not None:
+                    x = self.bn[i](x)
+
+        return x
 

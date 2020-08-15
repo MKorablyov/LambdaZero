@@ -186,13 +186,17 @@ class DrugCombEdge(NewDrugComb):
         row_fp = self.data.x_drugs[ddi_idx[0]]
         col_fp = self.data.x_drugs[ddi_idx[1]]
         edge_attr = self.data.ddi_edge_attr[idx]
+        edge_classes = self.data.ddi_edge_classes[idx]
 
-        data_dict = {"row_fp": row_fp, # fixme??
-                     "col_fp": col_fp,
-                     "row_ic50": edge_attr[5][None],
-                     "col_ic50": edge_attr[6][None],
-                     "css": edge_attr[0][None],
-                     "negative_css": -edge_attr[0][None]
+        data_dict = {
+                         "edge_index": ddi_idx,
+                         "row_fp": row_fp, # fixme??
+                         "col_fp": col_fp,
+                         "row_ic50": edge_attr[5][None],
+                         "col_ic50": edge_attr[6][None],
+                         "css": edge_attr[0][None],
+                         "negative_css": -edge_attr[0][None],
+                         "edge_classes": edge_classes,
                      }
         return EdgeData(data_dict)
 
