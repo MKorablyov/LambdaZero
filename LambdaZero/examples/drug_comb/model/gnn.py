@@ -49,9 +49,9 @@ class GNN(torch.nn.Module):
 
         lin_input_dim = -1
         if self._aggr == 'concat':
-            lin_input_dim = 2 * gcn_channels[-1]
+            lin_input_dim = (2 * gcn_channels[-1]) + 2
         elif self._aggr == 'kroenecker':
-            lin_input_dim = gcn_channels[-1]
+            lin_input_dim = gcn_channels[-1] + 1
 
         linear_channels.insert(0, lin_input_dim)
         self.predictor = RelationAwareMLP(linear_channels, num_relations,
@@ -79,7 +79,7 @@ class GNN(torch.nn.Module):
         for param in self.predictor.parameters():
             yield param
 
-    def forward(self, x, edge_index, relations):
+    def forward(self, x, edge_index, relations, concs):
         for i, conv in enumerate(self.convs):
             if i >= len(self.convs) - self.num_residual_gcn_layers:
                 x = F.relu(conv(x)) + x
@@ -90,7 +90,9 @@ class GNN(torch.nn.Module):
                 x = self.gcn_dropout(x)
 
         row, col = edge_index.t()
-        z = self._aggregate(x[row], x[col])
+        x_i = torch.cat((x[row], concs[:, 0].view(-1, 1)), dim=1)
+        x_j = torch.cat((x[col], concs[:, 1].view(-1, 1)), dim=1)
+        z = self._aggregate(x_i, x_j)
 
         return self.predictor(z, relations)
 

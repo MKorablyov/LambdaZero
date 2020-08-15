@@ -46,10 +46,12 @@ def _get_split(dataset, config):
 def _get_loaders(train_set, val_set, batch_size, device):
     train_tensor_set = TensorDataset(train_set.edge_index.T,
                                      train_set.edge_classes,
+                                     torch.cat((train_set.row_ic50, train_set.col_ic50), dim=1),
                                      train_set.css)
 
     val_tensor_set = TensorDataset(val_set.edge_index.T,
                                    val_set.edge_classes,
+                                   torch.cat((val_set.row_ic50, val_set.col_ic50), dim=1),
                                    val_set.css)
 
     train_loader = DataLoader(train_tensor_set, batch_size,
@@ -65,9 +67,9 @@ def run_epoch(loader, model, x_drug, optim, is_train):
 
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for i, batch in enumerate(loader):
-        edge_index, edge_classes, y = batch
+        edge_index, edge_classes, edge_attr, y = batch
 
-        y_hat = model(x_drug, edge_index, edge_classes)
+        y_hat = model(x_drug, edge_index, edge_classes, edge_attr)
         loss = F.mse_loss(y, y_hat)
 
         metrics['loss'] += loss.item()
