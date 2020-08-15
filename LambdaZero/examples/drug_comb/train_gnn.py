@@ -102,6 +102,9 @@ class DrugDrugGNNRegressor(tune.Trainable):
         self.train_loader, self.val_loader = _get_loaders(train_set, val_set,
                                                           config['batch_size'], device)
 
+        # Base variance for computing explained variance
+        self.var0 = torch.mse_loss(val_set[:].css, train_set[:].css.mean()).item()
+
     def _train(self):
         train_scores = run_epoch(self.train_loader, self.model, self.x_drugs,
                                  self.optim, True)
@@ -113,6 +116,10 @@ class DrugDrugGNNRegressor(tune.Trainable):
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
 
         scores = dict(train_scores + eval_scores)
+
+        # Add explained variance
+        scores['explained_variance'] = (self.var0 - eval_scores['mse']) / self.var0
+
         return scores
 
     def _save(self, checkpoint_dir):
@@ -146,7 +153,7 @@ config = {
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
-    "stop": {"training_iteration": 100000},
+    "stop": {"training_iteration": 1000},
     "checkpoint_at_end": False,
     "resources_per_trial": {"gpu": 1},
     "name": "Testing"
