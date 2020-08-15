@@ -2,12 +2,15 @@ import torch
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
+from LambdaZero.examples.drug_comb.model.layers.GCNWithAttention import GCNWithAttention
+from LambdaZero.examples.drug_comb.model.layers.RelationAwareMLP import RelationAwareMLP
 import time
 
 class GNNWithAttention(torch.nn.Module):
     def __init__(self, gcn_channels, rank, linear_channels,
                  num_relation_lin_layers, gcn_dropout_rate,
-                 linear_dropout_rate, edge_index, num_relations,
+                 linear_dropout_rate, train_edge_index,
+                 val_edge_index, num_relations,
                  num_residual_gcn_layers, aggr):
         super().__init__()
 
@@ -22,7 +25,8 @@ class GNNWithAttention(torch.nn.Module):
             out_channels = gcn_channels[i + 1]
 
             self.convs.append(GCNWithAttention(in_channels, out_channels,
-                                               rank, edge_index, gcn_dropout))
+                                               rank, train_edge_index,
+                                               val_edge_index, gcn_dropout))
 
         if num_residual_gcn_layers > len(self.convs):
             raise AttributeError(

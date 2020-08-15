@@ -5,10 +5,11 @@ from torch_geometric.utils import degree, add_remaining_self_loops
 import time
 
 class GCNWithAttention(torch.nn.Module):
-    def __init__(self, in_channels, out_channels, rank, edge_index, dropout):
+    def __init__(self, in_channels, out_channels, rank,
+                 train_edge_index, val_edge_index, dropout):
         super().__init__()
 
-        self.conv = InMemoryGCN(in_channels, out_channels, edge_index)
+        self.conv = InMemoryGCN(in_channels, out_channels, train_edge_index, val_edge_index)
         self.attention = LowRankAttention(in_channels, rank)
         self.dim_reduce = torch.nn.Linear(out_channels + (4 * rank), out_channels)
 

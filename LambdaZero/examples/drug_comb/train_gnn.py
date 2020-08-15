@@ -1,6 +1,7 @@
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.inputs import random_split
 from LambdaZero.examples.drug_comb.model.GNN import GNN
+from LambdaZero.examples.drug_comb.model.GNNWithAttention import GNNWithAttention
 from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
@@ -14,17 +15,17 @@ def _get_model(config, train_set, val_set):
     model = None
     if config['model'] is GNNWithAttention
         model = GNNWithAttention(config['gcn_channels'], config['rank'],
-                                      config['linear_channels'], config['num_relation_lin_lyrs'],
-                                      config['gcn_dropout_rate'], config['lin_dropout_rate'],
-                                      config['num_residual_gcn_lyrs'], config['aggr'],
-                                      train_set.edge_index, val_set.edge_index,
-                                      num_relations)
+                                 config['linear_channels'], config['num_relation_lin_lyrs'],
+                                 config['gcn_dropout_rate'], config['lin_dropout_rate'],
+                                 config['num_residual_gcn_lyrs'], config['aggr'],
+                                 train_set.edge_index, val_set.edge_index,
+                                 num_relations)
     elif config['model'] is GNN:
         model = GNN(config['gcn_channels'], config['linear_channels'],
-                         config['num_relation_lin_lyrs'], config['gcn_dropout_rate'],
-                         config['lin_dropout_rate'], config['num_residual_gcn_lyrs'],
-                         config['aggr'], train_set.edge_index, val_set.edge_index,
-                         num_relations)
+                    config['num_relation_lin_lyrs'], config['gcn_dropout_rate'],
+                    config['lin_dropout_rate'], config['num_residual_gcn_lyrs'],
+                    config['aggr'], train_set.edge_index, val_set.edge_index,
+                    num_relations)
     else:
         raise ValueError('Model was not one of GNN or GNNWithAttention')
 
@@ -89,7 +90,7 @@ def run_epoch(loader, model, x_drug, optim, batch_size, is_train):
 class DrugDrugGNNRegressor(tune.Trainable):
     def _setup(self, config):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        dataset = DrugCombEdge(transform=config['transform']).to(device)
+        dataset = DrugCombEdge().to(device)
 
         train_idx, val_idx = _get_split(dataset, config)
         train_set = torch.Subset(dataset, train_idx)
@@ -125,35 +126,30 @@ class DrugDrugGNNRegressor(tune.Trainable):
 
 _, _, summaries_dir =  get_external_dirs()
 config = {
-    "trainer": SubgraphRegressor,
+    "trainer": DrugDrugGNNRegressor,
     "trainer_config": {
-        "transform": None,
-        "pre_transform": to_drug_induced_subgraphs,
-        "val_set_prop": 0.2,
-        "test_set_prop": 0.0,
-        "prediction_type": tune.grid_search(["dot_product", "mlp"]),
-        "lr": tune.grid_search([1e-4, 5e-4, 5e-5, 1e-5]),
-        "use_one_hot": tune.grid_search([True, False]),
-        "score_type": 'hsa',
-        "weight_initialization_type": "torch_base",
-        "protein_embedding_size": 256,
-        "train_epoch": train_epoch,
-        "eval_epoch": eval_epoch,
-        "embed_channels": 256,
-        "regressor_hidden_channels": 64,
-        "num_epochs": 256,
-        "batch_size": 64,
-        "conv_dropout_rate": 0.1,
-        "linear_dropout_rate": 0.2,
-        "use_single_cell_line": tune.grid_search([True, False]),
+        "model": GNN,
+        "gcn_channels": [512, 512, 512],
+        "rank": 124,
+        "linear_channels": [1024, 512, 256, 128, 1],
+        "num_relation_lin_lyrs": 2,
+        "gcn_dropout_rate": .1,
+        "lin_dropout_rate": .3
+        "num_residual_gcn_lyrs": 1,
+        "aggr": "concat",
+        "num_examples_to_use": 300,
+        "train_prop": .9,
+        "val_prop": .1,
+        "lr": 1e-4,
+        "batch_size": 128,
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
-    "stop": {"training_iteration": 250},
+    "stop": {"training_iteration": 50},
     "checkpoint_at_end": True,
-    "resources_per_trial": {"gpu": 1},
-    "name": None
+    "resources_per_trial": {}#,"gpu": 1},
+    "name": "Testing"
 }
 
 if __name__ == "__main__":
@@ -164,7 +160,6 @@ if __name__ == "__main__":
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
 
-    config["name"] = "ShareFeaturesSingleCellLine"
     analysis = tune.run(
         config["trainer"],
         name=config["name"],

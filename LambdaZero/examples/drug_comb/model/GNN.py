@@ -2,12 +2,15 @@ import torch
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
+from LambdaZero.examples.drug_comb.model.layers.InMemoryGCN import InMemoryGCN
+from LambdaZero.examples.drug_comb.model.layers.RelationAwareMLP import RelationAwareMLP
 import time
 
 class GNN(torch.nn.Module):
     def __init__(self, gcn_channels, linear_channels,
                  num_relation_lin_layers, gcn_dropout_rate,
-                 linear_dropout_rate, edge_index, num_relations,
+                 linear_dropout_rate, train_edge_index,
+                 val_edge_index, num_relations,
                  num_residual_gcn_layers, aggr):
         super().__init__()
 
@@ -20,7 +23,8 @@ class GNN(torch.nn.Module):
             in_channels  = gcn_channels[i]
             out_channels = gcn_channels[i + 1]
 
-            self.convs.append(InMemoryGCN(in_channels, out_channels, edge_index))
+            self.convs.append(InMemoryGCN(in_channels, out_channels,
+                                          train_edge_index, val_edge_index))
 
         if num_residual_gcn_layers > len(self.convs):
             raise AttributeError(
