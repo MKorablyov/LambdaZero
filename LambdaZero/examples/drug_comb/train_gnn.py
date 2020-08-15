@@ -1,6 +1,6 @@
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.inputs import random_split
-from LambdaZero.examples.drug_comb.model.GNN import GNN
+from LambdaZero.examples.drug_comb.model.gnn import GNN
 from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
@@ -142,7 +142,7 @@ config = {
         "val_prop": .1,
         "lr": 1e-4,
         "batch_size": 128,
-        "gnn_lyr_type": "GCNWithAttention", # Must be a str as we can't pickle modules
+        "gnn_lyr_type": "InMemoryGCN", # Must be a str as we can't pickle modules
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,

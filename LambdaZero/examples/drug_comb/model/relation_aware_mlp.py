@@ -2,7 +2,7 @@ import torch
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
 from torch_geometric.utils import degree, add_remaining_self_loops
-from LambdaZero.examples.drug_comb.model.layers.RelationAwareLinear import RelationAwareLinear
+from LambdaZero.examples.drug_comb.model.layers.relation_aware_linear import RelationAwareLinear
 import time
 
 class RelationAwareMLP(torch.nn.Module):

@@ -2,9 +2,9 @@ import torch
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
-from LambdaZero.examples.drug_comb.model.RelationAwareMLP import RelationAwareMLP
-from LambdaZero.examples.drug_comb.model.layers.InMemoryGCN import InMemoryGCN
-from LambdaZero.examples.drug_comb.model.layers.GCNWithAttention import GCNWithAttention
+from LambdaZero.examples.drug_comb.model.relation_aware_mlp import RelationAwareMLP
+from LambdaZero.examples.drug_comb.model.layers.in_memory_gcn import InMemoryGCN
+from LambdaZero.examples.drug_comb.model.layers.gcn_with_attention import GCNWithAttention
 import time
 
 class GNN(torch.nn.Module):
