@@ -48,6 +48,31 @@ class RelationAwareMLP(torch.nn.Module):
                 for k in range(num_layers - num_relation_layers, num_layers)
             ]
 
+    def to(self, device):
+        super().to(device)
+
+        for i in range(len(self.relation_lyrs)):
+            self.relation_lyrs[i] = self.relation_lyrs[i].to(device)
+
+        if self.bn is not None:
+            for i in range(len(self.bn)):
+                self.bn[i] = self.bn[i].to(device)
+
+        return self
+
+    def parameters(self):
+        for param in super().parameters():
+            yield param
+
+        for lyr in self.relation_lyrs:
+            for param in lyr.parameters():
+                yield param
+
+        if self.bn is not None:
+            for bn in self.bn:
+                for param in bn.parameters():
+                    yield param
+
     def forward(self, x, relations):
         x = self.non_relation_pred(x)
 

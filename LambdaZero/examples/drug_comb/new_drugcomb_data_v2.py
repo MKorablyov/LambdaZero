@@ -168,6 +168,7 @@ class NewDrugComb(InMemoryDataset):
         data.ddi_edge_idx = torch.tensor(ddi_edge_idx, dtype=torch.long)
         data.ddi_edge_attr = torch.tensor(ddi_edge_attr, dtype=torch.float)
         data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.long)
+        data.num_relations = torch.unique(data.ddi_edge_classes).shape[0]
 
         data_list = [data]
         if self.pre_transform is not None:

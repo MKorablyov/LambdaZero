@@ -11,12 +11,9 @@ import numpy as np
 import torch
 import ray
 import time
+import os
 
-def _get_model(config, train_set, val_set):
-    num_relations = torch.unique(
-        torch.cat((train_set.edge_classes, val_set.edge_classes))
-    ).shape[0]
-
+def _get_model(config, train_set, val_set, num_relations):
     return GNN(config['gcn_channels'], config['rank'],
                config['linear_channels'], config['num_relation_lin_lyrs'],
                config['gcn_dropout_rate'], config['lin_dropout_rate'],
@@ -96,7 +93,7 @@ class DrugDrugGNNRegressor(tune.Trainable):
         train_set = dataset[train_idx]
         val_set = dataset[val_idx]
 
-        self.model = _get_model(config, train_set, val_set).to(device)
+        self.model = _get_model(config, train_set, val_set, dataset.data.num_relations).to(device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config['lr'])
 
         self.x_drugs = dataset.data.x_drugs
@@ -129,27 +126,27 @@ config = {
     "trainer": DrugDrugGNNRegressor,
     "trainer_config": {
         "model": GNN,
-        "gcn_channels": [1024, 64, 64, 64],
+        "gcn_channels": [1024, 512, 512],
         "rank": 124,
-        "linear_channels": [10, 9, 8, 1],#[1024, 512, 256, 128, 1],
+        "linear_channels": [1024, 512, 256, 128, 1],
         "num_relation_lin_lyrs": 2,
         "gcn_dropout_rate": .1,
         "lin_dropout_rate": .3,
         "num_residual_gcn_lyrs": 1,
         "aggr": "concat",
-        "num_examples_to_use": -1,
-        "train_prop": .9,
-        "val_prop": .1,
+        "num_examples_to_use": 100,
+        "train_prop": .8,
+        "val_prop": .2,
         "lr": 1e-4,
-        "batch_size": 128,
-        "gnn_lyr_type": "InMemoryGCN", # Must be a str as we can't pickle modules
+        "batch_size": 32,
+        "gnn_lyr_type": "GCNWithAttention", # Must be a str as we can't pickle modules
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
-    "stop": {"training_iteration": 50},
-    "checkpoint_at_end": True,
-    "resources_per_trial": {},#,"gpu": 1},
+    "stop": {"training_iteration": 100000},
+    "checkpoint_at_end": False,
+    "resources_per_trial": {"gpu": 1},
     "name": "Testing"
 }
 
