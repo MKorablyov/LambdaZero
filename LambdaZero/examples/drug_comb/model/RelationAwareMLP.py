@@ -38,7 +38,7 @@ class RelationAwareMLP(torch.nn.Module):
         self.non_relation_pred = torch.nn.Sequential(*modules)
         self.relation_lyrs = [
             RelationAwareLinear(num_relations, layer_channels[j], layer_channels[j + 1])
-            for j in range(i, num_layers)
+            for j in range(num_layers - num_relation_layers, num_layers)
         ]
 
         self.bn = None

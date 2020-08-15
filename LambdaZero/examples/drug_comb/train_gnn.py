@@ -1,35 +1,28 @@
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.inputs import random_split
 from LambdaZero.examples.drug_comb.model.GNN import GNN
-from LambdaZero.examples.drug_comb.model.GNNWithAttention import GNNWithAttention
 from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 from torch.nn import functional as F
+from torch.utils.data import TensorDataset, DataLoader
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
 from ray import tune
+import numpy as np
 import torch
 import ray
 import time
 
 def _get_model(config, train_set, val_set):
-    model = None
-    if config['model'] is GNNWithAttention
-        model = GNNWithAttention(config['gcn_channels'], config['rank'],
-                                 config['linear_channels'], config['num_relation_lin_lyrs'],
-                                 config['gcn_dropout_rate'], config['lin_dropout_rate'],
-                                 config['num_residual_gcn_lyrs'], config['aggr'],
-                                 train_set.edge_index, val_set.edge_index,
-                                 num_relations)
-    elif config['model'] is GNN:
-        model = GNN(config['gcn_channels'], config['linear_channels'],
-                    config['num_relation_lin_lyrs'], config['gcn_dropout_rate'],
-                    config['lin_dropout_rate'], config['num_residual_gcn_lyrs'],
-                    config['aggr'], train_set.edge_index, val_set.edge_index,
-                    num_relations)
-    else:
-        raise ValueError('Model was not one of GNN or GNNWithAttention')
+    num_relations = torch.unique(
+        torch.cat((train_set.edge_classes, val_set.edge_classes))
+    ).shape[0]
 
-    return model
+    return GNN(config['gcn_channels'], config['rank'],
+               config['linear_channels'], config['num_relation_lin_lyrs'],
+               config['gcn_dropout_rate'], config['lin_dropout_rate'],
+               train_set.edge_index, val_set.edge_index,
+               num_relations, config['num_residual_gcn_lyrs'],
+               config['gnn_lyr_type'], config['aggr'])
 
 def _get_split(dataset, config):
     # If -1 then we use all the examples
@@ -37,12 +30,21 @@ def _get_split(dataset, config):
 
     prop_factor = 1.
     if num_examples_to_use != -1:
-        prop_factor = math.max(num_examples_to_use / len(dataset), 1.)
+        if num_examples_to_use > len(dataset):
+            raise ValueError('num_values_to_use must be at most the size of the dataset')
+
+        prop_factor = min(num_examples_to_use / len(dataset), 1.)
 
     props = [config['train_prop'], config['val_prop']]
     props = [x * prop_factor for x in props]
 
-    return random_split(len(dataset), props)
+    # If we're picking only k samples, add a proportion to the props list
+    # so the values add to 1.0.
+    if not np.isclose(1.0, sum(props)):
+        props.append(1 - props[0] - props[1])
+
+    # First two items are train & val, so only return them
+    return random_split(len(dataset), props)[:2]
 
 def _get_loaders(train_set, val_set, batch_size, device):
     train_tensor_set = TensorDataset(train_set.edge_index.T,
@@ -61,26 +63,24 @@ def _get_loaders(train_set, val_set, batch_size, device):
 
     return train_loader, val_loader
 
-def run_epoch(loader, model, x_drug, optim, batch_size, is_train):
-    if is_train:
-        model.train()
-    else:
-        model.eval()
+def run_epoch(loader, model, x_drug, optim, is_train):
+    model.train() if is_train else model.eval()
 
     metrics = {"loss": 0, "mse": 0, "mae": 0}
     for i, batch in enumerate(loader):
-        optim.zero_grad()
         edge_index, edge_classes, y = batch
 
         y_hat = model(x_drug, edge_index, edge_classes)
         loss = F.mse_loss(y, y_hat)
 
-        loss.backward()
-        optim.step()
-
         metrics['loss'] += loss.item()
         metrics['mse'] += loss.item()
         metrics['mae'] += F.l1_loss(y, y_hat).item()
+
+        if is_train:
+            loss.backward()
+            optim.step()
+            optim.zero_grad()
 
     for key in metrics.keys():
         metrics[key] /= len(loader)
@@ -93,22 +93,22 @@ class DrugDrugGNNRegressor(tune.Trainable):
         dataset = DrugCombEdge().to(device)
 
         train_idx, val_idx = _get_split(dataset, config)
-        train_set = torch.Subset(dataset, train_idx)
-        val_set = torch.Subset(dataset, val_idx)
+        train_set = dataset[train_idx]
+        val_set = dataset[val_idx]
 
         self.model = _get_model(config, train_set, val_set).to(device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config['lr'])
-        self.batch_size = config['batch_size']
 
         self.x_drugs = dataset.data.x_drugs
-        self.train_loader, self.val_loader = _get_loaders(train_set, val_set, config)
+        self.train_loader, self.val_loader = _get_loaders(train_set, val_set,
+                                                          config['batch_size'], device)
 
     def _train(self):
         train_scores = run_epoch(self.train_loader, self.model, self.x_drugs,
-                                 self.optim, self.batch_size, True)
+                                 self.optim, True)
 
         eval_scores = run_epoch(self.val_loader, self.model, self.x_drugs,
-                                self.optim, self.batch_size, False)
+                                self.optim, False)
 
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
@@ -129,26 +129,27 @@ config = {
     "trainer": DrugDrugGNNRegressor,
     "trainer_config": {
         "model": GNN,
-        "gcn_channels": [512, 512, 512],
+        "gcn_channels": [1024, 64, 64, 64],
         "rank": 124,
-        "linear_channels": [1024, 512, 256, 128, 1],
+        "linear_channels": [10, 9, 8, 1],#[1024, 512, 256, 128, 1],
         "num_relation_lin_lyrs": 2,
         "gcn_dropout_rate": .1,
-        "lin_dropout_rate": .3
+        "lin_dropout_rate": .3,
         "num_residual_gcn_lyrs": 1,
         "aggr": "concat",
-        "num_examples_to_use": 300,
+        "num_examples_to_use": -1,
         "train_prop": .9,
         "val_prop": .1,
         "lr": 1e-4,
         "batch_size": 128,
+        "gnn_lyr_type": "GCNWithAttention", # Must be a str as we can't pickle modules
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
     "stop": {"training_iteration": 50},
     "checkpoint_at_end": True,
-    "resources_per_trial": {}#,"gpu": 1},
+    "resources_per_trial": {},#,"gpu": 1},
     "name": "Testing"
 }
 

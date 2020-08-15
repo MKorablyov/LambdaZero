@@ -98,6 +98,10 @@ def _get_ddi_edges(_data, cid_to_idx, cell_line_to_idx,properties):
 
     cell_line_names = _data[["cell_line_name"]].to_numpy()[:,0]
     ddi_edge_classes = np.array([cell_line_to_idx[na] for na in cell_line_names],dtype=np.int32)
+
+    cell_line_bins = np.unique(ddi_edge_classes) + 1
+    ddi_edge_classes = np.digitize(ddi_edge_classes, cell_line_bins)
+
     return ddi_edge_idx, ddi_edge_attr, ddi_edge_classes
 
 class NewDrugComb(InMemoryDataset):
@@ -163,7 +167,7 @@ class NewDrugComb(InMemoryDataset):
         # Add ddi attributes to data
         data.ddi_edge_idx = torch.tensor(ddi_edge_idx, dtype=torch.long)
         data.ddi_edge_attr = torch.tensor(ddi_edge_attr, dtype=torch.float)
-        data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.int32)
+        data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.long)
 
         data_list = [data]
         if self.pre_transform is not None:
@@ -181,6 +185,14 @@ class DrugCombEdge(NewDrugComb):
     def __len__(self):
         return self.data.ddi_edge_idx.shape[1]
 
+    def to(self, device):
+        self.data.ddi_edge_idx = self.data.ddi_edge_idx.to(device)
+        self.data.x_drugs = self.data.x_drugs.to(device)
+        self.data.ddi_edge_attr = self.data.ddi_edge_attr.to(device)
+        self.data.ddi_edge_classes = self.data.ddi_edge_classes.to(device)
+
+        return self
+
     def __getitem__(self, idx):
         ddi_idx = self.data.ddi_edge_idx[:, idx]
         row_fp = self.data.x_drugs[ddi_idx[0]]
@@ -192,15 +204,19 @@ class DrugCombEdge(NewDrugComb):
                          "edge_index": ddi_idx,
                          "row_fp": row_fp, # fixme??
                          "col_fp": col_fp,
-                         "row_ic50": edge_attr[5][None],
-                         "col_ic50": edge_attr[6][None],
-                         "css": edge_attr[0][None],
-                         "negative_css": -edge_attr[0][None],
-                         "edge_classes": edge_classes,
+                         "row_ic50": edge_attr[:, 5, None],
+                         "col_ic50": edge_attr[:, 6, None],
+                         "css": edge_attr[:, 0, None],
+                         "negative_css": -edge_attr[:, 0, None],
+                         "edge_classes": edge_classes[:, None],
                      }
         return EdgeData(data_dict)
 
+    def download(self):
+        super().download()
 
+    def process(self):
+        super().process()
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt

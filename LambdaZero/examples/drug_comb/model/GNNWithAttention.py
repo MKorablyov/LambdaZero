@@ -2,8 +2,8 @@ import torch
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
+from LambdaZero.examples.drug_comb.model.RelationAwareMLP import RelationAwareMLP
 from LambdaZero.examples.drug_comb.model.layers.GCNWithAttention import GCNWithAttention
-from LambdaZero.examples.drug_comb.model.layers.RelationAwareMLP import RelationAwareMLP
 import time
 
 class GNNWithAttention(torch.nn.Module):
@@ -39,11 +39,11 @@ class GNNWithAttention(torch.nn.Module):
         lin_input_dim = -1
         if self._aggr == 'concat':
             lin_input_dim = 2 * gcn_channels[-1]
-        else if self._aggr == 'kroenecker':
+        elif self._aggr == 'kroenecker':
             lin_input_dim = gcn_channels[-1]
 
         linear_channels.insert(0, lin_input_dim)
-        self.predictor = RelationAwareMLP(linear_channels, num_relations
+        self.predictor = RelationAwareMLP(linear_channels, num_relations,
                                           num_relation_lin_layers, linear_dropout,
                                           batch_norm=False)
 
@@ -54,7 +54,8 @@ class GNNWithAttention(torch.nn.Module):
             else:
                 x = F.relu(self.conv(x))
 
-            x = self.gcn_dropout(x)
+            if self.gcn_dropout is not None:
+                x = self.gcn_dropout(x)
 
         row, col = edge_index
         z = self._aggregate(x[row], x[col])
@@ -70,6 +71,6 @@ class GNNWithAttention(torch.nn.Module):
 
             return torch.cat((row, col), dim=1)
 
-        else if self._aggr == 'kroenecker':
+        elif self._aggr == 'kroenecker':
             return x_i * x_j
 

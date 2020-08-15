@@ -10,14 +10,14 @@ class InMemoryGCN(MessagePassing):
         super().__init__(aggr=aggr)
 
         self.w = torch.nn.Linear(in_channels, out_channels)
-        self.train_edge_index = add_remaining_self_loops(train_edge_index)
-        self.val_edge_index = add_remaining_self_loops(val_edge_index)
+        self.train_edge_index = add_remaining_self_loops(train_edge_index)[0]
+        self.val_edge_index = add_remaining_self_loops(val_edge_index)[0]
 
         norms = []
         # Compute normalization
         for edge_index in [self.train_edge_index, self.val_edge_index]:
             row, col = edge_index
-            num_unique_nodes = torch.unique(edge_index)[0].shape[0]
+            num_unique_nodes = torch.unique(edge_index).shape[0]
             deg = degree(col, num_unique_nodes, dtype=torch.long)
             deg_inv_sqrt = deg.pow(-0.5)
             norms.append(deg_inv_sqrt[row] * deg_inv_sqrt[col])
