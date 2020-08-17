@@ -104,7 +104,7 @@ class DrugDrugGNNRegressor(tune.Trainable):
                                                           config['batch_size'], device)
 
         # Base variance for computing explained variance
-        self.var0 = torch.mse_loss(val_set[:].css, train_set[:].css.mean()).item()
+        self.var0 = F.mse_loss(val_set.css, train_set.css.mean()).item()
 
     def _train(self):
         train_scores = run_epoch(self.train_loader, self.model, self.x_drugs,
@@ -119,7 +119,7 @@ class DrugDrugGNNRegressor(tune.Trainable):
         scores = dict(train_scores + eval_scores)
 
         # Add explained variance
-        scores['explained_variance'] = (self.var0 - eval_scores['mse']) / self.var0
+        scores['explained_variance'] = (self.var0 - scores['eval_mse']) / self.var0
 
         return scores
 
@@ -163,7 +163,7 @@ config = {
 if __name__ == "__main__":
     ray.init()
 
-    time_to_sleep = 5
+    time_to_sleep = 15
     print("Sleeping for %d seconds" % time_to_sleep)
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")

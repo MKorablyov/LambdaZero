@@ -1,7 +1,7 @@
 import time
 import os.path as osp
 from torch_geometric.data import Data, InMemoryDataset
-from pubchempy import Compound
+#from pubchempy import Compound
 import urllib.request
 import ssl
 from rdkit import Chem
