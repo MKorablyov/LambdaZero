@@ -13,6 +13,7 @@ import LambdaZero.utils
 import LambdaZero.models
 import LambdaZero.inputs
 from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
+# from LambdaZero.models import MPNNetDrop
 from LambdaZero.examples.bayesian_models.bayes_tune.brr import BRR
 
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
@@ -20,7 +21,7 @@ from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch
 from LambdaZero.examples.bayesian_models.bayes_tune import aq_config
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
-
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def aq_regret(train_loader, ul_loader, config):
     train_targets = np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in 
@@ -66,8 +67,8 @@ class Thompson(tune.Trainable):
 
     def _train(self):
         # for _ in range(self.config['data']['b_size']):
-        idx = self.acquire_batch(batch_size = self.config['data']['b_size'])
-        scores = self.update_with_seen(idx)
+        idxs = self.acquire_batch(batch_size = self.config['data']['b_size'])
+        scores = self.update_with_seen(idxs)
         return scores
 
     def update_with_seen(self, idxs):
@@ -91,16 +92,44 @@ class Thompson(tune.Trainable):
         return scores
 
     def acquire_batch(self, batch_size=500):
-        # Thompson sampling
-        mean, var = self.regressor.get_mean_variance(self.ul_loader)
-        mean = torch.from_numpy(mean)
-        var = torch.diag(torch.from_numpy(var))
-        mvn = distributions.MultivariateNormal(mean, var)
+        idxs = []
         
-        sample = mvn.sample_n(1)[0]
-        idx = sample.argsort()[:batch_size]
+        for _ in range(batch_size):
+            embs = []
+            y = np.concatenate([getattr(d, 'gridscore').cpu().numpy() for d in self.train_loader.dataset],0)
+            for bidx, data in enumerate(self.train_loader):
+                data = data.to(device)
+                emb = self.regressor.model.get_embed(data, False)
+                embs.append(emb.detach().cpu().numpy())
+            embs = np.concatenate(embs, 0)
 
-        return idx
+            ul_embs = []
+            for bidx, data in enumerate(self.ul_loader):
+                data = data.to(device)
+                emb = self.regressor.model.get_embed(data, False)
+                ul_embs.append(emb.detach().cpu().numpy())
+            ul_embs = np.concatenate(ul_embs, 0)
+
+            idx = self.get_posterior_sample(X_in = ul_embs,X_trn = embs, y = y, idxs = idxs, X_feature_size = 64, sigma_y = 0.2)
+
+            if idx: idxs.append(int(idx))
+        return idxs
+
+    def get_posterior_sample(self, X_in, X_trn, y, idxs, X_feature_size,sigma_y):
+
+        w_0 = np.zeros(X_feature_size)
+        V_0 = np.diag([sigma_y] * X_feature_size)**2
+        V0_inv = np.linalg.inv(V_0)
+        V_n = sigma_y**2 * np.linalg.inv(sigma_y**2 * V0_inv + (X_trn.T @ X_trn))
+        w_n = V_n @ V0_inv @ w_0 + 1 / (sigma_y**2) * V_n @ X_trn.T @ y
+
+        samples = np.random.multivariate_normal(w_n, V_n, size = 1)
+        y_star = X_in @ samples.T
+        y_star = y_star.argsort()
+        for i in y_star:
+            if i not in idxs:
+                return i
+        
 
 DEFAULT_CONFIG = {
     "acquirer_config": {
@@ -111,8 +140,6 @@ DEFAULT_CONFIG = {
             "regressor_config": aq_config.regressor_config,
             "aq_size0": 200,
             "aq_size": 50,
-            "kappa": 0.2,
-            "epsilon": 0.0,
             "minimize_objective":True,
         },
         "local_dir": summaries_dir,
