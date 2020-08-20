@@ -30,8 +30,12 @@ class GNN(torch.nn.Module):
                 gnn_lyr = InMemoryGCN(in_channels, out_channels,
                                       train_edge_index, val_edge_index)
             elif gnn_lyr_type == 'GCNWithAttention':
+                # Note that we here cast rank to an int as if we are using
+                # hyperopt, hyperopt's quniform distribution returns discrete values
+                # as a float.  We cast as the GCNWithAttention module requires
+                # rank to be an int.
                 gnn_lyr = GCNWithAttention(in_channels, out_channels,
-                                           rank, train_edge_index,
+                                           int(rank), train_edge_index,
                                            val_edge_index, gcn_dropout)
 
             self.convs.append(gnn_lyr)

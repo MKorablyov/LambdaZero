@@ -13,6 +13,7 @@ def joint_normalize(U, V_T):
 class LowRankAttention(torch.nn.Module):
     def __init__(self, in_channels, rank):
         super().__init__()
+
         self.u = torch.nn.Linear(in_channels, rank)
         self.v = torch.nn.Linear(in_channels, rank)
         self.z = torch.nn.Linear(in_channels, rank)

@@ -7,7 +7,10 @@ from torch.utils.data import TensorDataset, DataLoader
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
 from ray import tune
+from ray.tune.schedulers import ASHAScheduler
+from ray.tune.suggest.hyperopt import HyperOptSearch
 import numpy as np
+from hyperopt import hp
 import torch
 import ray
 import time
@@ -136,27 +139,21 @@ config = {
     "trainer": DrugDrugGNNRegressor,
     "trainer_config": {
         "model": GNN,
-        "gcn_channels": [],#tune.grid_search([[],[1024, 256, 256, 256], [1024, 256, 256]]),
-        "rank": 128,
         "linear_channels": [1024, 512, 256, 128, 1],
         "num_relation_lin_lyrs": 2,
-        "gcn_dropout_rate": .1,
-        "lin_dropout_rate": .4,
         "num_residual_gcn_lyrs": 1,
         "aggr": "concat",
         "num_examples_to_use": -1,
         "train_prop": .8,
         "val_prop": .2,
-        "lr": 1e-4,#tune.grid_search([1e-4, 1e-5]),
-        "batch_size": 512,#tune.grid_search([512, 256]),
-        "gnn_lyr_type": "GCNWithAttention",#tune.grid_search(["GCNWithAttention", "InMemoryGCN"]) # Must be a str as we can't pickle modules
+        "gnn_lyr_type": "GCNWithAttention",
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
     "checkpoint_freq": 200,
     "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
-    "resources_per_trial": {"gpu": 1},
+    "resources_per_trial": {},#"gpu": 1},
     "name": "DrugCombLoewe",
     "asha_metric": "eval_loss",
     "asha_mode": "min",
@@ -178,7 +175,35 @@ if __name__ == "__main__":
 	max_t=config['asha_max_t'],
 	grace_period=10,
 	reduction_factor=3,
-	brackets=1)
+	brackets=1
+    )
+
+    search_space = {
+        "lr": hp.loguniform("lr", -7, -2),
+        "rank": hp.quniform("rank", 50, 300),
+        "gcn_channels": hp.choice("gcn_channels", [[1024, 256, 256, 256], [1024, 256, 256]]),
+        "batch_size": hp.choice("batch_size", [256, 512]),
+        "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
+        "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
+    }
+
+    current_best_params = [
+        {
+            "lr": 1e-3,
+            "rank": 128,
+            "gcn_channels": 1,
+            "batch_size": 0,
+            "gcn_dropout_rate": .1,
+            "lin_dropout_rate": .4,
+        }
+    ]
+
+    search_alg = HyperOptSearch(
+        search_space,
+        metric=config['asha_metric'],
+        mode=config['asha_mode'],
+        points_to_evaluate=current_best_params
+    )
 
     analysis = tune.run(
         config["trainer"],
@@ -189,5 +214,7 @@ if __name__ == "__main__":
         num_samples=1,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
-        checkpoint_freq=config["checkpoint_freq"]
+        checkpoint_freq=config["checkpoint_freq"],
+        scheduler=asha_scheduler,
+        search_alg=search_alg,
     )
