@@ -47,12 +47,12 @@ def _get_loaders(train_set, val_set, batch_size, device):
     train_tensor_set = TensorDataset(train_set.edge_index.T,
                                      train_set.edge_classes,
                                      torch.cat((train_set.row_ic50, train_set.col_ic50), dim=1),
-                                     train_set.css)
+                                     train_set.loewe)
 
     val_tensor_set = TensorDataset(val_set.edge_index.T,
                                    val_set.edge_classes,
                                    torch.cat((val_set.row_ic50, val_set.col_ic50), dim=1),
-                                   val_set.css)
+                                   val_set.loewe)
 
     train_loader = DataLoader(train_tensor_set, batch_size,
                               pin_memory=device == 'cpu', shuffle=True)
@@ -104,7 +104,7 @@ class DrugDrugGNNRegressor(tune.Trainable):
                                                           config['batch_size'], device)
 
         # Base variance for computing explained variance
-        self.var0 = F.mse_loss(val_set.css, train_set.css.mean()).item()
+        self.var0 = F.mse_loss(val_set.loewe, train_set.loewe.mean()).item()
 
     def _train(self):
         train_scores = run_epoch(self.train_loader, self.model, self.x_drugs,
@@ -136,7 +136,7 @@ config = {
     "trainer": DrugDrugGNNRegressor,
     "trainer_config": {
         "model": GNN,
-        "gcn_channels": [1024, 256, 256, 256],
+        "gcn_channels": [],#tune.grid_search([[],[1024, 256, 256, 256], [1024, 256, 256]]),
         "rank": 128,
         "linear_channels": [1024, 512, 256, 128, 1],
         "num_relation_lin_lyrs": 2,
@@ -147,9 +147,9 @@ config = {
         "num_examples_to_use": -1,
         "train_prop": .8,
         "val_prop": .2,
-        "lr": tune.grid_search([1e-3, 1e-4, 1e-5]),
-        "batch_size": tune.grid_search([128, 256, 64]),
-        "gnn_lyr_type": tune.grid_search(["GCNWithAttention", "InMemoryGCN"]) # Must be a str as we can't pickle modules
+        "lr": 1e-4,#tune.grid_search([1e-4, 1e-5]),
+        "batch_size": 512,#tune.grid_search([512, 256]),
+        "gnn_lyr_type": "GCNWithAttention",#tune.grid_search(["GCNWithAttention", "InMemoryGCN"]) # Must be a str as we can't pickle modules
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
@@ -157,16 +157,28 @@ config = {
     "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
     "resources_per_trial": {"gpu": 1},
-    "name": "FirstRuns"
+    "name": "DrugCombLoewe",
+    "asha_metric": "eval_loss",
+    "asha_mode": "min",
+    "asha_max_t": 100
 }
 
 if __name__ == "__main__":
     ray.init()
 
-    time_to_sleep = 15
+    time_to_sleep = 5
     print("Sleeping for %d seconds" % time_to_sleep)
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
+
+    asha_scheduler = ASHAScheduler(
+	time_attr='training_iteration',
+	metric=config['asha_metric'],
+	mode=config['asha_mode'],
+	max_t=config['asha_max_t'],
+	grace_period=10,
+	reduction_factor=3,
+	brackets=1)
 
     analysis = tune.run(
         config["trainer"],
