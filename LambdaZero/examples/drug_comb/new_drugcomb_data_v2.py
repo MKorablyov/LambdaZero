@@ -192,7 +192,7 @@ class DrugCombEdge(NewDrugComb):
                      "row_ic50": edge_attr[5][None],
                      "col_ic50": edge_attr[6][None],
                      "css": edge_attr[0][None],
-                     "negative_css": -edge_attr[0][None]
+                     "negative_css": -edge_attr[0][None],
                      }
         return EdgeData(data_dict)
 
@@ -228,14 +228,14 @@ if __name__ == '__main__':
         model.fit(train_x, train_y)
         val_y_hat = model.predict(val_x)
 
-        #plt.figure(dpi=300)
-        #plt.scatter(val_y,val_y_hat)
-        #plt.xlabel("CSS")
-        #plt.ylabel("predicted CSS")
+        plt.figure(dpi=300)
+        plt.scatter(val_y,val_y_hat)
+        plt.xlabel("growth inhibition")
+        plt.ylabel("predicted growth inhibition")
         #plt.show()
-        #plt.savefig("/home/maksym/Desktop/" +str(idx) +  ".png")
-        #print("saved fig")
-        #time.sleep(2)
+        plt.savefig("/home/maksym/Desktop/" + str(time.time()) + ".png")
+        print("saved fig")
+        time.sleep(2)
         var0 = ((val_y - train_y.mean()) ** 2).mean()
 
         exp_var = (var0 - ((val_y - val_y_hat) ** 2).mean()) / var0
@@ -246,8 +246,13 @@ if __name__ == '__main__':
     dataset = DrugCombEdge()
     cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
 
+    #print(np.unique(dataset.data.ddi_edge_classes.numpy()).shape[0])
+    #time.sleep(100)
+
     for cell_line_idx in cell_line_idxs:
         idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idx)[0]
+
+
         #print("len idxs", len(idxs))
         dataset_cell = Subset(dataset,idxs)
         exp_var, rmse = train_ridge_regression(dataset_cell)

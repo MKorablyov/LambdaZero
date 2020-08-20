@@ -113,6 +113,7 @@ uct005 = {
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]}
             }}}
+
 uct006 = {
     "acquirer_config":{
             "config":{
@@ -124,6 +125,8 @@ uct006 = {
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]}
             }}}
+
+
 uct007 = {
     "acquirer_config":{
             "config":{
@@ -175,8 +178,31 @@ uctComb001 = {
             "regressor_config": {"config": {
                 "data":comb_data,
                 "regressor_config": {"get_feat": concat_fp_feat},
+
             }},
-        "aq_size": 100,
-        }}}
-uctComb002 = uctComb001
-uctComb002["acquirer_config"]["config"]["epsilon"] = 10000
+            "aq_size0": 200,
+            "aq_size": 100, # this is 2200
+            "kappa": 0.07, #grid_search(list(10**np.linspace(start=-2,stop=2,num=10))),
+        },
+    "num_samples":5,
+    }}
+
+
+uctComb002 = {
+    "acquirer_config": {
+        #"stop": {"training_iteration": 115},
+        "config": {
+            "data": comb_data,
+            "regressor": BRR,
+            "regressor_config": {"config": {
+                "data":comb_data,
+                "regressor_config": {"get_feat": concat_fp_feat},
+
+            }},
+            "aq_size0": 200,
+            "aq_size": 100, # this is 2200
+            "kappa": 0.07, #grid_search(list(10**np.linspace(start=-2,stop=2,num=10))),
+            "epsilon":10000,
+        },
+        "num_samples":5
+    }}

@@ -32,10 +32,16 @@ def aq_regret(train_loader, ul_loader, config):
     aq_top15 = np.median(train_sorted[:15])
     aq_top50 = np.median(train_sorted[:15])
 
-    n = int(all_targets.shape[0] * 0.01)
-    frac_top1percent = np.asarray(train_sorted[:n] <= all_sorted[n],dtype=np.float).mean()
+    n1 = int(all_targets.shape[0] * 0.01)
+    frac_top1percent = np.asarray(train_sorted[:n1] <= all_sorted[n1],dtype=np.float).mean()
+    n10 = int(all_targets.shape[0] * 0.1)
+    frac_top10percent = np.asarray(train_sorted[:n10] <= all_sorted[n10], dtype=np.float).mean()
+    n25 = int(all_targets.shape[0] * 0.25)
+    frac_top25percent = np.asarray(train_sorted[:n25] <= all_sorted[n25], dtype=np.float).mean()
+
     return {"aq_top15_regret":top15_regret, "aq_top50_regret":top50_regret, "aq_top15":aq_top15, "aq_top50":aq_top50,
-            "aq_frac_top1_percent":frac_top1percent}
+            "aq_frac_top1_percent":frac_top1percent, "aq_frac_top10_percent":frac_top10percent,
+            "aq_frac_top25_percent":frac_top25percent}
 
 
 class UCT(tune.Trainable):
@@ -95,6 +101,15 @@ class UCT(tune.Trainable):
         return idxs
 
 
+    # def get_reward(molecule)
+        # self.ul_set.append(molecule)
+        # if len(ul_set > 1000):
+                #  self._acquire_and_update() # nonblocking
+        # score = mean + kappa * var
+
+
+
+
 
 
 DEFAULT_CONFIG = {
@@ -122,7 +137,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "uctComb001"
+    else: config_name = "uctComb002"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["acquirer_config"]["name"] = config_name
