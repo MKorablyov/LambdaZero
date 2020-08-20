@@ -210,6 +210,7 @@ class DrugCombEdge(NewDrugComb):
                          "css": edge_attr[:, 0, None],
                          "negative_css": -edge_attr[:, 0, None],
                          "edge_classes": edge_classes[:, None],
+                         "loewe": edge_attr[:, 3, None],
                      }
         return EdgeData(data_dict)
 

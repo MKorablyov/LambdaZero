@@ -36,11 +36,11 @@ class GNN(torch.nn.Module):
 
             self.convs.append(gnn_lyr)
 
-        if num_residual_gcn_layers > len(self.convs):
-            raise AttributeError(
-                "num_residual_gcn_layers must be at most " +
-                "the number of gcn layers"
-            )
+        #if num_residual_gcn_layers > len(self.convs):
+        #    raise AttributeError(
+        #        "num_residual_gcn_layers must be at most " +
+        #        "the number of gcn layers"
+        #    )
 
         self.gcn_dropout = gcn_dropout if gnn_lyr_type == 'InMemoryGCN' else None
         self.num_residual_gcn_layers = num_residual_gcn_layers
@@ -48,10 +48,11 @@ class GNN(torch.nn.Module):
         linear_dropout = torch.nn.Dropout(linear_dropout_rate)
 
         lin_input_dim = -1
+        embed_size = gcn_channels[-1] if len(gcn_channels) > 0 else 1024
         if self._aggr == 'concat':
-            lin_input_dim = (2 * gcn_channels[-1]) + 2
+            lin_input_dim = (2 * embed_size) + 2
         elif self._aggr == 'kroenecker':
-            lin_input_dim = gcn_channels[-1] + 1
+            lin_input_dim = embed_size + 1
 
         linear_channels.insert(0, lin_input_dim)
         self.predictor = RelationAwareMLP(linear_channels, num_relations,
