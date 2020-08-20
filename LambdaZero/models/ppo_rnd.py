@@ -186,12 +186,21 @@ def ppo_rnd_surrogate_loss(policy, model, dist_class, train_batch):
     train_batch["int_reward"] = model.compute_intrinsic_rewards(train_batch)
 
     if policy.config["use_gae"]:
+        # num_steps = train_batch["vf_int_pred"].size(0)
+        # discounted_returns = torch.zeros_like(train_batch["vf_int_pred"]).to(train_batch["vf_int_pred"].device)
         vpred_t = torch.cat([train_batch["vf_int_pred"], torch.tensor([0.], device=train_batch["vf_int_pred"].device)])
+        # gae = torch.tensor(0.0).to(vpred_t.device)
+        # for t in range(num_steps -1, -1, -1):
+        #     delta = train_batch["int_reward"][t] + policy.config['gamma'] * vpred_t[t + 1] - vpred_t[t]
+        #     gae = delta + policy.config['gamma'] * policy.config['lambda'] * gae
+        #     discounted_returns[t] += (gae + vpred_t[t])
+        # adv = discounted_returns - vpred_t[:-1]
         delta_t = (
             train_batch["int_reward"] + policy.config['gamma'] * vpred_t[1:] - vpred_t[:-1])
         a_coeff = torch.tensor([1.0, 0.0]).to(delta_t[:-1].device)
         b_coeff = torch.tensor([1.0, - policy.config['gamma'] * policy.config['lambda']]).to(delta_t[:-1].device)
         train_batch["int_adv"] = lfilter(delta_t, a_coeff, b_coeff)
+               
         train_batch["vf_int_target"] = (train_batch["int_adv"] + train_batch["vf_int_pred"])
 
     else:

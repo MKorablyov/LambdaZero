@@ -132,7 +132,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
             return priors, value
 
     def compute_intrinsic_rewards(self, train_batch):
-        obs_ = restore_original_dimensions(train_batch['obs'], self.obs_space, "torch")
+        obs_ = restore_original_dimensions(train_batch['new_obs'], self.obs_space, "torch")
         device = obs_["mol_graph"].device
 
         enc_graphs = obs_["mol_graph"].data.cpu().numpy().astype(np.uint8)
@@ -147,7 +147,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         target_reward = self.rnd_target(data)
         predictor_reward = self.rnd_predictor(data)
-        rnd_loss_ = ((target_reward - predictor_reward) ** 2).sum(1).mean(0)
+        rnd_loss_ = ((target_reward - predictor_reward) ** 2).sum(1)
         
         rew_mean = torch.as_tensor(self.rnd_rew_stats.mean, dtype=torch.float32, device=rnd_loss_.device)
         rew_var = torch.as_tensor(self.rnd_rew_stats.var, dtype=torch.float32, device=rnd_loss_.device)

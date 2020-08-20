@@ -194,11 +194,12 @@ def guided_search(exp_hps):
     mbsize = 32 # 64
 
     pred_dock_actor = PredDockRewardActor.options(max_concurrency=2).remote()
-    sim_dock_actor = SimDockRewardActor.options(max_concurrency=2).remote(
-        os.environ['SLURM_TMPDIR'],
-        programs_dir_tmp, datasets_dir,
-        hyperparameters['num_docking_threads'],
-    )
+    if hyperparameters['enable_docking_simulation']:
+        sim_dock_actor = SimDockRewardActor.options(max_concurrency=2).remote(
+            os.environ['SLURM_TMPDIR'],
+            programs_dir_tmp, datasets_dir,
+            hyperparameters['num_docking_threads'],
+        )
 
     tree = ray.remote(PersistentSearchTree).options(max_concurrency=mbsize * 2).remote(env_config)
 
@@ -243,7 +244,8 @@ def guided_search(exp_hps):
     #time.sleep(30)
     print("Starting reward threads")
     pred_dock_actor_thread = pred_dock_actor.run.remote(tree, 256)
-    sim_dock_actor_thread = sim_dock_actor.run.remote(tree, 32)
+    if hyperparameters['enable_docking_simulation']:
+        sim_dock_actor_thread = sim_dock_actor.run.remote(tree, 32)
 
     idxs_available_actions = [list(zip(*ray.get(tree.sample_many.remote(mbsize * 2, idxs_and_aa=True))))
                               for i in range(len(rollout_actors))]
@@ -333,7 +335,8 @@ def guided_search(exp_hps):
     save = tree.save.remote(exp_path)
     pickle.dump(logs, gzip.open(f'{exp_path}/logs.pkl.gz', 'wb'))
     ray.get(pred_dock_actor.stop.remote())
-    ray.get(sim_dock_actor.stop.remote())
+    if hyperparameters['enable_docking_simulation']:
+        ray.get(sim_dock_actor.stop.remote())
     ray.get(save)
 
 if __name__ == '__main__':
@@ -389,25 +392,27 @@ if __name__ == '__main__':
         array_id = int(os.environ['SLURM_ARRAY_TASK_ID'])
         guided_search(configs[array_id])
     elif 1:
-        restore = 'guided_search_max_07Jul_16_09_03_2643'
-        restore = 'guided_search_max_07Jul_16_20_01_b64d'
-        restore = 'guided_search_max_07Jul_17_17_37_186a'
-        restore = 'guided_search_max_07Jul_20_23_28_64a9' # 400k
-        #restore = 'guided_search_max_07Jul_21_14_37_6b43' # 100k
+        # restore = 'guided_search_max_07Jul_16_09_03_2643'
+        # restore = 'guided_search_max_07Jul_16_20_01_b64d'
+        # restore = 'guided_search_max_07Jul_17_17_37_186a'
+        # restore = 'guided_search_max_07Jul_20_23_28_64a9' # 400k
+        restore = 'guided_search_max_08Aug_10_16_38_3cea' # 100k
         #restore = 'guided_search_max_07Jul_21_14_38_63ce' # 400k
         #restore = 'guided_search_max_07Jul_20_20_44_6c85' # 100k
+        sim = sys.argv[1] == 'True'
 
         guided_search({
             'priority_pred': 'max_desc_r', #'greedy_q',
             'update_prio_on_refresh': True,
             'return_type':'max_desc_r',
             'save_path': os.path.join(summaries_dir, 'persistent_search_tree'),
-            'exp_path_override': os.path.join(summaries_dir, 'persistent_search_tree', restore),
-            'num_molecules': int(50e6),
-            'prune_at': int(400e3),
+            # 'exp_path_override': os.path.join(summaries_dir, 'persistent_search_tree', restore), 
+            'num_molecules': int(sys.argv[2]),
+            'prune_at': int(sys.argv[3]),
             'num_rollout_actors': 4,
             'num_docking_threads': 8,
             'learning_rate': 1e-4,
-            'restore_nodes': f'/home/mila/b/bengioe/tmp/lz_3/persistent_search_tree/{restore}/final_tree.pkl.gz',
-            'restore_params': f'/home/mila/b/bengioe/tmp/lz_3/persistent_search_tree/{restore}/params.pkl.gz',
-            'score_temperature': 1.5})
+            # 'restore_nodes': f'/home/mjain/scratch/persistent_search_tree/{restore}/final_tree.pkl.gz',
+            # 'restore_params': f'/home/mjain/scratch/persistent_search_tree/{restore}/params.pkl.gz',
+            'score_temperature': 1.5,
+            'enable_docking_simulation': sim})
