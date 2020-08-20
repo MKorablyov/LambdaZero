@@ -64,7 +64,7 @@ class PersistentSearchBuffer:
             fp_buff = np.asarray(self.mol_fps)
             dist = np.sum(np.abs(fp_buff - mol_fp[None, :]), axis=1)
             dist = 1 - (dist / (np.sum(np.abs(fp_buff),1) + np.sum(np.abs(mol_fp[None,:]),1)))
-            return (dist < threshold).any()
+            return (dist > threshold).any()
 
     def add(self, mol, mol_info, mol_fp):
         if len(self.mols) >= self.max_size:
@@ -77,7 +77,7 @@ class PersistentSearchBuffer:
         # if smi in self.smiles:
         #     return
         self.mols.append((mol, mol_info['reward'], smi, mol_fp))
-        self.sumtree.set(len(self.mols)-1, np.exp(mol_info['reward'] / self.temperature))
+        self.sumtree.set(len(self.mols) - 1, np.exp(mol_info['reward'] / self.temperature))
         self.smiles.add(smi)
         self.mol_fps.append(mol_fp)
 
@@ -269,7 +269,7 @@ class BlockMolGraphEnv_PersistentBuffer(BlockMolEnvGraph_v1):
             smiles = None
         info = {"molecule": smiles, "log_vals": log_vals}
         done = any((simulate, done))
-        if self.penalize_repeat and reward != 0:
-            if ray.get(self.searchbuf.contains.remote(self.get_fps(self.molMDP.molecule)[0], self.threshold)):
-                reward = 0 # exploration penalty
+        # if self.penalize_repeat and reward != 0:
+        #     if ray.get(self.searchbuf.contains.remote(self.get_fps(self.molMDP.molecule)[0], self.threshold)):
+        #         reward = 0 # exploration penalty
         return obs, reward, done, info
