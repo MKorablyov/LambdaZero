@@ -1,4 +1,4 @@
-from LambdaZero.utils import get_external_dirs
+from LambdaZero.utils import get_external_dirs, MeanVarianceNormalizer
 from LambdaZero.inputs import random_split
 from LambdaZero.examples.drug_comb.model.gnn import GNN
 from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
@@ -65,30 +65,36 @@ def _get_loaders(train_set, val_set, batch_size, device):
 
     return train_loader, val_loader
 
-def run_epoch(loader, model, x_drug, optim, is_train):
+def run_epoch(loader, model, normalizer, x_drug, optim, is_train):
     model.train() if is_train else model.eval()
 
-    metrics = {"loss": 0, "mse": 0, "mae": 0, "rmse": 0}
+    loss_sum      = 0
+    epoch_targets = []
+    epoch_preds   = []
     for i, batch in enumerate(loader):
         edge_index, edge_classes, edge_attr, y = batch
 
         y_hat = model(x_drug, edge_index, edge_classes, edge_attr)
-        loss = F.mse_loss(y, y_hat)
-
-        metrics['loss'] += loss.item()
-        metrics['mse'] += loss.item()
-        metrics['rmse'] += torch.sqrt(loss).item()
-        metrics['mae'] += F.l1_loss(y, y_hat).item()
+        loss = F.mse_loss(normalizer.tfm(y), y_hat)
 
         if is_train:
             loss.backward()
             optim.step()
             optim.zero_grad()
 
-    for key in metrics.keys():
-        metrics[key] /= len(loader)
+        loss_sum += loss.item()
+        epoch_targets.append(y)
+        epoch_preds.append(normalizer.itfm(y_hat))
 
-    return metrics
+    epoch_targets = torch.cat(epoch_targets)
+    epoch_preds = torch.cat(epoch_preds)
+
+    return {
+        "loss": loss_sum / epoch_targets.shape[0],
+        "mae": F.l1_loss(epoch_targets, epoch_preds).item(),
+        "mse": F.mse_loss(epoch_targets, epoch_preds).item(),
+        "rmse": torch.sqrt(F.mse_loss(epoch_targets, epoch_preds)).item(),
+    }
 
 class DrugDrugGNNRegressor(tune.Trainable):
     def _setup(self, config):
@@ -108,13 +114,14 @@ class DrugDrugGNNRegressor(tune.Trainable):
 
         # Base variance for computing explained variance
         self.var0 = F.mse_loss(val_set.css, train_set.css.mean()).item()
+        self.normalizer = MeanVarianceNormalizer((dataset[:].css.mean(), dataset[:].css.var()))
 
     def _train(self):
-        train_scores = run_epoch(self.train_loader, self.model, self.x_drugs,
-                                 self.optim, True)
+        train_scores = run_epoch(self.train_loader, self.model, self.normalizer,
+                                 self.x_drugs, self.optim, True)
 
-        eval_scores = run_epoch(self.val_loader, self.model, self.x_drugs,
-                                self.optim, False)
+        eval_scores = run_epoch(self.val_loader, self.model, self.normalizer,
+                                self.x_drugs, self.optim, False)
 
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
@@ -123,6 +130,10 @@ class DrugDrugGNNRegressor(tune.Trainable):
 
         # Add explained variance
         scores['explained_variance'] = (self.var0 - scores['eval_mse']) / self.var0
+
+        for k, v in scores.items():
+            if math.isnan(v):
+                scores[k] = float('inf')
 
         return scores
 
@@ -155,7 +166,7 @@ config = {
     "checkpoint_at_end": False,
     "resources_per_trial": {"gpu": 1},
     "name": "DrugCombTryHyperopt",
-    "asha_metric": "eval_loss",
+    "asha_metric": "eval_mse",
     "asha_mode": "min",
     "asha_max_t": 100
 }
@@ -179,7 +190,7 @@ if __name__ == "__main__":
     )
 
     search_space = {
-        "lr": hp.loguniform("lr", -7, -2),
+        "lr": hp.loguniform("lr", -7, -3),
         "rank": hp.quniform("rank", 50, 300, 1),
         "gcn_channels": hp.choice("gcn_channels", [[1024, 256, 256, 256], [1024, 256, 256]]),
         "batch_size": hp.choice("batch_size", [256, 512]),
@@ -189,7 +200,7 @@ if __name__ == "__main__":
 
     current_best_params = [
         {
-            "lr": 1e-3,
+            "lr": 1e-4,
             "rank": 128,
             "gcn_channels": 1,
             "batch_size": 0,
