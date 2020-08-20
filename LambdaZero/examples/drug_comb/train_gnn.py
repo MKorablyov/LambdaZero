@@ -50,12 +50,12 @@ def _get_loaders(train_set, val_set, batch_size, device):
     train_tensor_set = TensorDataset(train_set.edge_index.T,
                                      train_set.edge_classes,
                                      torch.cat((train_set.row_ic50, train_set.col_ic50), dim=1),
-                                     train_set.loewe)
+                                     train_set.css)
 
     val_tensor_set = TensorDataset(val_set.edge_index.T,
                                    val_set.edge_classes,
                                    torch.cat((val_set.row_ic50, val_set.col_ic50), dim=1),
-                                   val_set.loewe)
+                                   val_set.css)
 
     train_loader = DataLoader(train_tensor_set, batch_size,
                               pin_memory=device == 'cpu', shuffle=True)
@@ -107,7 +107,7 @@ class DrugDrugGNNRegressor(tune.Trainable):
                                                           config['batch_size'], device)
 
         # Base variance for computing explained variance
-        self.var0 = F.mse_loss(val_set.loewe, train_set.loewe.mean()).item()
+        self.var0 = F.mse_loss(val_set.css, train_set.css.mean()).item()
 
     def _train(self):
         train_scores = run_epoch(self.train_loader, self.model, self.x_drugs,
@@ -153,8 +153,8 @@ config = {
     "checkpoint_freq": 200,
     "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
-    "resources_per_trial": {},#"gpu": 1},
-    "name": "DrugCombLoewe",
+    "resources_per_trial": {"gpu": 1},
+    "name": "DrugCombTryHyperopt",
     "asha_metric": "eval_loss",
     "asha_mode": "min",
     "asha_max_t": 100
@@ -180,7 +180,7 @@ if __name__ == "__main__":
 
     search_space = {
         "lr": hp.loguniform("lr", -7, -2),
-        "rank": hp.quniform("rank", 50, 300),
+        "rank": hp.quniform("rank", 50, 300, 1),
         "gcn_channels": hp.choice("gcn_channels", [[1024, 256, 256, 256], [1024, 256, 256]]),
         "batch_size": hp.choice("batch_size", [256, 512]),
         "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=1,
+        num_samples=100000,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"],
