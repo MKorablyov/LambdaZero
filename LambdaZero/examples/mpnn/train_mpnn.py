@@ -1,4 +1,5 @@
-import socket, os,sys, time
+import os
+import sys
 import numpy as np
 import os.path as osp
 import torch
@@ -17,34 +18,34 @@ from LambdaZero.examples.mpnn import config
 transform = LambdaZero.utils.Complete()
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
-if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "mpnn000"
+config_name = sys.argv[1] if len(sys.argv) >= 2 else "mpnn000"
 config = getattr(config, config_name)
+
 
 def train_epoch(loader, model, optimizer, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.train()
 
-    metrics = {"loss":0,}
+    metrics = {"loss": 0, }
     epoch_targets = []
     epoch_preds = []
 
-    for bidx,data in enumerate(loader):
+    for bidx, data in enumerate(loader):
         data = data.to(device)
         targets = getattr(data, config["target"])
 
         optimizer.zero_grad()
         logits = model(data)
-        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
+        loss = F.mse_loss(logits, normalizer.tfm(targets))
         loss.backward()
         optimizer.step()
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
 
-    epoch_targets = np.concatenate(epoch_targets,0)
+    epoch_targets = np.concatenate(epoch_targets, 0)
     epoch_preds = np.concatenate(epoch_preds, 0)
     metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
     metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
@@ -55,27 +56,28 @@ def train_epoch(loader, model, optimizer, device, config):
     metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
+
 
 def eval_epoch(loader, model, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.eval()
-    metrics = {"loss":0,}
+    metrics = {"loss": 0, }
     epoch_targets = []
     epoch_preds = []
 
-    for bidx,data in enumerate(loader):
+    for bidx, data in enumerate(loader):
         data = data.to(device)
         targets = getattr(data, config["target"])
 
         logits = model(data)
-        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
+        loss = F.mse_loss(logits, normalizer.tfm(targets))
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
 
-    epoch_targets = np.concatenate(epoch_targets,0)
+    epoch_targets = np.concatenate(epoch_targets, 0)
     epoch_preds = np.concatenate(epoch_preds, 0)
     metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
     metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
@@ -86,8 +88,6 @@ def eval_epoch(loader, model, device, config):
     metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
     metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
     return metrics
-
-
 
 
 DEFAULT_CONFIG = {
