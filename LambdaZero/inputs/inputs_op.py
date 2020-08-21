@@ -619,13 +619,13 @@ atomic_num_to_period.update(dict.fromkeys(list(range(19, 36+1)), 4))
 atomic_num_to_period.update(dict.fromkeys(list(range(37, 54+1)), 5))
 
 
-
 def onehot(arr, num_classes, dtype=np.int):
     arr = np.asarray(arr, dtype=np.int)
     assert arr.ndim == 1, "dims other than 1 not implemented"
     onehot_arr = np.zeros((arr.size, num_classes), dtype=dtype)
     onehot_arr[np.arange(arr.size), arr] = 1
     return onehot_arr
+
 
 def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     atomtypes = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
@@ -680,6 +680,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
         atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
     return atmfeat, coord, bond, bondfeat
 
+
 def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
     "convert to PyTorch geometric module"
     natm = atmfeat.shape[0]
@@ -696,6 +697,7 @@ def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
+
 def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     "mol to graph convertor"
     mol,_,_ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
@@ -705,6 +707,7 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
         raise NotImplementedError(feat)
     graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
     return graph
+
 
 def create_mol_graph_with_3d_coordinates(smi, props):
     mol = rdkit.Chem.rdmolfiles.MolFromSmiles(smi)
@@ -740,6 +743,7 @@ def tpnn_proc(smi, props, pre_filter, pre_transform):
         graph = pre_transform(graph)
     return graph
 
+
 @ray.remote
 def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
     try:
@@ -751,6 +755,7 @@ def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
     if pre_transform is not None:
         graph = pre_transform(graph)
     return graph
+
 
 def tpnn_transform(data):
     def _group_period(atomic_numbers):
@@ -771,10 +776,12 @@ def tpnn_transform(data):
     
     data = data.clone()
     data.x = _one_hot_group_period(*_group_period(data.x))
-    data.rel_vec = _rel_vectors(data.pos, data.edge_index)	# relative vectors (not normalized)
-    data.edge_attr = data.rel_vec.norm(dim=1)			# absolute distances
+    data.rel_vec = _rel_vectors(data.pos, data.edge_index)
+    data.abs_distances = data.rel_vec.norm(dim=1)
+    data.rel_vec = torch.nn.functional.normalize(data.rel_vec, p=2, dim=-1)
 
     return data
+
 
 class BrutalDock(InMemoryDataset):
     # own internal dataset

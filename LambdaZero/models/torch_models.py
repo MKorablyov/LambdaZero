@@ -1,5 +1,5 @@
 from abc import ABC
-import os, time
+import os
 
 import numpy as np
 from ray.rllib.models.model import restore_original_dimensions
@@ -7,9 +7,10 @@ from ray.rllib.models.preprocessors import get_preprocessor
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
 
-#from torch_geometric.nn import GINEConv
+# from torch_geometric.nn import GINEConv
 from torch_geometric.nn import NNConv
 from torch_geometric.nn import Set2Set
+from torch_geometric.nn import global_mean_pool
 
 
 # import torch and torch.nn using ray utils
@@ -17,6 +18,13 @@ from torch_geometric.nn import Set2Set
 import torch
 from torch import nn
 import torch.nn.functional as F
+
+from e3nn.point.message_passing import TensorPassingHomogenous
+from e3nn.radial import GaussianRadialModel
+from e3nn.point.gate import Gate
+from e3nn.non_linearities.rescaled_act import swish, tanh, sigmoid
+from functools import partial
+
 
 def convert_to_tensor(arr):
     tensor = torch.from_numpy(np.asarray(arr))
@@ -132,7 +140,6 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
         return actor_logits, state
 
-
     def value_function(self):
         return self._value_out
 
@@ -190,6 +197,7 @@ class MPNNet(nn.Module):
         out = self.lin2(out)
         return out.view(-1)
 
+
 class MPNNetDrop(nn.Module):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
@@ -232,8 +240,6 @@ class MPNNetDrop(nn.Module):
         embed = self.get_embed(data, do_dropout)
         out = self.lin2(embed)
         return out.view(-1)
-
-
 
 
 class GraphIsomorphismNet(nn.Module):
@@ -320,3 +326,37 @@ class GraphIsomorphismNet(nn.Module):
         out = self.fully_connected(node_out)
 
         return out.view(-1)
+
+
+class TPNN_v1(TensorPassingHomogenous):
+    def __init__(self):
+        representations = [[(23, 0, 0)],
+                           [(32, 0, 0), (32, 1, 0)],
+                           [(32, 0, 0), (32, 1, 0)],
+                           [(32, 0, 0), (32, 1, 0)],
+                           [(1, 0, 0)]]
+        radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
+        gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
+        super().__init__(representations, radial_model, gate)
+
+    def forward(self, graph):
+        output_features = super().forward(graph)
+        pooled_features = global_mean_pool(output_features, graph.batch)
+        return pooled_features
+
+
+class TPNN_v2(TensorPassingHomogenous):
+    def __init__(self):
+        representations = [[(23, 0, 0)],
+                           [(128, 0, 0)],
+                           [(128, 0, 0)],
+                           [(128, 0, 0)],
+                           [(1, 0, 0)]]
+        radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
+        gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
+        super().__init__(representations, radial_model, gate)
+
+    def forward(self, graph):
+        output_features = super().forward(graph)
+        pooled_features = global_mean_pool(output_features, graph.batch)
+        return pooled_features
