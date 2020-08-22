@@ -106,13 +106,13 @@ def _rebuild_edge_index_and_graphs(edge_index, graphs):
     '''
     # torch.unique guarantees sorted return vals
     drug_idxs = torch.unique(edge_index, sorted=True)
-    graph_batch = Batch.from_data_list([graphs[i] for i in drug_idxs])
+    graph_batch = Batch.from_data_list([graphs[i] for i in drug_idxs]).to(edge_index.device)
 
     # Re-index edge_index relative to graph idxs
     bins = np.unique(edge_index.cpu().flatten()) + 1
-    edge_index = torch.from_numpy(np.digitize(edge_index.cpu(), bins))
+    re_edge_index = torch.from_numpy(np.digitize(edge_index.cpu(), bins)).to(edge_index.device)
 
-    return edge_index, graph_batch
+    return re_edge_index, graph_batch
 
 class DrugDrugMolGNNRegressor(tune.Trainable):
     def _setup(self, config):
@@ -174,7 +174,7 @@ config = {
         "num_relation_lin_lyrs": 2,
         "num_residual_gcn_lyrs": 1,
         "aggr": "concat",
-        "num_examples_to_use": 10,
+        "num_examples_to_use": -1,
         "train_prop": .8,
         "val_prop": .2,
         "gnn_lyr_type": "GCNWithAttention",
@@ -184,17 +184,17 @@ config = {
     "checkpoint_freq": 200,
     "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
-    "resources_per_trial": {},#"gpu": 1},
-    "name": "DrugCombTryHyperopt",
+    "resources_per_trial": {"gpu": 1},
+    "name": "MPNNMolStructure",
     "asha_metric": "eval_mse",
     "asha_mode": "min",
-    "asha_max_t": 100
+    "asha_max_t": 50
 }
 
 if __name__ == "__main__":
     ray.init()
 
-    time_to_sleep = 5
+    time_to_sleep = 15
     print("Sleeping for %d seconds" % time_to_sleep)
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     search_space = {
         "lr": hp.loguniform("lr", np.log(1e-7), np.log(5e-2)),
-        "batch_size": hp.choice("batch_size", [256, 512]),
+        "batch_size": hp.choice("batch_size", [4, 8, 16]),
         "embed_dim": hp.quniform("embed_dim", 32, 512, 1),
         "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
         "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     current_best_params = [
         {
             "lr": 1e-4,
-            "batch_size": 0,
+            "batch_size": 2,
             "embed_dim": 64,
             "gcn_dropout_rate": .1,
             "lin_dropout_rate": .4,
@@ -240,7 +240,7 @@ if __name__ == "__main__":
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=1,
+        num_samples=100000,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"],
