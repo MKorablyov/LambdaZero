@@ -18,6 +18,13 @@ import time
 import os
 import math
 
+"""
+We unfortunately here use a separate file here, as the
+hyperparameters for the trials with all cell lines are
+significantly different than here.  Thus, to reduce
+coding time, we just use separate, largely duplicated files.
+"""
+
 def _get_model(config, train_set, num_relations):
     return MolGnnPredictor(config['linear_channels'], config['num_relation_lin_lyrs'],
                            int(config['embed_dim']), config['gcn_dropout_rate'],
@@ -119,6 +126,15 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         dataset = DrugCombEdge().to(device)
 
+        # Only use specific cell line if we are specified to
+        cell_line_idx = config['cell_line_idx']
+        if cell_line_idx != -1:
+            # -2 means use most common
+            if cell_line_idx == -2:
+                cell_line_idx = dataset.data.ddi_edge_classes.mode()
+
+            dataset.use_specific_cell_line(cell_line_idx)
+
         train_idx, val_idx = _get_split(dataset, config)
         train_set = dataset[train_idx]
         val_set = dataset[val_idx]
@@ -165,6 +181,7 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
     def _restore(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
+# Use same cell lines as were used for BRR experiments
 _, _, summaries_dir =  get_external_dirs()
 config = {
     "trainer": DrugDrugMolGNNRegressor,
@@ -173,6 +190,12 @@ config = {
         "linear_channels": [1024, 512, 256, 128, 1],
         "num_relation_lin_lyrs": 2,
         "num_residual_gcn_lyrs": 1,
+        "lr": tune.grid_search([1e-3, 1e-4, 1e-5]),
+        "batch_size": tune.grid_search([64, 128, 32]),
+        "embed_dim": tune.grid_search([64, 128, 256]),
+        "cell_line_idx": tune.grid_search([1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542, -2]),
+        "gcn_dropout_rate": .2,
+        "lin_dropout_rate": .4,
         "aggr": "concat",
         "num_examples_to_use": 10,
         "train_prop": .8,
@@ -209,31 +232,6 @@ if __name__ == "__main__":
 	brackets=1
     )
 
-    search_space = {
-        "lr": hp.loguniform("lr", np.log(1e-7), np.log(5e-2)),
-        "batch_size": hp.choice("batch_size", [256, 512]),
-        "embed_dim": hp.quniform("embed_dim", 32, 512, 1),
-        "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
-        "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
-    }
-
-    current_best_params = [
-        {
-            "lr": 1e-4,
-            "batch_size": 0,
-            "embed_dim": 64,
-            "gcn_dropout_rate": .1,
-            "lin_dropout_rate": .4,
-        }
-    ]
-
-    search_alg = HyperOptSearch(
-        search_space,
-        metric=config['asha_metric'],
-        mode=config['asha_mode'],
-        points_to_evaluate=current_best_params
-    )
-
     analysis = tune.run(
         config["trainer"],
         name=config["name"],
@@ -245,5 +243,5 @@ if __name__ == "__main__":
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"],
         scheduler=asha_scheduler,
-        search_alg=search_alg,
     )
+
