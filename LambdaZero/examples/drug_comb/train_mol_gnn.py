@@ -106,7 +106,6 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
         self.model = _get_model(config, train_set, val_set, dataset.data.num_relations).to(device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config['lr'])
 
-        self.x_drugs = dataset.data.x_drugs
         self.train_loader, self.val_loader = _get_loaders(train_set, val_set,
                                                           config['batch_size'], device)
 
@@ -145,7 +144,7 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
 
 _, _, summaries_dir =  get_external_dirs()
 config = {
-    "trainer": DrugDrugGNNRegressor,
+    "trainer": DrugDrugMolGNNRegressor,
     "trainer_config": {
         "model": MolGnnPredictor,
         "linear_channels": [1024, 512, 256, 128, 1],
@@ -190,7 +189,7 @@ if __name__ == "__main__":
     search_space = {
         "lr": hp.loguniform("lr", np.log(1e-7), np.log(5e-2)),
         "batch_size": hp.choice("batch_size", [256, 512]),
-        "embed_dim": hp.quniform("embed_dim", 32, 512, 1)
+        "embed_dim": hp.quniform("embed_dim", 32, 512, 1),
         "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
         "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
     }
@@ -218,7 +217,7 @@ if __name__ == "__main__":
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=100000,
+        num_samples=1,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"],
