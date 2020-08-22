@@ -76,7 +76,6 @@ def run_epoch(loader, model, normalizer, x_drug, optim, is_train):
         edge_index, edge_classes, edge_attr, y = batch
 
         y_hat = model(x_drug, edge_index, edge_classes, edge_attr)
-        import pdb; pdb.set_trace()
         loss = F.mse_loss(normalizer.tfm(y), y_hat)
 
         if is_train:
