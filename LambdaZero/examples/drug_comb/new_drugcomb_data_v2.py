@@ -228,6 +228,13 @@ class DrugCombEdge(NewDrugComb):
 
         return self
 
+    def use_specific_cell_line(self, cell_line_idx):
+        matching_idxs = self.data.ddi_edge_classes == cell_line_idx
+
+        self.data.ddi_edge_idx = self.data.ddi_edge_idx[:, matching_idxs]
+        self.data.ddi_edge_attr = self.data.ddi_edge_attr[matching_idxs]
+        self.data.ddi_edge_classes = self.data.ddi_edge_classes[matching_idxs]
+
     def __getitem__(self, idx):
         ddi_idx = self.data.ddi_edge_idx[:, idx]
         row_fp = self.data.x_drugs[ddi_idx[0]]

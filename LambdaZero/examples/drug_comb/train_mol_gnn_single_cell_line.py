@@ -18,6 +18,13 @@ import time
 import os
 import math
 
+"""
+We unfortunately here use a separate file here, as the
+hyperparameters for the trials with all cell lines are
+significantly different than here.  Thus, to reduce
+coding time, we just use separate, largely duplicated files.
+"""
+
 def _get_model(config, train_set, num_relations):
     return MolGnnPredictor(config['linear_channels'], config['num_relation_lin_lyrs'],
                            int(config['embed_dim']), config['gcn_dropout_rate'],
@@ -119,6 +126,15 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         dataset = DrugCombEdge().to(device)
 
+        # Only use specific cell line if we are specified to
+        cell_line_idx = config['cell_line_idx']
+        if cell_line_idx != -1:
+            # -2 means use most common
+            if cell_line_idx == -2:
+                cell_line_idx = dataset.data.ddi_edge_classes.mode()
+
+            dataset.use_specific_cell_line(cell_line_idx)
+
         train_idx, val_idx = _get_split(dataset, config)
         train_set = dataset[train_idx]
         val_set = dataset[val_idx]
@@ -165,6 +181,7 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
     def _restore(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
+# Use same cell lines as were used for BRR experiments
 _, _, summaries_dir =  get_external_dirs()
 config = {
     "trainer": DrugDrugMolGNNRegressor,
@@ -173,7 +190,13 @@ config = {
         "linear_channels": [1024, 512, 256, 128, 1],
         "num_relation_lin_lyrs": 2,
         "num_residual_gcn_lyrs": 1,
-        "aggr": "concat",
+        "lr": tune.grid_search([1e-3, 1e-4, 1e-5]),
+        "batch_size": tune.grid_search([64, 128, 32]),
+        "embed_dim": tune.grid_search([64, 128, 256]),
+        "cell_line_idx": tune.grid_search([53, 105, 34, 92, 27, 10, 64, -2]),
+        "gcn_dropout_rate": .2,
+        "lin_dropout_rate": .4,
+        "aggr": tune.grid_search(["concat", "hadamard"]),
         "num_examples_to_use": -1,
         "train_prop": .8,
         "val_prop": .2,
@@ -184,8 +207,8 @@ config = {
     "checkpoint_freq": 200,
     "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
-    "resources_per_trial": {"gpu": 1},
-    "name": "MPNNMolStructure",
+    "resources_per_trial": {},#"gpu": 1},
+    "name": "DrugStructureMPNNSiingleCellLines",
     "asha_metric": "eval_mse",
     "asha_mode": "min",
     "asha_max_t": 50
@@ -194,7 +217,7 @@ config = {
 if __name__ == "__main__":
     ray.init()
 
-    time_to_sleep = 15
+    time_to_sleep = 5
     print("Sleeping for %d seconds" % time_to_sleep)
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
@@ -209,41 +232,16 @@ if __name__ == "__main__":
 	brackets=1
     )
 
-    search_space = {
-        "lr": hp.loguniform("lr", np.log(1e-7), np.log(5e-2)),
-        "batch_size": hp.choice("batch_size", [4, 8, 16]),
-        "embed_dim": hp.quniform("embed_dim", 32, 512, 1),
-        "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
-        "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
-    }
-
-    current_best_params = [
-        {
-            "lr": 1e-4,
-            "batch_size": 2,
-            "embed_dim": 64,
-            "gcn_dropout_rate": .1,
-            "lin_dropout_rate": .4,
-        }
-    ]
-
-    search_alg = HyperOptSearch(
-        search_space,
-        metric=config['asha_metric'],
-        mode=config['asha_mode'],
-        points_to_evaluate=current_best_params
-    )
-
     analysis = tune.run(
         config["trainer"],
         name=config["name"],
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=100000,
+        num_samples=1,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"],
         scheduler=asha_scheduler,
-        search_alg=search_alg,
     )
+
