@@ -15,6 +15,7 @@ import torch
 import ray
 import time
 import os
+import math
 
 def _get_model(config, train_set, val_set, num_relations):
     return GNN(config['gcn_channels'], config['rank'],
@@ -75,6 +76,7 @@ def run_epoch(loader, model, normalizer, x_drug, optim, is_train):
         edge_index, edge_classes, edge_attr, y = batch
 
         y_hat = model(x_drug, edge_index, edge_classes, edge_attr)
+        import pdb; pdb.set_trace()
         loss = F.mse_loss(normalizer.tfm(y), y_hat)
 
         if is_train:
@@ -83,8 +85,8 @@ def run_epoch(loader, model, normalizer, x_drug, optim, is_train):
             optim.zero_grad()
 
         loss_sum += loss.item()
-        epoch_targets.append(y)
-        epoch_preds.append(normalizer.itfm(y_hat))
+        epoch_targets.append(y.detach().cpu())
+        epoch_preds.append(normalizer.itfm(y_hat).detach().cpu())
 
     epoch_targets = torch.cat(epoch_targets)
     epoch_preds = torch.cat(epoch_preds)
@@ -114,7 +116,9 @@ class DrugDrugGNNRegressor(tune.Trainable):
 
         # Base variance for computing explained variance
         self.var0 = F.mse_loss(val_set.css, train_set.css.mean()).item()
-        self.normalizer = MeanVarianceNormalizer((dataset[:].css.mean(), dataset[:].css.var()))
+
+        all_css = dataset.data.ddi_edge_attr[:, 0]
+        self.normalizer = MeanVarianceNormalizer((all_css.mean(), all_css.var()))
 
     def _train(self):
         train_scores = run_epoch(self.train_loader, self.model, self.normalizer,
@@ -190,7 +194,7 @@ if __name__ == "__main__":
     )
 
     search_space = {
-        "lr": hp.loguniform("lr", -7, -3),
+        "lr": hp.loguniform("lr", -16.118095651, -5.52146091786),
         "rank": hp.quniform("rank", 50, 300, 1),
         "gcn_channels": hp.choice("gcn_channels", [[1024, 256, 256, 256], [1024, 256, 256]]),
         "batch_size": hp.choice("batch_size", [256, 512]),
@@ -222,7 +226,7 @@ if __name__ == "__main__":
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=100000,
+        num_samples=1,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"],
