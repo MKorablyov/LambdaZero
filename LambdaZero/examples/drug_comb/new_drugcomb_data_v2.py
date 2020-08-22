@@ -160,7 +160,6 @@ class NewDrugComb(InMemoryDataset):
         self.cell_line_to_idx = _cell_line_to_idx(_drugcomb_data, self.raw_dir)
         nodes, mol_graphs, cid_to_idx = _get_nodes(_drugcomb_data, self.cid_to_smiles,
                                                    self.fp_radius, self.fp_bits)
-        import pdb; pdb.set_trace()
 
         # todo: save raw_data_table
         # ddi_edge_idx, ddi_edge_attr, ddi_edge_classes = _get_ddi_edges(self._drugcomb_data, cid_to_idx,
