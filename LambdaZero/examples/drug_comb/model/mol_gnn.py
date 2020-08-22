@@ -6,21 +6,6 @@ from LambdaZero.models.torch_models import MPNNetDrop
 from LambdaZero.examples.drug_comb.model.relation_aware_mlp import RelationAwareMLP
 import time
 
-def _aggregate(x_i, x_j):
-    # We need to feed in the edges backwards half of the time
-    # so that the MLP doesn't just learn the ordering of the edges
-    # instead of the combinatioin itself. To do this, we
-    # create a random mask of shape (x_i.shape[0], x_i.shape[1]).
-    # The line with torch.cat expands the mask according to its
-    # first values across all columns of the mask.
-    mask = torch.rand(x_i.shape[0], device=x_i.device) >= .5
-    mask = torch.cat(x_i.shape[1] * [mask[None].t()], dim=1)
-
-    row = (x_i * mask) + (x_j * ~mask)
-    col = (x_i * ~mask) + (x_j * mask)
-
-    return torch.cat((row, col), dim=1)
-
 class MolGnnPredictor(torch.nn.Module):
     def __init__(self, linear_channels, num_relation_lin_layers,
                  mpnn_out_dim, gcn_dropout_rate,
@@ -64,7 +49,7 @@ class MolGnnPredictor(torch.nn.Module):
         row, col = edge_index.t()
         x_i = torch.cat((x[row], concs[:, 0].view(-1, 1)), dim=1)
         x_j = torch.cat((x[col], concs[:, 1].view(-1, 1)), dim=1)
-        z = _aggregate(x_i, x_j)
+        z = self._aggregate(x_i, x_j)
 
         return self.predictor(z, relations)
 
