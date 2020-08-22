@@ -94,7 +94,6 @@ class GNN(torch.nn.Module):
             if self.gcn_dropout is not None:
                 x = self.gcn_dropout(x)
 
-        import pdb; pdb.set_trace()
         row, col = edge_index.t()
         x_i = torch.cat((x[row], concs[:, 0].view(-1, 1)), dim=1)
         x_j = torch.cat((x[col], concs[:, 1].view(-1, 1)), dim=1)

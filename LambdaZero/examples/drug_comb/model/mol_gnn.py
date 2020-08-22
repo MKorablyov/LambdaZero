@@ -34,16 +34,14 @@ class MolGnnPredictor(torch.nn.Module):
 
         # Add two since we're concatenating the concentrations
         linear_channels.insert(0, (2 * mpnn_out_dim) + 2)
+        linear_dropout = torch.nn.Dropout(linear_dropout_rate)
         self.predictor = RelationAwareMLP(linear_channels, num_relations,
                                           num_relation_lin_layers, linear_dropout,
                                           batch_norm=False)
 
         # A torch_geometric batch object for all molecule graphs
         self.train_graphs = train_graphs
-        self.train_mol_idx = train_graphs.batch
-
         self.val_graphs = val_graphs
-        self.val_mol_idx = val_graphs.batch
 
     def to(self, device):
         super().to(device)
@@ -58,11 +56,9 @@ class MolGnnPredictor(torch.nn.Module):
             yield param
 
     def forward(self, edge_index, relations, concs):
-        graphs = self.train_graphs if self.train else self.val_graphs
-        mol_idx = self.train_mol_idx if self.train else self.val_mol_idx
-
-        atom_embeds = self.mpnn.get_embeds(graphs, do_dropout=self.train)
-        mol_embeds = scatter_mean(atom_embeds, mol_idx)
+        import pdb; pdb.set_trace()
+        graphs = self.train_graphs if self.training else self.val_graphs
+        x = self.mpnn.get_embed(graphs, do_dropout=self.training)
 
         row, col = edge_index.t()
         x_i = torch.cat((x[row], concs[:, 0].view(-1, 1)), dim=1)

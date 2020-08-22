@@ -114,11 +114,11 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
         self.normalizer = MeanVarianceNormalizer((dataset[:].css.mean(), dataset[:].css.var()))
 
     def _train(self):
-        train_scores = run_epoch(self.train_loader, self.model, self.normalizer,
-                                 self.x_drugs, self.optim, True)
+        train_scores = run_epoch(self.train_loader, self.model,
+                                 self.normalizer, self.optim, True)
 
-        eval_scores = run_epoch(self.val_loader, self.model, self.normalizer,
-                                self.x_drugs, self.optim, False)
+        eval_scores = run_epoch(self.val_loader, self.model,
+                                self.normalizer, self.optim, False)
 
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
@@ -161,7 +161,7 @@ config = {
     "checkpoint_freq": 200,
     "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
-    "resources_per_trial": {"gpu": 1},
+    "resources_per_trial": {},#"gpu": 1},
     "name": "DrugCombTryHyperopt",
     "asha_metric": "eval_mse",
     "asha_mode": "min",

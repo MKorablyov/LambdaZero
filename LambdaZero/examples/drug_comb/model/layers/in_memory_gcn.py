@@ -27,8 +27,8 @@ class InMemoryGCN(MessagePassing):
 
     def forward(self, x):
         x = self.w(x)
-        edge_index = self.train_edge_index if self.train else self.val_edge_index
-        norm = self.train_norm if self.train else self.val_norm
+        edge_index = self.train_edge_index if self.training else self.val_edge_index
+        norm = self.train_norm if self.training else self.val_norm
         return self.propagate(edge_index, x=x, norm=norm)
 
     def message(self, x_j, norm):

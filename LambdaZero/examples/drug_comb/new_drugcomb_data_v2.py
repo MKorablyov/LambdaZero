@@ -1,6 +1,6 @@
 import time
 import os.path as osp
-from torch_geometric.data import Data, InMemoryDataset
+from torch_geometric.data import Data, InMemoryDataset, Batch
 #from pubchempy import Compound
 import urllib.request
 import ssl
@@ -53,19 +53,14 @@ def _get_fingerprint(smiles, radius, n_bits):
         return np.array([-1] * n_bits)
 
 
-def _get_nodes(_drugcomb_data, cid_to_smiles_dict, fp_radius, fp_bits):
+def _get_nodes(_drugcomb_data, raw_dir, cid_to_smiles_dict, fp_radius, fp_bits):
     _drugcomb_data['drug_row_smiles'] = _drugcomb_data['drug_row_cid'].apply(
         lambda cid: cid_to_smiles_dict[cid] if cid in cid_to_smiles_dict.keys() else -1)
 
     _drugcomb_data['drug_col_smiles'] = _drugcomb_data['drug_col_cid'].apply(
         lambda cid: cid_to_smiles_dict[cid] if cid in cid_to_smiles_dict.keys() else -1)
 
-    cid_to_mol_graphs = {}
-    for cid, smiles in tqdm(list(cid_to_smiles_dict.items())):
-        try:
-            cid_to_mol_graphs[cid] = mol_to_graph(smiles)
-        except:
-            continue
+    cid_to_mol_graphs = _get_mol_graphs_dict(raw_dir, cid_to_smiles_dict)
 
     # Computing fingerprints
     cid_to_fp_dict = {cid: _get_fingerprint(cid_to_smiles_dict[cid], fp_radius, fp_bits)
@@ -75,12 +70,35 @@ def _get_nodes(_drugcomb_data, cid_to_smiles_dict, fp_radius, fp_bits):
     nodes.reset_index(drop=True, inplace=True)
     return nodes, list(cid_to_mol_graphs.values()), cid_to_idx_dict
 
+def _get_mol_graphs_dict(raw_dir, cid_to_smiles_dict):
+    dict_path = os.path.join(raw_dir, "cid_to_mol_graphs_dict.npy")
+    if os.path.exists(dict_path):
+        cid_to_mol_graphs = torch.load(dict_path)
+    else:
+        print('Building drug molecule graphs, this only happens the first time')
+        cid_to_mol_graphs = {}
+        for cid, smiles in tqdm(list(cid_to_smiles_dict.items())):
+            try:
+                graph = mol_to_graph(smiles)
+                # Don't include if have no edges
+                if len(graph.edge_index) != 0:
+                    cid_to_mol_graphs[cid] = mol_to_graph(smiles)
+
+            except:
+                continue
+
+        torch.save(cid_to_mol_graphs, dict_path)
+
+    return {
+        cid: graph for cid, graph in cid_to_mol_graphs.items()
+        if len(graph.edge_index) != 0
+    }
 
 def _append_cid(_drugcomb_data, _summary_data, cid_to_idx):
     first = _drugcomb_data[['drug_row', 'drug_row_cid']].rename(columns={'drug_row': 'name', 'drug_row_cid': 'cid'})
     scnd = _drugcomb_data[['drug_col', 'drug_col_cid']].rename(columns={'drug_col': 'name', 'drug_col_cid': 'cid'})
     uniques = first.append(scnd).dropna().drop_duplicates().values.tolist()
-    name_to_cid = {tpl[0]: tpl[1] for tpl in uniques if tpl[0] in cid_to_idx}
+    name_to_cid = {tpl[0]: tpl[1] for tpl in uniques if tpl[1] in cid_to_idx}
 
     _summary_data['drug_row_cid'] = _summary_data['drug_row'].apply(
         lambda drug: name_to_cid[drug] if drug in name_to_cid else -1)
@@ -158,8 +176,9 @@ class NewDrugComb(InMemoryDataset):
         _drugcomb_data = pd.read_csv(os.path.join(self.raw_dir, self.raw_file_names[0]), low_memory=False)
         self.cid_to_smiles = _cid_to_smiles(_drugcomb_data, self.raw_dir)
         self.cell_line_to_idx = _cell_line_to_idx(_drugcomb_data, self.raw_dir)
-        nodes, mol_graphs, cid_to_idx = _get_nodes(_drugcomb_data, self.cid_to_smiles,
-                                                   self.fp_radius, self.fp_bits)
+        nodes, mol_graphs, cid_to_idx = _get_nodes(_drugcomb_data, self.raw_dir,
+                                                   self.cid_to_smiles, self.fp_radius,
+                                                   self.fp_bits)
 
         # todo: save raw_data_table
         # ddi_edge_idx, ddi_edge_attr, ddi_edge_classes = _get_ddi_edges(self._drugcomb_data, cid_to_idx,
@@ -178,13 +197,18 @@ class NewDrugComb(InMemoryDataset):
         data.ddi_edge_attr = torch.tensor(ddi_edge_attr, dtype=torch.float)
         data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.long)
         data.num_relations = torch.unique(data.ddi_edge_classes).shape[0]
-        data.mol_graphs = mol_graphs
 
         data_list = [data]
         if self.pre_transform is not None:
             data_list = self.pre_transform(data_list)
 
         data, slices = self.collate(data_list)
+
+        # Using collate on the data_list while it has mol_graphs will make
+        # mol_graphs a 2d list with only one item in the first list dim,
+        # so add the mol_graphs attr after collating to avoid the extraneous
+        # list dim
+        data.mol_graphs = mol_graphs
         torch.save((data, slices), self.processed_paths[1])
 
 
@@ -214,7 +238,7 @@ class DrugCombEdge(NewDrugComb):
 
         # Could do something more clever here for efficiency
         # with torrch geometric batches if really want to.
-        mol_graphs = Batch.from_data_list([self.data.mol_graphs[i] for i in idx])
+        mol_graphs = Batch.from_data_list(self.data.mol_graphs)
         mol_graphs.batch = mol_graphs.batch.to(edge_classes.device)
 
         data_dict = {
