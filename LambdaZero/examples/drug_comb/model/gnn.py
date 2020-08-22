@@ -16,8 +16,8 @@ class GNN(torch.nn.Module):
         super().__init__()
 
         self._aggr = aggr
-        if self._aggr not in ['concat', 'kroenecker']:
-            raise AttributeError('aggr must be one of "concat" or "kroenecker"')
+        if self._aggr not in ['concat', 'hadamard']:
+            raise AttributeError('aggr must be one of "concat" or "hadamard"')
 
         gcn_dropout = torch.nn.Dropout(gcn_dropout_rate)
         self.convs = []
@@ -117,6 +117,6 @@ class GNN(torch.nn.Module):
 
             return torch.cat((row, col), dim=1)
 
-        elif self._aggr == 'kroenecker':
+        elif self._aggr == 'hadamard':
             return x_i * x_j
 

@@ -22,7 +22,7 @@ def _get_model(config, train_set, num_relations):
     return MolGnnPredictor(config['linear_channels'], config['num_relation_lin_lyrs'],
                            int(config['embed_dim']), config['gcn_dropout_rate'],
                            config['lin_dropout_rate'], num_relations,
-                           train_set.mol_graphs[0].x.shape[1])
+                           train_set.mol_graphs[0].x.shape[1], config['aggr'])
 
 def _get_split(dataset, config):
     # If -1 then we use all the examples
