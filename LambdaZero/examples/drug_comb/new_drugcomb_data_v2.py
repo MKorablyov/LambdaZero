@@ -225,7 +225,6 @@ class DrugCombEdge(NewDrugComb):
         self.data.x_drugs = self.data.x_drugs.to(device)
         self.data.ddi_edge_attr = self.data.ddi_edge_attr.to(device)
         self.data.ddi_edge_classes = self.data.ddi_edge_classes.to(device)
-        self.data.mol_graphs = [g.to(device) for g in self.data.mol_graphs]
 
         return self
 
