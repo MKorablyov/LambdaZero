@@ -169,6 +169,7 @@ class NewDrugComb(InMemoryDataset):
         data.ddi_edge_attr = torch.tensor(ddi_edge_attr, dtype=torch.float)
         data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.long)
         data.num_relations = torch.unique(data.ddi_edge_classes).shape[0]
+        data.mol_graphs = [mol_to_graph(smiles) for smiles in self.cid_to_smiles.values()]
 
         data_list = [data]
         if self.pre_transform is not None:
@@ -201,6 +202,10 @@ class DrugCombEdge(NewDrugComb):
         edge_attr = self.data.ddi_edge_attr[idx]
         edge_classes = self.data.ddi_edge_classes[idx]
 
+        # Could do something more clever here for efficiency
+        # with torrch geometric batches if really want to.
+        mol_graphs = [self.data.mol_graphs[i] for i in idx]
+
         data_dict = {
                          "edge_index": ddi_idx,
                          "row_fp": row_fp, # fixme??
@@ -211,7 +216,8 @@ class DrugCombEdge(NewDrugComb):
                          "negative_css": -edge_attr[:, 0, None],
                          "edge_classes": edge_classes[:, None],
                          "loewe": edge_attr[:, 3, None],
-                     }
+                         "mol_graphs": mol_graphs,
+                    }
         return EdgeData(data_dict)
 
     def download(self):
