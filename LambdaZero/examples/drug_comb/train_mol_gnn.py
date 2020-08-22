@@ -4,6 +4,7 @@ from LambdaZero.examples.drug_comb.model.mol_gnn import MolGnnPredictor
 from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
+from torch_geometric.data import Batch
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
 from ray import tune
@@ -15,12 +16,13 @@ import torch
 import ray
 import time
 import os
+import math
 
-def _get_model(config, train_set, val_set, num_relations):
+def _get_model(config, train_set, num_relations):
     return MolGnnPredictor(config['linear_channels'], config['num_relation_lin_lyrs'],
                            int(config['embed_dim']), config['gcn_dropout_rate'],
                            config['lin_dropout_rate'], num_relations,
-                           train_set.mol_graphs, val_set.mol_graphs)
+                           train_set.mol_graphs[0].x.shape[1])
 
 def _get_split(dataset, config):
     # If -1 then we use all the examples
@@ -63,7 +65,7 @@ def _get_loaders(train_set, val_set, batch_size, device):
 
     return train_loader, val_loader
 
-def run_epoch(loader, model, normalizer, optim, is_train):
+def run_epoch(loader, model, normalizer, graphs, optim, is_train):
     model.train() if is_train else model.eval()
 
     loss_sum      = 0
@@ -71,8 +73,9 @@ def run_epoch(loader, model, normalizer, optim, is_train):
     epoch_preds   = []
     for i, batch in enumerate(loader):
         edge_index, edge_classes, edge_attr, y = batch
+        edge_index, graph_batch = _rebuild_edge_index_and_graphs(edge_index, graphs)
 
-        y_hat = model(edge_index, edge_classes, edge_attr)
+        y_hat = model(graph_batch, edge_index, edge_classes, edge_attr)
         loss = F.mse_loss(normalizer.tfm(y), y_hat)
 
         if is_train:
@@ -94,6 +97,18 @@ def run_epoch(loader, model, normalizer, optim, is_train):
         "rmse": torch.sqrt(F.mse_loss(epoch_targets, epoch_preds)).item(),
     }
 
+def _rebuild_edge_index_and_graphs(edge_index, graphs):
+    # torch.unique guarantees sorted return vals
+    drug_idxs = torch.unique(edge_index, sorted=True)
+    graph_batch = Batch.from_data_list([graphs[i] for i in drug_idxs])
+
+    # Re-index edge_index relative to graph idxs
+    bins = np.unique(edge_index.cpu().flatten()) + 1
+    edge_index = torch.from_numpy(np.digitize(edge_index.cpu(), bins))
+
+    return edge_index, graph_batch
+
+
 class DrugDrugMolGNNRegressor(tune.Trainable):
     def _setup(self, config):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -103,8 +118,9 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
         train_set = dataset[train_idx]
         val_set = dataset[val_idx]
 
-        self.model = _get_model(config, train_set, val_set, dataset.data.num_relations).to(device)
+        self.model = _get_model(config, train_set, dataset.data.num_relations).to(device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config['lr'])
+        self.graphs = dataset.data.mol_graphs
 
         self.train_loader, self.val_loader = _get_loaders(train_set, val_set,
                                                           config['batch_size'], device)
@@ -115,10 +131,12 @@ class DrugDrugMolGNNRegressor(tune.Trainable):
 
     def _train(self):
         train_scores = run_epoch(self.train_loader, self.model,
-                                 self.normalizer, self.optim, True)
+                                 self.normalizer, self.graphs,
+                                 self.optim, True)
 
         eval_scores = run_epoch(self.val_loader, self.model,
-                                self.normalizer, self.optim, False)
+                                self.normalizer, self.graphs,
+                                self.optim, False)
 
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]

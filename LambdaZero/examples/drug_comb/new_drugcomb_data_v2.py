@@ -236,11 +236,6 @@ class DrugCombEdge(NewDrugComb):
         edge_attr = self.data.ddi_edge_attr[idx]
         edge_classes = self.data.ddi_edge_classes[idx]
 
-        # Could do something more clever here for efficiency
-        # with torrch geometric batches if really want to.
-        mol_graphs = Batch.from_data_list(self.data.mol_graphs)
-        mol_graphs.batch = mol_graphs.batch.to(edge_classes.device)
-
         data_dict = {
                          "edge_index": ddi_idx,
                          "row_fp": row_fp, # fixme??
@@ -251,7 +246,7 @@ class DrugCombEdge(NewDrugComb):
                          "negative_css": -edge_attr[:, 0, None],
                          "edge_classes": edge_classes[:, None],
                          "loewe": edge_attr[:, 3, None],
-                         "mol_graphs": mol_graphs,
+                         "mol_graphs": self.data.mol_graphs,
                     }
         return EdgeData(data_dict)
 
