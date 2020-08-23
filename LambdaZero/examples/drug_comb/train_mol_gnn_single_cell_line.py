@@ -112,6 +112,7 @@ def _rebuild_edge_index_and_graphs(edge_index, graphs):
     to match that of the new list of graphs.  This method does both things.
     '''
     # torch.unique guarantees sorted return vals
+    # Load batch into memory one at a time to save on memory consumption.
     drug_idxs = torch.unique(edge_index, sorted=True)
     graph_batch = Batch.from_data_list([graphs[i] for i in drug_idxs]).to(edge_index.device)
 
@@ -193,11 +194,15 @@ config = {
         "lr": tune.grid_search([1e-3, 1e-4, 1e-5]),
         "batch_size": tune.grid_search([64, 128, 32]),
         "embed_dim": tune.grid_search([64, 128, 256]),
+<<<<<<< HEAD
         "cell_line_idx": tune.grid_search([39, 95, 63, 32, 25, 86, 106, 58, 97, 70]),
+=======
+        "cell_line_idx": tune.grid_search([1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542, -2]),
+>>>>>>> d67025fdcba58cc1ca50ba173e5613e99007787b
         "gcn_dropout_rate": .2,
         "lin_dropout_rate": .4,
         "aggr": tune.grid_search(["concat", "hadamard"]),
-        "num_examples_to_use": -1,
+        "num_examples_to_use": 20,
         "train_prop": .8,
         "val_prop": .2,
         "gnn_lyr_type": "GCNWithAttention",
@@ -208,7 +213,7 @@ config = {
     "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
     "resources_per_trial": {"gpu": 1},
-    "name": "DrugStructureMPNNSiingleCellLines",
+    "name": "DrugStructureMPNNSingleCellLines",
     "asha_metric": "eval_mse",
     "asha_mode": "min",
     "asha_max_t": 50

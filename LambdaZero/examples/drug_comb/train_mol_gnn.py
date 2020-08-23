@@ -105,6 +105,7 @@ def _rebuild_edge_index_and_graphs(edge_index, graphs):
     to match that of the new list of graphs.  This method does both things.
     '''
     # torch.unique guarantees sorted return vals
+    # Load batch into memory one at a time to save on memory consumption
     drug_idxs = torch.unique(edge_index, sorted=True)
     graph_batch = Batch.from_data_list([graphs[i] for i in drug_idxs]).to(edge_index.device)
 
