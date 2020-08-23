@@ -84,11 +84,11 @@ def run_epoch(loader, model, normalizer, graphs, optim, is_train):
             optim.zero_grad()
 
         loss_sum += loss.item()
-        epoch_targets.append(y)
-        epoch_preds.append(normalizer.itfm(y_hat))
+        epoch_targets.append(y.detach().cpu().numpy())
+        epoch_preds.append(normalizer.itfm(y_hat).detach().cpu().numpy())
 
-    epoch_targets = torch.cat(epoch_targets)
-    epoch_preds = torch.cat(epoch_preds)
+    epoch_targets = torch.tensor(np.concatenate(epoch_targets, axis=0))
+    epoch_preds = torch.tensor(np.concatenate(epoch_preds, axis=0))
 
     return {
         "loss": loss_sum / epoch_targets.shape[0],
@@ -172,8 +172,7 @@ config = {
         "model": MolGnnPredictor,
         "linear_channels": [1024, 512, 256, 128, 1],
         "num_relation_lin_lyrs": 2,
-        "num_residual_gcn_lyrs": 1,
-        "aggr": "concat",
+        "embed_dim": 64,
         "num_examples_to_use": -1,
         "train_prop": .8,
         "val_prop": .2,
@@ -188,7 +187,7 @@ config = {
     "name": "MPNNMolStructure",
     "asha_metric": "eval_mse",
     "asha_mode": "min",
-    "asha_max_t": 50
+    "asha_max_t": 100
 }
 
 if __name__ == "__main__":
@@ -210,20 +209,20 @@ if __name__ == "__main__":
     )
 
     search_space = {
-        "lr": hp.loguniform("lr", np.log(1e-7), np.log(5e-2)),
-        "batch_size": hp.choice("batch_size", [4, 8, 16]),
-        "embed_dim": hp.quniform("embed_dim", 32, 512, 1),
+        "lr": hp.loguniform("lr", np.log(1e-7), np.log(5e-3)),
+        "batch_size": hp.choice("batch_size", [128, 256, 512]),
         "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
         "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
+        "aggr": hp.choice("aggr", ["concat", "hadamard"]),
     }
 
     current_best_params = [
         {
             "lr": 1e-4,
             "batch_size": 2,
-            "embed_dim": 64,
             "gcn_dropout_rate": .1,
             "lin_dropout_rate": .4,
+            "aggr": 0,
         }
     ]
 
@@ -240,7 +239,7 @@ if __name__ == "__main__":
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=100000,
+        num_samples=1000,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"],

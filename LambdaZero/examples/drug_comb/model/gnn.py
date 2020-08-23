@@ -55,7 +55,7 @@ class GNN(torch.nn.Module):
         embed_size = gcn_channels[-1] if len(gcn_channels) > 0 else 1024
         if self._aggr == 'concat':
             lin_input_dim = (2 * embed_size) + 2
-        elif self._aggr == 'kroenecker':
+        elif self._aggr == 'hadamard':
             lin_input_dim = embed_size + 1
 
         linear_channels.insert(0, lin_input_dim)
@@ -71,6 +71,14 @@ class GNN(torch.nn.Module):
 
         self.predictor = self.predictor.to(device)
 
+        return self
+
+    def train(self, mode=True):
+        self = super().train(mode)
+        for i in range(len(self.convs)):
+            self.convs[i] = self.convs[i].train(mode)
+
+        self.predictor = self.predictor.train(mode)
         return self
 
     def parameters(self):
