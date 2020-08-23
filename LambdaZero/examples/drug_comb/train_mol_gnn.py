@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     search_space = {
         "lr": hp.loguniform("lr", np.log(1e-7), np.log(5e-3)),
-        "batch_size": hp.choice("batch_size", [128, 256, 512]),
+        "batch_size": hp.choice("batch_size", [256, 512, 1028]),
         "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
         "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
         "aggr": hp.choice("aggr", ["concat", "hadamard"]),
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     current_best_params = [
         {
             "lr": 1e-4,
-            "batch_size": 2,
+            "batch_size": 1,
             "gcn_dropout_rate": .1,
             "lin_dropout_rate": .4,
             "aggr": 0,
