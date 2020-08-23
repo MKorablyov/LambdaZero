@@ -177,7 +177,6 @@ config = {
         "num_examples_to_use": -1,
         "train_prop": .8,
         "val_prop": .2,
-        "gnn_lyr_type": "GCNWithAttention",
     },
     "summaries_dir": summaries_dir,
     "memory": 20 * 10 ** 9,
