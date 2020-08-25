@@ -178,7 +178,30 @@ def mpnn_brr_mean_variance(train_loader, loader, model, device, config):
     mean, std = clf.predict(embeds, return_std=True)
     return mean, std
 
+def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
+    model.train()
+    epoch_targets_norm = []
+    epoch_logits = []
 
+    for bidx, data in enumerate(loader):
+        data = data.to(device)
+        target = data.y
+
+        optimizer.zero_grad()
+        logits = model(data, do_dropout=True)
+        targets_norm = config["data"]["normalizer"].tfm(targets)
+        reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
+        loss = F.mse_loss(logits, targets_norm) + reg_loss
+        loss.backward()
+        optimizer.step()
+
+        epoch_targets_norm.append(targets_norm.detach().cpu().numpy())
+        epoch_logits.append(logits.detach().cpu().numpy())
+
+    epoch_targets_norm = np.concatenate(epoch_targets_norm,0)
+    epoch_logits = np.concatenate(epoch_logits, 0)
+    scores = _epoch_metrics(epoch_targets_norm, epoch_logits, config["data"]["normalizer"], scope)
+    return scores
 
 
 def train_brr(train_loader, val_loader, model, device, config, optim, iteration):
