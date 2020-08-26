@@ -211,6 +211,42 @@ class NewDrugComb(InMemoryDataset):
         data.mol_graphs = mol_graphs
         torch.save((data, slices), self.processed_paths[1])
 
+    def random_split(self, test_prob, valid_prob):
+	"""
+	We split at the edge index level. the data.ddi_edge_idx attribute contains the "same" edge several times, each
+	time corresponding to a specific cell line.
+	We split so that all edges that correspond to the same drug pair end up in the same split
+	"""
+	def get_set_from_idx(idx, i):
+	    """
+	    return 0 if unique edge i is in train, 1 if valid, 2 if test
+	    """
+	    if idx[i] >= ntest + nvalid:
+		return 0
+	    elif idx[i] < nvalid:
+		return 1
+	    else:
+		return 2
+	# Get unique edges (one for each drug pair, regardless of cell line)
+	unique_ddi_edge_idx = self.data.ddi_edge_idx.unique(dim=1)
+	num_unique_examples = unique_ddi_edge_idx.shape[1]
+	# train test valid split of unique edges
+	nvalid = int(num_unique_examples * valid_prob)
+	ntest = int(num_unique_examples * test_prob)
+	unique_idx = torch.randperm(num_unique_examples)
+	# Dictionary that associate each unique edge with a split (train valid or test)
+	edge_to_split_dict = {tuple(unique_ddi_edge_idx.T[i].tolist()): get_set_from_idx(unique_idx, i)
+			      for i in range(num_unique_examples)}
+	# Split for all edges (non unique)
+	all_edges_split = np.array([edge_to_split_dict[tuple(edge.tolist())] for edge in self.data.ddi_edge_idx.T])
+	train_idx = np.where(all_edges_split == 0)[0]
+	val_idx = np.where(all_edges_split == 1)[0]
+	test_idx = np.where(all_edges_split == 2)[0]
+	np.random.shuffle(train_idx)
+	np.random.shuffle(val_idx)
+	np.random.shuffle(test_idx)
+	return torch.tensor(train_idx), torch.tensor(val_idx), torch.tensor(test_idx)
+
 
 class EdgeData:
     def __init__(self,data_dict):
@@ -242,6 +278,10 @@ class DrugCombEdge(NewDrugComb):
         col_fp = self.data.x_drugs[ddi_idx[1]]
         edge_attr = self.data.ddi_edge_attr[idx]
         edge_classes = self.data.ddi_edge_classes[idx]
+
+        if not hasattr(idx, '__len__') or len(idx) == 1:
+            edge_attr = edge_attr.unsqueeze(0)
+            edge_classes = edge_classes.unsqueeze(0)
 
         data_dict = {
                          "edge_index": ddi_idx,
@@ -309,7 +349,15 @@ if __name__ == '__main__':
 
     NewDrugComb()
     dataset = DrugCombEdge()
-    cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
+
+    num_edges = np.array([torch.unique(x.edge_index).shape[0] for x in dataset.data.mol_graphs])
+    hist = plt.hist(num_edges, bins='auto')
+    plt.title('Histogram of atoms per drug')
+    plt.xlabel('Num atoms')
+    plt.ylabel('Num occurrences')
+    plt.show()
+
+    cell_line_idxs = [39, 95, 63, 32, 25, 86, 106, 58, 97, 70]
 
     for cell_line_idx in cell_line_idxs:
         idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idx)[0]
