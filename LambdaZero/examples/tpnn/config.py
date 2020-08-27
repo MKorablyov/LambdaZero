@@ -18,6 +18,34 @@ tpnn_default = {
 }
 
 
+tpnn_2_64_0_set2set = {
+    "trainer_config":
+    {
+        "model_config":
+        {
+            "representations": [[(23, 0, 0)],
+                                [(64, 0, 0)],
+                                [(64, 0, 0)]],
+            "use_set2set": True
+        }
+    }
+}
+
+
+tpnn_2_128_0_set2set = {
+    "trainer_config":
+    {
+        "model_config":
+        {
+            "representations": [[(23, 0, 0)],
+                                [(128, 0, 0)],
+                                [(128, 0, 0)]],
+            "use_set2set": True
+        }
+    }
+}
+
+
 tpnn_2_64_01_set2set = {
     "trainer_config":
     {
