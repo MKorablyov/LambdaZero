@@ -105,7 +105,7 @@ TPNN_CONFIG = {
             "props": ["gridscore", "coord"],
             "proc_func": proc_func,
             "transform": transform,
-            "file_names": ["_Zinc15_260k_0", "_Zinc15_260k_1", "_Zinc15_260k_2", "_Zinc15_260k_3"],  # ["Zinc15_2k"]
+            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],  # ["Zinc15_2k"]
         },
 
         "model": LambdaZero.models.TPNN_v1,

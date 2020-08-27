@@ -1,4 +1,5 @@
-import os,time
+import ast
+import os
 import numpy as np
 import pandas as pd
 import torch
@@ -727,7 +728,8 @@ def create_mol_graph_with_3d_coordinates(smi, props):
     y = torch.tensor([props['gridscore']], dtype=torch.float64)
 
     # pos
-    pos = torch.tensor(np.vstack(props['coord']), dtype=torch.float64) 
+    coord = ast.literal_eval(props['coord'].decode('utf-8')) if isinstance(props['coord'][0], bytes) else props['coord']
+    pos = torch.tensor(np.vstack(coord), dtype=torch.float64)
 
     return Data(x, edge_index, edge_attr, y, pos)
 
