@@ -728,7 +728,7 @@ def create_mol_graph_with_3d_coordinates(smi, props):
     y = torch.tensor([props['gridscore']], dtype=torch.float64)
 
     # pos
-    coord = ast.literal_eval(props['coord'].decode('utf-8')) if isinstance(props['coord'][0], bytes) else props['coord']
+    coord = ast.literal_eval(props['coord'].decode('utf-8')) if isinstance(props['coord'], bytes) else props['coord']
     pos = torch.tensor(np.vstack(coord), dtype=torch.float64)
 
     return Data(x, edge_index, edge_attr, y, pos)
