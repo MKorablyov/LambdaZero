@@ -105,7 +105,7 @@ def train_mcdrop(train_loader, val_loader, model, device, config, optim, iterati
     val_scores = config["eval_epoch"](val_loader, model, device, config, "val")
     scores = {**train_scores, **val_scores}
 
-    if iteration % config["uncertainty_eval_freq"] == 1:
+    if iteration % config["uncertainty_eval_freq"] == config["uncertainty_eval_freq"] - 1:
         _scores = eval_mcdrop(val_loader, model, device, config, N, "val")
         scores = {**scores, **_scores}
     return scores
@@ -160,7 +160,7 @@ def train_mpnn_brr(train_loader, val_loader, model, device, config, optim, itera
     val_scores = config["eval_epoch"](val_loader, model, device, config, "val")
     scores = {**train_scores, **val_scores}
 
-    if iteration % config["uncertainty_eval_freq"] == 1:
+    if iteration % config["uncertainty_eval_freq"] == config["uncertainty_eval_freq"] -1:
         _scores = eval_mpnn_brr(train_loader, val_loader, model, device, config, N)
         scores = {**scores, **_scores}
     return scores
@@ -181,23 +181,3 @@ def mpnn_brr_mean_variance(train_loader, loader, model, device, config):
 
 
 
-def train_brr(train_loader, val_loader, model, device, config, optim, iteration):
-    N = len(train_loader.dataset)
-
-    print(train_loader.dataset)
-    print(train_loader.dataset[0])
-    print(train_loader.dataset[0].__dict__)
-    time.sleep(10000)
-
-    #train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
-    #val_scores = config["eval_epoch"](val_loader, model, device, config, "val")
-    #scores = {**train_scores, **val_scores}
-
-    #if iteration % config["uncertainty_eval_freq"] == 1:
-    #    _scores = eval_mpnn_brr(train_loader, val_loader, model, device, config, N)
-    #    scores = {**scores, **_scores}
-    #return scores
-
-
-def brr_mean_variance(train_loader, loader, model, device, config):
-    pass

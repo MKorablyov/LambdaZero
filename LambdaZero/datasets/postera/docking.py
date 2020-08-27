@@ -89,7 +89,7 @@ if __name__ == "__main__":
     binding = pd.concat([binding, dockscore],axis=1)
 
     binding = binding.dropna()
-    plt.scatter(binding["Standard Value"], binding["dockscore"])
+    plt.scatter(np.log(binding["Standard Value"]), binding["dockscore"])
     plt.show()
 
 
