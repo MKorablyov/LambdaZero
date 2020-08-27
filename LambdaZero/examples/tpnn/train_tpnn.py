@@ -9,24 +9,17 @@ import ray
 from ray import tune
 from ray.rllib.utils import merge_dicts
 
-from LambdaZero.utils import get_external_dirs, BasicRegressor
+from LambdaZero.utils import get_external_dirs, TPNNRegressor
 import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
-from LambdaZero.examples.mpnn import config
-
-
-class TPNNRegressor(BasicRegressor):
-    def _setup(self, config):
-        torch.set_default_dtype(torch.float64)
-        super()._setup(config)
-
+from LambdaZero.examples.tpnn import config
 
 proc_func = LambdaZero.inputs.tpnn_proc
 transform = LambdaZero.inputs.tpnn_transform
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
-config_name = sys.argv[1] if len(sys.argv) >= 2 else "mpnn000"
+config_name = sys.argv[1] if len(sys.argv) >= 2 else "tpnn_default"
 config = getattr(config, config_name)
 
 
@@ -103,7 +96,7 @@ TPNN_CONFIG = {
     "trainer_config": {
         "target": "y",  # gridscore
         "target_norm": [-49.3, 26.1],  # [-43.042, 7.057],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),  # osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),  # osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),  # osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
         "b_size": 64,
 
         "dataset": LambdaZero.inputs.BrutalDock,
@@ -112,12 +105,11 @@ TPNN_CONFIG = {
             "props": ["gridscore", "coord"],
             "proc_func": proc_func,
             "transform": transform,
-            "file_names": ["Zinc15_2k"]  # ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],  # ["Zinc15_2k"]
+            "file_names": ["_Zinc15_260k_0", "_Zinc15_260k_1", "_Zinc15_260k_2", "_Zinc15_260k_3"],  # ["Zinc15_2k"]
         },
 
-        "model": LambdaZero.models.TPNN_v2,
+        "model": LambdaZero.models.TPNN_v1,
         "model_config": {},
-
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
             "lr": 0.001

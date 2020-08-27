@@ -127,8 +127,8 @@ DEFAULT_CONFIG = {
         "gpu": 1.0
     },
     "keep_checkpoint_num": 2,
-    "checkpoint_score_attr":"train_loss",
-    "num_samples":1,
+    "checkpoint_score_attr": "train_loss",
+    "num_samples": 1,
     "checkpoint_at_end": False,
     "checkpoint_freq": 0,  # 1;  0 is a default in tune.run
 }

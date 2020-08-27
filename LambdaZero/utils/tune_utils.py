@@ -33,7 +33,7 @@ class BasicRegressor(tune.Trainable):
         train_scores = self.train_epoch(self.train_loader, self.model, self.optim, self.device, self.config)
         eval_scores = self.eval_epoch(self.val_loader, self.model,  self.device, self.config)
         # rename to make scope
-        train_scores = [("train_" + k, v) for k,v in train_scores.items()]
+        train_scores = [("train_" + k, v) for k, v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
         scores = dict(train_scores + eval_scores)
         return scores
@@ -45,3 +45,9 @@ class BasicRegressor(tune.Trainable):
 
     def _restore(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
+
+
+class TPNNRegressor(BasicRegressor):
+    def _setup(self, config):
+        torch.set_default_dtype(torch.float64)
+        super()._setup(config)

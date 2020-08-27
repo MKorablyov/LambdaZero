@@ -329,34 +329,29 @@ class GraphIsomorphismNet(nn.Module):
 
 
 class TPNN_v1(TensorPassingHomogenous):
-    def __init__(self):
-        representations = [[(23, 0, 0)],
-                           [(32, 0, 0), (32, 1, 0)],
-                           [(32, 0, 0), (32, 1, 0)],
-                           [(32, 0, 0), (32, 1, 0)],
-                           [(1, 0, 0)]]
+    def __init__(self, representations, use_set2set=True):
+        hidden_size = representations[-1][0][0]
+        self.use_set2set = use_set2set
         radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
         gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
         super().__init__(representations, radial_model, gate)
+        if use_set2set:
+            self.pooling = Set2Set(hidden_size, processing_steps=3)
+            self.fully_connected = nn.Sequential(
+                nn.Linear(2 * hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, 1)
+            )
+        else:
+            self.pooling = global_mean_pool
+            self.fully_connected = nn.Sequential(
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, 1)
+            )
 
     def forward(self, graph):
-        output_features = super().forward(graph)
-        pooled_features = global_mean_pool(output_features, graph.batch)
-        return pooled_features
-
-
-class TPNN_v2(TensorPassingHomogenous):
-    def __init__(self):
-        representations = [[(23, 0, 0)],
-                           [(128, 0, 0)],
-                           [(128, 0, 0)],
-                           [(128, 0, 0)],
-                           [(1, 0, 0)]]
-        radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
-        gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
-        super().__init__(representations, radial_model, gate)
-
-    def forward(self, graph):
-        output_features = super().forward(graph)
-        pooled_features = global_mean_pool(output_features, graph.batch)
-        return pooled_features
+        hidden_features = super().forward(graph)
+        pooled_features = self.pooling(hidden_features, graph.batch)
+        output = self.fully_connected(pooled_features)
+        return output
