@@ -120,9 +120,9 @@ TPNN_CONFIG = {
     },
 
     "summaries_dir": summaries_dir,
-    "memory": 6 * 10 ** 9,
+    "memory": 20 * 10 ** 9,
 
-    "stop": {"training_iteration": 200},
+    "stop": {"training_iteration": 120},
     "resources_per_trial": {
         "cpu": 4,  # fixme - calling ray.remote would request resources outside of tune allocation
         "gpu": 1.0
