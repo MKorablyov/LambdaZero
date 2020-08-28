@@ -24,6 +24,8 @@ class MCDrop(tune.Trainable):
     def _setup(self, config):
         self.config = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.train_loader = None
+        self.val_loader = None
         if config["data"]["dataset_creator"] is not None:
             self.train_loader, self.val_loader = config["data"]["dataset_creator"](config["data"])
 
@@ -47,6 +49,7 @@ class MCDrop(tune.Trainable):
         # todo allow ray native stopping
         all_scores = []
         for i in range(self.config["train_iterations"]):
+            self._iteration = i
             scores = self._train()
             all_scores.append(scores)
         return all_scores

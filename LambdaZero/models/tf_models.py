@@ -3,11 +3,11 @@ from ray.rllib.utils import try_import_tf
 import numpy as np
 tf = try_import_tf()
 
-from ray.rllib.agents.dqn.distributional_q_model import DistributionalQModel
+from ray.rllib.agents.dqn.distributional_q_tf_model import DistributionalQTFModel
 from ray.rllib.models.tf.tf_modelv2 import TFModelV2
 from ray.rllib.models.tf.misc import normc_initializer
 
-class MolActorCritic_tfv1(DistributionalQModel, TFModelV2):
+class MolActorCritic_tfv1(DistributionalQTFModel, TFModelV2):
 
     def __init__(self,obs_space, action_space, num_outputs, model_config, name, **kw):
         super(MolActorCritic_tfv1, self).__init__(obs_space, action_space, num_outputs, model_config, name, **kw)

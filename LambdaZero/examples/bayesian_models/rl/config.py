@@ -19,59 +19,7 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 # synth_config["predict_config"]["checkpoint_path"] = \
 #     os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 
-
-ppo000 = {
-    # 3.2-3.3
-    "rllib_config":{
-        "env": BlockMolEnv_v3,
-        "env_config": {
-            "allow_removal": True,
-        }
-    }
-}
-
-ppo001 = {
-    "rllib_config":{
-        "env": BlockMolEnv_v3,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v2,
-            "reward_config": {
-                "synth_cutoff": [0, 5],
-                # "synth_config": chemprop_cfg,
-            }
-        }
-    }
-}
-
-ppo002 = {
-    # 3.2-3.3
-    "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v3,
-            "reward_config": {
-                "dockscore_config": binding_config,
-                "synth_config": synth_config
-            }
-        }
-    }
-}
-
-ppo_mpro_v001 = {
-    "rllib_config":{
-        "env": BlockMolEnv_v3,
-        },
-}
-
-ppo_mpro_v002 = {
-    "rllib_config": {
-        "env": BlockMolEnv_v4,
-        },
-}
-
-ppo_graph_000 = {
+ppo_bayes_reward_000 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {

@@ -110,6 +110,11 @@ def train_mcdrop(train_loader, val_loader, model, device, config, optim, iterati
         scores = {**scores, **_scores}
     return scores
 
+def train_mcdrop_rl(train_loader, val_loader, model, device, config, optim, iteration):
+    N = len(train_loader.dataset)
+    train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
+    
+    return train_scores
 
 def mcdrop_mean_variance(train_loader, loader, model, device, config):
     # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
@@ -185,7 +190,9 @@ def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
 
     for bidx, data in enumerate(loader):
         data = data.to(device)
-        target = data.y
+        targets = data.y
+        if targets is None:
+            targets = getattr(data, config["data"]["target"])
 
         optimizer.zero_grad()
         logits = model(data, do_dropout=True)
