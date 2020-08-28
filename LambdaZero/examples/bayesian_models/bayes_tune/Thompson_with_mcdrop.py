@@ -1,3 +1,4 @@
+
 import time, random, sys
 import os.path as osp
 import numpy as np
@@ -16,8 +17,8 @@ from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
 # from LambdaZero.models import MPNNetDrop
 from LambdaZero.examples.bayesian_models.bayes_tune.brr import BRR
 
-from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
-    mcdrop_mean_variance
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop#, \
+    #mcdrop_mean_variance
 from LambdaZero.examples.bayesian_models.bayes_tune import aq_config
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -91,45 +92,30 @@ class Thompson(tune.Trainable):
         scores = {**scores, **_scores}
         return scores
 
-    def acquire_batch(self, batch_size=500):
-        idxs = []
-        
-        for _ in range(batch_size):
-            embs = []
-            y = np.concatenate([getattr(d, 'gridscore').cpu().numpy() for d in self.train_loader.dataset],0)
-            for bidx, data in enumerate(self.train_loader):
-                data = data.to(device)
-                emb = self.regressor.model.get_embed(data, False)
-                embs.append(emb.detach().cpu().numpy())
-            embs = np.concatenate(embs, 0)
+    def acquire_batch(self, batch_size=500):        
+        preds = []
+        self.regressor.model.set_mask()
+        for bidx, data in enumerate(self.ul_loader):
+            data = data.to(device)
+            emb = self.regressor.model(data, True, True)
+            preds.append(emb.detach().cpu().numpy())
 
-            ul_embs = []
-            for bidx, data in enumerate(self.ul_loader):
-                data = data.to(device)
-                emb = self.regressor.model.get_embed(data, False)
-                ul_embs.append(emb.detach().cpu().numpy())
-            ul_embs = np.concatenate(ul_embs, 0)
+        preds = np.concatenate(preds, 0)
 
-            idx = self.get_posterior_sample(X_in = ul_embs,X_trn = embs, y = y, idxs = idxs, X_feature_size = 64, sigma_y = 0.2)
+        preds = preds.argsort()
+        idxs = preds[:batch_size]
 
-            if idx: idxs.append(int(idx))
         return idxs
 
-    def get_posterior_sample(self, X_in, X_trn, y, idxs, X_feature_size,sigma_y):
+    def get_greed_sample(self, X_in, X_trn, y, idxs, X_feature_size,sigma_y):
+        preds = []
+        for bidx, data in enumerate(self.ul_loader):
+            data = data.to(device)
+            emb = self.regressor.model(data, False)
+            preds.append(emb.detach().cpu().numpy())
+        preds = np.concatenate(preds, 0)
 
-        w_0 = np.zeros(X_feature_size)
-        V_0 = np.diag([sigma_y] * X_feature_size)**2
-        V0_inv = np.linalg.inv(V_0)
-        V_n = sigma_y**2 * np.linalg.inv(sigma_y**2 * V0_inv + (X_trn.T @ X_trn))
-        w_n = V_n @ V0_inv @ w_0 + 1 / (sigma_y**2) * V_n @ X_trn.T @ y
-
-        samples = np.random.multivariate_normal(w_n, V_n, size = 1)
-        y_star = X_in @ samples.T
-        y_star = y_star.argsort()
-        for i in y_star:
-            if i not in idxs:
-                return i
-        
+        preds = preds.argsort()
 
 DEFAULT_CONFIG = {
     "acquirer_config": {
@@ -140,6 +126,8 @@ DEFAULT_CONFIG = {
             "regressor_config": aq_config.regressor_config,
             "aq_size0": 200,
             "aq_size": 50,
+            # "kappa": 0.2,
+            # "epsilon": 0.0,
             "minimize_objective":True,
         },
         "local_dir": summaries_dir,
@@ -159,3 +147,4 @@ if __name__ == "__main__":
 
     print(config)
     tune.run(**config["acquirer_config"])
+
