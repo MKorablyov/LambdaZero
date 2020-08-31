@@ -83,10 +83,12 @@ def sample_targets(loader, config):
     return norm_targets
 
 
-def eval_epoch(loader, model, device, config, scope):
+def eval_epoch(loader, model, device, config, scope, N):
     logits = sample_logits(loader, model, device, config, 1, False)[0]
     norm_targets = sample_targets(loader, config)
     scores = _epoch_metrics(norm_targets, logits, config["data"]["normalizer"], scope)
+    # ll_dict = eval_mcdrop(loader, model, device, config, N, scope)
+    # scores.update(ll_dict)
     return scores
 
 
@@ -102,11 +104,11 @@ def eval_mcdrop(loader, model, device, config, N, scope):
 def train_mcdrop(train_loader, val_loader, model, device, config, optim, iteration):
     N = len(train_loader.dataset)
     train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
-    val_scores = config["eval_epoch"](val_loader, model, device, config, "val")
+    val_scores = config["eval_epoch"](val_loader, model, device, config, "val", N = N)
     scores = {**train_scores, **val_scores}
 
     if iteration % config["uncertainty_eval_freq"] == config["uncertainty_eval_freq"] - 1:
-        _scores = eval_mcdrop(val_loader, model, device, config, N, "val")
+        _scores = eval_mcdrop(val_loader, model, device, config, N, "val", N = N)
         scores = {**scores, **_scores}
     return scores
 
@@ -157,7 +159,7 @@ def eval_mpnn_brr(train_loader, val_loader, model, device, config, N):
 def train_mpnn_brr(train_loader, val_loader, model, device, config, optim, iteration):
     N = len(train_loader.dataset)
     train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
-    val_scores = config["eval_epoch"](val_loader, model, device, config, "val")
+    val_scores = config["eval_epoch"](val_loader, model, device, config, "val", N = N)
     scores = {**train_scores, **val_scores}
 
     if iteration % config["uncertainty_eval_freq"] == config["uncertainty_eval_freq"] -1:
@@ -177,7 +179,3 @@ def mpnn_brr_mean_variance(train_loader, loader, model, device, config):
     clf.fit(train_embeds, train_targets_norm)
     mean, std = clf.predict(embeds, return_std=True)
     return mean, std
-
-
-
-

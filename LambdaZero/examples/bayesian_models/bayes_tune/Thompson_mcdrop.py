@@ -1,3 +1,4 @@
+
 import time, random, sys
 import os.path as osp
 import numpy as np
@@ -12,7 +13,7 @@ from torch.utils.data import Subset, ConcatDataset
 import LambdaZero.utils
 import LambdaZero.models
 import LambdaZero.inputs
-from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
+from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop2 import MCDrop
 # from LambdaZero.models import MPNNetDrop
 from LambdaZero.examples.bayesian_models.bayes_tune.brr import BRR
 
@@ -23,8 +24,10 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def aq_regret(train_loader, ul_loader, config):
-    train_targets = np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in train_loader.dataset],0)
-    ul_targets = np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in ul_loader.dataset],0)
+    train_targets = np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in 
+train_loader.dataset],0)
+    ul_targets = np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in 
+ul_loader.dataset],0)
     all_targets = np.concatenate([train_targets, ul_targets],0)
     train_sorted = train_targets[np.argsort(train_targets)]
     all_sorted = all_targets[np.argsort(all_targets)]
@@ -47,7 +50,8 @@ class Thompson(tune.Trainable):
         # load dataset
         self.dataset = config["data"]["dataset"](**config["data"]["dataset_config"])
         ul_idxs, val_idxs, test_idxs = np.load(self.config["data"]["dataset_split_path"], allow_pickle=True)
-        
+       # ul_idxs = ul_idxs[:-1] # remove invalid index coming from the fact that one molecule broke in rdkit processing (zinc_260k)
+
         np.random.shuffle(ul_idxs) # randomly acquire batch zero
         train_idxs = ul_idxs[:self.config["aq_size0"]]
         ul_idxs = ul_idxs[self.config["aq_size0"]:]
@@ -59,10 +63,10 @@ class Thompson(tune.Trainable):
         self.val_loader = DataLoader(val_set, batch_size=config["data"]["b_size"])
 
         # make model with uncertainty
-        model = LambdaZero.models.MPNNetDrop
+        model = LambdaZero.models.MPNNetDrop2
         self.config['model'] = model
-        config['regressor_config']['config']['train'] = train_mpnn_brr
-        config['regressor_config']['config']['get_mean_variance'] = mpnn_brr_mean_variance
+        config['regressor_config']['config']['train'] = train_mcdrop
+        config['regressor_config']['config']['get_mean_variance'] = mcdrop_mean_variance
         self.regressor = self.config["regressor"](**config["regressor_config"])
         
         self.regressor.fit(self.train_loader,self.val_loader)
@@ -93,46 +97,30 @@ class Thompson(tune.Trainable):
         scores = {**scores, **_scores}
         return scores
 
-    def acquire_batch(self, batch_size=500):
-        idxs = []
-        
-        for _ in range(batch_size):
-            embs = []
-            y = np.concatenate([getattr(d, 'gridscore').cpu().numpy() for d in self.train_loader.dataset],0)
-            for bidx, data in enumerate(self.train_loader):
-                data = data.to(device)
-                emb = self.regressor.model.get_embed(data, False)
-                embs.append(emb.detach().cpu().numpy())
-            embs = np.concatenate(embs, 0)
+    def acquire_batch(self, batch_size=500):        
+        preds = []
+        self.regressor.model.set_mask()
+        for bidx, data in enumerate(self.ul_loader):
+            data = data.to(device)
+            emb = self.regressor.model(data, True, True)
+            preds.append(emb.detach().cpu().numpy())
 
-            ul_embs = []
+        preds = np.concatenate(preds, 0)
 
-            for bidx, data in enumerate(self.ul_loader):
-                data = data.to(device)
-                emb = self.regressor.model.get_embed(data, False)
-                ul_embs.append(emb.detach().cpu().numpy())
-            ul_embs = np.concatenate(ul_embs, 0)
-            idx = self.get_posterior_sample(X_in = ul_embs,X_trn = embs, y = y, idxs = idxs, X_feature_size = 64, sigma_y = 0.2)
-            if idx: idxs.append(int(idx))
+        preds = preds.argsort()
+        idxs = preds[:batch_size]
+
         return idxs
 
-    def get_posterior_sample(self, X_in, X_trn, y, idxs, X_feature_size,sigma_y):
+    def get_greed_sample(self, X_in, X_trn, y, idxs, X_feature_size,sigma_y):
+        preds = []
+        for bidx, data in enumerate(self.ul_loader):
+            data = data.to(device)
+            emb = self.regressor.model(data, False)
+            preds.append(emb.detach().cpu().numpy())
+        preds = np.concatenate(preds, 0)
 
-        w_0 = np.zeros(X_feature_size)
-        V_0 = np.diag([sigma_y] * X_feature_size)**2
-        V0_inv = np.linalg.inv(V_0)
-        V_n = sigma_y**2 * np.linalg.inv(sigma_y**2 * V0_inv + (X_trn.T @ X_trn))
-        w_n = V_n @ V0_inv @ w_0 + 1 / (sigma_y**2) * V_n @ X_trn.T @ y
-
-        #sample w from distribution N(w_n,V_n)
-        samples = np.random.multivariate_normal(w_n, V_n, size = 1)
-        #pick the argmax of expectation of y* which is x*w
-        y_star = X_in @ samples.T
-        #add best the train set
-        y_star = y_star.argsort()
-        for i in y_star:
-            if i not in idxs:
-                return i
+        preds = preds.argsort()
 
 DEFAULT_CONFIG = {
     "acquirer_config": {
@@ -154,11 +142,13 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "ts005_testing"
+    else: config_name = "uct001"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["acquirer_config"]["name"] = config_name
     ray.init(memory=config["memory"])
 
+    config['acquirer_config']['config']['regressor_config']['config']['model'] = LambdaZero.models.MPNNetDrop2
+    # ^ this will manually overwrite the config and change the model to MPNNetDrop2
     print(config)
     tune.run(**config["acquirer_config"])
