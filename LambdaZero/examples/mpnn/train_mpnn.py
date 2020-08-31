@@ -24,26 +24,21 @@ config = getattr(config, config_name)
 def train_epoch(loader, model, optimizer, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.train()
-
-    metrics = {"loss":0,}
+    metrics = {"loss":0}
     epoch_targets = []
     epoch_preds = []
-
     for bidx,data in enumerate(loader):
         data = data.to(device)
         targets = getattr(data, config["target"])
-
         optimizer.zero_grad()
-        logits = model(data)
-        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
+        logits = model(data,do_dropout=True)
+        loss = F.mse_loss(logits, normalizer.tfm(targets))
         loss.backward()
         optimizer.step()
-
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
-
+        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
     epoch_targets = np.concatenate(epoch_targets,0)
     epoch_preds = np.concatenate(epoch_preds, 0)
     metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
@@ -59,28 +54,23 @@ def train_epoch(loader, model, optimizer, device, config):
 def eval_epoch(loader, model, device, config):
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.eval()
-    metrics = {"loss":0,}
+    metrics = {"loss": 0}
     epoch_targets = []
     epoch_preds = []
-
     for bidx,data in enumerate(loader):
         data = data.to(device)
         targets = getattr(data, config["target"])
-
-        logits = model(data)
-        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
-
+        logits = model(data, do_dropout=False)
+        loss = F.mse_loss(logits, normalizer.tfm(targets))
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
-
+        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
     epoch_targets = np.concatenate(epoch_targets,0)
     epoch_preds = np.concatenate(epoch_preds, 0)
     metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
     metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
     metrics["mse"] = ((epoch_targets - epoch_preds)**2).mean()
-
     ranked_targets = epoch_targets[np.argsort(epoch_targets)]
     predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
     metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
@@ -95,29 +85,29 @@ DEFAULT_CONFIG = {
     "trainer_config": {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-        "b_size": 64,
-
+        "dataset_split_path": osp.join(datasets_dir,
+                                       #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+                                       "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+        "b_size": 25,
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
             "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
             "props": ["gridscore"],
             "transform": transform,
-            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+            "file_names":
+            #["Zinc15_2k"],
+                # fixme !!!!!!!!!!!! false large dataset
+                ["Zinc15_260k_0"],#, "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
         },
-
-        "model": LambdaZero.models.MPNNet,
-        "model_config": {},
-
+        "model": LambdaZero.models.MPNNetDropLRGA,
+        "model_config": {"drop_last": True, "drop_data": False, "drop_weights": True, "drop_prob": 0.00},
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
             "lr": 0.001
         },
-
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
     },
-
     "summaries_dir": summaries_dir,
     "memory": 10 * 10 ** 9,
 
@@ -128,9 +118,9 @@ DEFAULT_CONFIG = {
     },
     "keep_checkpoint_num": 2,
     "checkpoint_score_attr":"train_loss",
-    "num_samples":1,
+    "num_samples": 1,
     "checkpoint_at_end": False,
-    #"checkpoint_freq": 1,
+    "checkpoint_freq": 25,
 }
 
 

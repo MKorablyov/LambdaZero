@@ -7,49 +7,52 @@ import subprocess
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-def gen_molfile(smi, mol_name, outpath, num_conf):
-    # generate num_conf 3D conformers from smiles
-    mol = Chem.MolFromSmiles(smi)
-    Chem.SanitizeMol(mol)
-    mol_h = Chem.AddHs(mol)
-    AllChem.EmbedMultipleConfs(mol_h,numConfs=num_conf)
-    [AllChem.MMFFOptimizeMolecule(mol_h,confId=i) for i in range(num_conf)]
-    mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
-    # choose minimum energy conformer
-    mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
-    mol = Chem.RemoveHs(mol_h)
-    # save file in .mol format
-    mol_file = os.path.join(outpath,mol_name + ".mol")
-    print(Chem.MolToMolBlock(mol,confId=int(mi)),file=open(mol_file,'w+'))
-    return mol_file
+from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from sklearn.metrics import roc_curve, auc, roc_auc_score
+
+
+
+class GenMolFile_v1:
+    def __init__(self, outpath, num_conf):
+        self.outpath = outpath
+        self.num_conf = num_conf
+    def __call__(self, smi,mol_name):
+        mol = Chem.MolFromSmiles(smi)
+        Chem.SanitizeMol(mol)
+        mol_h = Chem.AddHs(mol)
+        AllChem.EmbedMultipleConfs(mol_h, numConfs=self.num_conf)
+        [AllChem.MMFFOptimizeMolecule(mol_h, confId=i) for i in range(self.num_conf)]
+        mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
+        # choose minimum energy conformer
+        mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy()
+                        for i in range(self.num_conf)])
+        mol = Chem.RemoveHs(mol_h)
+        # save file in .mol format
+        mol_file = os.path.join(self.outpath, mol_name + ".mol")
+        print(Chem.MolToMolBlock(mol, confId=int(mi)), file=open(mol_file, 'w+'))
+        return mol_file
 
 
 class DockVina_smi:
-    def __init__(self,
-                 outpath,           # directory where to write stuff
-                 smina_bin,         # smina binary
-                 docksetup_dir,     # folder with lig.pdb and rec.pdb
-                 molgen_conf=20):
-        self.outpath = outpath
-        self.smina_bin = smina_bin
-        self.docksetup_dir = docksetup_dir
-        self.molgen_conf = molgen_conf
+    def __init__(self, config):
+        self.config = config
+        self.gen_molfile = config["gen_molfile"](**config["gen_molfile_par"])
 
     def dock(self, smi, mol_name=None):
         try:
             # generate random molecule name if needed
             if mol_name is None:
                 mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
-
             #make mol file to dock
-            dock_file = gen_molfile(smi, mol_name, self.outpath, self.molgen_conf)
+            dock_file = self.gen_molfile(smi, mol_name)
             # make vina command
-            # todo: dock_pars
-            rec_file = osp.join(self.docksetup_dir, "rec.pdb")
-            lig_file = osp.join(self.docksetup_dir, "lig.pdb")
-            sminaord_file = osp.join(self.outpath, mol_name + "_sminaord.pdb")
+            rec_file = osp.join(self.config["docksetup_dir"], "rec.pdb")
+            lig_file = osp.join(self.config["docksetup_dir"], "lig.pdb")
+            sminaord_file = osp.join(self.config["outpath"], mol_name + "_sminaord.pdb")
             dock_cmd = "{} -r {} -l {} --autobox_ligand {} -o {}".\
-                format(self.smina_bin,rec_file,dock_file,lig_file,sminaord_file)
+                format(self.config["smina_bin"],rec_file,dock_file,lig_file,sminaord_file)
+            dock_cmd = dock_cmd + " " + self.config["dock_pars"]
+
             # dock
             cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
             cl.wait()
@@ -59,38 +62,61 @@ class DockVina_smi:
                 dockscore = float(smina_out[1].split(" ")[-1])
             else:
                 raise Exception("can't correctly parse docking energy")
+            print("docskscore", dockscore)
             return dockscore
         except Exception as e:
+            print(e)
             return None
 
 
 
 if __name__ == "__main__":
+    config = {
+        "outpath":"/home/maksym/Datasets/seh/4jnc/docked",
+        "smina_bin":"/home/maksym/Programs/smina/smina.static",
+        "docksetup_dir":"/home/maksym/Datasets/seh/4jnc",
+        "dock_pars": "",#"--exhaustiveness 8 --cpu 1",
+        "gen_molfile": GenMolFile_v1,
+        "gen_molfile_par": {
+            "outpath":"/home/maksym/Datasets/seh/4jnc/docked",
+            "num_conf":20,
+        }}
+
+
+
+
+
     data = pd.read_csv("/home/maksym/Datasets/seh/seh_chembl.csv", sep=";")
     binding = data[["Smiles", "Standard Value", "Ligand Efficiency BEI", "Ligand Efficiency SEI"]].copy()
     binding["Standard Value"] = pd.to_numeric(binding["Standard Value"], errors="coerce")
     binding["Ligand Efficiency BEI"] = pd.to_numeric(binding["Ligand Efficiency BEI"], errors="coerce")
     binding["Ligand Efficiency SEI"] = pd.to_numeric(binding["Ligand Efficiency SEI"], errors="coerce")
     binding = binding.dropna()
+    ic50 = binding["Standard Value"].to_numpy()
+    binders = ic50 < 1
+    decoys = ic50 > 10000
+    binding = pd.concat([binding[binders], binding[decoys]])
+    binding.reset_index(inplace=True)
     smis = binding["Smiles"].to_numpy()
-    # plt.scatter(binding["Ligand Efficiency SEI"], binding["Ligand Efficiency BEI"])
-    # plt.show()
-
-    class cfg:
-        dock_out = "/home/maksym/Datasets/seh/4jnc/docked"
-        smina_bin = "/home/maksym/Programs/smina/smina.static"
-        docksetup_dir = "/home/maksym/Datasets/seh/4jnc"
+    print(len(smis))
 
 
-    dock_smi = DockVina_smi(cfg.dock_out,cfg.smina_bin,cfg.docksetup_dir)
-
-
-    dockscore = pd.DataFrame({"dockscore":[dock_smi.dock(smi) for smi in smis[:50]]})
+    dock_smi = DockVina_smi(config)
+    dockscore = pd.DataFrame({"dockscore":[dock_smi.dock(smi) for smi in smis]})
     binding = pd.concat([binding, dockscore],axis=1)
-
+    binding.to_feather(os.path.join(config["outpath"], "seh.ftr"))
+    binding = pd.read_feather(os.path.join(config["dock_out"], "seh.ftr"))
     binding = binding.dropna()
-    plt.scatter(np.log(binding["Standard Value"]), binding["dockscore"])
+
+
+    fpr, tpr, _ = roc_curve(binding["Standard Value"] < 1, -binding["dockscore"])
+    roc_auc = auc(fpr,tpr)
+    plt.plot(fpr,tpr)
     plt.show()
+    #print(roc_auc)
+    #print(roc_auc_score(binding["Standard Value"] < 1, -binding["dockscore"]))
+    #plt.scatter(np.log(binding["Standard Value"]), binding["dockscore"])
+    #plt.show()
 
 
 
