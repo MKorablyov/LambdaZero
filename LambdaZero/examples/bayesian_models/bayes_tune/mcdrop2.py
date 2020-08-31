@@ -9,7 +9,6 @@ from ray import tune
 from ray.tune import grid_search
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models.catalog import ModelCatalog
-from sklearn import linear_model
 import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
@@ -19,7 +18,6 @@ from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, tr
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 transform = T.Compose([LambdaZero.utils.Complete()])
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class MCDrop(tune.Trainable):
@@ -29,9 +27,8 @@ class MCDrop(tune.Trainable):
         if config["data"]["dataset_creator"] is not None:
             self.train_loader, self.val_loader = config["data"]["dataset_creator"](config["data"])
 
-        # self.feature_dim = 64
         # make model
-        self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"])
+        self.model = LambdaZero.models.MPNNetDrop2(**self.config["model_config"])
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
 
@@ -44,30 +41,9 @@ class MCDrop(tune.Trainable):
         # update internal dataset
         self.train_loader, self.val_loader = train_loader, val_loader
         # make a new model
-        self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"]) # todo: reset?
+        self.model = LambdaZero.models.MPNNetDrop2(**self.config["model_config"]) # todo: reset?
         self.optim = self.config["optimizer"](self.model.parameters(), **self.config["optimizer_config"])
         self.model.to(self.device)
-
-        #############
-
-        # x_train, y_train = self.get_data_targs(train_loader)
-
-        # self.clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False, verbose=True)
-        # self.clf.fit(x_train, y_train)
-
-        # self.alpha = self.clf.lambda_
-        # self.beta = self.clf.alpha_
-        # x_train = torch.from_numpy(x_train)
-        # self.K = self.beta * x_train.T @ x_train + self.alpha * torch.eye(self.feature_dim)   # [M, M]
-        # self.chol_K = torch.cholesky(self.K)
-
-        # projected_y = x_train.T @ y_train
-        # # import pdb; pdb.set_trace()
-        # k_inv_projected_y = torch.cholesky_solve(projected_y, self.chol_K)
-        # self.m = self.beta * k_inv_projected_y  # [M, 1]
-
-        #############
-
         # todo allow ray native stopping
         all_scores = []
         for i in range(self.config["train_iterations"]):
@@ -79,39 +55,40 @@ class MCDrop(tune.Trainable):
         mean,var = self.config["get_mean_variance"](self.train_loader, loader, self.model, self.device, self.config)
         return mean, var
 
-    # def get_data_targs(self, loader):
-    #     self.model.eval()
-    #     epoch_targets_norm = []
-    #     epoch_logits = []
+    def get_embed(self, data, do_dropout):
+        # if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin0(data.x))
+        h = out.unsqueeze(0)
+        # if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
 
-    #     for bidx,data in enumerate(loader):
-    #         data = data.to(device)
-    #         targets = getattr(data, 'gridscore')
+        for i in range(3):
+            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+            # if self.drop_weights: m = F.dropout(m, training=do_dropout, p=self.drop_prob)
+            out, h = self.gru(m.unsqueeze(0), h)
+            # if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+            out = out.squeeze(0)
 
-    #         embeds = self.model.get_embed(data, do_dropout=False)
-    #         targets_norm = self.config["data"]["normalizer"].tfm(targets)
+        out = self.set2set(out, data.batch)
+        # if self.drop_weights: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin1(out))
+        # if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        return out
 
-    #         epoch_targets_norm.append(targets_norm.detach().cpu().numpy())
-    #         epoch_logits.append(embeds.detach().squeeze().cpu().numpy())
-
-    #     epoch_targets_norm = np.concatenate(epoch_targets_norm,0)
-    #     epoch_logits = np.concatenate(epoch_logits, 0)
-
-    #     return epoch_logits, epoch_targets_norm
 
 
 data_config = {
     "target": "gridscore",
     "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
     "dataset_split_path": osp.join(datasets_dir,
-                                   "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
-    # "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+                                #    "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+                                "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
         "props": ["gridscore", "smi"],
         "transform": transform,
-        "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+        "file_names": #["Zinc15_2k"],
+            ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
     },
     "b_size": 40,
     "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057])
@@ -171,6 +148,3 @@ if __name__ == "__main__":
     # mcdrop = MCDrop(config["regressor_config"]["config"])
     # print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
     # print(mcdrop.get_mean_variance(mcdrop.train_loader))
-
-
-

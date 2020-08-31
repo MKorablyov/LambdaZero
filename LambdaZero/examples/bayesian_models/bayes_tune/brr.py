@@ -8,7 +8,7 @@ from LambdaZero.inputs import random_split
 import LambdaZero.inputs
 import LambdaZero.utils
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import *
-from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
+# from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -20,12 +20,24 @@ class BRR(tune.Trainable):
     def _setup(self, config):
         self.config = config
         self.get_feat = self.config["regressor_config"]["get_feat"]
+        # self.feature_dim = 64
 
     def fit(self, train_loader, val_loader):
         train_feat, val_feat = self.get_feat(train_loader), self.get_feat(val_loader)
         train_targets_norm = sample_targets(train_loader, self.config)
         val_targets_norm = sample_targets(val_loader, self.config)
         scores, self.clf = bayesian_ridge(train_feat, val_feat, train_targets_norm, val_targets_norm, self.config)
+
+        # self.alpha = self.clf.lambda_
+        # self.beta = self.clf.alpha_
+
+        # self.K = self.beta * train_feat.T @ train_feat + self.alpha * torch.eye(self.feature_dim)   # [M, M]
+        # self.chol_K = torch.cholesky(self.K)
+
+        # projected_y = x_train.T @ train_targets_norm
+        # k_inv_projected_y = torch.cholesky_solve(projected_y, self.chol_K)
+        # self.m = self.beta * k_inv_projected_y  # [M, 1]
+
         return [scores]
 
     def get_mean_variance(self, loader):
