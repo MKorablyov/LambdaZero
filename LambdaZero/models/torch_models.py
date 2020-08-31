@@ -274,7 +274,7 @@ class MPNNetDropLRGA(nn.Module):
             local_feat = F.relu(self.conv(out, data.edge_index, data.edge_attr))
             if self.drop_weights: local_feat = F.dropout(local_feat, training=do_dropout, p=self.drop_prob)
             #with torch.no_grad():
-            global_feat = self.lrga[i](data.x)
+            global_feat = 0* self.lrga[i](data.x)
             m = torch.cat([local_feat, global_feat], axis=1)
             #m = F.relu(self.lrga_lin[i](feat))
             #print("mean var", local_feat.mean(), local_feat.var(), global_feat.mean(), global_feat.var(),)

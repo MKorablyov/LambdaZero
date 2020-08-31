@@ -84,8 +84,6 @@ if __name__ == "__main__":
 
 
 
-
-
     data = pd.read_csv("/home/maksym/Datasets/seh/seh_chembl.csv", sep=";")
     binding = data[["Smiles", "Standard Value", "Ligand Efficiency BEI", "Ligand Efficiency SEI"]].copy()
     binding["Standard Value"] = pd.to_numeric(binding["Standard Value"], errors="coerce")
@@ -100,12 +98,12 @@ if __name__ == "__main__":
     smis = binding["Smiles"].to_numpy()
     print(len(smis))
 
-
     dock_smi = DockVina_smi(config)
     dockscore = pd.DataFrame({"dockscore":[dock_smi.dock(smi) for smi in smis]})
     binding = pd.concat([binding, dockscore],axis=1)
     binding.to_feather(os.path.join(config["outpath"], "seh.ftr"))
     binding = pd.read_feather(os.path.join(config["dock_out"], "seh.ftr"))
+    #binding = pd.read_feather("/home/maksym/Datasets/seh/4jnc/docked/seh_v1.ftr")
     binding = binding.dropna()
 
 
