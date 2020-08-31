@@ -20,6 +20,8 @@ import torch.nn.functional as F
 from .global_attention_layer import LowRankAttention
 
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 def convert_to_tensor(arr):
     tensor = torch.from_numpy(np.asarray(arr))
     if tensor.dtype == torch.double:
@@ -236,7 +238,74 @@ class MPNNetDrop(nn.Module):
         return out.view(-1)
 
 
+class MPNNetDrop2(nn.Module):
+    """
+    Added a second MPNNetDrop network to use a consistent dropout mask throughout acquisition
+    A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
+    """
+    def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=64):
+        super(MPNNetDrop2, self).__init__()
+        self.drop_last = drop_last
+        self.drop_data = drop_data
+        self.drop_weights = drop_weights
+        self.drop_prob = drop_prob
+        self.lin0 = nn.Linear(num_feat, dim)
 
+        self.drop_prob = 0.5
+        self.num_feat = num_feat
+        self.dim = dim
+        self.lin0 = nn.Linear(num_feat, dim)
+
+        h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
+        self.conv = NNConv(dim, dim, h, aggr='mean')
+        self.gru = nn.GRU(dim, dim)
+        self.set2set = Set2Set(dim, processing_steps=3)
+        self.lin1 = nn.Linear(2 * dim, dim)
+        self.lin2 = nn.Linear(dim, 1)
+
+    def get_embed(self, data, do_dropout, use_mask = False):
+        if do_dropout and not use_mask: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
+        if do_dropout and use_mask: data.x = data.x * self.input_mask
+        out = F.relu(self.lin0(data.x))
+        if do_dropout and use_mask: out = out * self.lin0_mask
+        h = out.unsqueeze(0)
+        if do_dropout and not use_mask: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+
+        for i in range(3):
+            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+            if do_dropout and use_mask: m = m * self.conv_mask
+            if do_dropout and not use_mask: m = F.dropout(m, training=do_dropout, p=self.drop_prob)
+            out, h = self.gru(m.unsqueeze(0), h)
+            if do_dropout and use_mask: out = out * self.gru_mask
+            if do_dropout and not use_mask: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+            out = out.squeeze(0)
+
+        out = self.set2set(out, data.batch)
+        if do_dropout and use_mask: out = out * self.set_mask
+        if do_dropout and not use_mask: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin1(out))
+        if do_dropout and use_mask: out = out * self.lin1_mask
+        if do_dropout and not use_mask: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        return out
+
+    def forward(self, data, do_dropout, use_mask = False):
+        embed = self.get_embed(data, do_dropout, use_mask)
+        if do_dropout and use_mask: embed = embed * self.lin2_mask
+        if do_dropout and not use_mask: embed = F.dropout(embed, training=do_dropout, p=self.drop_prob)
+        out = self.lin2(embed)
+        return out.view(-1)
+
+    def set_mask(self):
+        self.input_mask = torch.bernoulli(torch.zeros(self.num_feat).fill_(1 - self.drop_prob)).to(device)
+        self.lin0_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+        self.h_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+        self.conv_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+        self.gru_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+        self.set_mask = torch.bernoulli(torch.zeros(self.dim + self.dim).fill_(1 - self.drop_prob)).to(device)
+        self.lin1_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+        self.lin2_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+        
+        
 class MPNNetDropLRGA(nn.Module):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
@@ -293,7 +362,6 @@ class MPNNetDropLRGA(nn.Module):
         embed = self.get_embed(data, do_dropout)
         out = self.lin2(embed)
         return out.view(-1)
-
 
 
 class GraphIsomorphismNet(nn.Module):
@@ -375,8 +443,6 @@ class GraphIsomorphismNet(nn.Module):
 
         # pooling with set2set
         node_out = self.set2set2(node_out, data.batch)
-
         # fully-connected layer for output
         out = self.fully_connected(node_out)
-
         return out.view(-1)
