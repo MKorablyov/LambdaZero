@@ -148,4 +148,5 @@ if __name__ == "__main__":
                         num_samples=config["num_samples"],
                         checkpoint_at_end=config["checkpoint_at_end"],
                         local_dir=summaries_dir,
-                        checkpoint_freq=config["checkpoint_freq"])
+                        checkpoint_freq=config["checkpoint_freq"],
+                        name=config_name)
