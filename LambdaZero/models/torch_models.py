@@ -12,6 +12,10 @@ th, nn = try_import_torch()
 from torch_geometric.nn import NNConv, Set2Set, GCNConv
 import torch.nn.functional as F
 
+from rdkit import Chem
+import LambdaZero.environments
+from LambdaZero import chem
+
 
 def convert_to_tensor(arr):
 	tensor = th.from_numpy(np.asarray(arr))
@@ -181,57 +185,6 @@ class MPNNet(th.nn.Module):
 		return out.view(-1)
 	
 
-
-# class GraphConvolution(nn.Module):
-#     """
-#     Simple GCN layer, similar to https://arxiv.org/abs/1609.02907
-#     """
-#
-#     def __init__(self, in_features, out_features, bias=True):
-#         super(GraphConvolution, self).__init__()
-#         self.in_features = in_features
-#         self.out_features = out_features
-#         self.weight = nn.parameter(th.FloatTensor(in_features, out_features))
-#         if bias:
-#             self.bias = nn.parameter(th.FloatTensor(out_features))
-#         else:
-#             self.register_parameter('bias', None)
-#         self.reset_parameters()
-#
-#     def reset_parameters(self):
-#         stdv = 1. / math.sqrt(self.weight.size(1))
-#         self.weight.data.uniform_(-stdv, stdv)
-#         if self.bias is not None:
-#             self.bias.data.uniform_(-stdv, stdv)
-#
-#     def forward(self, input, adj):
-#         support = th.mm(input, self.weight)
-#         output = th.spmm(adj, support)
-#         if self.bias is not None:
-#             return output + self.bias
-#         else:
-#             return output
-#
-#     def __repr__(self):
-#         return self.__class__.__name__ + ' (' \
-#                + str(self.in_features) + ' -> ' \
-#                + str(self.out_features) + ')'
-#
-#
-# class GCN(nn.Module):
-#     def __init__(self, nfeat, nhid, nclass, dropout):
-#         super(GCN, self).__init__()
-#
-#         self.gc1 = GraphConvolution(nfeat, nhid)
-#         self.gc2 = GraphConvolution(nhid, nclass)
-#         self.dropout = dropout
-#
-#     def forward(self, x, adj):
-#         x = nn.functional.relu(self.gc1(x, adj))
-#         x = nn.functional.dropout(x, self.dropout, training=self.training)
-#         x = self.gc2(x, adj)
-#         return nn.functional.log_softmax(x, dim=1)
-
 class ActorGCN(nn.Module):
 	def __init__(self, n_features=14, n_hidden=64, n_blocks=105, n_stems=105, drop_prob=0.2):
 		super(ActorGCN, self).__init__()
@@ -261,7 +214,7 @@ class ActorGCN(nn.Module):
 		# block_logits = self.conv21(x, edge_index)
 		# stem_logits = self.conv22(x, edge_index)
 		# #TODO: mask all the stem idxs other than the ones in the input
-		# selected_block = F.gumbel_softmax(block_logits, tau=1, hard=True) #TODO: set hard=False for probability values
+		# selected_block = F.gumbel_softmax(block_logits, tau=1, hard=True)
 		# selected_stem = F.gumbel_softmax(stem_logits, tau=1, hard=True)
 		# return block_logits, stem_logits, selected_block, selected_stem
 		
@@ -291,10 +244,6 @@ class CriticGCN(nn.Module):
 		return docking_energy
 
 
-from rdkit import Chem
-import LambdaZero.environments
-from LambdaZero import chem
-
 class GreedyActorCritic(nn.Module):
 	def __init__(self, num_features, num_hidden, critic_hidden_multiplier, num_class):
 		super(GreedyActorCritic, self).__init__()
@@ -313,6 +262,7 @@ class GreedyActorCritic(nn.Module):
 		best_stem = th.argmax(th.max((stem_logits + selected_stem), dim=0).values)
 		
 		# Get Molecules by adding the predicted block at the predicted stem
+		#TODO: make batch data compatible
 		# molecules = [Chem.MolFromSmiles(smile) for smile in data['Smiles']]
 		self.molMDP.molecule.mol = Chem.MolFromSmiles(data['smile'])
 		# chem.mol_from_frag(frag_smis=, frags=self.blocks)
