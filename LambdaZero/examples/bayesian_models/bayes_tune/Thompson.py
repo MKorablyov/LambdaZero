@@ -117,7 +117,7 @@ class Thompson(tune.Trainable):
         return idxs
 
     def get_posterior_sample(self, X_in, X_trn, y, idxs, X_feature_size,sigma_y):
-
+        # Murphy 7.55
         w_0 = np.zeros(X_feature_size)
         V_0 = np.diag([sigma_y] * X_feature_size)**2
         V0_inv = np.linalg.inv(V_0)
