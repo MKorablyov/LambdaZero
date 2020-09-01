@@ -19,9 +19,67 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 DEFAULT_CONFIG = {
-    "dataset_root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-    "file_names": ["Zinc15_260k_0",  "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
-    "split_name": "ksplit_Zinc15_260k",
+    "dataset_root": "/home/vbutoi/scratch/zinc15",
+    "file_names": ["zinc15_full_0",
+                   "zinc15_full_17",
+                   "zinc15_full_24",
+                   "zinc15_full_31",
+                   "zinc15_full_39",
+                   "zinc15_full_46",
+                   "zinc15_full_53",
+                   "zinc15_full_7",
+                   "zinc15_full_10",
+                   "zinc15_full_18",
+                   "zinc15_full_25",
+                   "zinc15_full_32",
+                   "zinc15_full_3",
+                   "zinc15_full_47",
+                   "zinc15_full_54",
+                   "zinc15_full_8",
+                   "zinc15_full_11",
+                   "zinc15_full_19",
+                   "zinc15_full_26",
+                   "zinc15_full_33",
+                   "zinc15_full_40",
+                   "zinc15_full_48",
+                   "zinc15_full_55",
+                   "zinc15_full_9",
+                   "zinc15_full_12",
+                   "zinc15_full_1",
+                   "zinc15_full_27",
+                   "zinc15_full_34",
+                   "zinc15_full_41",
+                   "zinc15_full_49",
+                   "zinc15_full_56",
+                   "zinc15_full_13",
+                   "zinc15_full_20",
+                   "zinc15_full_28",
+                   "zinc15_full_35",
+                   "zinc15_full_42",
+                   "zinc15_full_4",
+                   "zinc15_full_57",
+                   "zinc15_full_14",
+                   "zinc15_full_21",
+                   "zinc15_full_29",
+                   "zinc15_full_36",
+                   "zinc15_full_43",
+                   "zinc15_full_50",
+                   "zinc15_full_58",
+                   "zinc15_full_15",
+                   "zinc15_full_22",
+                   "zinc15_full_2",
+                   "zinc15_full_37",
+                   "zinc15_full_44",
+                   "zinc15_full_51",
+                   "zinc15_full_5",
+                   "zinc15_full_16",
+                   "zinc15_full_23",
+                   "zinc15_full_30",
+                   "zinc15_full_38",
+                   "zinc15_full_45",
+                   "zinc15_full_52",
+                   "zinc15_full_6"],
+    "split_name": "ksplit_total_dataset",
     "probs": [0.8, 0.1, 0.1],
 }
 config = DEFAULT_CONFIG
@@ -38,6 +96,7 @@ fps = []
 num_broken = 0
 
 for m in data['smi']:
+    print("Lol")
     mol = Chem.MolFromSmiles(m)
     mf = get_fp(mol,1024,[2])
     fps.append(mf)
@@ -73,6 +132,8 @@ print(test_set)
 print(len(train_set))
 print(len(val_set))
 print(len(test_set))
+
+raise ValueError
 
 split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
 np.save(split_path, splits)
