@@ -35,14 +35,14 @@ def train_epoch(loader, model, optimizer, device, config):
 
         optimizer.zero_grad()
         logits = model(data)
-        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
+        loss = F.mse_loss(logits, normalizer.tfm(targets))
         loss.backward()
         optimizer.step()
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
 
     epoch_targets = np.concatenate(epoch_targets,0)
     epoch_preds = np.concatenate(epoch_preds, 0)
@@ -68,12 +68,12 @@ def eval_epoch(loader, model, device, config):
         targets = getattr(data, config["target"])
 
         logits = model(data)
-        loss = F.mse_loss(logits, normalizer.forward_transform(targets))
+        loss = F.mse_loss(logits, normalizer.tfm(targets))
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.backward_transform(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
 
     epoch_targets = np.concatenate(epoch_targets,0)
     epoch_preds = np.concatenate(epoch_preds, 0)
@@ -88,25 +88,23 @@ def eval_epoch(loader, model, device, config):
     return metrics
 
 
-
-
 DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
         "target": "gridscore",
         "target_norm": [-43.042, 7.057],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-        "b_size": 64,
+        "dataset_split_path": "/home/vbutoi/LambdaZero/datasets/brutal_dock/qm9/raw/randsplit_qm9.npy",
+        "b_size": 32,
 
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
-            "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
+            "root": "/home/vbutoi/LambdaZero/datasets/brutal_dock/qm9",
             "props": ["gridscore"],
             "transform": transform,
-            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+            "file_names": ["qm9"]
         },
 
-        "model": LambdaZero.models.MPNNet,
+        "model": LambdaZero.models.MPNNet(),
         "model_config": {},
 
         "optimizer": torch.optim.Adam,
@@ -130,7 +128,7 @@ DEFAULT_CONFIG = {
     "checkpoint_score_attr":"train_loss",
     "num_samples":1,
     "checkpoint_at_end": False,
-    #"checkpoint_freq": 1,
+    "checkpoint_freq": 100,
 }
 
 

@@ -192,7 +192,9 @@ class MPNNet(nn.Module):
 
         for i in range(3):
             m = nn.functional.relu(self.conv(out, data.edge_index, data.edge_attr))
+            
             out, h = self.gru(m.unsqueeze(0), h)
+            
             out = out.squeeze(0)
 
         out = self.set2set(out, data.batch)
@@ -319,7 +321,9 @@ class GraphIsomorphismNet(nn.Module):
         h = node_out.unsqueeze(0)
         for gin, edge_update in zip(self.graphconv, self.edge_mlps):
             m = gin(node_out, data.edge_index, edge_out)
+            
             node_out, h = self.gru(m.unsqueeze(0), h)
+            
             node_out = node_out.squeeze(0)
             edge_out = edge_update(edge_out)
 
@@ -700,6 +704,7 @@ class DimeNet(torch.nn.Module):
         angle = torch.atan2(b, a)
 
         rbf = self.rbf(dist)
+
         sbf = self.sbf(dist, angle, idx_kj)
 
         # Embedding block.

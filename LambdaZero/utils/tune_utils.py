@@ -17,13 +17,17 @@ class BasicRegressor(tune.Trainable):
         # make dataset
         dataset = self.config["dataset"](**self.config["dataset_config"])
         train_idxs, val_idxs, test_idxs = np.load(self.config["dataset_split_path"], allow_pickle=True)
+        train_idxs = train_idxs[train_idxs<107135]
+        val_idxs = val_idxs[val_idxs<107135]
+
         self.train_set = Subset(dataset, train_idxs.tolist())
         self.val_set = Subset(dataset, val_idxs.tolist())
+        
         self.train_loader = DataLoader(self.train_set,shuffle=True, batch_size=self.config["b_size"])
         self.val_loader = DataLoader(self.val_set, batch_size=self.config["b_size"])
 
         # make model
-        self.model = config["model"](**config["model_config"])
+        self.model = config["model"]
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
 
