@@ -106,7 +106,6 @@ tpnn_16_64_012_set2set = {
 }
 
 
-
 tpnn_2_64_0_set2set = {
     "trainer_config":
     {

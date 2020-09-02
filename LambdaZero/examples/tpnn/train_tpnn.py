@@ -108,7 +108,7 @@ TPNN_CONFIG = {
             "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],  # ["Zinc15_2k"]
         },
 
-        "model": LambdaZero.models.TPNN_v1,
+        "model": LambdaZero.models.TPNN_v2,
         "model_config": {},
         "optimizer": torch.optim.Adam,
         "optimizer_config": {

@@ -355,3 +355,32 @@ class TPNN_v1(TensorPassingHomogenous):
         pooled_features = self.pooling(hidden_features, graph.batch)
         output = self.fully_connected(pooled_features)
         return output
+
+
+class TPNN_v2(TensorPassingHomogenous):
+    def __init__(self, representations, **kwargs):
+        emb_size = 16
+        hidden_size = representations[-1][0][0]
+        input_size = representations[0][0][0]
+        representations[0][0] = (emb_size, 0, 0)
+        radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
+        gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
+        super().__init__(representations, radial_model, gate)
+
+        self.emb = nn.Sequential(
+            nn.Linear(input_size, emb_size),
+            nn.Tanh()
+        )
+        self.pooling = Set2Set(hidden_size, processing_steps=3)
+        self.fully_connected = nn.Sequential(
+                nn.Linear(2 * hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, 1)
+        )
+
+    def forward(self, graph):
+        graph.x = self.emb(graph.x)
+        hidden_features = super().forward(graph)
+        pooled_features = self.pooling(hidden_features, graph.batch)
+        output = self.fully_connected(pooled_features)
+        return output
