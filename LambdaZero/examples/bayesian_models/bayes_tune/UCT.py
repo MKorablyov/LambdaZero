@@ -82,8 +82,9 @@ class UCT(tune.Trainable):
         self.train_loader = DataLoader(train_set, shuffle=True, batch_size=self.config["data"]["b_size"])
         self.ul_loader = DataLoader(ul_set, batch_size=self.config["data"]["b_size"])
         # fit model to the data
-
         scores = self.regressor.fit(self.train_loader, self.val_loader)[-1]
+        print([len(s) for s in scores])
+
 
         # compute acquisition metrics
         _scores = aq_regret(self.train_loader, self.ul_loader, self.config["regressor_config"]["config"])
@@ -99,17 +100,6 @@ class UCT(tune.Trainable):
         if self.config["minimize_objective"]: scores = -scores
         idxs = np.argsort(-scores)[:self.config["aq_size"]]
         return idxs
-
-
-    # def get_reward(molecule)
-        # self.ul_set.append(molecule)
-        # if len(ul_set > 1000):
-                #  self._acquire_and_update() # nonblocking
-        # score = mean + kappa * var
-
-
-
-
 
 
 DEFAULT_CONFIG = {
@@ -137,7 +127,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "uctComb002"
+    else: config_name = "uct001"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["acquirer_config"]["name"] = config_name

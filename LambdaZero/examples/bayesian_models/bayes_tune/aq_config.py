@@ -10,7 +10,8 @@ import LambdaZero.models
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_mcdrop, train_mpnn_brr, \
     mpnn_brr_mean_variance
 from LambdaZero.examples.bayesian_models.bayes_tune.brr import BRR
-from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, mcdrop_mean_variance
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
+    mcdrop_mean_variance
 # from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 
 datasets_dir, _, _ = LambdaZero.utils.get_external_dirs()
@@ -62,47 +63,46 @@ random001 = {
             "config":{
                 "train":train_mpnn_brr,
                 "get_mean_variance": mpnn_brr_mean_variance,
+                "kappa":0,
                 "epsilon":1000,
                 "regressor_config":{
                     "config":{
                         "train": train_mpnn_brr,
                         "get_mean_variance":mpnn_brr_mean_variance
-                    }
-                }
-            }}}
+                    }}}}}
+
+
 
 random002 = {
     "acquirer_config":{
             "config":{
                 "train":train_mpnn_brr,
                 "get_mean_variance": mpnn_brr_mean_variance,
-                "epsilon":1000,
+                "kappa": 0,
+                "epsilon": 1000,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
                     "config":{
                         "train": train_mpnn_brr,
                         "get_mean_variance":mpnn_brr_mean_variance
-                    }
-                }
-            }}}
-
+                    }}}}}
 # greedy
 greedy001 = {
     "acquirer_config":{
             "config":{
                 "train":train_mpnn_brr,
                 "get_mean_variance": mpnn_brr_mean_variance,
-                "epsilon":0,
+                "epsilon": 0,
+                "kappa": 0,
                 "regressor_config":{
                     "config":{
                         "train": train_mpnn_brr,
                         "get_mean_variance":mpnn_brr_mean_variance
-                    }
-                }
-            }}}
+                    }}}}}
 
 greedy002 = {
     "acquirer_config":{
@@ -110,17 +110,17 @@ greedy002 = {
                 "train":train_mpnn_brr,
                 "get_mean_variance": mpnn_brr_mean_variance,
                 "epsilon":0,
+                "kappa":0,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
                     "config":{
                         "train": train_mpnn_brr,
                         "get_mean_variance":mpnn_brr_mean_variance
-                    }
-                }
-            }}}
+                    }}}}}
 
 uct003_brr = {
     "acquirer_config":{
@@ -132,9 +132,7 @@ uct003_brr = {
                     "config":{
                         "train": train_mpnn_brr,
                         "get_mean_variance":mpnn_brr_mean_variance
-                    }
-                }
-            }}}
+                    }}}}}
 
 uct003_mcdrop = {
     "acquirer_config":{
@@ -146,9 +144,7 @@ uct003_mcdrop = {
                     "config":{
                         "train": train_mcdrop,
                         "get_mean_variance": mcdrop_mean_variance 
-                    }
-                }
-            }}}
+                    }}}}}
 
 uct004_brr = {
     "acquirer_config":{
@@ -157,16 +153,15 @@ uct004_brr = {
                 "get_mean_variance": mpnn_brr_mean_variance,
                 "kappa":1e-2,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
                     "config":{
                         "train": train_mpnn_brr,
                         "get_mean_variance":mpnn_brr_mean_variance
-                    }
-                }
-            }}}
+                    }}}}}
 
 uct004_mcdrop = {
     "acquirer_config":{
@@ -175,16 +170,15 @@ uct004_mcdrop = {
                 "get_mean_variance": mcdrop_mean_variance,
                 "kappa":1e-2,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
                     "config":{
                         "train": train_mcdrop,
                         "get_mean_variance": mcdrop_mean_variance 
-                    }
-                }
-            }}}
+                    }}}}}
 
 # uct 005, 006, 006 repeat uct 004 but with different kappas
 uct005_brr = {
@@ -194,16 +188,15 @@ uct005_brr = {
                 "get_mean_variance": mpnn_brr_mean_variance,
                 "kappa":1e-1,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
                     "config":{
                         "train": train_mpnn_brr,
                         "get_mean_variance":mpnn_brr_mean_variance
-                    }
-                }
-            }}}
+                    }}}}}
 
 uct005_mcdrop = {
     "acquirer_config":{
@@ -212,16 +205,15 @@ uct005_mcdrop = {
                 "get_mean_variance": mcdrop_mean_variance,
                 "kappa":1e-1,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
                     "config":{
                         "train": train_mcdrop,
                         "get_mean_variance": mcdrop_mean_variance 
-                    }
-                }
-            }}}
+                    }}}}}
 
 uct006_brr = {
     "acquirer_config":{
@@ -230,7 +222,8 @@ uct006_brr = {
                 "get_mean_variance": mpnn_brr_mean_variance,
                 "kappa":1,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
@@ -248,7 +241,8 @@ uct006_mcdrop = {
                 "get_mean_variance": mcdrop_mean_variance,
                 "kappa":1,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
@@ -267,7 +261,8 @@ uct007_brr = {
                 "get_mean_variance": mpnn_brr_mean_variance,
                 "kappa":10,
                 "dataset_split_path":
-                    osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                    osp.join(datasets_dir,
+                             "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
                 "dataset_config": {
                     "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]},
                 "regressor_config":{
@@ -307,11 +302,7 @@ ts003_brr = {
                     "config":{
                         "train": train_mpnn_brr,
                         "get_mean_variance":mpnn_brr_mean_variance
-                    }
-                }
-            },
-            
-            }}
+                    }}}}}
 
 ts003_mcdrop = {
     "acquirer_config":{
@@ -322,9 +313,7 @@ ts003_mcdrop = {
                     "config":{
                         "train": train_mcdrop,
                         "get_mean_variance": mcdrop_mean_variance
-                    }
-                }
-            }}}
+                    }}}}}
 
 
 ts004_brr = {

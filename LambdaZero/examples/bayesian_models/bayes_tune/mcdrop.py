@@ -48,26 +48,6 @@ class MCDrop(tune.Trainable):
         self.optim = self.config["optimizer"](self.model.parameters(), **self.config["optimizer_config"])
         self.model.to(self.device)
 
-        #############
-
-        # x_train, y_train = self.get_data_targs(train_loader)
-
-        # self.clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False, verbose=True)
-        # self.clf.fit(x_train, y_train)
-
-        # self.alpha = self.clf.lambda_
-        # self.beta = self.clf.alpha_
-        # x_train = torch.from_numpy(x_train)
-        # self.K = self.beta * x_train.T @ x_train + self.alpha * torch.eye(self.feature_dim)   # [M, M]
-        # self.chol_K = torch.cholesky(self.K)
-
-        # projected_y = x_train.T @ y_train
-        # # import pdb; pdb.set_trace()
-        # k_inv_projected_y = torch.cholesky_solve(projected_y, self.chol_K)
-        # self.m = self.beta * k_inv_projected_y  # [M, 1]
-
-        #############
-
         # todo allow ray native stopping
         all_scores = []
         for i in range(self.config["train_iterations"]):
@@ -79,39 +59,20 @@ class MCDrop(tune.Trainable):
         mean,var = self.config["get_mean_variance"](self.train_loader, loader, self.model, self.device, self.config)
         return mean, var
 
-    # def get_data_targs(self, loader):
-    #     self.model.eval()
-    #     epoch_targets_norm = []
-    #     epoch_logits = []
-
-    #     for bidx,data in enumerate(loader):
-    #         data = data.to(device)
-    #         targets = getattr(data, 'gridscore')
-
-    #         embeds = self.model.get_embed(data, do_dropout=False)
-    #         targets_norm = self.config["data"]["normalizer"].tfm(targets)
-
-    #         epoch_targets_norm.append(targets_norm.detach().cpu().numpy())
-    #         epoch_logits.append(embeds.detach().squeeze().cpu().numpy())
-
-    #     epoch_targets_norm = np.concatenate(epoch_targets_norm,0)
-    #     epoch_logits = np.concatenate(epoch_logits, 0)
-
-    #     return epoch_logits, epoch_targets_norm
-
 
 data_config = {
     "target": "gridscore",
     "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
     "dataset_split_path": osp.join(datasets_dir,
-                                   "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
-    # "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+                                   "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+                                   #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
         "props": ["gridscore", "smi"],
         "transform": transform,
-        "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+        "file_names": ["Zinc15_2k"],
+        #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
     },
     "b_size": 40,
     "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057])
@@ -158,7 +119,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "mcdrop003"
+    else: config_name = "mcdrop001"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
