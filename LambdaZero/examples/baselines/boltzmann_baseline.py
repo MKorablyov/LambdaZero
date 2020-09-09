@@ -21,78 +21,78 @@ default_config = {
     "env_config": env_config
 }
 
-def boltzmann_choice(probs, actions):
-    a = np.random.choice(actions, p=probs)
-    return a
-
-def enumerate_actions(env, obs, temperature):
-    state = env.get_state()
-    actions = np.where(obs["action_mask"])[0]
-    rewards = []
-    for i, a in enumerate(actions):
-        obs, reward, _, info = env.step(a)
-        rewards.append(reward)
-        env.set_state(state)
-    probs = special.softmax(np.divide(rewards, temperature))
-    return actions, probs
+# def boltzmann_choice(probs, actions):
+#     a = np.random.choice(actions, p=probs)
+#     return a
+#
+# def enumerate_actions(env, obs, temperature):
+#     state = env.get_state()
+#     actions = np.where(obs["action_mask"])[0]
+#     rewards = []
+#     for i, a in enumerate(actions):
+#         obs, reward, _, info = env.step(a)
+#         rewards.append(reward)
+#         env.set_state(state)
+#     probs = special.softmax(np.divide(rewards, temperature))
+#     return actions, probs
+#
+# @ray.remote
+# def boltzmann_opt(env, temperature=2., steps=10):
+#     rewards = []
+#     observations = []
+#     obs = env.reset()
+#     for i in range(steps):
+#         actions, probs = enumerate_actions(env, obs, temperature)
+#         #print ('done')
+#         action = boltzmann_choice(probs, actions)
+#         obs, reward, _, info = env.step(action)
+#         rewards.append(reward)
+#         observations.append(obs)
+#     return max(rewards)
 
 @ray.remote
-def boltzmann_opt(env, temperature=2., steps=10):
-    rewards = []
-    observations = []
-    obs = env.reset()
-    for i in range(steps):
-        actions, probs = enumerate_actions(env, obs, temperature)
-        #print ('done')
-        action = boltzmann_choice(probs, actions)
-        obs, reward, _, info = env.step(action)
-        rewards.append(reward)
-        observations.append(obs)
-    return max(rewards)
+class boltzmann_opt:
 
-# @ray.remote
-# class boltzmann_opt:
-#
-#     def __init__(self, env, temperature=1., steps=10):
-#         self.env = env
-#         self.temperature = temperature
-#         self.steps = steps
-#
-#     def boltzmann_choice(self, probs, actions):
-#         a = np.random.choice(actions, p=probs)
-#         return a
-#
-#     def enumerate_actions(self, obs):
-#         state = self.env.get_state()
-#         actions = np.where(obs["action_mask"])[0]
-#         rewards = []
-#         for i, a in enumerate(actions):
-#             obs, reward, _, info = env.step(a)
-#             rewards.append(reward)
-#             env.set_state(state)
-#         probs = special.softmax(np.divide(rewards, self.temperature))
-#         return actions, probs
-#
-#     def __call__(self):
-#         rewards = []
-#         observations = []
-#         obs = env.reset()
-#         for i in range(self.steps):
-#             actions, probs = self.enumerate_actions(obs)
-#             action = self.boltzmann_choice(probs, actions)
-#             obs, reward, _, info = env.step(action)
-#             rewards.append(reward)
-#             observations.append(obs)
-#         return max(rewards)
+    def __init__(self, config, temperature=1., steps=10):
+        config["env_config"]["reward_config"]["device"] = "cpu"
+        self.env = config["env"](config["env_config"])
+        self.temperature = temperature
+        self.steps = steps
+
+    def boltzmann_choice(self, probs, actions):
+        a = np.random.choice(actions, p=probs)
+        return a
+
+    def enumerate_actions(self, obs):
+        state = self.env.get_state()
+        actions = np.where(obs["action_mask"])[0]
+        rewards = []
+        for i, a in enumerate(actions):
+            obs, reward, _, info = self.env.step(a)
+            rewards.append(reward)
+            self.env.set_state(state)
+        probs = special.softmax(np.divide(rewards, self.temperature))
+        return actions, probs
+
+    def optimize(self):#__call__(self):
+        rewards = []
+        observations = []
+        obs = self.env.reset()
+        for i in range(self.steps):
+            actions, probs = self.enumerate_actions(obs)
+            action = self.boltzmann_choice(probs, actions)
+            obs, reward, _, info = self.env.step(action)
+            rewards.append(reward)
+            observations.append(obs)
+        return max(rewards)
 
 
 if __name__ == "__main__":
-
     ray.init()
     config = default_config
-    config["env_config"]["reward_config"]["device"] = "cpu"
-    env = config["env"](config["env_config"])
-    reward = ray.get(boltzmann_opt.remote(env))
+    #optimizer = boltzmann_opt(config)
+    optimizer = boltzmann_opt.remote(config)
+    reward = ray.get(optimizer.optimize.remote())
     print (reward)
     #value = ray.get(obj)
     #print("highest value is", value)
