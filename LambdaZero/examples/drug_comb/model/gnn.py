@@ -20,7 +20,7 @@ class GNN(torch.nn.Module):
             raise AttributeError('aggr must be one of "concat" or "hadamard"')
 
         gcn_dropout = torch.nn.Dropout(gcn_dropout_rate)
-        self.convs = []
+        convs = []
         for i in range(len(gcn_channels) - 1):
             in_channels  = gcn_channels[i]
             out_channels = gcn_channels[i + 1]
@@ -38,13 +38,15 @@ class GNN(torch.nn.Module):
                                            int(rank), train_edge_index,
                                            val_edge_index, gcn_dropout)
 
-            self.convs.append(gnn_lyr)
+            convs.append(gnn_lyr)
 
-        #if num_residual_gcn_layers > len(self.convs):
-        #    raise AttributeError(
-        #        "num_residual_gcn_layers must be at most " +
-        #        "the number of gcn layers"
-        #    )
+        self.convs = torch.nn.ModuleList(*convs)
+
+        if len(self.convs) > 0 and num_residual_gcn_layers > len(self.convs):
+            raise AttributeError(
+                "num_residual_gcn_layers must be at most " +
+                "the number of gcn layers"
+            )
 
         self.gcn_dropout = gcn_dropout if gnn_lyr_type == 'InMemoryGCN' else None
         self.num_residual_gcn_layers = num_residual_gcn_layers
@@ -62,35 +64,6 @@ class GNN(torch.nn.Module):
         self.predictor = RelationAwareMLP(linear_channels, num_relations,
                                           num_relation_lin_layers, linear_dropout,
                                           batch_norm=False)
-
-    def to(self, device):
-        super().to(device)
-
-        for i in range(len(self.convs)):
-            self.convs[i] = self.convs[i].to(device)
-
-        self.predictor = self.predictor.to(device)
-
-        return self
-
-    def train(self, mode=True):
-        self = super().train(mode)
-        for i in range(len(self.convs)):
-            self.convs[i] = self.convs[i].train(mode)
-
-        self.predictor = self.predictor.train(mode)
-        return self
-
-    def parameters(self):
-        for param in super().parameters():
-            yield param
-
-        for conv in self.convs:
-            for param in conv.parameters():
-                yield param
-
-        for param in self.predictor.parameters():
-            yield param
 
     def forward(self, x, edge_index, relations, concs):
         for i, conv in enumerate(self.convs):

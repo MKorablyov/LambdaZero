@@ -21,15 +21,6 @@ class RelationAwareLinear(torch.nn.Module):
             bound = 1 / math.sqrt(fan_in)
             init.uniform_(self.bias, -bound, bound)
 
-    def to(self, device):
-        super().to(device)
-
-        self.w = self.w.to(device)
-        if self.bias is not None:
-            self.bias = self.bias.to(device)
-
-        return self
-
     def forward(self, x, relations):
         # idx array for trick to do 3d tensor mult fast
         idxs = torch.arange(x.shape[0], device=x.device)

@@ -45,6 +45,7 @@ def _get_split(dataset, config):
         props.append(1 - props[0] - props[1])
 
     # First two items are train & val, so only return them
+    import pdb; pdb.set_trace()
     return dataset.random_split(props[1], .0)[:2]
 
 def _get_loaders(train_set, val_set, batch_size, device):
@@ -167,7 +168,7 @@ config = {
     "checkpoint_freq": 200,
     "stop": {"training_iteration": 100},
     "checkpoint_at_end": False,
-    "resources_per_trial": {"gpu": 1},
+    "resources_per_trial": {},#"gpu": 1},
     "name": "DrugCombTryHyperopt",
     "asha_metric": "eval_mse",
     "asha_mode": "min",

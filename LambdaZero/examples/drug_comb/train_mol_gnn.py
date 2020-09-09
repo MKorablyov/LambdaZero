@@ -65,17 +65,18 @@ def _get_loaders(train_set, val_set, batch_size, device):
 
     return train_loader, val_loader
 
-def run_epoch(loader, model, normalizer, graphs, optim, is_train):
+def run_epoch(loader, model, args_builder, normalizer, graphs, optim, is_train):
     model.train() if is_train else model.eval()
 
     loss_sum      = 0
     epoch_targets = []
     epoch_preds   = []
     for i, batch in enumerate(loader):
-        edge_index, edge_classes, edge_attr, y = batch
-        edge_index, graph_batch = _rebuild_edge_index_and_graphs(edge_index, graphs)
+        y_hat = model(**args_builder(batch))
+        #edge_index, edge_classes, edge_attr, y = batch
+        #edge_index, graph_batch = _rebuild_edge_index_and_graphs(edge_index, graphs)
 
-        y_hat = model(graph_batch, edge_index, edge_classes, edge_attr)
+        #y_hat = model(graph_batch, edge_index, edge_classes, edge_attr)
         loss = F.mse_loss(normalizer.tfm(y), y_hat)
 
         if is_train:

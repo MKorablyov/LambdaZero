@@ -31,18 +31,6 @@ class MolGnnPredictor(torch.nn.Module):
                                           num_relation_lin_layers, linear_dropout,
                                           batch_norm=False)
 
-    def to(self, device):
-        super().to(device)
-        self.predictor = self.predictor.to(device)
-        return self
-
-    def parameters(self):
-        for param in super().parameters():
-            yield param
-
-        for param in self.predictor.parameters():
-            yield param
-
     def forward(self, x, edge_index, relations, concs):
         x = self.mpnn.get_embed(x, do_dropout=self.training)
 

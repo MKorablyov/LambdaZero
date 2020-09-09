@@ -212,40 +212,40 @@ class NewDrugComb(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[1])
 
     def random_split(self, test_prob, valid_prob):
-	"""
-	We split at the edge index level. the data.ddi_edge_idx attribute contains the "same" edge several times, each
-	time corresponding to a specific cell line.
-	We split so that all edges that correspond to the same drug pair end up in the same split
-	"""
-	def get_set_from_idx(idx, i):
-	    """
-	    return 0 if unique edge i is in train, 1 if valid, 2 if test
-	    """
-	    if idx[i] >= ntest + nvalid:
-		return 0
-	    elif idx[i] < nvalid:
-		return 1
-	    else:
-		return 2
-	# Get unique edges (one for each drug pair, regardless of cell line)
-	unique_ddi_edge_idx = self.data.ddi_edge_idx.unique(dim=1)
-	num_unique_examples = unique_ddi_edge_idx.shape[1]
-	# train test valid split of unique edges
-	nvalid = int(num_unique_examples * valid_prob)
-	ntest = int(num_unique_examples * test_prob)
-	unique_idx = torch.randperm(num_unique_examples)
-	# Dictionary that associate each unique edge with a split (train valid or test)
-	edge_to_split_dict = {tuple(unique_ddi_edge_idx.T[i].tolist()): get_set_from_idx(unique_idx, i)
-			      for i in range(num_unique_examples)}
-	# Split for all edges (non unique)
-	all_edges_split = np.array([edge_to_split_dict[tuple(edge.tolist())] for edge in self.data.ddi_edge_idx.T])
-	train_idx = np.where(all_edges_split == 0)[0]
-	val_idx = np.where(all_edges_split == 1)[0]
-	test_idx = np.where(all_edges_split == 2)[0]
-	np.random.shuffle(train_idx)
-	np.random.shuffle(val_idx)
-	np.random.shuffle(test_idx)
-	return torch.tensor(train_idx), torch.tensor(val_idx), torch.tensor(test_idx)
+        """
+        We split at the edge index level. the data.ddi_edge_idx attribute contains the "same" edge several times, each
+        time corresponding to a specific cell line.
+        We split so that all edges that correspond to the same drug pair end up in the same split
+        """
+        def get_set_from_idx(idx, i):
+            """
+            return 0 if unique edge i is in train, 1 if valid, 2 if test
+            """
+            if idx[i] >= ntest + nvalid:
+                return 0
+            elif idx[i] < nvalid:
+                return 1
+            else:
+                return 2
+        # Get unique edges (one for each drug pair, regardless of cell line)
+        unique_ddi_edge_idx = self.data.ddi_edge_idx.unique(dim=1)
+        num_unique_examples = unique_ddi_edge_idx.shape[1]
+        # train test valid split of unique edges
+        nvalid = int(num_unique_examples * valid_prob)
+        ntest = int(num_unique_examples * test_prob)
+        unique_idx = torch.randperm(num_unique_examples)
+        # Dictionary that associate each unique edge with a split (train valid or test)
+        edge_to_split_dict = {tuple(unique_ddi_edge_idx.T[i].tolist()): get_set_from_idx(unique_idx, i)
+                              for i in range(num_unique_examples)}
+        # Split for all edges (non unique)
+        all_edges_split = np.array([edge_to_split_dict[tuple(edge.tolist())] for edge in self.data.ddi_edge_idx.T])
+        train_idx = np.where(all_edges_split == 0)[0]
+        val_idx = np.where(all_edges_split == 1)[0]
+        test_idx = np.where(all_edges_split == 2)[0]
+        np.random.shuffle(train_idx)
+        np.random.shuffle(val_idx)
+        np.random.shuffle(test_idx)
+        return torch.tensor(train_idx), torch.tensor(val_idx), torch.tensor(test_idx)
 
 
 class EdgeData:

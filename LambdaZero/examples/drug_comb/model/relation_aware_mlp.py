@@ -34,44 +34,23 @@ class RelationAwareMLP(torch.nn.Module):
                 if batch_norm:
                     modules.append(torch.nn.BatchNorm1d(out_channels))
 
-        self.dropout = dropout
-        self.non_relation_pred = torch.nn.Sequential(*modules)
-        self.relation_lyrs = [
+        relation_lyrs = [
             RelationAwareLinear(num_relations, layer_channels[j], layer_channels[j + 1])
             for j in range(num_layers - num_relation_layers, num_layers)
         ]
 
+        self.dropout = dropout
+        self.non_relation_pred = torch.nn.Sequential(*modules)
+        self.relation_lyrs = torch.nn.ModuleList(*relation_lyrs)
+
         self.bn = None
         if batch_norm:
-            self.bn = [
+            bn = [
                 torch.nn.BatchNorm1d(layer_channels[j])
                 for k in range(num_layers - num_relation_layers, num_layers)
             ]
 
-    def to(self, device):
-        super().to(device)
-
-        for i in range(len(self.relation_lyrs)):
-            self.relation_lyrs[i] = self.relation_lyrs[i].to(device)
-
-        if self.bn is not None:
-            for i in range(len(self.bn)):
-                self.bn[i] = self.bn[i].to(device)
-
-        return self
-
-    def parameters(self):
-        for param in super().parameters():
-            yield param
-
-        for lyr in self.relation_lyrs:
-            for param in lyr.parameters():
-                yield param
-
-        if self.bn is not None:
-            for bn in self.bn:
-                for param in bn.parameters():
-                    yield param
+            self.bn = torch.nn.ModuleList(*bn)
 
     def forward(self, x, relations):
         x = self.non_relation_pred(x)
