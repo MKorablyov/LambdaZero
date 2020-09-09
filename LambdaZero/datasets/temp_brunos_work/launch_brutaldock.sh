@@ -1,1 +1,0 @@
-python brutal_dock_model.py --config mpnn_default.json --data_path ../../../Datasets/brutal_dock/d4/ --output_path tests/
