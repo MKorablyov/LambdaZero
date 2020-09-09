@@ -352,11 +352,15 @@ class DrugCombScore(InMemoryDataset):
         val_idx = np.where(all_edges_split == 1)[0]
         test_idx = np.where(all_edges_split == 2)[0]
 
-        np.random.shuffle(train_idx)
-        np.random.shuffle(val_idx)
-        np.random.shuffle(test_idx)
+        train_idx = torch.tensor(np.random.shuffle(train_idx))
+        val_idx = torch.tensor(np.random.shuffle(val_idx))
+        test_idx = torch.tensor(np.random.shuffle(test_idx))
 
-        return torch.tensor(train_idx), torch.tensor(val_idx), torch.tensor(test_idx)
+        self.train_edge_index = self.ddi_edge_index[:, train_idx]
+        self.val_edge_index = self.ddi_edge_index[:, .val_idx]
+        self.test_edge_index = self.ddi_edge_index[:, test_idx]
+
+        return train_idx, val_idx, test_idx
 
 
 class DrugCombScoreNoPPI(DrugCombScore):
