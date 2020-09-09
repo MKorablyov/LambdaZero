@@ -166,7 +166,7 @@ DEFAULT_CONFIG = {
     # (if num_bloks(molecule) > max_bloks, block additon is not alowed)
     "max_atoms": 50,
     "max_branches": 25,
-    "random_blocks": 2, # regularizer; start environment with molecule with random_bloks bloks
+    "random_blocks": 3, # regularizer; start environment with molecule with random_bloks bloks
     "max_simulations": 1, # max simulations before agent is forced to exit
     "allow_removal": True
 }

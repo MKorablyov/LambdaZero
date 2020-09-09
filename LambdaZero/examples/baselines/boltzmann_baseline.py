@@ -18,7 +18,9 @@ import ray
 
 default_config = {
     "env": BlockMolEnv_v4,
-    "env_config": env_config
+    "env_config": env_config,
+    "temperature": 2.,
+    "steps": 8
 }
 
 # def boltzmann_choice(probs, actions):
@@ -53,15 +55,15 @@ default_config = {
 @ray.remote
 class boltzmann_opt:
 
-    def __init__(self, config, temperature=1., steps=10):
+    def __init__(self, config):
         config["env_config"]["reward_config"]["device"] = "cpu"
         self.env = config["env"](config["env_config"])
-        self.temperature = temperature
-        self.steps = steps
+        self.temperature = config["temperature"]
+        self.steps = config["steps"]
 
     def boltzmann_choice(self, probs, actions):
-        a = np.random.choice(actions, p=probs)
-        return a
+        action = np.random.choice(actions, p=probs)
+        return action
 
     def enumerate_actions(self, obs):
         state = self.env.get_state()
@@ -74,28 +76,26 @@ class boltzmann_opt:
         probs = special.softmax(np.divide(rewards, self.temperature))
         return actions, probs
 
-    def optimize(self):#__call__(self):
+    def optimize(self):  # __call__(self):
         rewards = []
-        observations = []
+        # observations = []
         obs = self.env.reset()
         for i in range(self.steps):
             actions, probs = self.enumerate_actions(obs)
             action = self.boltzmann_choice(probs, actions)
             obs, reward, _, info = self.env.step(action)
             rewards.append(reward)
-            observations.append(obs)
-        return max(rewards)
-
+            # observations.append(obs)
+        return rewards
+    
 
 if __name__ == "__main__":
     ray.init()
     config = default_config
-    #optimizer = boltzmann_opt(config)
     optimizer = boltzmann_opt.remote(config)
-    reward = ray.get(optimizer.optimize.remote())
-    print (reward)
-    #value = ray.get(obj)
-    #print("highest value is", value)
+    rewards = ray.get(optimizer.optimize.remote())
+    print(rewards)
+
 
 
 #
