@@ -21,117 +21,139 @@ default_config = {
     "env_config": env_config
 }
 
-def step_env(rng, env, state, action_mask, temperature, evaluate_molecules):
-    actions = np.where(action_mask)[0]
-    # molecules = []
-    next_states = []
-    observations = []
-    values = []
+def boltzmann_choice(probs, actions):
+    a = np.random.choice(actions, p=probs)
+    return a
 
+def enumerate_actions(env, obs, temperature):
+    state = env.get_state()
+    actions = np.where(obs["action_mask"])[0]
+    rewards = []
     for i, a in enumerate(actions):
-        env.set_state(state)
         obs, reward, _, info = env.step(a)
-        #molecules.append(copy.deepcopy(info["molecule"].mol))
-        next_states.append(env.get_state())
-        observations.append(obs)
-        values.append(reward)
-    #values = evaluate_molecules(molecules)
-    probs = special.softmax(np.divide(values, temperature))
-    a = rng.choice(actions.shape[0], p=probs)
-    return values[a], next_states[a], observations[a]
+        rewards.append(reward)
+        env.set_state(state)
+    probs = special.softmax(np.divide(rewards, temperature))
+    return actions, probs
 
 @ray.remote
-def boltzmann_search(env, state, obs, max_steps, mol_eval, temperature=1., stop_condition=None, top_k=1):
-    # start = time.time()
-    values = []
-    # states = []
-    rng = np.random.default_rng()
-    for i in range(max_steps):
-        action_mask = obs["action_mask"]
-        val, state, obs = step_env(rng, env, state, action_mask, temperature, mol_eval)
-        values.append(val)
-        #states.append(state)
-        print(("Finished iteration {}, current max: {:.3f}").format(i, np.max(values)))
-        # print((
-        #     "Finished iteration {}, current max: {:.3f}, total evals: {}"
-        # ).format(i, np.max(values), total_evals()))
-        if stop_condition is not None:
-            stop_condition.update(val, state, obs)
-            if stop_condition.should_stop():
-                break
-
-    # end = time.time()
-    # time = end-start
-    # print("time", end - start)
-    return max(values)
-
-    # top_idx = np.argsort(values)[-top_k:]
-    # return tuple(zip(*[(values[i], states[i]) for i in top_idx]))
-
-
-# def boltzmann_choice(probs, temperature)
-    # return sample
-
-# def enumerate_actions(env):
-    # return actions, probs
+def boltzmann_opt(env, temperature=2., steps=10):
+    rewards = []
+    observations = []
+    obs = env.reset()
+    for i in range(steps):
+        actions, probs = enumerate_actions(env, obs, temperature)
+        #print ('done')
+        action = boltzmann_choice(probs, actions)
+        obs, reward, _, info = env.step(action)
+        rewards.append(reward)
+        observations.append(obs)
+    return max(rewards)
 
 # @ray.remote
-# def boltzmann_opt(env, n):
-    # for i in rage(n):
-        # env.reset()
-        # actions, values = enumerate_actions
-        # action = boltzmann_choice(probs, temperature)
-        # env.step(action)
-        # return energy
-
-
-#  ray.wait_for()
-    #
+# class boltzmann_opt:
+#
+#     def __init__(self, env, temperature=1., steps=10):
+#         self.env = env
+#         self.temperature = temperature
+#         self.steps = steps
+#
+#     def boltzmann_choice(self, probs, actions):
+#         a = np.random.choice(actions, p=probs)
+#         return a
+#
+#     def enumerate_actions(self, obs):
+#         state = self.env.get_state()
+#         actions = np.where(obs["action_mask"])[0]
+#         rewards = []
+#         for i, a in enumerate(actions):
+#             obs, reward, _, info = env.step(a)
+#             rewards.append(reward)
+#             env.set_state(state)
+#         probs = special.softmax(np.divide(rewards, self.temperature))
+#         return actions, probs
+#
+#     def __call__(self):
+#         rewards = []
+#         observations = []
+#         obs = env.reset()
+#         for i in range(self.steps):
+#             actions, probs = self.enumerate_actions(obs)
+#             action = self.boltzmann_choice(probs, actions)
+#             obs, reward, _, info = env.step(action)
+#             rewards.append(reward)
+#             observations.append(obs)
+#         return max(rewards)
 
 
 if __name__ == "__main__":
 
     ray.init()
-    # dockactors = [DockActor.remote() for _ in range(multiprocessing.cpu_count())]
-    # pool = util.ActorPool(dockactors)
-    reward_func = reward.PredDockReward_v2(default_config['env_config']["reward_config"]['binding_model'],
-                                           default_config['env_config']["reward_config"]['qed_cutoff'],
-                                           default_config['env_config']["reward_config"]['synth_cutoff'],
-                                           default_config['env_config']["reward_config"]['synth_config'],
-                                           default_config['env_config']["reward_config"]['soft_stop'],
-                                           default_config['env_config']["reward_config"]['exp'],
-                                           default_config['env_config']["reward_config"]['delta'],
-                                           default_config['env_config']["reward_config"]['simulation_cost'],
-                                           default_config['env_config']["reward_config"]['device'])
-
-    def evaluate_molecules(molecules):
-        rewards = []
-        for molecule in molecules:
-            dock = reward_func._simulation(molecule)
-            if dock is not None:
-                discounted_reward, log_val = reward_func._discount(molecule, dock)
-                rewards.append(discounted_reward)
-        return rewards
-        # return list(
-        #    pool.map(lambda a, m: a.evaluate_molecule.remote(m), molecules))
-
-
     config = default_config
     config["env_config"]["reward_config"]["device"] = "cpu"
     env = config["env"](config["env_config"])
-    times = 0
-    for i in range(10000):
-        obs = env.reset()
-        state = env.get_state()
-        # values, states = boltzmann_search(env, state, obs, 8, evaluate_molecules, total_evaluations, 1.0, None, 1)
-        obj = boltzmann_search.remote(env, state, obs, 12,
-                                      evaluate_molecules,
-                                          1.0, None, 1)
-        # times += timesz
-        # print(states)
-        value = ray.get(obj)
-        print("highest value is", value)
-    print (times/100)
+    reward = ray.get(boltzmann_opt.remote(env))
+    print (reward)
+    #value = ray.get(obj)
+    #print("highest value is", value)
+
+
+#
+# def step_env(rng, env, state, action_mask, temperature):
+#     actions = np.where(action_mask)[0]
+#     # molecules = []
+#     next_states = []
+#     observations = []
+#     values = []
+#
+#     for i, a in enumerate(actions):
+#         env.set_state(state)
+#         obs, reward, _, info = env.step(a)
+#         #molecules.append(copy.deepcopy(info["molecule"].mol))
+#         next_states.append(env.get_state())
+#         observations.append(obs)
+#         values.append(reward)
+#     #values = evaluate_molecules(molecules)
+#     probs = special.softmax(np.divide(values, temperature))
+#     a = rng.choice(actions.shape[0], p=probs)
+#     return values[a], next_states[a], observations[a]
+#
+# @ray.remote
+# def boltzmann_search(env, state, obs, max_steps, temperature=1.):
+#     values = []
+#     # states = []
+#     rng = np.random.default_rng()
+#     for i in range(max_steps):
+#         action_mask = obs["action_mask"]
+#         val, state, obs = step_env(rng, env, state, action_mask, temperature)
+#         values.append(val)
+#         #states.append(state)
+#         print(("Finished iteration {}, current max: {:.3f}").format(i, np.max(values)))
+#     return max(values)
+#     # top_idx = np.argsort(values)[-top_k:]
+#     # return tuple(zip(*[(values[i], states[i]) for i in top_idx]))
+
+# if __name__ == "__main__":
+#     config = default_config
+#     config["env_config"]["reward_config"]["device"] = "cpu"
+#     env = config["env"](config["env_config"])
+#     times = 0
+#     for i in range(10000):
+#         obs = env.reset()
+#         state = env.get_state()
+#         # values, states = boltzmann_search(env, state, obs, 8, evaluate_molecules, total_evaluations, 1.0, None, 1)
+#         obj = boltzmann_search.remote(env, state, obs, 12,
+#                                       evaluate_molecules,
+#                                           1.0, None, 1)
+#         # times += timesz
+#         # print(states)
+#         value = ray.get(obj)
+#         print("highest value is", value)
+#     print (times/100)
+
+
+
+
 
 
 

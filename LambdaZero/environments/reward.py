@@ -132,9 +132,11 @@ class PredDockReward_v2:
         return disc_reward, {"dock_reward": reward, "natm": natm, "qed" : qed, "synth" : synth}
 
     def _simulation(self, molecule):
-        if isinstance(molecule, Chem.Mol): mol = molecule
-        else: mol = molecule.mol
-        if (mol is not None) and (mol.GetNumAtoms() > 2): #(len(molecule.jbonds) > 0):
+        #if isinstance(molecule, Chem.Mol): mol = molecule
+        #else: mol = molecule.mol
+        mol = molecule.mol
+        if (mol is not None) and (len(molecule.jbonds) > 0):
+        #if (mol is not None) and (mol.GetNumAtoms() > 2): #(len(molecule.jbonds) > 0):
             atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
             graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
             graph = self.transform(graph)
