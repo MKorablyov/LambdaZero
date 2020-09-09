@@ -1,8 +1,15 @@
-import time
+import time, os.path as osp
 import torch
 import numpy as np
 from torch_sparse import SparseTensor
 from torch_scatter import scatter, scatter_max, scatter_sum, scatter_logsumexp
+from rdkit import Chem
+import networkx as nx
+
+import LambdaZero.utils
+import LambdaZero.environments
+import LambdaZero.inputs
+
 from mlp import MLP
 
 
@@ -22,6 +29,7 @@ class DiffGCN(torch.nn.Module):
         self.t = t
         self.eps = eps
         self.diff_mlp = MLP([channels[0]*t, 1])
+        self.aggr_mlp = MLP([channels[0]*t, channels[1]])
 
     def diffuse(self, v, adj, slices):
         num_nodes, d = v.shape
@@ -41,7 +49,8 @@ class DiffGCN(torch.nn.Module):
             walk_embeds_t = repeat_cat(walk_embeds, slices_t[:,1])
             walk_embeds_t[:, i*d:(i+1)*d] += v_t
             # unscaled walk probs
-            walk_logp_t = self.diff_mlp(walk_embeds_t)[:,0]
+            with torch.no_grad(): # diffusion gradient provided separately
+                walk_logp_t = self.diff_mlp(walk_embeds_t)[:,0]
             # rescale walk probs
             init_vs = repeat_cat(walks[:,0], slices_t[:,1])
             norm = scatter_logsumexp(walk_logp_t, init_vs, dim=0, dim_size=num_nodes)
@@ -49,6 +58,7 @@ class DiffGCN(torch.nn.Module):
             walk_p_t = torch.exp(walk_logp_t - norm)
             #print(scatter(walk_p_t,init_vs, reduce="sum", dim=0, dim_size=num_nodes))
             # add_noise
+            # todo: categorical noise and why
             noise = self.eps * torch.randn(walk_p_t.shape[0])
             walk_p_t = walk_p_t + noise
             _, walks_t = scatter_max(walk_p_t, init_vs, dim=0, dim_size=num_nodes)
@@ -58,16 +68,17 @@ class DiffGCN(torch.nn.Module):
             walk_embeds[:, i*d:(i+1)*d] += v[walks_t,:]
         return walks, walk_embeds
 
+    def aggregate(self, walks, walk_embeds): # [e,d] -> [v,d]
+        return self.aggr_mlp(walk_embeds)
 
     def forward(self, v, adj, slices):
-        self.diffuse(v, adj, slices)
-        #num_nodes = x1.shape[0]
-        #edge_x = self.message(x1, adj)
-        #x2 = self.aggregate(edge_x, adj, num_nodes)
-        #x3 = self.combine(x1,x2)
-        #return x3
+        walks, walk_embeds = self.diffuse(v, adj, slices)
+        v_out = self.aggregate(walks, walk_embeds)
+        return v_out
 
-
+    # def backward_hook()
+        # rewards = F([s0,s1,s2,s3], l2_loss)
+        # R * log (prob(a | s))
 
 
 
@@ -116,6 +127,53 @@ if __name__ == "__main__":
                            [3,1]])
     conv = DiffGCN([4, 4],eps=0.2,t=3)
     conv(v1,adj, slices)
+
+
+
+    datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+    blocks_file = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
+
+    # todo: create a benchmark for molecule graph; estimate largest distance for every atom L2 loss
+    # todo: try 3 blocks; try longest distance heuristic; also try random walks
+    # todo: normalize distances
+
+    G = nx.Graph()
+    G.add_edges_from([(0,1),(1,2),(2,3),(3,4),
+                      (1,0),(2,1),(3,2),(4,3)])
+    p = nx.shortest_path_length(G,source=1,target=3)
+
+    # todo: I am looking to obtain 4,3,2,3,4
+
+    #wl = np.stack([list(l[1].keys()) for l in p])
+
+    #print(p)
+    #print(max(p.keys()), p)
+
+    #time.sleep(1000)
+
+    molMDP = LambdaZero.environments.molMDP.MolMDP(blocks_file=blocks_file)
+
+
+    def mol_to_graph(mol):
+        mol = Chem.RemoveHs(mol)
+        atmfeat, coord, bond, bondfeat = LambdaZero.inputs.mpnn_feat(mol, ifcoord=False)
+        graph = LambdaZero.inputs._mol_to_graph(atmfeat, coord, bond, bondfeat, {})
+        return graph
+
+    for i in range(100):
+        molMDP.reset()
+        molMDP.random_walk(3)
+        mol = molMDP.molecule.mol
+        g = mol_to_graph(mol)
+        # edges
+        e = g.edge_index.numpy()
+
+        #
+        G = nx.Graph()
+        G.add_edges_from(e.T)
+        p = nx.shortest_path_length(G)
+        print([max(l[1].keys()) for l in p])
+
 
 
 # def test_sage_conv():
