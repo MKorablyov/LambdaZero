@@ -83,9 +83,7 @@ class UCT(tune.Trainable):
         self.ul_loader = DataLoader(ul_set, batch_size=self.config["data"]["b_size"])
         # fit model to the data
         scores = self.regressor.fit(self.train_loader, self.val_loader)[-1]
-        print([len(s) for s in scores])
-
-
+        # print([len(s) for s in scores])
         # compute acquisition metrics
         _scores = aq_regret(self.train_loader, self.ul_loader, self.config["regressor_config"]["config"])
         scores = {**scores, **_scores}

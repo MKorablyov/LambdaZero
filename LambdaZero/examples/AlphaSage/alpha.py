@@ -56,11 +56,10 @@ class DiffGCN(torch.nn.Module):
             # update walks and walk embeddings
             walks = torch.cat([walks, walks_t[:,None]],dim=1)
             walk_embeds[:, i*d:(i+1)*d] += v[walks_t,:]
-
         return walks, walk_embeds
 
 
-    def forward(self, v, adj, slices, t):
+    def forward(self, v, adj, slices):
         self.diffuse(v, adj, slices)
         #num_nodes = x1.shape[0]
         #edge_x = self.message(x1, adj)
@@ -78,7 +77,6 @@ class DiffGCN(torch.nn.Module):
 #                      ])
 #index = torch.tensor([[0,0,0,1,1]])
 #indes = torch.tensor([0,0,0,1,1])
-
 #print(indes[1:3])
 
 class SimpleGCN(torch.nn.Module):
@@ -117,7 +115,7 @@ if __name__ == "__main__":
                            [2,1],
                            [3,1]])
     conv = DiffGCN([4, 4],eps=0.2,t=3)
-    conv(v1,adj, slices, 3)
+    conv(v1,adj, slices)
 
 
 # def test_sage_conv():

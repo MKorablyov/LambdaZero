@@ -26,7 +26,6 @@ class MCDrop(tune.Trainable):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if config["data"]["dataset_creator"] is not None:
             self.train_loader, self.val_loader = config["data"]["dataset_creator"](config["data"])
-
         # make model
         self.model = LambdaZero.models.MPNNetDrop2(**self.config["model_config"])
         self.model.to(self.device)
