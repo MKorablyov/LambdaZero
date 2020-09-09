@@ -14,7 +14,7 @@ from LambdaZero.environments.block_mol_v4 import DEFAULT_CONFIG as env_config
 from rdkit import Chem
 
 import ray
-from ray import util
+#from ray import util
 
 default_config = {
     "env": BlockMolEnv_v4,
@@ -35,37 +35,31 @@ def step_env(rng, env, state, action_mask, temperature, evaluate_molecules):
         next_states.append(env.get_state())
         observations.append(obs)
         values.append(reward)
-
     #values = evaluate_molecules(molecules)
-
     probs = special.softmax(np.divide(values, temperature))
-
     a = rng.choice(actions.shape[0], p=probs)
     return values[a], next_states[a], observations[a]
 
 @ray.remote
-def boltzmann_search(env, state, obs, max_steps, mol_eval, temperature=1.,
-                     stop_condition=None, top_k=1):
+def boltzmann_search(env, state, obs, max_steps, mol_eval, temperature=1., stop_condition=None, top_k=1):
     # start = time.time()
     values = []
     # states = []
     rng = np.random.default_rng()
-
     for i in range(max_steps):
         action_mask = obs["action_mask"]
-        val, state, obs = step_env(rng, env, state, action_mask, temperature,
-                                   mol_eval)
+        val, state, obs = step_env(rng, env, state, action_mask, temperature, mol_eval)
         values.append(val)
         #states.append(state)
         print(("Finished iteration {}, current max: {:.3f}").format(i, np.max(values)))
         # print((
         #     "Finished iteration {}, current max: {:.3f}, total evals: {}"
         # ).format(i, np.max(values), total_evals()))
-
         if stop_condition is not None:
             stop_condition.update(val, state, obs)
             if stop_condition.should_stop():
                 break
+
     # end = time.time()
     # time = end-start
     # print("time", end - start)
@@ -73,6 +67,26 @@ def boltzmann_search(env, state, obs, max_steps, mol_eval, temperature=1.,
 
     # top_idx = np.argsort(values)[-top_k:]
     # return tuple(zip(*[(values[i], states[i]) for i in top_idx]))
+
+
+# def boltzmann_choice(probs, temperature)
+    # return sample
+
+# def enumerate_actions(env):
+    # return actions, probs
+
+# @ray.remote
+# def boltzmann_opt(env, n):
+    # for i in rage(n):
+        # env.reset()
+        # actions, values = enumerate_actions
+        # action = boltzmann_choice(probs, temperature)
+        # env.step(action)
+        # return energy
+
+
+#  ray.wait_for()
+    #
 
 
 if __name__ == "__main__":
@@ -85,7 +99,8 @@ if __name__ == "__main__":
                                            default_config['env_config']["reward_config"]['synth_cutoff'],
                                            default_config['env_config']["reward_config"]['synth_config'],
                                            default_config['env_config']["reward_config"]['soft_stop'],
-                                           default_config['env_config']["reward_config"]['exp'], default_config['env_config']["reward_config"]['delta'],
+                                           default_config['env_config']["reward_config"]['exp'],
+                                           default_config['env_config']["reward_config"]['delta'],
                                            default_config['env_config']["reward_config"]['simulation_cost'],
                                            default_config['env_config']["reward_config"]['device'])
 
@@ -106,11 +121,11 @@ if __name__ == "__main__":
     env = config["env"](config["env_config"])
     times = 0
     for i in range(10000):
-
         obs = env.reset()
         state = env.get_state()
         # values, states = boltzmann_search(env, state, obs, 8, evaluate_molecules, total_evaluations, 1.0, None, 1)
-        obj = boltzmann_search.remote(env, state, obs, 12, evaluate_molecules,
+        obj = boltzmann_search.remote(env, state, obs, 12,
+                                      evaluate_molecules,
                                           1.0, None, 1)
         # times += timesz
         # print(states)
