@@ -147,7 +147,7 @@ DEFAULT_CONFIG = {
         "exp": None,
         "delta": False,
         "simulation_cost": 0.0,
-        "device":"cuda",
+        "device":"cpu",
     },
     #"reward_config" : {
     #    "soft_stop": True,

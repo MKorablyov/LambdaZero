@@ -163,67 +163,70 @@ class chemMDP:
                 # make new bonds
                 self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
                 self.molecule.AddBond(atom_indx[-1], num_atom + ring_size - (1 + len(atom_indx)), Chem.BondType.SINGLE)
-        elif ring_size == 5:
-            # for cyclopentadiene; ring_indx refers to position 1, 2, 3 in cyclopentadiene. note adding onto C3 is different from C2
-            num_atom = self.molecule.GetNumAtoms()
-            if len(atom_indx) == 1:
-                # add ring onto 1 atom
-                ring.RemoveAtom(ring_indx)
-                # stitch molecule and ring together
-                self.molecule = Chem.RWMol(Chem.CombineMols(self.molecule, ring))
-                if ring_indx == 0:
-                    # add onto sp3 carbon by making new bonds to the original molecule
-                    self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
-                    self.molecule.AddBond(atom_indx[0], num_atom + ring_size - (1 + len(atom_indx)),
-                                          Chem.BondType.SINGLE) # for cosistency one can employ atom_indx[-1], but there's only 1 element
-                elif ring_indx == 1:
-                    # add onto alpha position
-                    self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
-                    self.molecule.AddBond(atom_indx[0], num_atom + 1, Chem.BondType.DOUBLE)
-                else:
-                    # to beta position
-                    self.molecule.AddBond(atom_indx[0], num_atom + 1, Chem.BondType.DOUBLE)
-                    self.molecule.AddBond(atom_indx[0], num_atom + 2, Chem.BondType.SINGLE)
-            elif len(atom_indx) == 2:
-                # add ring onto a bond (2 atoms)
-                # remove the two atoms in cyclopentadiene
-                ring.RemoveAtom(ring_indx)
-                ring.RemoveAtom(ring_indx)
-                # stitch molecule and ring together
-                self.molecule = Chem.RWMol(Chem.CombineMols(self.molecule, ring))
-                # two cases: 1) bond to add on is aliphatic, or 2) bond to add on is unsaturated (aromatic/double/triple)
-                jbond = self.molecule.GetBondBetweenAtoms(atom_indx[0], atom_indx[1])
-                if bool(jbond):
-                    if 'SINGLE' in str(jbond.GetBondType()):
-                        # preserve the double bond geometry in petadiene
-                        if ring_indx == 0:
-                            self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.DOUBLE) # the order of single vs double is important
-                            self.molecule.AddBond(atom_indx[-1], num_atom + 2, Chem.BondType.SINGLE) # 2 because 2 more atoms are left, go to the end
-                        elif ring_indx == 1:
-                            self.molecule.RemoveBond(atom_indx[0], atom_indx[1])
-                            self.molecule.AddBond(atom_indx[0], atom_indx[1], Chem.BondType.DOUBLE)
-                            self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
-                            self.molecule.AddBond(atom_indx[-1], num_atom + 1,
-                                              Chem.BondType.SINGLE) # drawing the cyclopentadiene helps to understand the numbering, remember CH2 is 0
-                        elif ring_indx == 2:
-                            self.molecule.AddBond(atom_indx[0], num_atom + 1, Chem.BondType.DOUBLE)
-                            self.molecule.AddBond(atom_indx[-1], num_atom + 2,
-                                              Chem.BondType.DOUBLE)
-                    else:
-                        if ring_indx == 0 or ring_indx == 1:
-                            # add onto C1 or C2, build 2 single bonds!, i.e. just keep the untouched double bond in pentadiene, the other double bond becomes single bond/aromtized
-                            self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
-                            self.molecule.AddBond(atom_indx[-1], num_atom + 2 - ring_indx, # add to 0, +2; add to 1, +1
-                                      Chem.BondType.SINGLE)
-                        elif ring_indx == 2:
-                            # slightly more complicated, here we have to remove a bond in the original system to make it single bond - else some chemicals, e.g. benzothiadiazole would not form
-                            self.molecule.RemoveBond(atom_indx[0], atom_indx[1])
-                            self.molecule.AddBond(atom_indx[0], atom_indx[1], Chem.BondType.SINGLE)
-                            self.molecule.AddBond(atom_indx[0], num_atom + 1, Chem.BondType.DOUBLE)
-                            self.molecule.AddBond(atom_indx[-1], num_atom + 2,
-                                          Chem.BondType.DOUBLE)
-            # note that len(atom_indx) == 3 (add rings onto 3 atoms or 2 bonds for cyclopentadiene) is chemically feasible but very rare (basically on naphtalene/hydronaphtalene), not included here, it should be doable via simple add aliphatic ring and then adding 1/2 double bond
-        elif ring_size == 6:
+        # # we currently forbid adding aromatic cyclohexadiene because it is the same as cyclohexane + double bonds, but it can be worked with
+        # elif ring_size == 5:
+        #     # for cyclopentadiene; ring_indx refers to position 1, 2, 3 in cyclopentadiene. note adding onto C3 is different from C2
+        #     num_atom = self.molecule.GetNumAtoms()
+        #     if len(atom_indx) == 1:
+        #         # add ring onto 1 atom
+        #         ring.RemoveAtom(ring_indx)
+        #         # stitch molecule and ring together
+        #         self.molecule = Chem.RWMol(Chem.CombineMols(self.molecule, ring))
+        #         if ring_indx == 0:
+        #             # add onto sp3 carbon by making new bonds to the original molecule
+        #             self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
+        #             self.molecule.AddBond(atom_indx[0], num_atom + ring_size - (1 + len(atom_indx)),
+        #                                   Chem.BondType.SINGLE) # for cosistency one can employ atom_indx[-1], but there's only 1 element
+        #         elif ring_indx == 1:
+        #             # add onto alpha position
+        #             self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
+        #             self.molecule.AddBond(atom_indx[0], num_atom + 1, Chem.BondType.DOUBLE)
+        #         else:
+        #             # to beta position
+        #             self.molecule.AddBond(atom_indx[0], num_atom + 1, Chem.BondType.DOUBLE)
+        #             self.molecule.AddBond(atom_indx[0], num_atom + 2, Chem.BondType.SINGLE)
+        #     elif len(atom_indx) == 2:
+        #         # add ring onto a bond (2 atoms)
+        #         # remove the two atoms in cyclopentadiene
+        #         ring.RemoveAtom(ring_indx)
+        #         ring.RemoveAtom(ring_indx)
+        #         # stitch molecule and ring together
+        #         self.molecule = Chem.RWMol(Chem.CombineMols(self.molecule, ring))
+        #         # two cases: 1) bond to add on is aliphatic, or 2) bond to add on is unsaturated (aromatic/double/triple)
+        #         jbond = self.molecule.GetBondBetweenAtoms(atom_indx[0], atom_indx[1])
+        #         if bool(jbond):
+        #             if 'SINGLE' in str(jbond.GetBondType()):
+        #                 # preserve the double bond geometry in petadiene
+        #                 if ring_indx == 0:
+        #                     self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.DOUBLE) # the order of single vs double is important
+        #                     self.molecule.AddBond(atom_indx[-1], num_atom + 2, Chem.BondType.SINGLE) # 2 because 2 more atoms are left, go to the end
+        #                 elif ring_indx == 1:
+        #                     self.molecule.RemoveBond(atom_indx[0], atom_indx[1])
+        #                     self.molecule.AddBond(atom_indx[0], atom_indx[1], Chem.BondType.DOUBLE)
+        #                     self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
+        #                     self.molecule.AddBond(atom_indx[-1], num_atom + 1,
+        #                                       Chem.BondType.SINGLE) # drawing the cyclopentadiene helps to understand the numbering, remember CH2 is 0
+        #                 elif ring_indx == 2:
+        #                     self.molecule.AddBond(atom_indx[0], num_atom + 1, Chem.BondType.DOUBLE)
+        #                     self.molecule.AddBond(atom_indx[-1], num_atom + 2,
+        #                                       Chem.BondType.DOUBLE)
+        #             else:
+        #                 # bond to attach is already unsaturated
+        #                 if ring_indx == 0 or ring_indx == 1:
+        #                     # add onto C1 or C2, build 2 single bonds!, i.e. just keep the untouched double bond in pentadiene, the other double bond becomes single bond/aromtized
+        #                     self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.SINGLE)
+        #                     self.molecule.AddBond(atom_indx[-1], num_atom + 2 - ring_indx, # add to 0, +2; add to 1, +1
+        #                               Chem.BondType.SINGLE)
+        #                 elif ring_indx == 2:
+        #                     # slightly more complicated, here we have to remove a bond in the original system to make it single bond - else some chemicals, e.g. benzothiadiazole would not form
+        #                     self.molecule.RemoveBond(atom_indx[0], atom_indx[1])
+        #                     self.molecule.AddBond(atom_indx[0], atom_indx[1], Chem.BondType.SINGLE)
+        #                     self.molecule.AddBond(atom_indx[0], num_atom + 1, Chem.BondType.DOUBLE)
+        #                     self.molecule.AddBond(atom_indx[-1], num_atom + 2,
+        #                                   Chem.BondType.DOUBLE)
+        #     # note that len(atom_indx) == 3 (add rings onto 3 atoms or 2 bonds for cyclopentadiene) is chemically feasible but very rare (basically on naphtalene/hydronaphtalene), not included here, it should be doable via simple add aliphatic ring and then adding 1/2 double bond
+        # elif ring_size == 6:
+        else:
             # for benzene
             for i in range(len(atom_indx)):
                 # produce the partial ring by deleting the number of unneeded atoms, since it's aromatic it doesn't matter where to add onto the ring
@@ -248,8 +251,8 @@ class chemMDP:
                 # make new bonds
                 self.molecule.AddBond(atom_indx[0], num_atom, Chem.BondType.AROMATIC)
                 self.molecule.AddBond(atom_indx[-1], num_atom + ring_size - (1 + len(atom_indx)), Chem.BondType.AROMATIC)
-        else:
-            raise Exception('other ring sizes/features currently not supported')
+        # else:
+        #     raise Exception('other ring sizes/features currently not supported')
         Chem.SanitizeMol(self.molecule)
         return None
 
@@ -317,8 +320,9 @@ class chemMDP:
                         # add a ring
                         aromatic = bool(random.getrandbits(1))
                         if self.molecule.GetNumAtoms() <= 5:
-                            atom_indx_length = random.choice(range(1, 2))
-                        else: atom_indx_length = random.choice(range(1, 5))
+                            atom_indx_length = int(random.choices(range(1, 2), weights=(2, 3))[0])
+                            #atom_indx_length = random.choice(range(1, 2))
+                        else: atom_indx_length = int(random.choices(range(1, 5), weights=(2, 3, 1, 1, 1))[0]) #atom_indx_length = random.choice(range(1, 5))
                         # this ensures all atoms chosen are bonded to others, but it prevents rare cases of, e.g. joining the tails of a macrocycle
                         atom_indx = [random.randint(0, self.molecule.GetNumAtoms(onlyExplicit=True) - 1)] # get the first atom
                         for i in range(atom_indx_length-1): atom_indx.append(random.choice(self.molecule.GetAtomWithIdx(atom_indx[-1]).GetNeighbors()).GetIdx())
@@ -381,3 +385,7 @@ class chemMDP:
         # todo
         return None
 
+# mask actions by
+# if my action = add_new_ring -> check valency for each atom -> omit atoms that is not
+# choosing atom -> choosing action -> better action embedding
+# sensibility contraint -> pretrain on zinc, or molecules - imditation learning; transfomer architecture
