@@ -2,3 +2,5 @@ LINCS
 ExpressionBaseline
 DrugComb
 recover/embeddings
+external_dirs.cfg
+LambdaZero.egg-info
