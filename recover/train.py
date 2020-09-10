@@ -14,55 +14,70 @@ from recover.utils import get_project_root
 from torch.utils.data import TensorDataset, DataLoader
 import time
 from ray import tune
+from contextlib import contextmanager
 import ray
 
 ########################################################################################################################
 # Epoch loops
 ########################################################################################################################
 
+def _get_loaders(data, batch_size, device, train_idxs, val_idxs, test_idxs):
+    result = {}
+    for set_name in ["train", "val", "test"]:
+        idxs = locals()["%s_idxs" % set_name]
 
-def train_epoch(data, loader, model, optim):
-    model.train()
-    epoch_loss = 0
-    num_batches = len(loader)
+        dataset = TensorDataset(data.ddi_edge_idx[:, idxs].T,
+                                data.ddi_edge_classes[idxs],
+                                data.ddi_edge_attr[idxs],
+                                data.ddi_edge_response[idxs])
 
-    for i, drug_drug_batch in enumerate(loader):
-        optim.zero_grad()
+        result[set_name] = DataLoader(dataset,
+                                      batch_size=batch_size,
+                                      pin_memory=(device == 'cpu'))
 
-        out = model.forward(data, drug_drug_batch)
-        loss = model.loss(out, drug_drug_batch)
+    return result["train"], result["val"], result["test"]
 
-        loss.backward()
-        optim.step()
+def _get_normalizers(data, train_idxs, val_idxs, test_idxs):
+    result = {}
+    for set_name in ["train", "val", "test"]:
+        idxs = locals()["%s_idxs" % set_name]
+        result[set_name] = MeanVarianceNormalizer((data.ddi_edge_response[idxs].mean(),
+                                                   data.ddi_edge_response[idxs].var()))
 
-        epoch_loss += loss.item() * data.response_std**2
+    return result
 
-    print('Mean train loss: {:.4f}'.format(epoch_loss / num_batches))
+def run_epoch(data, loader, model, normalizer, optim, is_train):
+    model.train() if is_train else model.eval()
 
-    return {"loss_sum": epoch_loss, "loss_mean": epoch_loss / num_batches}
+    loss_sum      = 0
+    epoch_targets = []
+    epoch_preds   = []
 
+    # Context manager for if we are in train mode and need to pass grad
+    none_ctx = contextmanager(lambda: iter([None]))()
+    with none_ctx if is_train else torch.no_grad():
+        for batch in loader:
+            y_hat = model(data, batch)
+            loss = F.mse_loss(normalizer.tfm(y), y_hat)
 
-def eval_epoch(data, loader, model):
-    model.eval()
-    epoch_loss = 0
-    r_squared = 0
-    num_batches = len(loader)
+            if is_train:
+                loss.backward()
+                optim.step()
+                optim.zero_grad()
 
-    with torch.no_grad():
-        for i, drug_drug_batch in enumerate(loader):
-            out = model.forward(data, drug_drug_batch)
+            loss_sum += loss.item()
+            epoch_targets.append(y.detach().cpu())
+            epoch_preds.append(normalizer.itfm(y_hat).detach().cpu())
 
-            loss = model.loss(out, drug_drug_batch)
-            epoch_loss += loss.item() * data.response_std**2
+    epoch_targets = torch.cat(epoch_targets)
+    epoch_preds = torch.cat(epoch_preds)
 
-            # Explained variance
-            var = drug_drug_batch[3].var().item()
-            r_squared += (var - loss.item())/var
-
-    print('Mean valid loss: {:.4f}'.format(epoch_loss / num_batches))
-
-    return {"loss_sum": epoch_loss, "loss_mean": epoch_loss / num_batches, "r_squared": r_squared / num_batches}
-
+    return {
+        "loss": loss_sum / epoch_targets.shape[0],
+        "mae": F.l1_loss(epoch_targets, epoch_preds).item(),
+        "mse": F.mse_loss(epoch_targets, epoch_preds).item(),
+        "rmse": torch.sqrt(F.mse_loss(epoch_targets, epoch_preds)).item(),
+    }
 
 ########################################################################################################################
 # Main training loop
@@ -88,50 +103,40 @@ class GiantGraphTrainer(tune.Trainable):
                                      "zip": self.data.ddi_edge_zip,
                                      "hsa": self.data.ddi_edge_hsa,
                                      "loewe": self.data.ddi_edge_loewe}
-            self.data.ddi_edge_response = possible_target_dicts[config["target"]]
 
-        # Normalize mean and variance
-        self.data.ddi_edge_response -= self.data.ddi_edge_response.mean()
-        self.data.response_std = self.data.ddi_edge_response.std().item()
-        self.data.ddi_edge_response /= self.data.ddi_edge_response.std()
+            self.data.ddi_edge_response = possible_target_dicts[config["target"]]
 
         torch.manual_seed(config["seed"])
 
         train_idxs, val_idxs, test_idxs = dataset.random_split(config["test_set_prop"], config["val_set_prop"])
+        self.train_loader, self.valid_loader, self.test_loader = _get_loaders(data, config["batch_size"],
+                                                                              train_idxs, val_idxs, test_idxs)
 
-        # Train loader
-        train_ddi_dataset = TensorDataset(self.data.ddi_edge_idx[:, train_idxs].T,
-                                          self.data.ddi_edge_classes[train_idxs], self.data.ddi_edge_attr[train_idxs],
-                                          self.data.ddi_edge_response[train_idxs])
+        self.train_norm, self.valid_norm, self.test_norm = _get_normalizers(data, train_idxs, val_idxs, test_idxs)
 
-        self.train_loader = DataLoader(train_ddi_dataset,
-                                       batch_size=config["batch_size"],
-                                       pin_memory=(self.device == 'cpu'))
-
-        # Valid loader
-        valid_ddi_dataset = TensorDataset(self.data.ddi_edge_idx[:, val_idxs].T,
-                                          self.data.ddi_edge_classes[val_idxs], self.data.ddi_edge_attr[val_idxs],
-                                          self.data.ddi_edge_response[val_idxs])
-
-        self.valid_loader = DataLoader(valid_ddi_dataset, batch_size=config["batch_size"],
-                                       pin_memory=(self.device == 'cpu'))
+        self.valid_var = data.ddi_edge_response[val_idxs].var()
+        self.test_var = data.ddi_edge_response[test_idxs].var()
 
         # Initialize model and optimizer
         self.model = config["model"](self.data, config).to(self.device)
         self.optim = torch.optim.Adam(self.model.parameters(), lr=config["lr"])
 
-        self.train_epoch = config["train_epoch"]
-        self.eval_epoch = config["eval_epoch"]
-
     def _train(self):
-        train_scores = self.train_epoch(self.data, self.train_loader, self.model, self.optim)
-        eval_scores = self.eval_epoch(self.data, self.valid_loader, self.model)
+        all_scores = {}
+        for set_name in ["train", "valid", "test"]:
+            is_train = set_name == "train"
+            optim = self.optim if is_train else None
 
-        train_scores = [("train_" + k, v) for k, v in train_scores.items()]
-        eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
-        scores = dict(train_scores + eval_scores)
+            scores = run_epoch(self.data, getattr(self, "%s_loader" % set_name),
+                               self.model, getattr(self, "%s_norm"), optim, is_train)
 
-        return scores
+            if not is_train:
+                var = getattr(self, "%s_var" % set_name)
+                scores["%s_r_squared"] = (var - scores["mse"]) / var
+
+            all_scores += {"%s_%s" % (set_name, key): val for key, val in scores.items()}
+
+        return all_scores
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
@@ -145,7 +150,7 @@ class GiantGraphTrainer(tune.Trainable):
 if __name__ == '__main__':
     ray.init(num_cpus=40)
 
-    time_to_sleep = 30
+    time_to_sleep = 5
     print("Sleeping for %d seconds" % time_to_sleep)
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
@@ -176,9 +181,10 @@ if __name__ == '__main__':
             "fp_bits": 1024,
             "fp_radius": 4,
             "ppi_confidence_thres": 0,
-            "train_epoch": train_epoch,
-            "eval_epoch": eval_epoch,
             "batch_size": 128,  # tune.grid_search([1024, 2048]),
+            "asha_metric": "eval_mse",
+            "asha_mode": "min",
+            "asha_max_t": 100
         },
         "summaries_dir": summaries_dir,
         "memory": 1800,
@@ -189,6 +195,44 @@ if __name__ == '__main__':
         "name": "ExpressionBaseline"
     }
 
+    asha_scheduler = ASHAScheduler(
+	time_attr='training_iteration',
+	metric=config['asha_metric'],
+	mode=config['asha_mode'],
+	max_t=config['asha_max_t'],
+	grace_period=10,
+	reduction_factor=3,
+	brackets=1
+    )
+
+    search_space = {
+        "lr": hp.loguniform("lr", -16.118095651, -5.52146091786),
+        "rank": hp.quniform("rank", 50, 300, 1),
+        "gcn_channels": hp.choice("gcn_channels", [[1024, 256, 256, 256], [1024, 256, 256]]),
+        "batch_size": hp.choice("batch_size", [256, 512]),
+        "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
+        "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
+    }
+
+    current_best_params = [
+        {
+            "lr": 1e-4,
+            "rank": 128,
+            "gcn_channels": 1,
+            "batch_size": 0,
+            "gcn_dropout_rate": .1,
+            "lin_dropout_rate": .4,
+        }
+    ]
+
+    search_alg = HyperOptSearch(
+        search_space,
+        metric=config['asha_metric'],
+        mode=config['asha_mode'],
+        points_to_evaluate=current_best_params
+    )
+
+
     analysis = tune.run(
         configuration["trainer"],
         name=configuration["name"],
@@ -198,8 +242,8 @@ if __name__ == '__main__':
         num_samples=1,
         checkpoint_at_end=configuration["checkpoint_at_end"],
         local_dir=configuration["summaries_dir"],
-        checkpoint_freq=configuration["checkpoint_freq"]
+        checkpoint_freq=configuration["checkpoint_freq"],
+        scheduler=asha_scheduler,
+        search_alg=search_alg,
     )
 
-    # trainer = GiantGraphTrainer(configuration["trainer_config"])
-    # trainer.train()
