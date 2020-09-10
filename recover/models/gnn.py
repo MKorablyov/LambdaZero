@@ -64,7 +64,9 @@ class GNN(torch.nn.Module):
                                           config['num_relation_lin_layers'], linear_dropout,
                                           batch_norm=False)
 
-    def forward(self, x, edge_index, relations, concs):
+    def forward(self, data, batch):
+        x = data.x
+        edge_index, relations, concs, _ = batch
         for i, conv in enumerate(self.convs):
             if i >= len(self.convs) - self.num_residual_gcn_layers:
                 x = F.relu(conv(x)) + x
