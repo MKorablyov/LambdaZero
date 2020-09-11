@@ -154,7 +154,7 @@ class NewDrugComb(InMemoryDataset):
         torch.save(torch.tensor([0]), self.processed_paths[0])
 
         _summary_table = pd.read_csv(os.path.join(self.raw_dir, self.raw_file_names[1]), low_memory=False)
-        props = ["css", "synergy_zip" , "synergy_bliss", "synergy_loewe", "synergy_hsa", "ic50_row", "ic50_col"]
+        props = ["css", "synergy_zip", "synergy_bliss", "synergy_loewe", "synergy_hsa", "ic50_row", "ic50_col"]
         _summary_table = _append_cid(_drugcomb_data, _summary_table)
         ddi_edge_idx, ddi_edge_attr, ddi_edge_classes = _get_ddi_edges(_summary_table, cid_to_idx,
                                                                 self.cell_line_to_idx, props)

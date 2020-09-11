@@ -9,6 +9,7 @@ import networkx as nx
 import LambdaZero.utils
 import LambdaZero.environments
 import LambdaZero.inputs
+from copy import deepcopy
 
 from mlp import MLP
 
@@ -33,6 +34,7 @@ class DiffGCN(torch.nn.Module):
 
     def diffuse(self, v, adj, slices):
         num_nodes, d = v.shape
+
         # initialize
         walks = torch.arange(num_nodes)[:,None] # [w,t]
         walk_embeds = torch.zeros(num_nodes, d*self.t, dtype=torch.float) # [w, d*t]
@@ -49,14 +51,16 @@ class DiffGCN(torch.nn.Module):
             walk_embeds_t = repeat_cat(walk_embeds, slices_t[:,1])
             walk_embeds_t[:, i*d:(i+1)*d] += v_t
             # unscaled walk probs
+
             with torch.no_grad(): # diffusion gradient provided separately
                 walk_logp_t = self.diff_mlp(walk_embeds_t)[:,0]
+
             # rescale walk probs
             init_vs = repeat_cat(walks[:,0], slices_t[:,1])
             norm = scatter_logsumexp(walk_logp_t, init_vs, dim=0, dim_size=num_nodes)
             norm = repeat_cat(norm,slices_t[:,1])
             walk_p_t = torch.exp(walk_logp_t - norm)
-            #print(scatter(walk_p_t,init_vs, reduce="sum", dim=0, dim_size=num_nodes))
+            # print(scatter(walk_p_t,init_vs, reduce="sum", dim=0, dim_size=num_nodes))
             # add_noise
             # todo: categorical noise and why
             noise = self.eps * torch.randn(walk_p_t.shape[0])
@@ -71,10 +75,13 @@ class DiffGCN(torch.nn.Module):
     def aggregate(self, walks, walk_embeds): # [e,d] -> [v,d]
         return self.aggr_mlp(walk_embeds)
 
-    def forward(self, v, adj, slices):
-        walks, walk_embeds = self.diffuse(v, adj, slices)
+    def forward(self, node_attr, edge_index, slices):
+        #v, adj, slices = graph.x, graph.edge_index, graph.slices
+        walks, walk_embeds = self.diffuse(node_attr, edge_index, slices)
         v_out = self.aggregate(walks, walk_embeds)
         return v_out
+
+
 
     # def backward_hook()
         # rewards = F([s0,s1,s2,s3], l2_loss)
@@ -82,13 +89,7 @@ class DiffGCN(torch.nn.Module):
 
 
 
-# src = torch.tensor([[17, 19,]
-#                     [7, 11, 13],
-#                      [3, 5, 23, 29, 31]
-#                      ])
-#index = torch.tensor([[0,0,0,1,1]])
-#indes = torch.tensor([0,0,0,1,1])
-#print(indes[1:3])
+
 
 class SimpleGCN(torch.nn.Module):
     def __init__(self, channels):
@@ -113,7 +114,42 @@ class SimpleGCN(torch.nn.Module):
         x3 = self.combine(x1,x2)
         return x3
 
+def mol_to_graph(mol):
+    mol = Chem.RemoveHs(mol)
+    atmfeat, coord, bond, bondfeat = LambdaZero.inputs.mpnn_feat(mol, ifcoord=False)
+    graph = LambdaZero.inputs._mol_to_graph(atmfeat, coord, bond, bondfeat, {})
+    return graph
 
+def precompute_edge_slices(graph):
+    # add inverse direction
+    edges = graph.edge_index.numpy()
+    assert np.all(np.diff(edges[0]) >= 0), "implement me: edge array was not sorted"
+    _, slices1 = np.unique(edges[0], return_counts=True)
+    slices0 = np.concatenate([np.array([0]), np.cumsum(slices1)])[:-1]
+    #print((slices0 + slices1)[-1], graph.edge_attr.shape)
+    graph.slices = torch.tensor(np.stack([slices0, slices1], axis=1))
+    return graph
+
+def precompute_max_dist(graph):
+    # compute distance to the furthers atom for each
+    e = graph.edge_index.numpy()
+    G = nx.Graph()
+    G.add_edges_from(e.T)
+    p = nx.shortest_path_length(G)
+    graph.max_dist = torch.tensor([max(l[1].values()) for l in p])
+    return graph
+
+class MolMaxDist:
+    def __init__(self, blocks_file):
+        self.molMDP = LambdaZero.environments.molMDP.MolMDP(blocks_file=blocks_file)
+
+    def __call__(self):
+        self.molMDP.reset()
+        self.molMDP.random_walk(5)
+        graph = mol_to_graph(self.molMDP.molecule.mol)
+        graph = precompute_edge_slices(graph)
+        graph = precompute_max_dist(graph)
+        return graph
 
 
 
@@ -125,61 +161,17 @@ if __name__ == "__main__":
     slices = torch.tensor([[0,2],
                            [2,1],
                            [3,1]])
-    conv = DiffGCN([4, 4],eps=0.2,t=3)
-    conv(v1,adj, slices)
 
-
+    conv = DiffGCN([14, 4],eps=0.2,t=3)
+    #conv(v1,adj, slices)
 
     datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
-    blocks_file = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
+    dataset = MolMaxDist(osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"))
 
     # todo: create a benchmark for molecule graph; estimate largest distance for every atom L2 loss
-    # todo: try 3 blocks; try longest distance heuristic; also try random walks
     # todo: normalize distances
 
-    G = nx.Graph()
-    G.add_edges_from([(0,1),(1,2),(2,3),(3,4),
-                      (1,0),(2,1),(3,2),(4,3)])
-    p = nx.shortest_path_length(G,source=1,target=3)
-
-    # todo: I am looking to obtain 4,3,2,3,4
-
-    #wl = np.stack([list(l[1].keys()) for l in p])
-
-    #print(p)
-    #print(max(p.keys()), p)
-
-    #time.sleep(1000)
-
-    molMDP = LambdaZero.environments.molMDP.MolMDP(blocks_file=blocks_file)
-
-
-    def mol_to_graph(mol):
-        mol = Chem.RemoveHs(mol)
-        atmfeat, coord, bond, bondfeat = LambdaZero.inputs.mpnn_feat(mol, ifcoord=False)
-        graph = LambdaZero.inputs._mol_to_graph(atmfeat, coord, bond, bondfeat, {})
-        return graph
-
-    for i in range(100):
-        molMDP.reset()
-        molMDP.random_walk(3)
-        mol = molMDP.molecule.mol
-        g = mol_to_graph(mol)
-        # edges
-        e = g.edge_index.numpy()
-
-        #
-        G = nx.Graph()
-        G.add_edges_from(e.T)
-        p = nx.shortest_path_length(G)
-        print([max(l[1].keys()) for l in p])
-
-
-
-# def test_sage_conv():
-#     conv = SAGEConv(3,3)
-#     conv.__fuse__ = False
-#     out = conv(x1, edge_index)
-#
-#     print(out)
-# test_sage_conv()
+    for i in range(1000):
+        g = dataset()
+        print(g)
+        conv(g.x, g.edge_index, g.slices)
