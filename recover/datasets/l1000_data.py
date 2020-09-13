@@ -1,23 +1,47 @@
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from recover.utils import get_project_root
-# import pubchempy as pcp
-# from cmapPy.pandasGEXpress.parse import parse
+import pubchempy as pcp
+from cmapPy.pandasGEXpress.parse import parse
+from rdkit.Chem import AllChem
+from pubchempy import Compound
 import pickle
 import pandas as pd
+import numpy as np
 import torch
 import os
 import gzip
 import shutil
 from tqdm import tqdm
 
+def _get_fingerprint(smile, radius, n_bits):
+    if smile == 'none':
+        return np.array([-1] * n_bits)
+    try:
+        return np.array(AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(smile), radius, n_bits))
+    except Exception as ex:
+        return np.array([-1] * n_bits)
+
+def get_fingerprints(cids, cid_to_smiles, radius, n_bits):
+    unique_cids = np.unique(cids)
+    cid_to_fp_dict = {}
+
+    for cid in unique_cids:
+        if cid not in cid_to_smiles:
+            cid_to_fp_dict[cid] = np.array([-1] * n_bits)
+        else:
+            cid_to_fp_dict[cid] = _get_fingerprint(cid_to_smiles[cid], radius, n_bits)
+
+    return np.ndarray([cid_to_fp_dict[cid] for cid in cids])
 
 class L1000(InMemoryDataset):
-    def __init__(self, transform=None, pre_transform=None):
+    def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4, name='LINCS/'):
         """
         Dataset object for the LINCS L1000 dataset.
         """
 
-        super().__init__(os.path.join(get_project_root(), 'LINCS/'), transform, pre_transform)
+        self.fp_bits = fp_bits
+        self.fp_radius = fp_radius
+        super().__init__(os.path.join(get_project_root(), name), transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
         print("L1000 dataset loaded.")
@@ -41,29 +65,29 @@ class L1000(InMemoryDataset):
         return ['l1000_data.pt']
 
     def download(self):
-        urls = [
-            'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5FLevel5'
+        urls = {
+            0: 'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5FLevel5'
             '%5FCOMPZ%5Fn118050x12328%5F2017%2D03%2D06%2Egctx%2Egz',
-            'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5Fsig%5F'
+            1: 'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5Fsig%5F'
             'info%5F2017%2D03%2D06%2Etxt%2Egz',
-            'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5Fgene%5'
+            2: 'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5Fgene%5'
             'Finfo%5F2017%2D03%2D06%2Etxt%2Egz',
-            'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5Fpert%5'
+            3: 'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5Fpert%5'
             'Finfo%5F2017%2D03%2D06%2Etxt%2Egz',
-            'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5Fcell%5'
+            4: 'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE70138&format=file&file=GSE70138%5FBroad%5FLINCS%5Fcell%5'
             'Finfo%5F2017%2D04%2D28%2Etxt%2Egz',
-            'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE92742&format=file&file=GSE92742%5FBroad%5FLINCS%5FLevel5'
+            5: 'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE92742&format=file&file=GSE92742%5FBroad%5FLINCS%5FLevel5'
             '%5FCOMPZ%2EMODZ%5Fn473647x12328%2Egctx%2Egz',
-            'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE92742&format=file&file=GSE92742%5FBroad%5FLINCS%5Fsig%5F'
+            6: 'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE92742&format=file&file=GSE92742%5FBroad%5FLINCS%5Fsig%5F'
             'info%2Etxt%2Egz',
-            'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE92742&format=file&file=GSE92742%5FBroad%5FLINCS%5Fpert%5'
+            7: 'https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE92742&format=file&file=GSE92742%5FBroad%5FLINCS%5Fpert%5'
             'Finfo%2Etxt%2Egz'
-        ]
+        }
 
-        for i in range(len(urls)):
-            download_url(urls[i], self.raw_dir)
-            with gzip.open(os.path.join(self.raw_dir, urls[i].split('/')[-1]), 'rb') as f_in:
-                with open(os.path.join(self.raw_dir, self.raw_file_names[i]), 'wb') as f_out:
+        for idx, url in urls.items():
+            download_url(url, self.raw_dir)
+            with gzip.open(os.path.join(self.raw_dir, url.split('/')[-1]), 'rb') as f_in:
+                with open(os.path.join(self.raw_dir, self.raw_file_names[idx]), 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
 
     def process(self):
@@ -73,19 +97,7 @@ class L1000(InMemoryDataset):
 
         data_df = pd.concat((self.expr_data, self.sig_info), axis=1)  # Concat with metadata
 
-        # Extract numpy arrays
-        gene_expr = data_df[data_df.columns[:len(self.landmark_gene_list)]].to_numpy()
-        cid = data_df['cid'].to_numpy()
-        cell_id = data_df['cell_id'].to_numpy()
-        dose = data_df['pert_idose_value'].to_numpy()
-        incub_time = data_df['pert_itime_value'].to_numpy()
-
-        # Create data object
-        data = Data(gene_expr=torch.tensor(gene_expr, dtype=torch.float),
-                    cid=torch.tensor(cid, dtype=torch.long),
-                    cell_id=cell_id,
-                    dose=torch.tensor(dose, dtype=torch.float),
-                    incub_time=torch.tensor(incub_time, dtype=torch.float))
+        data = self.build_data(self.filter_df(data_df))
 
         data_list = [data]
         if self.pre_transform is not None:
@@ -93,6 +105,31 @@ class L1000(InMemoryDataset):
 
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
+
+    def filter_df(self, data_df):
+        '''
+        Method allows classes inheriting from L1000 to easily select which
+        values to include in the data object
+        '''
+        return data_df
+
+    def build_data(self, data_df):
+        # Extract numpy arrays
+        gene_expr = data_df[data_df.columns[:len(self.landmark_gene_list)]].to_numpy()
+        cid = data_df['cid'].to_numpy().astype(np.int32)
+        #fingerprints = get_fingerprints(cid, self.get_smiles(cid), self.fp_radius, self.fp_bits)
+        cell_id = data_df['cell_id'].to_numpy()
+        cell_id_int = pd.factorize(data_df['cell_id'])[0]
+        dose = data_df['pert_idose_value'].to_numpy()
+        incub_time = data_df['pert_itime_value'].to_numpy()
+
+        # Create data object
+        return Data(gene_expr=torch.tensor(gene_expr, dtype=torch.float),
+                    cid=torch.tensor(cid, dtype=torch.long),
+                    cell_id=cell_id,
+                    cell_id_int=torch.tensor(cell_id_int, dtype=torch.long),
+                    dose=torch.tensor(dose, dtype=torch.float),
+                    incub_time=torch.tensor(incub_time, dtype=torch.float))
 
     def load_metadata(self):
         # Get list of landmark genes. Gene info and cell info are the same for both phases
@@ -179,6 +216,26 @@ class L1000(InMemoryDataset):
 
     def get_time(self, s):
         return float(s[:-2])
+
+    def get_smiles(self, cids):
+        unique_cid = np.unique(cids)
+        unique_cid = list(unique_cid)
+
+        dict_path = os.path.join(self.raw_dir, "cid_to_smiles_dict.npy")
+        if os.path.exists(dict_path):
+            cid_to_smiles_dict = np.load(dict_path, allow_pickle=True).item()
+        else:
+            print('recovering smiles, only happens the first time...')
+            cid_to_smiles_dict = {}
+            for cid in tqdm(unique_cid):
+                try:
+                    cid_to_smiles_dict[int(cid)] = Compound.from_cid(int(cid)).isomeric_smiles
+                except:
+                    print("error with cid", cid)
+                    pass
+            np.save(dict_path, cid_to_smiles_dict)
+
+        return cid_to_smiles_dict
 
 
 if __name__ == '__main__':
