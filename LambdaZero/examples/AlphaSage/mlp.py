@@ -1,4 +1,5 @@
 from typing import Optional, List, Union
+import torch
 from torch.nn import Sequential, Linear, ReLU, Dropout
 from torch.nn import BatchNorm1d, LayerNorm, InstanceNorm1d
 
@@ -23,3 +24,20 @@ class MLP(Sequential):
                 m.append(Dropout(dropout))
 
         super(MLP, self).__init__(*m)
+
+class GRUAggr(torch.nn.Module):
+    def __init__(self, in_dim, out_dim, hidden_size, gru_layers):
+        super(GRUAggr, self).__init__()
+        self.gru = torch.nn.GRU(in_dim, hidden_size, num_layers=gru_layers, batch_first=True)
+        self.lin = torch.nn.Linear(hidden_size, out_dim)
+
+    def forward(self, inputs):
+        out, _ = self.gru(inputs)
+        out = self.lin(out)[:,0,:]
+        return out
+
+
+
+#gru = GRUAggr(3, 7, 128, 2)
+#inputs = torch.randn(10,1,3)
+#print(gru(inputs).shape)
