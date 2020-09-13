@@ -19,7 +19,7 @@ def repeat_cat(tensor, repeats):
 
 
 class DiffGCN(torch.nn.Module):
-    def __init__(self, channels, t, eps):
+    def __init__(self, channels, t, eps, diff_aggr_h, diff_aggr_l, walk_aggr_h, walk_aggr_l):
         """
         :param channels: channels in channels out
         :param t: number of diffusion steps
@@ -29,16 +29,8 @@ class DiffGCN(torch.nn.Module):
         self.channels = channels
         self.t = t
         self.eps = eps
-        self.diff_mlp = MLP([channels[0]*(1+t), 64, 1])
-        self.walk_aggr = GRUAggr(channels[0], channels[1], 128, 1)
-
-    def _walk_logp(self, walk_embeds_t):
-        "copute probability of each walk on the graph"
-        walk_embeds_t = walk_embeds_t.view([walk_embeds_t.shape[0], self.channels[0] * (1+self.t)])
-        # unscaled walk probs
-        with torch.no_grad():  # diffusion gradient provided separately
-            walk_logp_t = self.diff_mlp(walk_embeds_t)[:, 0]
-        return walk_logp_t
+        self.diff_aggr = GRUAggr(channels[0], channels[1], diff_aggr_h, diff_aggr_l)
+        self.walk_aggr = GRUAggr(channels[0], channels[1], walk_aggr_h, walk_aggr_l)
 
     def _test_walks(self, node_attr, adj, walks, walk_embeds):
         node_attr, adj = node_attr.cpu().numpy(), adj.cpu().numpy()
@@ -55,9 +47,7 @@ class DiffGCN(torch.nn.Module):
         num_nodes = v.shape[0]
         # initialize
         walks = torch.arange(num_nodes,device=v.device)[:,None] # [w, 1] --> [w,t]
-        walk_embeds = torch.zeros([num_nodes, 1+self.t, self.channels[0]], dtype=torch.float, device=v.device)#[w, t, d]
-        walk_embeds[:,0,:] = v
-
+        walk_embeds = v[:, None, :]
         # diffuse
         for t in range(self.t):
             # find slices of the adjacency matrix
@@ -68,23 +58,25 @@ class DiffGCN(torch.nn.Module):
             v_t = v[adj_t[1]]
             # form timestep walk embeds
             walk_embeds_t = repeat_cat(walk_embeds, adj_slic_t[:,1])
-            walk_embeds_t[:, 1+t, :] = v_t
-            walk_logp_t = self._walk_logp(walk_embeds_t)
+            walk_embeds_t = torch.cat([walk_embeds_t, v_t[:, None, :]],dim=1)
+            walk_logp_t = self.diff_aggr(walk_embeds_t)[:, 0]
             # rescale walk probs
             init_vs = repeat_cat(walks[:,0], adj_slic_t[:,1])
-            norm = torch_scatter.scatter_logsumexp(walk_logp_t, init_vs, dim=0, dim_size=num_nodes)
+            with torch.no_grad(): # todo - make sure this norm is ok
+                norm = torch_scatter.scatter_logsumexp(walk_logp_t, init_vs, dim=0, dim_size=num_nodes)
             norm = repeat_cat(norm,adj_slic_t[:,1])
             walk_p_t = torch.exp(walk_logp_t - norm)
+            #print(v.shape, v_t.shape, walk_logp_t.shape, walk_p_t.shape)
             # print(scatter(walk_p_t,init_vs, reduce="sum", dim=0, dim_size=num_nodes))
             # add_noise
             # todo: categorical noise and why
-            noise = self.eps * torch.randn(walk_p_t.shape[0],device=v.device)
+            noise = self.eps * torch.randn(walk_p_t.shape,device=v.device)
             walk_p_t = walk_p_t + noise
             _, walks_t = torch_scatter.scatter_max(walk_p_t, init_vs, dim=0, dim_size=num_nodes)
             walks_t = adj_t[1][walks_t]
             # update walks and walk embeddings
             walks = torch.cat([walks, walks_t[:,None]], dim=1)
-            walk_embeds[:,1+t, :] = v[walks_t,:]
+            walk_embeds = torch.cat([walk_embeds,v[walks_t,:][:,None,:]],dim=1)
         return walks, walk_embeds
 
     def aggregate(self, walks, walk_embeds): # [e,d] -> [v,d]

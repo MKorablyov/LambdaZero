@@ -10,7 +10,7 @@ class AlphaSageTrainer(tune.Trainable):
     def _setup(self, config):
         self.config = config
         self.dataset = MolMaxDist(config["dataset_mdp_steps"],config["blocks_file"])
-        self.conv = config["model"]([14, 1], eps=config["eps"], t=config["t"])
+        self.conv = config["model"](**config["model_par"])
         self.optim = config["optimizer"](self.conv.parameters(), **config["optimizer_config"])
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.conv.to(self.device)
@@ -33,10 +33,6 @@ class AlphaSageTrainer(tune.Trainable):
         return {"loss_mean":loss_mean}
 
 
-# predictive power is almost same as predicting average
-# todo: atom embeddings have large numbers and could better be normalized
-
-
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 DEFAULT_CONFIG = {
     "regressor_config": {
@@ -46,10 +42,17 @@ DEFAULT_CONFIG = {
             "dataset_mdp_steps": 0,
             # "b_size": 50,
             "model": DiffGCN,
+            "model_par": {
+                "channels":[14,1],
+                "eps": 100,
+                "t": 5,
+                "diff_aggr_h":128,
+                "diff_aggr_l":1,
+                "walk_aggr_h":128,
+                "walk_aggr_l":1,
+            },
             "optimizer": torch.optim.Adam,
             "optimizer_config": {"lr": 0.001,},
-            "eps": 100,
-            "t": 5,
             "dataset_size":1000,
             "device":"cuda",
         },
@@ -68,6 +71,7 @@ DEFAULT_CONFIG = {
 }
 
 if __name__ == "__main__":
+    # todo: atom embeddings have large numbers and could better be normalized
     config = DEFAULT_CONFIG
     #trainer = AlphaSageTrainer(config["trainer_config"])
     #metrics = trainer._train()
