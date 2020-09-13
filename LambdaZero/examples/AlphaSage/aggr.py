@@ -28,8 +28,8 @@ class MLP(Sequential):
 class GRUAggr(torch.nn.Module):
     def __init__(self, in_dim, out_dim, hidden_size, gru_layers):
         super(GRUAggr, self).__init__()
-        self.gru = torch.nn.GRU(in_dim, hidden_size, num_layers=gru_layers, batch_first=True)
-        self.lin = torch.nn.Linear(hidden_size, out_dim)
+        self.gru = torch.nn.GRU(in_dim, hidden_size, num_layers=gru_layers, batch_first=True, bidirectional=True)
+        self.lin = torch.nn.Linear(hidden_size * 2, out_dim)
 
     def forward(self, inputs):
         out, _ = self.gru(inputs)
