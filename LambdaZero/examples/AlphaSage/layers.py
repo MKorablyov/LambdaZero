@@ -48,6 +48,7 @@ class DiffGCN(torch.nn.Module):
         # initialize
         walks = torch.arange(num_nodes,device=v.device)[:,None] # [w, 1] --> [w,t]
         walk_embeds = v[:, None, :]
+        walks_logp = []
         # diffuse
         for t in range(self.t):
             # find slices of the adjacency matrix
@@ -65,31 +66,39 @@ class DiffGCN(torch.nn.Module):
             with torch.no_grad(): # todo - make sure this norm is ok
                 norm = torch_scatter.scatter_logsumexp(walk_logp_t, init_vs, dim=0, dim_size=num_nodes)
             norm = repeat_cat(norm,adj_slic_t[:,1])
-            walk_p_t = torch.exp(walk_logp_t - norm)
+            walk_logp_t = walk_logp_t - norm
+            walk_p_t = torch.exp(walk_logp_t)
             #print(v.shape, v_t.shape, walk_logp_t.shape, walk_p_t.shape)
             # print(scatter(walk_p_t,init_vs, reduce="sum", dim=0, dim_size=num_nodes))
             # add_noise
             # todo: categorical noise and why
             noise = self.eps * torch.randn(walk_p_t.shape,device=v.device)
-            walk_p_t = walk_p_t + noise
-            _, walks_t = torch_scatter.scatter_max(walk_p_t, init_vs, dim=0, dim_size=num_nodes)
-            walks_t = adj_t[1][walks_t]
+            noise_walk_p_t = walk_p_t + noise
+            _, walk_t = torch_scatter.scatter_max(noise_walk_p_t, init_vs, dim=0, dim_size=num_nodes)
+            walks_logp.append(walk_logp_t[walk_t])
+            walk_t = adj_t[1][walk_t]
             # update walks and walk embeddings
-            walks = torch.cat([walks, walks_t[:,None]], dim=1)
-            walk_embeds = torch.cat([walk_embeds,v[walks_t,:][:,None,:]],dim=1)
-        return walks, walk_embeds
+            walks = torch.cat([walks, walk_t[:,None]], dim=1)
+            walk_embeds = torch.cat([walk_embeds,v[walk_t,:][:,None,:]],dim=1)
+        walks_logp = torch.stack(walks_logp,dim=1)
+        return walks, walk_embeds, walks_logp
 
     def aggregate(self, walks, walk_embeds): # [e,d] -> [v,d]
         return self.walk_aggr(walk_embeds)
 
     def forward(self, node_attr, edge_index, slices):
-        walks, walk_embeds = self.diffuse(node_attr, edge_index, slices)
+        walks, walk_embeds, walks_p = self.diffuse(node_attr, edge_index, slices)
         # print(walk_embeds.sum(dim=[2]))
         if np.random.randn() > 0.995:
             self._test_walks(node_attr, edge_index, walks, walk_embeds)
         v_out = self.aggregate(walks, walk_embeds)
-        return v_out
 
-    # def backward_hook()
-        # rewards = F([s0,s1,s2,s3], l2_loss)
-        # R * log (prob(a | s))
+        # todo: I need to maximize prob of good walks, and minimize prob of bad walks
+        # todo: I want loss from trajectory to be same as misclassification
+        #
+        # [s0, s1, s2, s3] # reward == loss
+        # r = - loss
+        # p[s0, s1] -> - loss
+        # p[s0, s1, s2] -> -loss
+
+        return v_out, walks_p
