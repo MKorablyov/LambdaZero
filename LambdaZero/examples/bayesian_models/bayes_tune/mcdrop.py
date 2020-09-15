@@ -14,7 +14,7 @@ import LambdaZero.utils
 import LambdaZero.models
 from LambdaZero.examples.bayesian_models.bayes_tune import config
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch, eval_epoch, \
-    train_mcdrop, mcdrop_mean_variance
+    train_mcdrop, mcdrop_mean_variance, eval_mcdrop
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 transform = T.Compose([LambdaZero.utils.Complete()])
@@ -39,7 +39,22 @@ class MCDrop(tune.Trainable):
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
         return scores
 
-    def fit(self, train_loader, val_loader):
+    def fine_tune(self, new_samples_loader, train_loader, val_loader, validate):
+        self.train_loader, self.val_loader = new_samples_loader, val_loader
+        all_scores = []
+        for i in range(self.config["finetune_iterations"]):
+            self._iteration = i
+            scores = self._train()
+            all_scores.append(scores)
+        self.train_loader = train_loader
+        if validate:
+            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
+            return all_scores[-1], {**val_score, **val_ll}
+        else:
+            return all_scores[-1], {}
+
+    def fit(self, train_loader, val_loader, validate=False):
         # update internal dataset
         self.train_loader, self.val_loader = train_loader, val_loader
         # make a new model
@@ -52,10 +67,15 @@ class MCDrop(tune.Trainable):
             self._iteration = i
             scores = self._train()
             all_scores.append(scores)
-        return all_scores
+        if validate:
+            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
+            return all_scores[-1], {**val_score, **val_ll}
+        else:
+            return all_scores[-1], {}
 
-    def get_mean_variance(self, loader):
-        mean,var = self.config["get_mean_variance"](self.train_loader, loader, self.model, self.device, self.config)
+    def get_mean_variance(self, loader, train_len):
+        mean,var = self.config["get_mean_variance"](train_len, loader, self.model, self.device, self.config)
         return mean, var
 
 

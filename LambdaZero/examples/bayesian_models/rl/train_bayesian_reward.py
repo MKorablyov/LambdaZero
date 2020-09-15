@@ -54,59 +54,58 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 7,
-        "num_gpus_per_worker": 0.075,
+        "num_workers": 8,
+        "num_gpus_per_worker": 0.25,
         "num_gpus": 1,
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
         "framework": "torch",
-
-        # "rollout_fragment_length": 1500,
-        # "train_batch_size": 200,
-        # "num_workers": 4,
-        # # "num_gpus_per_worker": 0.075,
-        # # "num_gpus": 0,
-        # # "model": {
-        # #     "custom_model": "GraphMolActorCritic_thv1",
-        # # },
-        # "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
-        # "framework": "torch",
         },
     "summaries_dir": summaries_dir,
-    "memory": 30 * 10 ** 9,
+    "memory": 60 * 10 ** 9,
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
     "stop":{"training_iteration": 2000000},
     "regressor_config": {
-        "lambda": 1e-8,
-        "data": dict(data_config, **{"dataset_creator":None}),
-        "T": 20,
-        "lengthscale": 1e-2,
-        "uncertainty_eval_freq":15,
-        "train_iterations": 120,
-        "model": LambdaZero.models.MPNNetDrop,
-        "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
-        "optimizer": torch.optim.Adam,
-        "optimizer_config": {
-            "lr": 0.001
-        },
-        "train_epoch": train_epoch_with_targets,
-        "eval_epoch": eval_epoch,
-        "train": train_mcdrop_rl,
-        "get_mean_variance": mcdrop_mean_variance,
+
     },
     "reward_learner_config": {
-        "aq_size0": 400,
+        "aq_size0": 2000,
         "data": dict(data_config, **{"dataset_creator":None}),
-        "aq_size": 50,
+        "aq_size": 64,
         "kappa": 0.2,
+        "sync_freq": 50,
         "epsilon": 0.0,
-        "minimize_objective":True,
-        "b_size": 40,
-        'num_mol_retrain': 10000
+        "minimize_objective": False,
+        "b_size": 32,
+        'num_mol_retrain': 1000,
+        "device": "cuda",
+        'regressor_config': {
+            "lambda": 6.16e-9,
+            "data": dict(data_config, **{"dataset_creator":None}),
+            "T": 20,
+            "lengthscale": 1e-2,
+            "uncertainty_eval_freq":15,
+            "train_iterations": 32,
+            "finetune_iterations": 16,
+            "model": LambdaZero.models.MPNNetDrop,
+            "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
+            "optimizer": torch.optim.Adam,
+            "optimizer_config": {
+                "lr": 0.001
+            },
+            "train_epoch": train_epoch_with_targets,
+            "eval_epoch": eval_epoch,
+            "train": train_mcdrop_rl,
+            "get_mean_variance": mcdrop_mean_variance,
+            "is_reward_model": True
+        },
+        "regressor": MCDrop,
     },
+    "use_dock": False,
+    "pretrained_model": None #  "/home/mjain/scratch/mcdrop_rl/model.pt"       
 }
 
 config = merge_dicts(DEFAULT_CONFIG, config)
@@ -118,15 +117,20 @@ if machine == "Ikarus":
     config["rllib_config"]["memory"] = 25 * 10**9
 
 if __name__ == "__main__":
-    ray.init(memory=config["memory"], num_gpus=4, num_cpus=12)
+    ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     
-    reward_learner = BayesianRewardActor.options(max_concurrency=4).remote(config['reward_learner_config'], MCDrop,
-                                                config['regressor_config'], 
+    reward_learner = BayesianRewardActor.remote(config['reward_learner_config'], 
+                                                config["use_dock"], 
                                                 config["rllib_config"]['env_config']['reward_config']['dockscore_config'],
-                                                "cuda")
+                                                config["pretrained_model"])
 
     config['rllib_config']['env_config']['reward_config']['reward_learner'] = reward_learner
+    config['rllib_config']['env_config']['reward_config']['regressor'] = config['reward_learner_config']['regressor']
+    config['rllib_config']['env_config']['reward_config']['regressor_config'] = config['reward_learner_config']['regressor_config']
+    config['rllib_config']['env_config']['reward_config']['kappa'] = config['reward_learner_config']['kappa']
+    config['rllib_config']['env_config']['reward_config']['sync_freq'] = config['reward_learner_config']['sync_freq']
+
     tune.run(config["trainer"],
         stop=config["stop"],
         max_failures=0,

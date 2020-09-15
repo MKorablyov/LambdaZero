@@ -116,7 +116,16 @@ def train_mcdrop_rl(train_loader, val_loader, model, device, config, optim, iter
     
     return train_scores
 
-def mcdrop_mean_variance(train_loader, loader, model, device, config):
+def mcdrop_mean_variance(train_len, loader, model, device, config):
+    # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
+    N = train_len
+    Yt_hat = sample_logits(loader, model, device, config, config["T"], do_dropout=True)
+    tau = get_tau(config, N)
+    sigma_sqr = 1. / tau
+    var = (sigma_sqr + Yt_hat ** 2).mean(0) - Yt_hat.mean(0) ** 2
+    return Yt_hat.mean(0), var
+
+def mcdrop_mean_variance_(train_loader, loader, model, device, config):
     # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
     N = len(train_loader.dataset)
     Yt_hat = sample_logits(loader, model, device, config, config["T"], do_dropout=True)
@@ -124,7 +133,6 @@ def mcdrop_mean_variance(train_loader, loader, model, device, config):
     sigma_sqr = 1. / tau
     var = (sigma_sqr + Yt_hat ** 2).mean(0) - Yt_hat.mean(0) ** 2
     return Yt_hat.mean(0), var
-
 
 def bayesian_ridge(train_x, val_x, train_targets_norm, val_targets_norm, config):
     clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
@@ -190,9 +198,7 @@ def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
 
     for bidx, data in enumerate(loader):
         data = data.to(device)
-        targets = data.y
-        if targets is None:
-            targets = getattr(data, config["data"]["target"])
+        targets = getattr(data, config["data"]["target"])
 
         optimizer.zero_grad()
         logits = model(data, do_dropout=True)
