@@ -2,3 +2,7 @@ LINCS
 ExpressionBaseline
 DrugComb
 recover/embeddings
+__pycache__
+LambdaZero.egg-info
+external_dirs.cfg
+L1000_24Hr_10MM
