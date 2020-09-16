@@ -22,3 +22,24 @@ class L1000TwentyFourHrTenMM(L1000):
 
 if __name__ == '__main__':
     x = L1000TwentyFourHrTenMM()
+
+    import pdb; pdb.set_trace()
+    genes = x.data.gene_expr.flatten()
+    import matplotlib.pyplot as plt
+    hist, bins = np.histogram(genes, bins = 50)
+    #max_val = max(hist)
+    #hist = [ float(n)/max_val for n in hist]
+
+    # Plot the resulting histogram
+    center = (bins[:-1]+bins[1:])/2
+    width = 0.7*(bins[1]-bins[0])
+    plt.bar(center, hist, align = 'center', width = width)
+    plt.title('Frequency of transcription element values')
+    plt.xlabel('Transcription element values')
+    plt.ylabel('Number of occurrences')
+    plt.show()
+
+    #plt.hist(genes, bins=12)
+    #plt.xlim(-6., 6.)
+    #plt.xticks(np.arange(-6, 6, step=1))
+    #plt.show()
