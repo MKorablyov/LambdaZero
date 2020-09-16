@@ -151,7 +151,7 @@ class TranscriptionGenTrainer(tune.Trainable):
             # was no data for this set
             if not is_train and len(scores) > 0:
                 var = getattr(self, "%s_var" % set_name)
-                scores["r_squared"] = (var - scores["mse"]) / var
+                scores["r_squared"] = ((var - scores["mse"]) / var).item()
 
             all_scores.update({"%s_%s" % (set_name, key): val for key, val in scores.items()})
 
@@ -192,9 +192,9 @@ if __name__ == '__main__':
         "asha_mode": "min",
         "asha_max_t": 1000,
         "checkpoint_freq": 20,
-        "stop": {"training_iteration": 1000},
+        "stop": {"training_iteration": 150},
         "checkpoint_at_end": True,
-        "resources_per_trial": {},#"cpu": 10, "gpu": 1},
+        "resources_per_trial": {"cpu": 10, "gpu": 1},
         "name": "TranscriptionGenBaseline"
     }
 
@@ -210,21 +210,23 @@ if __name__ == '__main__':
 
     search_space = {
         "lr": hp.loguniform("lr", -16.118095651, -5.52146091786),
-        "num_mtxs": hp.quniform("num_mtxs", 1, 12, 1),
-        "mtx_inner_dim": hp.quniform("mtx_inner_dim", 64, 512, 1),
+        "num_mtxs": hp.quniform("num_mtxs", 1, 4, 1),
+        "mtx_inner_dim": hp.quniform("mtx_inner_dim", 32, 120, 1),
         "alternate_mtx_types": hp.choice("alternate_mtx_types", [False, True]),
         "dropout_prob": hp.uniform("dropout_prob", .0, .7),
         "use_film": hp.choice("use_film", [False, True]),
+        "batch_size": hp.choice("batch_size", [128, 256, 512, 1028]),
     }
 
     current_best_params = [
         {
             "lr": 1e-4,
-            "num_mtxs": 5,
-            "mtx_inner_dim": 150,
+            "num_mtxs": 4,
+            "mtx_inner_dim": 50,
             "alternate_mtx_types": 0,
             "use_film": 1,
-            "dropout_prob": .3,
+            "dropout_prob": .1,
+            "batch_size": 2,
         }
     ]
 
@@ -242,7 +244,7 @@ if __name__ == '__main__':
         config=config["trainer_config"],
         stop=config["stop"],
         resources_per_trial=config["resources_per_trial"],
-        num_samples=1,
+        num_samples=100000,
         checkpoint_at_end=config["checkpoint_at_end"],
         local_dir=config["summaries_dir"],
         checkpoint_freq=config["checkpoint_freq"],

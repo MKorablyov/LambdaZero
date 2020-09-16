@@ -7,8 +7,9 @@ class TranscriptionGeneratorMatrixFactorizationModel(torch.nn.Module):
     def __init__(self, data, config):
         super().__init__()
 
-        num_mtxs = config['num_mtxs']
-        mtx_inner_dim = config['mtx_inner_dim']
+        num_mtxs = int(config['num_mtxs'])
+        mtx_inner_dim = int(config['mtx_inner_dim'])
+        num_shared_mtxs = int(config['num_shared_mtxs']) if 'num_shared_mtxs' in config else 0
         num_cell_lines = torch.unique(data.cell_id_int).shape[0]
         num_drugs = torch.unique(data.cid).shape[0]
 
@@ -20,7 +21,12 @@ class TranscriptionGeneratorMatrixFactorizationModel(torch.nn.Module):
             out_dim = mtx_inner_dim if i != num_mtxs - 1 else data.gene_expr.shape[1]
             num_relations = num_drugs if cond(i) else num_cell_lines
 
-            module = RelationAwareLinear(num_relations, mtx_inner_dim, out_dim)
+            module = None
+            if i < num_mtxs - num_shared_mtxs:
+                module = RelationAwareLinear(num_relations, mtx_inner_dim, out_dim)
+            else:
+                module = torch.nn.Linear(mtx_inner_dim, out_dim)
+
             module.is_drug_lyr = cond(i)
 
             modules.append(module)
@@ -40,7 +46,11 @@ class TranscriptionGeneratorMatrixFactorizationModel(torch.nn.Module):
 
         for i in range(len(self.mtx_modules)):
             rel_idx = drug_idx if self.mtx_modules[i].is_drug_lyr else cell_line_idx
-            out = self.mtx_modules[i](out, rel_idx)
+            args = [out]
+            if isinstance(self.mtx_modules[i], RelationAwareLinear):
+                args.append(rel_idx)
+
+            out = self.mtx_modules[i](*args)
 
             if i != len(self.mtx_modules) - 1:
                 if self.film is not None:
