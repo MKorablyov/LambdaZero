@@ -2,8 +2,8 @@ import torch
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
-from LambdaZero.models.torch_models import MPNNetDrop
-from LambdaZero.examples.drug_comb.model.relation_aware_mlp import RelationAwareMLP
+#from LambdaZero.models.torch_models import MPNNetDrop
+from recover.models.relation_aware_mlp import RelationAwareMLP
 import time
 
 def _rebuild_edge_index_and_graphs(edge_index, graphs):

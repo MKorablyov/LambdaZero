@@ -6,7 +6,8 @@ import time
 
 class InMemoryGCN(MessagePassing):
     def __init__(self, in_channels, out_channels,
-                 train_edge_index, val_edge_index, aggr="add"):
+                 train_edge_index, val_edge_index,
+                 test_edge_index, aggr="add"):
         super().__init__(aggr=aggr)
 
         self.w = torch.nn.Linear(in_channels, out_channels)

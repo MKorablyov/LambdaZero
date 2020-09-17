@@ -1,7 +1,9 @@
 import torch
+import torch.nn.functional as F
 from recover.datasets.drugcomb_data import DrugComb, DrugCombNoPPI
 from recover.datasets.drugcomb_score_data import DrugCombScore, DrugCombScoreNoPPI
 from recover.datasets.drugcomb_score_l1000_data import DrugCombScoreL1000, DrugCombScoreL1000NoPPI
+from recover.models.gnn import GNN
 from recover.models.multi_message_gcn import GiantGraphGCN
 from recover.models.baselines import Dummy, ConcentrationOnlyBaseline, ScalarProdBaselineFP, MLPBaselineFP, \
     MLPBaselineFPProt, FilmMLPBaselineFPProt, MLPBaselineExpr, MLPBaselineFPExpr
@@ -14,8 +16,26 @@ from recover.utils import get_project_root
 from torch.utils.data import TensorDataset, DataLoader
 import time
 from ray import tune
+from ray.tune.schedulers import ASHAScheduler
+from ray.tune.suggest.hyperopt import HyperOptSearch
+from hyperopt import hp
 from contextlib import contextmanager
 import ray
+
+class MeanVarianceNormalizer:
+    def __init__(self, mean_and_variance):
+        self.mean = mean_and_variance[0]
+        self.variance = mean_and_variance[1]
+
+    def tfm(self, x):
+        "normalize x"
+        x_norm = (x - self.mean) / self.variance
+        return x_norm
+
+    def itfm(self, x_norm):
+        "unnormalize x"
+        x = (x_norm * self.variance) + self.mean
+        return x
 
 ########################################################################################################################
 # Epoch loops
@@ -44,9 +64,10 @@ def _get_normalizers(data, train_idxs, val_idxs, test_idxs):
         result[set_name] = MeanVarianceNormalizer((data.ddi_edge_response[idxs].mean(),
                                                    data.ddi_edge_response[idxs].var()))
 
-    return result
+    return result["train"], result["val"], result["test"]
 
 def run_epoch(data, loader, model, normalizer, optim, is_train):
+    RESPONSE_IDX = 3
     model.train() if is_train else model.eval()
 
     loss_sum      = 0
@@ -57,6 +78,7 @@ def run_epoch(data, loader, model, normalizer, optim, is_train):
     none_ctx = contextmanager(lambda: iter([None]))()
     with none_ctx if is_train else torch.no_grad():
         for batch in loader:
+            y = batch[RESPONSE_IDX]
             y_hat = model(data, batch)
             loss = F.mse_loss(normalizer.tfm(y), y_hat)
 
@@ -69,15 +91,19 @@ def run_epoch(data, loader, model, normalizer, optim, is_train):
             epoch_targets.append(y.detach().cpu())
             epoch_preds.append(normalizer.itfm(y_hat).detach().cpu())
 
-    epoch_targets = torch.cat(epoch_targets)
-    epoch_preds = torch.cat(epoch_preds)
+    scores = {}
+    if len(epoch_targets) > 0 and len(epoch_preds) > 0:
+        epoch_targets = torch.cat(epoch_targets)
+        epoch_preds = torch.cat(epoch_preds)
 
-    return {
-        "loss": loss_sum / epoch_targets.shape[0],
-        "mae": F.l1_loss(epoch_targets, epoch_preds).item(),
-        "mse": F.mse_loss(epoch_targets, epoch_preds).item(),
-        "rmse": torch.sqrt(F.mse_loss(epoch_targets, epoch_preds)).item(),
-    }
+        scores = {
+            "loss": loss_sum / epoch_targets.shape[0],
+            "mae": F.l1_loss(epoch_targets, epoch_preds).item(),
+            "mse": F.mse_loss(epoch_targets, epoch_preds).item(),
+            "rmse": torch.sqrt(F.mse_loss(epoch_targets, epoch_preds)).item(),
+        }
+
+    return scores
 
 ########################################################################################################################
 # Main training loop
@@ -94,6 +120,7 @@ class GiantGraphTrainer(tune.Trainable):
                                     fp_bits=config["fp_bits"], fp_radius=config["fp_radius"],
                                     ppi_confidence_thres=config["ppi_confidence_thres"])
 
+        # Need to call this here so that the edge index properties are propagated later
         self.data = dataset[0].to(self.device)
 
         # If a score dataset is used, we have to specify the target
@@ -109,13 +136,21 @@ class GiantGraphTrainer(tune.Trainable):
         torch.manual_seed(config["seed"])
 
         train_idxs, val_idxs, test_idxs = dataset.random_split(config["test_set_prop"], config["val_set_prop"])
-        self.train_loader, self.valid_loader, self.test_loader = _get_loaders(data, config["batch_size"],
-                                                                              train_idxs, val_idxs, test_idxs)
+        self.train_loader, self.valid_loader, self.test_loader = _get_loaders(self.data, config["batch_size"],
+                                                                              self.device, train_idxs, val_idxs,
+                                                                              test_idxs)
 
-        self.train_norm, self.valid_norm, self.test_norm = _get_normalizers(data, train_idxs, val_idxs, test_idxs)
+        # Assign idxs to the data object here since if we did earlier
+        # there'd be an error data.to() is called
+        self.data.train_edge_index = self.data.ddi_edge_idx[:, train_idxs]
+        self.data.test_edge_index = self.data.ddi_edge_idx[:, test_idxs]
+        self.data.val_edge_index = self.data.ddi_edge_idx[:, val_idxs]
 
-        self.valid_var = data.ddi_edge_response[val_idxs].var()
-        self.test_var = data.ddi_edge_response[test_idxs].var()
+        self.train_norm, self.valid_norm, self.test_norm = _get_normalizers(self.data, train_idxs,
+                                                                            val_idxs, test_idxs)
+
+        self.valid_var = self.data.ddi_edge_response[val_idxs].var()
+        self.test_var = self.data.ddi_edge_response[test_idxs].var()
 
         # Initialize model and optimizer
         self.model = config["model"](self.data, config).to(self.device)
@@ -128,13 +163,14 @@ class GiantGraphTrainer(tune.Trainable):
             optim = self.optim if is_train else None
 
             scores = run_epoch(self.data, getattr(self, "%s_loader" % set_name),
-                               self.model, getattr(self, "%s_norm"), optim, is_train)
+                               self.model, getattr(self, "%s_norm" % set_name),
+                               optim, is_train)
 
-            if not is_train:
+            if not is_train and len(scores) > 0:
                 var = getattr(self, "%s_var" % set_name)
-                scores["%s_r_squared"] = (var - scores["mse"]) / var
+                scores["%s_r_squared" % set_name] = (var - scores["mse"]) / var
 
-            all_scores += {"%s_%s" % (set_name, key): val for key, val in scores.items()}
+            all_scores.update({"%s_%s" % (set_name, key): val for key, val in scores.items()})
 
         return all_scores
 
@@ -162,6 +198,14 @@ if __name__ == '__main__':
             "transform": None,
             "pre_transform": None,
             "seed": 1,  # tune.grid_search([1, 2, 3]),
+            "aggr": "concat",
+            "gcn_dropout_rate": .1,
+            "gcn_channels": [1024, 256, 256, 256],
+            "gnn_lyr_type": "GCNWithAttention",
+            "num_residual_gcn_layers": 1,
+            "linear_dropout_rate": .2,
+            "linear_channels": [64, 32, 16, 1],
+            "num_relation_lin_layers": 2,
             # "scalar_layers": [100, 100, 10],  # For scalar baselines
             "mlp_layers": [4096, 2048, 1024, 1],  #tune.grid_search([[1], [1024, 1]]),  # For MLP baselines
             "conv_layer": ThreeMessageConvLayer,
@@ -175,31 +219,31 @@ if __name__ == '__main__':
             "val_set_prop": 0.2,
             "test_set_prop": 0.,
             "lr": 1e-4,  # tune.grid_search([1e-4, 5e-4]),
-            "model": tune.grid_search([MLPBaselineFPExpr, MLPBaselineFPProt]),
-            "dataset": DrugCombScoreL1000NoPPI,
+            "model": GNN,
+            "dataset": DrugCombScore,
             "target": "css",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
             "fp_bits": 1024,
             "fp_radius": 4,
             "ppi_confidence_thres": 0,
             "batch_size": 128,  # tune.grid_search([1024, 2048]),
-            "asha_metric": "eval_mse",
-            "asha_mode": "min",
-            "asha_max_t": 100
         },
         "summaries_dir": summaries_dir,
         "memory": 1800,
         "checkpoint_freq": 20,
         "stop": {"training_iteration": 30},
         "checkpoint_at_end": False,
-        "resources_per_trial": {"cpu": 10, "gpu": 1},
-        "name": "ExpressionBaseline"
+        "resources_per_trial": {},#"cpu": 10, "gpu": 1},
+        "name": "ExpressionBaseline",
+        "asha_metric": "eval_mse",
+        "asha_mode": "min",
+        "asha_max_t": 100,
     }
 
     asha_scheduler = ASHAScheduler(
 	time_attr='training_iteration',
-	metric=config['asha_metric'],
-	mode=config['asha_mode'],
-	max_t=config['asha_max_t'],
+	metric=configuration['asha_metric'],
+	mode=configuration['asha_mode'],
+	max_t=configuration['asha_max_t'],
 	grace_period=10,
 	reduction_factor=3,
 	brackets=1
@@ -208,27 +252,21 @@ if __name__ == '__main__':
     search_space = {
         "lr": hp.loguniform("lr", -16.118095651, -5.52146091786),
         "rank": hp.quniform("rank", 50, 300, 1),
-        "gcn_channels": hp.choice("gcn_channels", [[1024, 256, 256, 256], [1024, 256, 256]]),
         "batch_size": hp.choice("batch_size", [256, 512]),
-        "gcn_dropout_rate": hp.uniform("gcn_dropout_rate", .0, .2),
-        "lin_dropout_rate": hp.uniform("lin_dropout_rate", .0, .4),
     }
 
     current_best_params = [
         {
             "lr": 1e-4,
             "rank": 128,
-            "gcn_channels": 1,
             "batch_size": 0,
-            "gcn_dropout_rate": .1,
-            "lin_dropout_rate": .4,
         }
     ]
 
     search_alg = HyperOptSearch(
         search_space,
-        metric=config['asha_metric'],
-        mode=config['asha_mode'],
+        metric=configuration['asha_metric'],
+        mode=configuration['asha_mode'],
         points_to_evaluate=current_best_params
     )
 

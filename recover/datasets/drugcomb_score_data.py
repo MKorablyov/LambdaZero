@@ -1,6 +1,6 @@
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from recover.utils import get_project_root
-# from pubchempy import Compound
+from pubchempy import Compound
 import urllib.request
 # from unrar import rarfile
 import ssl
@@ -74,10 +74,10 @@ class DrugCombScore(InMemoryDataset):
         for url in urls[2:]:
             download_url(url, self.raw_dir)
 
-        rar_filenames = ['/drug_protein_links.rar', '/protein_protein_links.rar']
-        for rar_filename in rar_filenames:
-            rar = rarfile.RarFile(self.raw_dir + rar_filename)
-            rar.extractall(path=self.raw_dir)
+        #rar_filenames = ['/drug_protein_links.rar', '/protein_protein_links.rar']
+        #for rar_filename in rar_filenames:
+        #    rar = rarfile.RarFile(self.raw_dir + rar_filename)
+        #    rar.extractall(path=self.raw_dir)
 
         chunk_size = 16 * 1024
         for url in urls[:2]:
@@ -352,13 +352,13 @@ class DrugCombScore(InMemoryDataset):
         val_idx = np.where(all_edges_split == 1)[0]
         test_idx = np.where(all_edges_split == 2)[0]
 
-        train_idx = torch.tensor(np.random.shuffle(train_idx))
-        val_idx = torch.tensor(np.random.shuffle(val_idx))
-        test_idx = torch.tensor(np.random.shuffle(test_idx))
+        np.random.shuffle(train_idx)
+        np.random.shuffle(val_idx)
+        np.random.shuffle(test_idx)
 
-        self.train_edge_index = self.ddi_edge_index[:, train_idx]
-        self.val_edge_index = self.ddi_edge_index[:, .val_idx]
-        self.test_edge_index = self.ddi_edge_index[:, test_idx]
+        train_idx = torch.tensor(train_idx)
+        val_idx = torch.tensor(val_idx)
+        test_idx = torch.tensor(test_idx)
 
         return train_idx, val_idx, test_idx
 

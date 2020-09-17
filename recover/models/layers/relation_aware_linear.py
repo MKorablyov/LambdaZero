@@ -25,9 +25,18 @@ class RelationAwareLinear(torch.nn.Module):
         # idx array for trick to do 3d tensor mult fast
         idxs = torch.arange(x.shape[0], device=x.device)
 
-        out = x.matmul(self.w[relations])[idxs, 0, idxs, :]
+        out = x.matmul(self.w[relations])
+        if len(out.shape) == 4:
+            out = out[idxs, 0, idxs, :]
+        else:
+            out = out[idxs, idxs, :]
+
         if self.bias is not None:
-            out = out + self.bias[relations][:, 0, :]
+            bias = self.bias[relations]
+            if len(bias.shape) == 3:
+                bias = bias[:, 0, :]
+
+            out = out + bias
 
         return out
 

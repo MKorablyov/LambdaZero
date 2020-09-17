@@ -2,16 +2,19 @@ import torch
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
-from LambdaZero.examples.drug_comb.model.layers.in_memory_gcn import InMemoryGCN
-from LambdaZero.examples.drug_comb.model.layers.low_rank_attention import LowRankAttention
+from recover.models.layers.in_memory_gcn import InMemoryGCN
+from recover.models.layers.low_rank_attention import LowRankAttention
 import time
 
 class GCNWithAttention(torch.nn.Module):
     def __init__(self, in_channels, out_channels, rank,
-                 train_edge_index, val_edge_index, dropout):
+                 train_edge_index, val_edge_index,
+                 test_edge_index, dropout):
         super().__init__()
 
-        self.conv = InMemoryGCN(in_channels, out_channels, train_edge_index, val_edge_index)
+        self.conv = InMemoryGCN(in_channels, out_channels, train_edge_index,
+                                val_edge_index, test_edge_index)
+
         self.attention = LowRankAttention(in_channels, rank)
         self.dim_reduce = torch.nn.Linear(out_channels + (2 * rank), out_channels)
 

@@ -2,7 +2,7 @@ import torch
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
 from torch_geometric.utils import degree, add_remaining_self_loops
-from LambdaZero.examples.drug_comb.model.layers.relation_aware_linear import RelationAwareLinear
+from recover.models.layers.relation_aware_linear import RelationAwareLinear
 import time
 
 class RelationAwareMLP(torch.nn.Module):
@@ -41,7 +41,7 @@ class RelationAwareMLP(torch.nn.Module):
 
         self.dropout = dropout
         self.non_relation_pred = torch.nn.Sequential(*modules)
-        self.relation_lyrs = torch.nn.ModuleList(*relation_lyrs)
+        self.relation_lyrs = torch.nn.ModuleList(relation_lyrs)
 
         self.bn = None
         if batch_norm:
@@ -50,7 +50,7 @@ class RelationAwareMLP(torch.nn.Module):
                 for k in range(num_layers - num_relation_layers, num_layers)
             ]
 
-            self.bn = torch.nn.ModuleList(*bn)
+            self.bn = torch.nn.ModuleList(bn)
 
     def forward(self, x, relations):
         x = self.non_relation_pred(x)

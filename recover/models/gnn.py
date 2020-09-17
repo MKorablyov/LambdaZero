@@ -2,9 +2,9 @@ import torch
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree, add_remaining_self_loops
-from LambdaZero.examples.drug_comb.model.relation_aware_mlp import RelationAwareMLP
-from LambdaZero.examples.drug_comb.model.layers.in_memory_gcn import InMemoryGCN
-from LambdaZero.examples.drug_comb.model.layers.gcn_with_attention import GCNWithAttention
+from recover.models.relation_aware_mlp import RelationAwareMLP
+from recover.models.layers.in_memory_gcn import InMemoryGCN
+from recover.models.layers.gcn_with_attention import GCNWithAttention
 import time
 
 class GNN(torch.nn.Module):
@@ -39,7 +39,7 @@ class GNN(torch.nn.Module):
 
             convs.append(gnn_lyr)
 
-        self.convs = torch.nn.ModuleList(*convs)
+        self.convs = torch.nn.ModuleList(convs)
 
         if len(self.convs) > 0 and config['num_residual_gcn_layers'] > len(self.convs):
             raise AttributeError(
@@ -59,13 +59,14 @@ class GNN(torch.nn.Module):
         elif self._aggr == 'hadamard':
             lin_input_dim = embed_size + 1
 
+        num_relations = torch.unique(data.ddi_edge_classes).shape[0]
         config['linear_channels'].insert(0, lin_input_dim)
-        self.predictor = RelationAwareMLP(config['linear_channels'], config['num_relations'],
+        self.predictor = RelationAwareMLP(config['linear_channels'], num_relations,
                                           config['num_relation_lin_layers'], linear_dropout,
                                           batch_norm=False)
 
     def forward(self, data, batch):
-        x = data.x
+        x = data.x_drugs
         edge_index, relations, concs, _ = batch
         for i, conv in enumerate(self.convs):
             if i >= len(self.convs) - self.num_residual_gcn_layers:
