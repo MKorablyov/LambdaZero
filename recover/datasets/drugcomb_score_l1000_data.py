@@ -36,9 +36,6 @@ class DrugCombScoreL1000(DrugCombScore):
     def _get_ddi_edges(self, cid_to_idx_dict):
         print('Processing drug drug interaction edges')
 
-        # Add categorical encoding of cell lines
-        self._score_data['cell_line_cat'] = self._score_data['cell_line_name'].astype('category').cat.codes
-
         self._score_data['drug_row_idx'] = self._score_data['drug_row_cid']. \
             apply(lambda cid: cid_to_idx_dict[cid] if cid in cid_to_idx_dict.keys() else -1)
 
@@ -51,6 +48,9 @@ class DrugCombScoreL1000(DrugCombScore):
 
         is_pairs_of_diff_drugs = self._score_data['drug_row_idx'] != self._score_data['drug_col_idx']
         self._score_data = self._score_data[is_pairs_of_diff_drugs]
+
+        # Add categorical encoding of cell lines
+        self._score_data['cell_line_cat'] = self._score_data['cell_line_name'].astype('category').cat.codes
 
         # Get cell line dictionary
         cell_lines = self._score_data['cell_line_name'].astype('category').cat.categories
@@ -83,6 +83,9 @@ class DrugCombScoreL1000(DrugCombScore):
 
         self._score_data = self._score_data[self._score_data['expr_row'].apply(lambda s: type(s) != int)]
         self._score_data = self._score_data[self._score_data['expr_col'].apply(lambda s: type(s) != int)]
+
+        # Edit categorical encoding of remaining cell lines
+        self._score_data['cell_line_cat'] = self._score_data['cell_line_name'].astype('category').cat.codes
 
         expr_row = np.array(self._score_data['expr_row'].apply(lambda s: s.to_numpy()).to_list())
         expr_row = np.concatenate((expr_row, self._score_data[['ic50_row']].to_numpy()), axis=1)

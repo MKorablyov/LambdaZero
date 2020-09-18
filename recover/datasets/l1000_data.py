@@ -183,5 +183,4 @@ class L1000(InMemoryDataset):
 
 if __name__ == '__main__':
     dataset = L1000()
-    print("toto")
 
