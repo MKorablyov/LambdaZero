@@ -1,7 +1,5 @@
 import torch
-import torch.nn as nn
 from torch.nn import functional as F
-from torch.nn import Parameter, ParameterList
 import numpy as np
 
 
@@ -67,379 +65,97 @@ def weight_init(layer):
             torch.nn.init.constant_(layer.bias.data,0)
     return
 
-
 ########################################################################################################################
-# Simple Predictors
-########################################################################################################################
-
-
-class InnerProductPredictor(torch.nn.Module):
-    def __init__(self, data, num_cell_lines, layer_dims):
-        """
-        Non linear transformation (linear layer + Relu) applied to each drug embedding independently
-        Then the score is predited as <h_1 , G . h_2> where G is learnt. We enforce G symmetric
-
-        All transformations are cell line specific
-        """
-        super(InnerProductPredictor, self).__init__()
-        assert len(layer_dims) == 2
-
-        self.predictor_lin = Parameter(1 / 100 * torch.randn((num_cell_lines, layer_dims[0],
-                                                              layer_dims[1])))
-        self.predictor_prod = Parameter(1 / 100 * torch.randn((num_cell_lines, layer_dims[1],
-                                                               layer_dims[1])))  # Mat for outer product
-
-    def forward(self, data, drug_drug_batch, h_drug):
-        batch_size = drug_drug_batch[0].shape[0]
-
-        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
-        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
-
-        h_drug_1s = h_drug[drug_1s].reshape(batch_size, 1, -1)  # Trick to allow broadcasting with matmul
-        h_drug_2s = h_drug[drug_2s].reshape(batch_size, 1, -1)  # Trick to allow broadcasting with matmul
-        # Cell line specific linear layer
-        h_drug_1s = F.relu(h_drug_1s.matmul(self.predictor_lin[cell_lines]))
-        h_drug_2s = F.relu(h_drug_2s.matmul(self.predictor_lin[cell_lines]))
-
-        h_drug_2s = h_drug_2s.reshape(batch_size, -1, 1)  # Trick to allow broadcasting with matmul
-
-        # Build G to be symmetric
-        G = self.predictor_prod[cell_lines] + self.predictor_prod[cell_lines].permute(0, 2, 1)
-
-        # Inner product of embedding pairs using G
-        batch_score_preds = h_drug_1s.matmul(G).matmul(h_drug_2s)[:, 0, 0]
-
-        return batch_score_preds
-
-
-class MLPPredictor(torch.nn.Module):
-    """
-    Does not take into account cell line
-    """
-    def __init__(self, data, num_cell_lines, layer_dims):
-        super(MLPPredictor, self).__init__()
-        assert layer_dims[-1] == 1
-
-        layers = []
-
-        for i in range(len(layer_dims) - 1):
-            layers.append(nn.Linear(layer_dims[i], layer_dims[i+1]))
-            if i != len(layer_dims) - 2:
-                layers.append(nn.ReLU())
-
-        self.mlp = nn.Sequential(*layers)
-
-    def forward(self, data, drug_drug_batch, h_drug):
-        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
-        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-
-        h_drug_1s = h_drug[drug_1s]
-        h_drug_2s = h_drug[drug_2s]
-
-        n_attr = drug_drug_batch[2].shape[1] // 2
-        # Concatenate with IC50s
-        batch_data_1 = torch.cat((h_drug_1s, drug_drug_batch[2][:, n_attr-1][:, None]), dim=1)
-        batch_data_2 = torch.cat((h_drug_2s, drug_drug_batch[2][:, -1][:, None]), dim=1)
-
-        if np.random.binomial(1, 0.5):  # Randomize head-tail of edges at the batch level
-            batch = torch.cat((batch_data_1, batch_data_2), dim=1)
-        else:
-            batch = torch.cat((batch_data_2, batch_data_1), dim=1)
-
-        batch_score_preds = self.mlp(batch)[:, 0]
-
-        return batch_score_preds
-
-########################################################################################################################
-# Predictors with conditioning
+# Functions for Predictors
 ########################################################################################################################
 
 
-class FilmMLPPredictor(torch.nn.Module):
+def get_batch(data, drug_drug_batch, h_drug, drug2target_dict, with_fp=False, with_expr=False, with_prot=False):
     """
-    Takes into account cell line with Film conditioning. Takes fingerprints as input as well
-    """
-
-    def __init__(self, data, num_cell_lines, layer_dims):
-        super(FilmMLPPredictor, self).__init__()
-        assert layer_dims[-1] == 1
-
-        layers = []
-        film = []
-
-        for i in range(len(layer_dims) - 1):
-            layers.append(nn.Linear(layer_dims[i], layer_dims[i + 1]))
-            film.append(Parameter(1/100 * torch.randn(num_cell_lines, 2) + torch.Tensor([[1, 0]])))
-
-        self.layers = nn.ModuleList(layers)
-        self.film = nn.ParameterList(film)
-
-    def forward(self, data, drug_drug_batch, h_drug):
-        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
-        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
-
-        h_drug_1s = h_drug[drug_1s]
-        h_drug_2s = h_drug[drug_2s]
-
-        n_attr = drug_drug_batch[2].shape[1] // 2
-        # Concatenate with IC50s
-        batch_data_1 = torch.cat((h_drug_1s, drug_drug_batch[2][:, n_attr-1][:, None]), dim=1)
-        batch_data_2 = torch.cat((h_drug_2s, drug_drug_batch[2][:, -1][:, None]), dim=1)
-
-        if np.random.binomial(1, 0.5):  # Randomize head-tail of edges at the batch level
-            batch = torch.cat((batch_data_1, batch_data_2), dim=1)
-        else:
-            batch = torch.cat((batch_data_2, batch_data_1), dim=1)
-
-        for i in range(len(self.layers)):
-            batch = self.layers[i](batch)
-            if i != len(self.layers) - 1:
-                # Film conditioning
-                batch = self.film[i][cell_lines][:, :1] * batch + self.film[i][cell_lines][:, 1:]
-                batch = F.relu(batch)
-
-        batch_score_preds = batch[:, 0]
-
-        return batch_score_preds
-
-
-class CellLineMLPPredictor(torch.nn.Module):
-    """
-    Takes into account cell line. All layers but the last two are shared between
-    cell lines. The last two layers are cell line specific
-    The forward passes are all computed in parallel
+    if h_drug is None, the fingerprints are taken as embeddings of the drugs, and the parameter with_fp is ignored
     """
 
-    def __init__(self, data, num_cell_lines, layer_dims):
-        super(CellLineMLPPredictor, self).__init__()
-        assert layer_dims[-1] == 1
+    batch_size = drug_drug_batch[0].shape[0]
 
-        last_layers = []
-        shared_layers = []
-        offsets = []
+    drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+    drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+    cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
 
-        # Shared layers
-        for i in range(len(layer_dims) - 3):
-            shared_layers.append(nn.Linear(layer_dims[i], layer_dims[i + 1]))
-            shared_layers.append(nn.ReLU())
+    #####################################################
+    # Get drug embeddings
+    #####################################################
 
-        # Cell line specific layers
-        for i in range(len(layer_dims) - 3, len(layer_dims) - 1):
-            last_layers.append(Parameter(1 / 100 * torch.randn((num_cell_lines, layer_dims[i + 1], layer_dims[i]))))
-            offsets.append(Parameter(1 / 100 * torch.randn((num_cell_lines, layer_dims[i + 1], 1))))
+    if h_drug is not None:
+        h_drug_1s = h_drug[drug_1s]  # Embeddings of tail drugs in the batch
+        h_drug_2s = h_drug[drug_2s]  # Embeddings of head drugs in the batch
+    else:  # The embedding of the drug is the fingerprint
+        h_drug_1s = data.x_drugs[drug_1s]
+        h_drug_2s = data.x_drugs[drug_2s]
 
-        self.shared_layers = nn.ModuleList(shared_layers)
-        self.last_layers = ParameterList(last_layers)
-        self.offsets = ParameterList(offsets)
+    n_attr = drug_drug_batch[2].shape[1] // 2  # Number of dd-edge attributes
 
-    def forward(self, data, drug_drug_batch, h_drug):
-        batch_size = drug_drug_batch[0].shape[0]
+    #####################################################
+    # Get drug pair attributes
+    #####################################################
 
-        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
-        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
+    if with_expr:  # Include gene expression data
+        attr_1s = drug_drug_batch[2][:, :n_attr]
+        attr_2s = drug_drug_batch[2][:, n_attr:]
+    else:
+        attr_1s = drug_drug_batch[2][:, n_attr - 1][:, None]
+        attr_2s = drug_drug_batch[2][:, -1][:, None]
 
-        h_drug_1s = h_drug[drug_1s]
-        h_drug_2s = h_drug[drug_2s]
+    #####################################################
+    # Add protein target information
+    #####################################################
 
-        n_attr = drug_drug_batch[2].shape[1] // 2
-        # Concatenate with IC50s
-        batch_data_1 = torch.cat((h_drug_1s, drug_drug_batch[2][:, n_attr-1][:, None]), dim=1)
-        batch_data_2 = torch.cat((h_drug_2s, drug_drug_batch[2][:, -1][:, None]), dim=1)
+    if with_prot:  # Include protein target information
+        prot_1 = torch.zeros((batch_size, data.x_prots.shape[0]))
+        prot_2 = torch.zeros((batch_size, data.x_prots.shape[0]))
 
-        if np.random.binomial(1, 0.5):  # Randomize head-tail of edges at the batch level
-            batch = torch.cat((batch_data_1, batch_data_2), dim=1)
-        else:
-            batch = torch.cat((batch_data_2, batch_data_1), dim=1)
+        if torch.cuda.is_available():
+            prot_1 = prot_1.to("cuda")
+            prot_2 = prot_2.to("cuda")
 
-        # Forward in shared layers
-        for i in range(len(self.shared_layers)):
-            batch = self.shared_layers[i](batch)
-            batch = F.relu(batch)
+        for i in range(batch_size):
+            prot_1[i, drug2target_dict[int(drug_1s[i])]] = 1
+            prot_2[i, drug2target_dict[int(drug_2s[i])]] = 1
 
-        batch = batch.reshape(batch_size, -1, 1)  # Trick to allow broadcasting with matmul
+        attr_1s = torch.cat((attr_1s, prot_1), dim=1)
+        attr_2s = torch.cat((attr_2s, prot_2), dim=1)
 
-        # Forward in cell_line specific MLPs in parallel
-        for i in range(len(self.last_layers)):
-            batch = self.last_layers[i][cell_lines].matmul(batch) + self.offsets[i][cell_lines]
-            if i != len(self.last_layers) - 1:
-                batch = F.relu(batch)
+    #####################################################
+    # Include fingerprints
+    #####################################################
 
-        batch_score_preds = batch[:, 0, 0]
-
-        return batch_score_preds
-
-
-########################################################################################################################
-# Predictors that take fingerprints as input as well
-########################################################################################################################
-
-
-class FingerprintMLPPredictor(torch.nn.Module):
-    """
-    Does not take into account cell line. Takes fingerprints as input as well
-    """
-
-    def __init__(self, data, num_cell_lines, layer_dims):
-        super(FingerprintMLPPredictor, self).__init__()
-        assert layer_dims[-1] == 1
-
-        layers = []
-        layer_dims[0] += data.x_drugs.shape[1] * 2
-
-        for i in range(len(layer_dims) - 1):
-            layers.append(nn.Linear(layer_dims[i], layer_dims[i + 1]))
-            if i != len(layer_dims) - 2:
-                layers.append(nn.ReLU())
-
-        self.mlp = nn.Sequential(*layers)
-
-    def forward(self, data, drug_drug_batch, h_drug):
-        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
-        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-
+    if with_fp and h_drug is not None:  # Concatenate the embeddings with fingerprints and IC50s
         x_drug_1s = data.x_drugs[drug_1s]
         x_drug_2s = data.x_drugs[drug_2s]
+        batch_data_1 = torch.cat((x_drug_1s, h_drug_1s, attr_1s), dim=1)
+        batch_data_2 = torch.cat((x_drug_2s, h_drug_2s, attr_2s), dim=1)
+    else:  # Concatenate with IC50 only
+        batch_data_1 = torch.cat((h_drug_1s, attr_1s), dim=1)
+        batch_data_2 = torch.cat((h_drug_2s, attr_2s), dim=1)
 
-        h_drug_1s = h_drug[drug_1s]
-        h_drug_2s = h_drug[drug_2s]
+    #####################################################
+    # Randomize head-tail of edges at the batch level
+    #####################################################
 
-        n_attr = drug_drug_batch[2].shape[1] // 2
-        # Concatenate with IC50s
-        batch_data_1 = torch.cat((x_drug_1s, h_drug_1s, drug_drug_batch[2][:, n_attr-1][:, None]), dim=1)
-        batch_data_2 = torch.cat((x_drug_2s, h_drug_2s, drug_drug_batch[2][:, -1][:, None]), dim=1)
+    if np.random.binomial(1, 0.5):
+        batch = torch.cat((batch_data_1, batch_data_2), dim=1)
+    else:
+        batch = torch.cat((batch_data_2, batch_data_1), dim=1)
 
-        if np.random.binomial(1, 0.5):  # Randomize head-tail of edges at the batch level
-            batch = torch.cat((batch_data_1, batch_data_2), dim=1)
-        else:
-            batch = torch.cat((batch_data_2, batch_data_1), dim=1)
-
-        batch_score_preds = self.mlp(batch)[:, 0]
-
-        return batch_score_preds
-
-
-class FilmFingerprintMLPPredictor(torch.nn.Module):
-    """
-    Takes into account cell line with Film conditioning. Takes fingerprints as input as well
-    """
-
-    def __init__(self, data, num_cell_lines, layer_dims):
-        super(FilmFingerprintMLPPredictor, self).__init__()
-        assert layer_dims[-1] == 1
-
-        layers = []
-        layer_dims[0] += data.x_drugs.shape[1] * 2
-        film = []
-
-        for i in range(len(layer_dims) - 1):
-            layers.append(nn.Linear(layer_dims[i], layer_dims[i + 1]))
-            film.append(Parameter(1/100 * torch.randn(num_cell_lines, 2) + torch.Tensor([[1, 0]])))
-
-        self.layers = nn.ModuleList(layers)
-        self.film = nn.ParameterList(film)
-
-    def forward(self, data, drug_drug_batch, h_drug):
-        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
-        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
-
-        x_drug_1s = data.x_drugs[drug_1s]
-        x_drug_2s = data.x_drugs[drug_2s]
-
-        h_drug_1s = h_drug[drug_1s]
-        h_drug_2s = h_drug[drug_2s]
-
-        n_attr = drug_drug_batch[2].shape[1] // 2
-        # Concatenate with IC50s
-        batch_data_1 = torch.cat((x_drug_1s, h_drug_1s, drug_drug_batch[2][:, n_attr-1][:, None]), dim=1)
-        batch_data_2 = torch.cat((x_drug_2s, h_drug_2s, drug_drug_batch[2][:, -1][:, None]), dim=1)
-
-        if np.random.binomial(1, 0.5):  # Randomize head-tail of edges at the batch level
-            batch = torch.cat((batch_data_1, batch_data_2), dim=1)
-        else:
-            batch = torch.cat((batch_data_2, batch_data_1), dim=1)
-
-        for i in range(len(self.layers)):
-            batch = self.layers[i](batch)
-            if i != len(self.layers) - 1:
-                # Film conditioning
-                batch = self.film[i][cell_lines][:, :1] * batch + self.film[i][cell_lines][:, 1:]
-                batch = F.relu(batch)
-
-        batch_score_preds = batch[:, 0]
-
-        return batch_score_preds
+    return batch, cell_lines
 
 
-class FPCellLineMLPPredictor(torch.nn.Module):
-    """
-    Takes into account cell line. Takes fingerprints as input as well. All layers but the last two are shared between
-    cell lines. The last two layers are cell line specific
-    The forward passes are all computed in parallel
-    """
-
-    def __init__(self, data, num_cell_lines, layer_dims):
-        super(FPCellLineMLPPredictor, self).__init__()
-        assert layer_dims[-1] == 1
-
-        last_layers = []
-        shared_layers = []
-        layer_dims[0] += data.x_drugs.shape[1] * 2
-        offsets = []
-
-        # Shared layers
-        for i in range(len(layer_dims) - 3):
-            shared_layers.append(nn.Linear(layer_dims[i], layer_dims[i + 1]))
-            shared_layers.append(nn.ReLU())
-
-        # Cell line specific layers
-        for i in range(len(layer_dims) - 3, len(layer_dims) - 1):
-            last_layers.append(Parameter(1 / 100 * torch.randn((num_cell_lines, layer_dims[i+1], layer_dims[i]))))
-            offsets.append(Parameter(1 / 100 * torch.randn((num_cell_lines, layer_dims[i+1], 1))))
-
-        self.shared_layers = nn.ModuleList(shared_layers)
-        self.last_layers = ParameterList(last_layers)
-        self.offsets = ParameterList(offsets)
-
-    def forward(self, data, drug_drug_batch, h_drug):
-        batch_size = drug_drug_batch[0].shape[0]
-
-        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
-        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
-        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
-
-        x_drug_1s = data.x_drugs[drug_1s]
-        x_drug_2s = data.x_drugs[drug_2s]
-
-        h_drug_1s = h_drug[drug_1s]
-        h_drug_2s = h_drug[drug_2s]
-
-        n_attr = drug_drug_batch[2].shape[1] // 2
-        # Concatenate with IC50s
-        batch_data_1 = torch.cat((x_drug_1s, h_drug_1s, drug_drug_batch[2][:, n_attr-1][:, None]), dim=1)
-        batch_data_2 = torch.cat((x_drug_2s, h_drug_2s, drug_drug_batch[2][:, -1][:, None]), dim=1)
-
-        if np.random.binomial(1, 0.5):  # Randomize head-tail of edges at the batch level
-            batch = torch.cat((batch_data_1, batch_data_2), dim=1)
-        else:
-            batch = torch.cat((batch_data_2, batch_data_1), dim=1)
-
-        # Forward in shared layers
-        for i in range(len(self.shared_layers)):
-            batch = self.shared_layers[i](batch)
-            batch = F.relu(batch)
-
-        batch = batch.reshape(batch_size, -1, 1)  # Trick to allow broadcasting with matmul
-
-        # Forward in cell_line specific MLPs in parallel
-        for i in range(len(self.last_layers)):
-            batch = self.last_layers[i][cell_lines].matmul(batch) + self.offsets[i][cell_lines]
-            if i != len(self.last_layers) - 1:
-                batch = F.relu(batch)
-
-        batch_score_preds = batch[:, 0, 0]
-
-        return batch_score_preds
+def get_layer_dims(predictor_layers, fp_dim, attr_dim, prot_dim, with_fp=False, with_expr=False, with_prot=False):
+    if with_expr:
+        predictor_layers[0] += attr_dim * 2
+    else:
+        predictor_layers[0] += 2
+    if with_fp:
+        predictor_layers[0] += fp_dim * 2
+    if with_prot:
+        predictor_layers[0] += prot_dim * 2
+    return predictor_layers
