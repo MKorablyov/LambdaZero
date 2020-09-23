@@ -11,7 +11,7 @@ from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 # fixme
-# binding_config = deepcopy(chemprop_cfg)
+binding_model = osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth")
 # binding_config["predict_config"]["checkpoint_path"] = \
 #     os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
 
@@ -27,14 +27,14 @@ ppo_bayes_reward_000 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             }
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
             "custom_options":{"num_hidden": 64} # does a **kw to __init__
         },
-        "lr": 1e-4,
+        # "lr": 1e-4,
         "framework": "torch",
     },
 }
@@ -47,7 +47,7 @@ ppo_bayes_reward_000_1 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             }
         },
         "model": {
@@ -69,7 +69,7 @@ ppo_bayes_reward_001 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             }
         },
         "model": {
@@ -92,7 +92,7 @@ ppo_bayes_reward_002 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             }
         },
         "model": {
@@ -118,7 +118,7 @@ ppo_bayes_reward_003 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             }
         },
         "model": {
@@ -144,7 +144,7 @@ ppo_bayes_reward_004 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             }
         },
         "model": {
@@ -171,7 +171,7 @@ ppo_bayes_reward_005 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             },
             "max_steps": 15,
             "max_blocks": 10,
@@ -195,7 +195,7 @@ ppo_bayes_reward_006 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             },
             "random_steps": 4,
         },
@@ -210,6 +210,32 @@ ppo_bayes_reward_006 = {
     },
 }
 
+ppo_bayes_reward_008 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        'num_mol_retrain': 1000,
+    },
+    "use_dock": True
+}
+
 ppo_bayes_reward_007 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
@@ -218,15 +244,16 @@ ppo_bayes_reward_007 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             },
+            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
             "custom_options":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
-        # "entropy_coeff": 1e-4,
+        "entropy_coeff": 1e-3,
         # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
         "framework": "torch",
     },
@@ -244,7 +271,7 @@ ppo_bayes_reward_009 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             },
         },
         "model": {
@@ -269,20 +296,159 @@ ppo_bayes_reward_010 = {
             "reward": PredDockBayesianReward_v1,
             "reward_config": {
                 "synth_config": synth_config,
-                "dockscore_config": binding_config,
+                "binding_model": binding_model,
             },
+            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
             "custom_options":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
-        # "entropy_coeff": 1e-4,
+        "entropy_coeff": 1e-3,
         # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
         "framework": "torch",
     },
     "reward_learner_config": {
-        "train_iterations": 100
+        "num_mol_retrain": 1000,
+        "kappa": 0
     },
     "use_dock": True
+}
+
+ppo_bayes_reward_010_1 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 4,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 0
+    },
+}
+
+ppo_bayes_reward_011 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 4,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 0.3
+    },
+    "use_dock": True
+}
+
+ppo_bayes_reward_011_1 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 4,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 0.3
+    }
+}
+
+ppo_bayes_reward_012 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 4,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1
+    },
+    "use_dock": True
+}
+
+ppo_bayes_reward_012_1 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 4,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1
+    },
 }

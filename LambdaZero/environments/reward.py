@@ -17,25 +17,9 @@ import LambdaZero.models
 import LambdaZero.chem
 from LambdaZero.utils import Complete, get_external_dirs
 import logging
+from LambdaZero.utils.fast_sumtree.fast_sumtree import SumTree
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
-
-def aq_regret(train_loader, ul_loader, config):
-    train_targets = np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in train_loader.dataset],0)
-    ul_targets = np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in ul_loader.dataset],0)
-    all_targets = np.concatenate([train_targets, ul_targets],0)
-    train_sorted = train_targets[np.argsort(train_targets)]
-    all_sorted = all_targets[np.argsort(all_targets)]
-
-    top15_regret = np.median(train_sorted[:15]) - np.median(all_sorted[:15])
-    top50_regret = np.median(train_sorted[:50]) - np.median(all_sorted[:50])
-    aq_top15 = np.median(train_sorted[:15])
-    aq_top50 = np.median(train_sorted[:15])
-
-    n = int(all_targets.shape[0] * 0.01)
-    frac_top1percent = np.asarray(train_sorted[:n] <= all_sorted[n],dtype=np.float).mean()
-    return {"aq_top15_regret":top15_regret, "aq_top50_regret":top50_regret, "aq_top15":aq_top15, "aq_top50":aq_top50,
-            "aq_frac_top1_percent":frac_top1percent}
 
 class PredDockReward:
     def __init__(self, load_model, natm_cutoff, qed_cutoff, soft_stop, exp, delta, simulation_cost, device,
@@ -252,7 +236,7 @@ class PredDockReward_v3:
         return discounted_reward, log_vals
 
 class PredDockBayesianReward_v1:
-    def __init__(self, qed_cutoff, synth_config, dockscore_config, kappa,
+    def __init__(self, qed_cutoff, synth_config, binding_model, kappa,
                  soft_stop, exp, delta, simulation_cost, reward_learner, regressor_config,
                  regressor, sync_freq, 
                  device, transform=T.Compose([LambdaZero.utils.Complete()])):
@@ -267,11 +251,16 @@ class PredDockBayesianReward_v1:
         self.kappa = kappa
 
         self.synth_cutoff = synth_config["synth_cutoff"]
-        self.dockscore_std = dockscore_config["dockscore_std"]
+        self.dockscore_std = [-43.042, 7.057]
         self.synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
-        self.binding_net = LambdaZero.models.ChempropWrapper_v1(dockscore_config)
+        
+        self.net = LambdaZero.models.MPNNet()
+        self.net.to(device)
+        self.net.load_state_dict(th.load(binding_model, map_location=th.device(device)))
+        self.net.eval()
+        
         self.regressor = regressor(regressor_config)
-        self.regressor.train_loader = ray.get(reward_learner.get_dataset.remote())
+        # self.regressor.train_loader = ray.get(reward_learner.get_dataset.remote())
         self.regressor.model.load_state_dict(ray.get(reward_learner.get_weights.remote()))
         self.reward_learner_logs = ray.get(reward_learner.get_logs.remote())
         self.reward_learner = reward_learner
@@ -318,11 +307,12 @@ class PredDockBayesianReward_v1:
         synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
 
         # Binding energy prediction
-        self.reward_learner.add_molecule.remote(molecule)
+        self.reward_learner.add_molecule.remote(molecule, synth_discount * qed_discount)
         # dockscore, log_vals = self._get_dockscore(molecule)
         dockscore_reward, log_vals = self._get_dockscore(molecule)
-        dockscore = self.binding_net(mol=mol)
-        dockscore = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
+        
+        dockscore = self._simulation(mol=mol)
+        # dockscore = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
         if self.reward_learner_logs is not None:
             log_vals = { **log_vals, **self.reward_learner_logs}
             self.reward_learner_logs = None
@@ -335,6 +325,15 @@ class PredDockBayesianReward_v1:
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
         return disc_reward, {"dockscore_reward": dockscore_reward, "chemprop_reward": dockscore, "qed": qed, "synth": synth, **log_vals}
+
+    def _simulation(self, mol):
+        atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
+        graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
+        graph = self.transform(graph)
+        batch = Batch.from_data_list([graph]).to(self.device)
+        pred = self.net(batch)
+        reward = -float(pred.detach().cpu().numpy())
+        return reward
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:
@@ -358,10 +357,37 @@ class PredDockBayesianReward_v1:
 
         return reward, log_vals
 
-@ray.remote(num_gpus=1, num_cpus=3)
+
+@ray.remote
+class _SimDockLet:
+    def __init__(self, tmp_dir, programs_dir, datasets_dir, attribute):
+        self.dock = LambdaZero.chem.Dock_smi(tmp_dir,
+                                  osp.join(programs_dir, 'chimera'),
+                                  osp.join(programs_dir, 'dock6'),
+                                  osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
+                                  gas_charge=True)
+        self.target_norm = [-43.042, 7.057]
+        self.attribute = attribute
+
+    def eval(self, mol):
+        s = Chem.MolToSmiles(mol[1])
+        print("starting", s)
+        try:
+            _, r, _ = self.dock.dock(s)
+        except Exception as e: # Sometimes the prediction fails
+            print('exception for', s, e)
+            r = 0
+        setattr(mol[0], 'gridscore', th.FloatTensor([-(r - self.target_norm[0]) / self.target_norm[1]]))
+        reward = -(r-self.target_norm[0])/self.target_norm[1]
+        print("done", s, r)
+        return mol, reward
+
+
+@ray.remote(num_gpus=1, num_cpus=4)
 class BayesianRewardActor():
-    def __init__(self, config, use_dock_sim, dockscore_config, 
+    def __init__(self, config, use_dock_sim, binding_model, 
                     pretrained_model=None, transform=T.Compose([LambdaZero.utils.Complete()])):
+        
         self.device = config["device"]
         self.transform = transform
         self.config = config
@@ -370,17 +396,23 @@ class BayesianRewardActor():
         self.train_molecules = []
         self.mols = 0
         self.use_dock_sim = use_dock_sim
-        self.num_threads = 4
-        # self.init = False
+        self.num_threads = 8
+        self.max_size = 25000
+        # self.sumtree = SumTree(self.max_size)
+        self.train_len = 0
+        self.prune_factor = 0.2
+
         self.regressor = config["regressor"](self.regressor_config)
         if use_dock_sim:
-            self.dock = LambdaZero.chem.Dock_smi(os.environ['SLURM_TMPDIR'],
-                                    osp.join(programs_dir, 'chimera'),
-                                    osp.join(programs_dir, 'dock6'),
-                                    osp.join(datasets_dir, 'brutal_dock/d4/docksetup/'))
+            self.actors = [_SimDockLet.remote(os.environ['SLURM_TMPDIR'], programs_dir, datasets_dir, self.config["data"]["target"])
+                       for i in range(self.num_threads)]
+            self.pool = ray.util.ActorPool(self.actors)
             
         else:
-            self.binding_net = LambdaZero.models.ChempropWrapper_v1(dockscore_config)
+            self.net = LambdaZero.models.MPNNet()
+            self.net.to(config['device'])
+            self.net.load_state_dict(th.load(binding_model, map_location=th.device(config['device'])))
+            self.net.eval()
         self.target_norm = [-43.042, 7.057]
 
         print('BR: Loaded Oracle Network')
@@ -395,14 +427,17 @@ class BayesianRewardActor():
         train_set = Subset(self.dataset, train_idxs.tolist())
         self.ul_set = Subset(self.dataset, ul_idxs.tolist())
         val_set = Subset(self.dataset, val_idxs.tolist())
-        
+        self.train_len += self.config["aq_size0"]
+        train_molecules = []
         for i, data in enumerate(train_set):
-            self.train_molecules.append([data, None])
+            setattr(data, config["data"]["target"], -(getattr(data, config["data"]["target"]) - self.target_norm[0]) / self.target_norm[1])
+            train_molecules.append(data)
         
-        self.train_loader = DataLoader(train_set, shuffle=True, batch_size=config["data"]["b_size"])
+        self.train_loader = DataLoader(train_molecules, shuffle=True, batch_size=config["data"]["b_size"])
         self.val_loader = DataLoader(val_set, batch_size=config["data"]["b_size"])
         self.ul_loader = DataLoader(self.ul_set, batch_size=config["data"]["b_size"])
         self.dataset = None
+        self.train_molecules = train_molecules
         print('BR: Loaded Dataset')
         
         if pretrained_model is not None:
@@ -417,6 +452,23 @@ class BayesianRewardActor():
         print('BR: Loaded Bayesian Reward Actor')
         self.batches = 0
     
+    def prune(self):
+        new_mols_idx = np.argsort([i[2] for i in self.unseen_molecules])[int(self.prune_factor * len(self.unseen_molecules)):]
+        # new_sum_tree = SumTree(self.max_size)
+        new_mols = []
+        for i, j in enumerate(new_mols_idx):
+            new_mols.append(self.mols[j])
+        self.unseen_molecules = new_mols
+
+    def _simulation(self, mol):
+        atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
+        graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
+        graph = self.transform(graph)
+        batch = Batch.from_data_list([graph]).to(self.device)
+        pred = self.net(batch)
+        reward = -float(pred.detach().cpu().numpy())
+        return reward
+
     def get_weights(self):
         return self.regressor.model.state_dict()
 
@@ -431,16 +483,18 @@ class BayesianRewardActor():
             return {
                 'weights': self.regressor.model.state_dict(),
                 'logs': self.logs,
-                'train_len': len(self.train_loader.dataset)
+                'train_len': self.train_len
                 }, self.batches
         return None, None
 
-    def add_molecule(self, molecule):
+    def add_molecule(self, molecule, discount):
+        if self.mols > self.max_size:
+            self.prune()
         mol = molecule.mol
         atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
         graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
         graph = self.transform(graph)
-        self.unseen_molecules.append([graph, mol])
+        self.unseen_molecules.append([graph, mol, None, discount])
         self.mols += 1
         if self.mols % self.config['num_mol_retrain'] == 0:
             print('Collected {} mols, performing batch acquisition'.format(self.mols))
@@ -453,60 +507,48 @@ class BayesianRewardActor():
         loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
         mean, var = self.regressor.get_mean_variance(loader, len(self.train_loader.dataset))
         scores = mean + (self.config["kappa"] * var)
+        for i in range(len(self.train_unseen_mols)):
+            # print(scores[i], self.train_unseen_mols[i][3])
+            scores[i] = self.train_unseen_mols[i][3] * scores[i]
+            self.train_unseen_mols[i][2] = self.train_unseen_mols[i][3] * scores[i]
+
         # noise is not a part of original UCT but is added here
         if self.config["minimize_objective"]: scores = -scores
+        # import pdb; pdb.set_trace();
         idxs = np.argsort(-scores)[:self.config["aq_size"]]
         return idxs
 
     def compute_targets(self, mol_set):
         if self.use_dock_sim:
             n = len(mol_set)
-            rs = [None] * n
-            def f(i):
-                s = Chem.MolToSmiles(mol_set[i][1])
-                try:
-                    _, r, _ = self.dock.dock(s)
-                except Exception as e: # Sometimes the prediction fails
-                    print(e)
-                    r = self.target_norm[0] # assign mean value
-                setattr(mol_set[i][0], self.config["data"]["target"], th.FloatTensor([r]))
-                rs[i] = r
-                print("done", i, s, r)
-
             t0 = time.time()
-            threads = []
-            thread_at = self.num_threads
-            for i, (graph, mol) in enumerate(mol_set):
-                threads.append(threading.Thread(target=f, args=(i,)))
-                if i < self.num_threads:
-                    threads[-1].start()
-            while None in rs:
-                if sum([i.is_alive() for i in threads]) < self.num_threads and thread_at < n:
-                    threads[thread_at].start()
-                    thread_at += 1
-                time.sleep(0.5)
+            result = np.array(list(self.pool.map(lambda a, m: a.eval.remote(m), mol_set)))
+            mol_set = np.array([mol for mol in result[:,0]]).tolist()
+            rs = np.array([mol for mol in result[:,1]])
             t1 = time.time()
-            logging.info('Docking sim done in {}'.format(t1-t0))
-            logging.info('Max R in batch: ', -(max(rs) - self.target_norm[0])/self.target_norm[1])
+            # import pdb; pdb.set_trace();
+            print('Docking sim done in {}'.format(t1-t0))
+            print('Mean R in batch: ', np.mean(rs))
         else:
             n = len(mol_set)
             rs = [None] * n
-            for i, (graph, mol) in enumerate(mol_set):
-                r = self.binding_net(mol=mol)
+            for i, (graph, mol, _, _) in enumerate(mol_set):
+                r = self._simulation(mol)
                 setattr(graph, self.config["data"]["target"], th.FloatTensor([r]))
                 rs[i] = r
+                print(r)
         return mol_set, rs
 
     def update_with_seen(self, idxs):
         aq_mask = np.zeros(len(self.train_unseen_mols), dtype=np.bool)
         aq_mask[idxs] = True
+        # import pdb; pdb.set_trace();
         aq_idxs = np.asarray(self.train_unseen_mols)[aq_mask].tolist()
         self.train_unseen_mols = np.asarray(self.train_unseen_mols)[~aq_mask].tolist()
 
         aq_idx, rews = self.compute_targets(aq_idxs)
         rews = np.array(rews)
-        rews = -(rews - self.target_norm[0]) / self.target_norm[1]
-
+        
         aq_mask = np.zeros(len(self.ul_set), dtype=np.bool)
         idx = np.random.choice(len(self.ul_set), len(idxs), replace=False)
         aq_mask[idx] = True
@@ -518,13 +560,13 @@ class BayesianRewardActor():
         loader = DataLoader(np.array(aq_idx)[:,0], shuffle=False, batch_size=self.config["data"]["b_size"])
         mean, var = self.regressor.get_mean_variance(loader, len(self.train_loader.dataset))
         mse_before = np.mean((rews - mean) ** 2)
-        
-        fine_tune_dataset = aq_idx + [[graph, None] for graph in aq_set]
+
+        fine_tune_dataset = aq_idx + [[graph, None, None, None] for graph in aq_set]
         fine_tune_loader = DataLoader(np.array(fine_tune_dataset)[:,0], shuffle=True, batch_size=self.config["data"]["b_size"])
 
-        self.train_molecules.extend(fine_tune_dataset)
+        self.train_molecules.extend(np.array(fine_tune_dataset)[:, 0].tolist())
         
-        self.train_loader = DataLoader(np.array(self.train_molecules)[:,0], shuffle=True, batch_size=self.config["data"]["b_size"])
+        self.train_loader = DataLoader(self.train_molecules, shuffle=True, batch_size=self.config["data"]["b_size"])
         self.unseen_molecules.extend(self.train_unseen_mols)
 
         # fit model to the data
@@ -532,13 +574,18 @@ class BayesianRewardActor():
             scores, val = self.regressor.fine_tune(fine_tune_loader, self.train_loader, self.val_loader, True)
         else:
             scores, val = self.regressor.fine_tune(fine_tune_loader, self.train_loader, self.val_loader, False)
-
+        
+        self.train_len += self.config["aq_size"]
         mean, var = self.regressor.get_mean_variance(loader, len(self.train_loader.dataset))
         mse_after = np.mean((rews - mean) ** 2)
-        self.logs = {**scores, **val, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 'oracle_max': np.max(rews)}
+
+        for i in range(len(aq_idx)):
+            rews[i] = rews[i] * aq_idx[i][3]
+
+        self.logs = {**scores, **val, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 
+                        'oracle_max': np.max(rews), 'oracle_mean': np.mean(rews)}
         print(self.logs)
 
-        # compute acquisition metrics
         logging.info(scores)
         return scores
 

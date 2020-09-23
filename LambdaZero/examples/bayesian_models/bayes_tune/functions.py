@@ -202,13 +202,13 @@ def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
 
         optimizer.zero_grad()
         logits = model(data, do_dropout=True)
-        targets_norm = config["data"]["normalizer"].tfm(targets)
+        # targets_norm = config["data"]["normalizer"].tfm(targets)
         reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
-        loss = F.mse_loss(logits, targets_norm) + reg_loss
+        loss = F.mse_loss(logits, targets) + reg_loss
         loss.backward()
         optimizer.step()
 
-        epoch_targets_norm.append(targets_norm.detach().cpu().numpy())
+        epoch_targets_norm.append(targets.detach().cpu().numpy())
         epoch_logits.append(logits.detach().cpu().numpy())
 
     epoch_targets_norm = np.concatenate(epoch_targets_norm,0)

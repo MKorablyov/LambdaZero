@@ -13,7 +13,7 @@ import LambdaZero.inputs
 import torch
 import torch_geometric.transforms as T
 
-from LambdaZero.environments import block_mol_v3
+# from LambdaZero.environments import block_mol_v3
 from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
 from LambdaZero.examples.bayesian_models.rl import config
 from LambdaZero.examples.bayesian_models.rl.random_search import RandomSearchTrainer
@@ -62,7 +62,8 @@ DEFAULT_CONFIG = {
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
         "framework": "torch",
-        },
+        "lr": 5e-5,
+    },
     "summaries_dir": summaries_dir,
     "memory": 60 * 10 ** 9,
     "trainer": PPOTrainer,
@@ -72,10 +73,10 @@ DEFAULT_CONFIG = {
 
     },
     "reward_learner_config": {
-        "aq_size0": 2000,
+        "aq_size0": 3000,
         "data": dict(data_config, **{"dataset_creator":None}),
-        "aq_size": 64,
-        "kappa": 0.2,
+        "aq_size": 32,
+        "kappa": 0.1,
         "sync_freq": 50,
         "epsilon": 0.0,
         "minimize_objective": False,
@@ -88,8 +89,8 @@ DEFAULT_CONFIG = {
             "T": 20,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations": 32,
-            "finetune_iterations": 16,
+            "train_iterations": 48,
+            "finetune_iterations": 12,
             "model": LambdaZero.models.MPNNetDrop,
             "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
             "optimizer": torch.optim.Adam,
@@ -122,7 +123,7 @@ if __name__ == "__main__":
     
     reward_learner = BayesianRewardActor.remote(config['reward_learner_config'], 
                                                 config["use_dock"], 
-                                                config["rllib_config"]['env_config']['reward_config']['dockscore_config'],
+                                                config["rllib_config"]['env_config']['reward_config']['binding_model'],
                                                 config["pretrained_model"])
 
     config['rllib_config']['env_config']['reward_config']['reward_learner'] = reward_learner
