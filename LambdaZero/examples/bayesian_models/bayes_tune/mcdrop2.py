@@ -9,32 +9,25 @@ from ray import tune
 from ray.tune import grid_search
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models.catalog import ModelCatalog
-from sklearn import linear_model
 import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
 from LambdaZero.examples.bayesian_models.bayes_tune import config
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch, eval_epoch, \
-    train_mcdrop, mcdrop_mean_variance, eval_mcdrop, mpnn_brr_mean_variance
-
+    train_mcdrop, mcdrop_mean_variance, mpnn_brr_mean_variance
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 transform = T.Compose([LambdaZero.utils.Complete()])
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class MCDrop(tune.Trainable):
     def _setup(self, config):
         self.config = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.train_loader = None
-        self.val_loader = None
         if config["data"]["dataset_creator"] is not None:
             self.train_loader, self.val_loader = config["data"]["dataset_creator"](config["data"])
-
-        # self.feature_dim = 64
         # make model
-        self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"])
+        self.model = LambdaZero.models.MPNNetDrop2(**self.config["model_config"])
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
 
@@ -43,60 +36,58 @@ class MCDrop(tune.Trainable):
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
         return scores
 
-    def fine_tune(self, new_samples_loader, train_loader, val_loader, validate):
-        self.train_loader, self.val_loader = new_samples_loader, val_loader
-        all_scores = []
-        for i in range(self.config["finetune_iterations"]):
-            self._iteration = i
-            scores = self._train()
-            all_scores.append(scores)
-        self.train_loader = train_loader
-        if validate:
-            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
-            return all_scores[-1], {**val_score, **val_ll}
-        else:
-            return all_scores[-1], {}
-
-    def fit(self, train_loader, val_loader, validate=False):
+    def fit(self, train_loader, val_loader):
         # update internal dataset
         self.train_loader, self.val_loader = train_loader, val_loader
         # make a new model
-        self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"]) # todo: reset?
+        self.model = LambdaZero.models.MPNNetDrop2(**self.config["model_config"]) # todo: reset?
         self.optim = self.config["optimizer"](self.model.parameters(), **self.config["optimizer_config"])
         self.model.to(self.device)
-
         # todo allow ray native stopping
         all_scores = []
         for i in range(self.config["train_iterations"]):
-            self._iteration = i
             scores = self._train()
             all_scores.append(scores)
-        if validate:
-            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
-            return all_scores[-1], {**val_score, **val_ll}
-        else:
-            return all_scores[-1], {}
+        return all_scores
 
-    def get_mean_variance(self, loader, train_len):
-        mean,var = self.config["get_mean_variance"](train_len, loader, self.model, self.device, self.config)
+    def get_mean_variance(self, loader):
+        mean,var = self.config["get_mean_variance"](self.train_loader, loader, self.model, self.device, self.config)
         return mean, var
+
+    def get_embed(self, data, do_dropout):
+        # if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin0(data.x))
+        h = out.unsqueeze(0)
+        # if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+
+        for i in range(3):
+            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+            # if self.drop_weights: m = F.dropout(m, training=do_dropout, p=self.drop_prob)
+            out, h = self.gru(m.unsqueeze(0), h)
+            # if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+            out = out.squeeze(0)
+
+        out = self.set2set(out, data.batch)
+        # if self.drop_weights: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin1(out))
+        # if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        return out
+
 
 
 data_config = {
     "target": "gridscore",
     "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
     "dataset_split_path": osp.join(datasets_dir,
-                                   "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-                                   #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                                #    "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+                                "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
         "props": ["gridscore", "smi"],
         "transform": transform,
-        "file_names": ["Zinc15_2k"],
-        #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+        "file_names": #["Zinc15_2k"],
+            ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
     },
     "b_size": 40,
     "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057])
@@ -143,7 +134,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "mcdrop001"
+    else: config_name = "mcdrop003"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
@@ -156,6 +147,3 @@ if __name__ == "__main__":
     # mcdrop = MCDrop(config["regressor_config"]["config"])
     # print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
     # print(mcdrop.get_mean_variance(mcdrop.train_loader))
-
-
-

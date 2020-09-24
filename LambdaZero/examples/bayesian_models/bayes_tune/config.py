@@ -63,6 +63,7 @@ mcdrop006= {"regressor_config":
                        "dataset_config": {
                            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]}
                       }}}
+
 mcdrop007= {"regressor_config":
                  {"config":
                       {"lambda":grid_search(list(10 ** np.linspace(-4,-12,num=10))),
