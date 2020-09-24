@@ -11,6 +11,18 @@ datasets_dir, _, _ = LambdaZero.utils.get_external_dirs()
 
 mcdrop000 = {}
 
+mcdrop_rl = {
+     "regressor_config": {
+          "config": {
+               "lambda": 5.99e-11,
+               "dataset_split_path":
+                    osp.join(datasets_dir,"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+               "dataset_config": {
+                    "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"]}
+          }
+     }
+}
+
 # default bayesian ridge regression 001-002
 mcdrop001 = {"regressor_config":
                  {"config":
