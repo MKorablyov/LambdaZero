@@ -14,7 +14,10 @@ class BasicRegressor(tune.Trainable):
 
         # make dataset
         dataset = self.config["dataset"](**self.config["dataset_config"])
-        train_idxs, val_idxs, test_idxs = np.load(self.config["dataset_split_path"], allow_pickle=True)
+        train_idxs, val_idxs, _ = np.load(self.config["dataset_split_path"], allow_pickle=True)
+        # fixme!!!!!!!!!!! --- make mpnn index --- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        train_idxs = train_idxs[train_idxs < len(dataset)]
+        val_idxs = val_idxs[val_idxs < len(dataset)]
         self.train_set = Subset(dataset, train_idxs.tolist())
         self.val_set = Subset(dataset, val_idxs.tolist())
         self.train_loader = DataLoader(self.train_set, shuffle=True, batch_size=self.config["b_size"])

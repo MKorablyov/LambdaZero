@@ -712,21 +712,16 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
 
 def create_mol_graph_with_3d_coordinates(smi, props):
     mol = rdkit.Chem.rdmolfiles.MolFromSmiles(smi)
-        
     # x (tmp)
     x = torch.tensor([a.GetAtomicNum() for a in mol.GetAtoms()], dtype=torch.int64)
-
     # edge index
     bonds = np.asarray([[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()] for bond in mol.GetBonds()])
     bonds = np.vstack((bonds, bonds[:, ::-1]))
     edge_index = torch.tensor(bonds.T, dtype=torch.int64)
-
     # edge_attr (tmp)
     edge_attr = None
-
     # y
     y = torch.tensor([props['gridscore']], dtype=torch.float64)
-
     # pos
     coord = ast.literal_eval(props['coord'].decode('utf-8')) if isinstance(props['coord'], bytes) else props['coord']
     pos = torch.tensor(np.vstack(coord), dtype=torch.float64)
