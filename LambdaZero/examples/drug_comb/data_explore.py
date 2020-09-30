@@ -27,13 +27,28 @@ drugcomb_data = pd.read_csv(os.path.join(cfg.raw_dir, cfg.raw_file_names[1]), lo
 
 
 # look at drugs
-drugs = drugcomb_data["drug_row"].to_numpy()
-studies_unq, raw_counts = np.unique(drugs,return_counts=True)
-plt.plot(-np.sort(-raw_counts))
-#plt.yscale("log")
-plt.savefig(osp.join(cfg.dataset_dir,"drugs.png"))
+# drugs = drugcomb_data["drug_row"].to_numpy()
+# studies_unq, raw_counts = np.unique(drugs,return_counts=True)
+# plt.plot(-np.sort(-raw_counts))
+# #plt.yscale("log")
+# plt.savefig(osp.join(cfg.dataset_dir,"drugs.png"))
+#
+# plt.show()
 
-plt.show()
+"KBM-7", "NCI-H460", "NCIH23", "SW-620", "T-47D", "HT29", "SK-OV-3", "HCT116", "UACC62", "OVCAR3", "DIPG25", "A549"
+
+# look at cell lines
+#cell_names = drugcomb_data["cell_line_name"].to_numpy()
+#cell_names_unq, cell_name_counts = np.unique(cell_names,return_counts=True)
+#ord = np.argsort(-cell_name_counts)
+#for c in cell_names_unq[ord]: print(c)
+
+
+#plt.plot(-np.sort(-raw_counts))
+# #plt.yscale("log")
+# plt.savefig(osp.join(cfg.dataset_dir,"drugs.png"))
+#
+
 
 # # look at studies
 # studies = drugcomb_data["study_name"].to_numpy()

@@ -12,6 +12,7 @@ from torch.utils.data import Dataset,DataLoader,Subset
 import torch
 import os
 from tqdm import tqdm
+from sklearn.metrics import explained_variance_score
 from sklearn.linear_model import Ridge
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.inputs import random_split
@@ -154,7 +155,8 @@ class NewDrugComb(InMemoryDataset):
         torch.save(torch.tensor([0]), self.processed_paths[0])
 
         _summary_table = pd.read_csv(os.path.join(self.raw_dir, self.raw_file_names[1]), low_memory=False)
-        props = ["css", "synergy_zip", "synergy_bliss", "synergy_loewe", "synergy_hsa", "ic50_row", "ic50_col"]
+        props = ["css", "synergy_zip", "synergy_bliss", "synergy_loewe", "synergy_hsa", "ic50_row", "ic50_col",
+                 "css_row", "css_col"]
         _summary_table = _append_cid(_drugcomb_data, _summary_table)
         ddi_edge_idx, ddi_edge_attr, ddi_edge_classes = _get_ddi_edges(_summary_table, cid_to_idx,
                                                                 self.cell_line_to_idx, props)
@@ -189,10 +191,15 @@ class DrugCombEdge(NewDrugComb):
 
         data_dict = {"row_fp": row_fp, # fixme??
                      "col_fp": col_fp,
+                     "css": edge_attr[0][None],
+                     "synergy_zip":edge_attr[1][None],
+                     "synergy_bliss":edge_attr[2][None],
+                     "synergy_loewe":edge_attr[3][None],
+                     "synergy_hsa":edge_attr[4][None],
                      "row_ic50": edge_attr[5][None],
                      "col_ic50": edge_attr[6][None],
-                     "css": edge_attr[0][None],
-                     "negative_css": -edge_attr[0][None],
+                     "css_row": edge_attr[7][None],
+                     "css_col": edge_attr[8][None],
                      }
         return EdgeData(data_dict)
 
@@ -201,16 +208,15 @@ class DrugCombEdge(NewDrugComb):
 if __name__ == '__main__':
     from matplotlib import pyplot as plt
     datasets_dir, _, _ = get_external_dirs()
-
     def _sample_xy(dataset):
         x, y = [], []
         for i in range(len(dataset)):
             d = dataset[i]
             x.append(np.concatenate([d.row_fp,d.col_fp]))
-#            x.append(np.concatenate([d.col_fp,d.row_fp]))
-            y.append(d.css)
-#            y.append(d.css)
-
+            #x.append(np.concatenate([d.col_fp,d.row_fp]))
+            #print(d.css - 0.5 * (d.css_row + d.css_col))
+            y.append(d.synergy_zip)
+            #y.append(d.synergy_zip)
         return np.array(x, dtype=np.float), np.array(y, dtype=np.float)
 
 
@@ -233,25 +239,25 @@ if __name__ == '__main__':
         plt.xlabel("growth inhibition")
         plt.ylabel("predicted growth inhibition")
         #plt.show()
-        plt.savefig("/home/maksym/Desktop/" + str(time.time()) + ".png")
-        print("saved fig")
-        time.sleep(2)
-        var0 = ((val_y - train_y.mean()) ** 2).mean()
-
-        exp_var = (var0 - ((val_y - val_y_hat) ** 2).mean()) / var0
+        #plt.savefig("/home/maksym/Desktop/" + str(time.time()) + ".png")
+        #print("saved fig")
+        #time.sleep(2)
+        #var0 = ((val_y - train_y.mean()) ** 2).mean()
+        #exp_var = (var0 - ((val_y - val_y_hat) ** 2).mean()) / var0
+        exp_var = explained_variance_score(val_y, val_y_hat)
         rmse = ((val_y - val_y_hat) ** 2).mean() ** 0.5
         return exp_var, rmse
 
     NewDrugComb()
     dataset = DrugCombEdge()
     #cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
-    cell_lines = ["A-673", "T98G", "L-1236", "KBM-7", "TMD8", "DIPG25", "HT29", "MCF7", "A375", "A549", "VCAP", "LNCAP"]
+    #cell_lines = ["A-673", "T98G", "L-1236", "KBM-7", "TMD8", "DIPG25",
+    #              "HT29", "MCF7", "A375", "A549", "VCAP", "LNCAP"]
+    cell_lines = ["KBM-7", "NCI-H460", "NCIH23", "SW-620", "T-47D", "HT29", "SK-OV-3", "HCT116", "UACC62",
+                  "OVCAR3", "DIPG25", "A549"]
+
     cell_line_to_idx = np.load(osp.join(dataset.raw_dir, "cell_line_to_idx.npy"), allow_pickle=True).flatten()[0]
     cell_line_idxs = [cell_line_to_idx[line] for line in cell_lines]
-
-
-    #print(np.unique(dataset.data.ddi_edge_classes.numpy()).shape[0])
-    #time.sleep(100)
 
     for i in range(len(cell_lines)):
         idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idxs[i])[0]
@@ -260,7 +266,7 @@ if __name__ == '__main__':
 
         exp_var, rmse = train_ridge_regression(dataset_cell)
         print("cell_line", cell_lines[i],
-            "cell_line_idx", cell_line_idxs[i],
+              "cell_line_idx", cell_line_idxs[i],
               "explained variance", exp_var,
               "rmse", rmse)
 
