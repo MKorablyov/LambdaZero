@@ -112,8 +112,22 @@ def train_mcdrop(train_loader, val_loader, model, device, config, optim, iterati
         scores = {**scores, **_scores}
     return scores
 
+def train_mcdrop_rl(train_loader, val_loader, model, device, config, optim, iteration):
+    N = len(train_loader.dataset)
+    train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
+    
+    return train_scores
 
-def mcdrop_mean_variance(train_loader, loader, model, device, config):
+def mcdrop_mean_variance(train_len, loader, model, device, config):
+    # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
+    N = train_len
+    Yt_hat = sample_logits(loader, model, device, config, config["T"], do_dropout=True)
+    tau = get_tau(config, N)
+    sigma_sqr = 1. / tau
+    var = (sigma_sqr + Yt_hat ** 2).mean(0) - Yt_hat.mean(0) ** 2
+    return Yt_hat.mean(0), var
+
+def mcdrop_mean_variance_(train_loader, loader, model, device, config):
     # \mean{t in T} (\tau^-1 + y_hat_t^2) - \mean_{t in T}(y_hat_t)^2
     N = len(train_loader.dataset)
     Yt_hat = sample_logits(loader, model, device, config, config["T"], do_dropout=True)
@@ -121,7 +135,6 @@ def mcdrop_mean_variance(train_loader, loader, model, device, config):
     sigma_sqr = 1. / tau
     var = (sigma_sqr + Yt_hat ** 2).mean(0) - Yt_hat.mean(0) ** 2
     return Yt_hat.mean(0), var
-
 
 def bayesian_ridge(train_x, val_x, train_targets_norm, val_targets_norm, config):
     clf = linear_model.BayesianRidge(compute_score=True, fit_intercept=False)
@@ -179,3 +192,50 @@ def mpnn_brr_mean_variance(train_loader, loader, model, device, config):
     clf.fit(train_embeds, train_targets_norm)
     mean, std = clf.predict(embeds, return_std=True)
     return mean, std
+
+def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
+    model.train()
+    epoch_targets_norm = []
+    epoch_logits = []
+
+    for bidx, data in enumerate(loader):
+        data = data.to(device)
+        targets = getattr(data, config["data"]["target"])
+
+        optimizer.zero_grad()
+        logits = model(data, do_dropout=True)
+        # targets_norm = config["data"]["normalizer"].tfm(targets)
+        reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
+        loss = F.mse_loss(logits, targets) + reg_loss
+        loss.backward()
+        optimizer.step()
+
+        epoch_targets_norm.append(targets.detach().cpu().numpy())
+        epoch_logits.append(logits.detach().cpu().numpy())
+
+    epoch_targets_norm = np.concatenate(epoch_targets_norm,0)
+    epoch_logits = np.concatenate(epoch_logits, 0)
+    scores = _epoch_metrics(epoch_targets_norm, epoch_logits, config["data"]["normalizer"], scope)
+    return scores
+
+
+def train_brr(train_loader, val_loader, model, device, config, optim, iteration):
+    N = len(train_loader.dataset)
+
+    print(train_loader.dataset)
+    print(train_loader.dataset[0])
+    print(train_loader.dataset[0].__dict__)
+    time.sleep(10000)
+
+    #train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
+    #val_scores = config["eval_epoch"](val_loader, model, device, config, "val")
+    #scores = {**train_scores, **val_scores}
+
+    #if iteration % config["uncertainty_eval_freq"] == 1:
+    #    _scores = eval_mpnn_brr(train_loader, val_loader, model, device, config, N)
+    #    scores = {**scores, **_scores}
+    #return scores
+
+
+def brr_mean_variance(train_loader, loader, model, device, config):
+    pass
