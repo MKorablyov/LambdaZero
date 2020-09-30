@@ -41,6 +41,7 @@ def _cell_line_to_idx(_drugcomb_data, raw_dir):
     cell_lines_names = _drugcomb_data[["cell_line_name"]].to_numpy()[:, 0]
     cell_lines_names = np.unique(cell_lines_names)
     cell_line_to_idx = {na:i for i,na in enumerate(cell_lines_names)}
+    np.save(osp.join(raw_dir, "cell_line_to_idx.npy"), cell_line_to_idx)
     return cell_line_to_idx
 
 def _get_fingerprint(smiles, radius, n_bits):
@@ -105,7 +106,6 @@ class NewDrugComb(InMemoryDataset):
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
         self.n_laplace_feat = n_laplace_feat
-
         datasets_dir, _, _ = get_external_dirs()
         super().__init__(datasets_dir + '/NewDrugComb/', transform, pre_transform)
 
@@ -244,23 +244,29 @@ if __name__ == '__main__':
 
     NewDrugComb()
     dataset = DrugCombEdge()
-    cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
+    #cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
+    cell_lines = ["A-673", "T98G", "L-1236", "KBM-7", "TMD8", "DIPG25", "HT29", "MCF7", "A375", "A549", "VCAP", "LNCAP"]
+    cell_line_to_idx = np.load(osp.join(dataset.raw_dir, "cell_line_to_idx.npy"), allow_pickle=True).flatten()[0]
+    cell_line_idxs = [cell_line_to_idx[line] for line in cell_lines]
+
 
     #print(np.unique(dataset.data.ddi_edge_classes.numpy()).shape[0])
     #time.sleep(100)
 
-    for cell_line_idx in cell_line_idxs:
-        idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idx)[0]
-
-
+    for i in range(len(cell_lines)):
+        idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idxs[i])[0]
         #print("len idxs", len(idxs))
         dataset_cell = Subset(dataset,idxs)
-        exp_var, rmse = train_ridge_regression(dataset_cell)
-        print("cell_line_idx", cell_line_idx, "explained variance", exp_var, "rmse", rmse)
 
-        splits = random_split(len(dataset_cell), [0.8, 0.1, 0.1])
-        split_path = osp.join(datasets_dir + "/NewDrugComb/raw", str(cell_line_idx) + "_split.npy")
-        np.save(split_path, splits)
+        exp_var, rmse = train_ridge_regression(dataset_cell)
+        print("cell_line", cell_lines[i],
+            "cell_line_idx", cell_line_idxs[i],
+              "explained variance", exp_var,
+              "rmse", rmse)
+
+        #splits = random_split(len(dataset_cell), [0.8, 0.1, 0.1])
+        #split_path = osp.join(datasets_dir + "/NewDrugComb/raw", str(cell_line_idx) + "_split.npy")
+        #np.save(split_path, splits)
 
 
 

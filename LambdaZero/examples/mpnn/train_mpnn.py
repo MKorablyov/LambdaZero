@@ -84,7 +84,7 @@ DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
         "target": "gridscore",
-        "target_norm": [-43.042, 7.057],
+        "target_norm": [-49.4, 7.057],
         "dataset_split_path": osp.join(datasets_dir,
                                        #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                        "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
@@ -96,8 +96,7 @@ DEFAULT_CONFIG = {
             "transform": transform,
             "file_names":
             #["Zinc15_2k"],
-                # fixme !!!!!!!!!!!! false large dataset
-                ["Zinc15_260k_0"],#, "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+                ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
         },
         "model": LambdaZero.models.MPNNetDropLRGA,
         "model_config": {"drop_last": True, "drop_data": False, "drop_weights": True, "drop_prob": 0.00},
@@ -129,7 +128,6 @@ config = merge_dicts(DEFAULT_CONFIG, config)
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
-
     analysis = tune.run(config["trainer"],
                         config=config["trainer_config"],
                         stop=config["stop"],
