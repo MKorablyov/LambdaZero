@@ -189,7 +189,7 @@ class DrugCombEdge(NewDrugComb):
         col_fp = self.data.x_drugs[ddi_idx[1]]
         edge_attr = self.data.ddi_edge_attr[idx]
 
-        data_dict = {"row_fp": row_fp, # fixme??
+        data_dict = {"row_fp": row_fp, # todo: better way of implementing this ?
                      "col_fp": col_fp,
                      "css": edge_attr[0][None],
                      "synergy_zip":edge_attr[1][None],
@@ -213,31 +213,28 @@ if __name__ == '__main__':
         for i in range(len(dataset)):
             d = dataset[i]
             x.append(np.concatenate([d.row_fp,d.col_fp]))
-            #x.append(np.concatenate([d.col_fp,d.row_fp]))
-            #print(d.css - 0.5 * (d.css_row + d.css_col))
+            x.append(np.concatenate([d.col_fp,d.row_fp]))
             y.append(d.synergy_zip)
-            #y.append(d.synergy_zip)
+            y.append(d.synergy_zip)
         return np.array(x, dtype=np.float), np.array(y, dtype=np.float)
 
-
     def train_ridge_regression(dataset):
+        if len(dataset) < 200:
+            return None, None, None
         # load/split dataset
-        train_idx, val_idx = random_split(len(dataset), [0.9, 0.1])
+        train_idx, val_idx = random_split(len(dataset), [0.5, 0.5])
         train_set = Subset(dataset, train_idx)
         val_set = Subset(dataset, val_idx)
-
         train_x, train_y = _sample_xy(train_set)
         val_x, val_y = _sample_xy(val_set)
-
         # do linear regression
         model = Ridge(alpha=0.001)
         model.fit(train_x, train_y)
         val_y_hat = model.predict(val_x)
-
-        plt.figure(dpi=300)
-        plt.scatter(val_y,val_y_hat)
-        plt.xlabel("growth inhibition")
-        plt.ylabel("predicted growth inhibition")
+        #plt.figure(dpi=300)
+        #plt.scatter(val_y,val_y_hat)
+        #plt.xlabel("growth inhibition")
+        #plt.ylabel("predicted growth inhibition")
         #plt.show()
         #plt.savefig("/home/maksym/Desktop/" + str(time.time()) + ".png")
         #print("saved fig")
@@ -245,36 +242,54 @@ if __name__ == '__main__':
         #var0 = ((val_y - train_y.mean()) ** 2).mean()
         #exp_var = (var0 - ((val_y - val_y_hat) ** 2).mean()) / var0
         exp_var = explained_variance_score(val_y, val_y_hat)
-        rmse = ((val_y - val_y_hat) ** 2).mean() ** 0.5
-        return exp_var, rmse
+        y = np.concatenate([train_y, val_y])
+        y_001 = np.median(y[np.argsort(-y)][:int(len(y) * 0.01)])
+        #y_val_001 = np.median(val_y[np.argsort(-val_y)][:int(len(val_y) * 0.01)])
+        y_001_found = np.median(val_y[np.argsort(-val_y_hat)][:int(len(val_y) * 0.01)])
+        #y_regret001 = y_val_001 - y_val_hat_001
+        #rmse = ((val_y - val_y_hat) ** 2).mean() ** 0.5
+        return exp_var, y_001, y_001_found
 
     NewDrugComb()
     dataset = DrugCombEdge()
-    #cell_line_idxs = [1098, 1797, 1485,  981,  928, 1700, 1901, 1449, 1834, 1542]
-    #cell_lines = ["A-673", "T98G", "L-1236", "KBM-7", "TMD8", "DIPG25",
-    #              "HT29", "MCF7", "A375", "A549", "VCAP", "LNCAP"]
-    cell_lines = ["KBM-7", "NCI-H460", "NCIH23", "SW-620", "T-47D", "HT29", "SK-OV-3", "HCT116", "UACC62",
-                  "OVCAR3", "DIPG25", "A549"]
-
     cell_line_to_idx = np.load(osp.join(dataset.raw_dir, "cell_line_to_idx.npy"), allow_pickle=True).flatten()[0]
-    cell_line_idxs = [cell_line_to_idx[line] for line in cell_lines]
 
+    # cell lines with most single drugs
+    #cell_lines = ["A-673", "T98G", "L-1236", "KBM-7", "TMD8", "DIPG25"]
+    # cell lines with known gene expression
+    #cell_lines = ["HT29", "MCF7", "A375", "A549", "VCAP", "LNCAP"]
+    # cell lines with most combinations
+    #cell_lines = ["KBM-7", "NCI-H460", "NCIH23", "SW-620", "T-47D", "HT29", "SK-OV-3", "HCT116", "UACC62",
+    #              "OVCAR3", "DIPG25", "A549"]
+
+    cell_lines = list(cell_line_to_idx.keys())
+    cell_line_idxs = [cell_line_to_idx[line] for line in cell_lines]
+    print(cell_line_idxs)
+
+    cell_line_summar = []
     for i in range(len(cell_lines)):
         idxs = np.where(dataset.data.ddi_edge_classes.numpy() == cell_line_idxs[i])[0]
-        #print("len idxs", len(idxs))
         dataset_cell = Subset(dataset,idxs)
 
-        exp_var, rmse = train_ridge_regression(dataset_cell)
-        print("cell_line", cell_lines[i],
-              "cell_line_idx", cell_line_idxs[i],
-              "explained variance", exp_var,
-              "rmse", rmse)
+        exp_var, synergy_zip_001, synergy_zip_001_regret = train_ridge_regression(dataset_cell)
 
+        summar = {"cell_line": [cell_lines[i]],
+                  "cell_line_idx": [cell_line_idxs[i]],
+                  "explained variance": [exp_var],
+                  "synergy_zip_001": [synergy_zip_001],
+                  "synergy_zip_001_found": [synergy_zip_001_regret],
+                }
+        cell_line_summar.append(summar)
         #splits = random_split(len(dataset_cell), [0.8, 0.1, 0.1])
         #split_path = osp.join(datasets_dir + "/NewDrugComb/raw", str(cell_line_idx) + "_split.npy")
         #np.save(split_path, splits)
 
+    cell_line_summar = pd.concat([pd.DataFrame(c) for c in cell_line_summar])
+    cell_line_summar.dropna(inplace=True)
+    cell_line_summar.sort_values("synergy_zip_001_found", inplace=True, ascending=False)
+    cell_line_summar.to_csv(osp.join(datasets_dir,"NewDrugComb/cell_line_summary.csv"),index=False)
 
+    print(cell_line_summar)
 
 
 # todo: log transform concentrations

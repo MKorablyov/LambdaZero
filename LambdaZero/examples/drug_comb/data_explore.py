@@ -35,7 +35,6 @@ drugcomb_data = pd.read_csv(os.path.join(cfg.raw_dir, cfg.raw_file_names[1]), lo
 #
 # plt.show()
 
-"KBM-7", "NCI-H460", "NCIH23", "SW-620", "T-47D", "HT29", "SK-OV-3", "HCT116", "UACC62", "OVCAR3", "DIPG25", "A549"
 
 # look at cell lines
 #cell_names = drugcomb_data["cell_line_name"].to_numpy()
@@ -57,3 +56,11 @@ drugcomb_data = pd.read_csv(os.path.join(cfg.raw_dir, cfg.raw_file_names[1]), lo
 #     study_data = drugcomb_data.mask(studies==studies_unq[i])
 #
 #     print("study", studies_unq[i], "raw_count", raw_counts[i])
+
+# look at fit data
+cell_line_summar = pd.read_csv(osp.join(datasets_dir,"NewDrugComb/cell_line_summary.csv"))
+
+#cell_line_summar.sort_values("synergy_zip_001_found",inplace=True,ascending=False)
+#cell_line_summar.reset_index(drop=True,inplace=True)
+pd.set_option('display.max_columns', 10)
+print(cell_line_summar)
