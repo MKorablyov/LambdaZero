@@ -3,6 +3,7 @@ from copy import deepcopy
 import os
 import os.path as osp
 from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnvGraph_v1
+from LambdaZero.environments.persistent_search import BlockMolGraphEnv_PersistentBuffer
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v3
 from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
@@ -358,6 +359,62 @@ az006_po = {
             "policy_optimization": True,
         },
     }
+}
+
+az006_po_buff = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 0.6,
+            "random_start_prob": 0.5
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 10,
+            "policy_optimization": True,
+        },
+    },
+    "buffer_size": 500_000
+}
+
+az006_po_buff_1 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 0.6,
+            "random_start_prob": 0
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 10,
+            "policy_optimization": True,
+        },
+    },
+    "buffer_size": 500_000
 }
 
 az006_po_lre4 = {

@@ -14,7 +14,8 @@ import pandas as pd
 import ray
 from rdkit import Chem
 from rdkit.Chem import QED
-
+from ray.rllib.utils import try_import_torch
+torch, _ = try_import_torch()
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -37,7 +38,6 @@ class BlocksData:
         self.block_natm = np.asarray([b.GetNumAtoms() for b in self.block_mols])
         self.num_blocks = len(self.block_smi)
 
-
 class PersistentSearchBuffer:
     def __init__(self, config):
         self.mols = [(BlockMoleculeData(), -0.5, None, 0)]
@@ -47,6 +47,7 @@ class PersistentSearchBuffer:
         self.sumtree = SumTree(self.max_size)
         self.temperature = config.get('temperature', 2)
         self.threshold = config.get('threshold', 0.7)
+        self.add_prob = config.get('add_prob', 0.5)
         self.smiles = set()
         self.mol_fps = []
 
@@ -62,16 +63,22 @@ class PersistentSearchBuffer:
                 return False
             mol_fp = mol
             fp_buff = np.asarray(self.mol_fps)
-            dist = np.sum(np.abs(fp_buff - mol_fp[None, :]), axis=1)
-            dist = 1 - (dist / (np.sum(np.abs(fp_buff),1) + np.sum(np.abs(mol_fp[None,:]),1)))
-            return (dist > threshold).any()
+            fp_buff = torch.FloatTensor(fp_buff).cuda()
+            mol_fp = torch.FloatTensor(mol_fp).cuda()
+            dist = torch.sum(torch.abs(fp_buff) - mol_fp, axis=1)
+            dist = 1 - (dist/ torch.sum(torch.abs(fp_buff), 1) + torch.sum(torch.abs(mol_fp.view(-1, 512)), 1))
+            # dist = np.sum(np.abs(fp_buff - mol_fp[None, :]), axis=1)
+            # dist = 1 - (dist / (np.sum(np.abs(fp_buff),1) + np.sum(np.abs(mol_fp[None,:]),1)))
+            return (dist > threshold).any().item()
 
-    def add(self, mol, mol_info, mol_fp):
+    def add(self, mol, mol_info, mol_fp, use_similarity=True):
         if len(self.mols) >= self.max_size:
             self.prune()
         mol.blocks = [self.blocksd.block_mols[i] for i in mol.blockidxs]
-        if self.contains(mol_fp, self.threshold):
-            return
+        if use_similarity and self.contains(mol_fp, self.threshold):
+            return len(self.mols)
+        elif np.random.uniform(0, 1) > self.add_prob:
+            return len(self.mols)
         smi = Chem.MolToSmiles(mol.mol)
         mol.blocks = None
         # if smi in self.smiles:
@@ -80,6 +87,7 @@ class PersistentSearchBuffer:
         self.sumtree.set(len(self.mols) - 1, np.exp(mol_info['reward'] / self.temperature))
         self.smiles.add(smi)
         self.mol_fps.append(mol_fp)
+        return len(self.mols)
 
     def sample(self):
         idx = self.sumtree.sample(np.random.uniform(0,1))
@@ -206,19 +214,24 @@ class BlockMolGraphEnv_PersistentBuffer(BlockMolEnvGraph_v1):
         self._reset = super().reset
         self.ep_mol_fp = None
         self.threshold = config.get('threshold', 0.7)
+        self.random_start_prob = config.get('random_start_prob', 0)
+        self.use_similarity = config.get('use_similarity', True)
+        self.buffer_len = 0
 
     def reset(self):
         self.num_steps = 0
         self.num_simulations = 0
-        if self.first_reset:
+        epsilon = np.random.uniform(0,1)
+        if self.first_reset or epsilon < self.random_start_prob:
             self.first_reset = False
             self._reset()
             last_reward = 0
         else:
             self.molMDP.molecule.blocks = None
             if len(self.last_reward_info.keys()) != 0:
-                ray.get(self.searchbuf.add.remote(self.molMDP.molecule, 
-                        self.last_reward_info, self.get_fps(self.molMDP.molecule)[0]))
+                self.buffer_len = ray.get(self.searchbuf.add.remote(self.molMDP.molecule, 
+                        self.last_reward_info, self.get_fps(self.molMDP.molecule)[0],
+                        self.use_similarity))
             self.molMDP.reset()
             self.molMDP.molecule, last_reward = ray.get(self.searchbuf.sample.remote())
             self.molMDP.molecule.blocks = [self.molMDP.block_mols[idx]
@@ -262,6 +275,7 @@ class BlockMolGraphEnv_PersistentBuffer(BlockMolEnvGraph_v1):
         done = self._if_terminate()
         reward, log_vals = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
         log_vals['reward'] = reward
+        log_vals['buffer_size'] = self.buffer_len
         self.last_reward_info = copy(log_vals)
         if (self.molMDP.molecule.mol is not None):
             smiles = Chem.MolToSmiles(self.molMDP.molecule.mol)
