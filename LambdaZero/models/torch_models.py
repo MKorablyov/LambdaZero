@@ -94,44 +94,14 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         self.critic_layers = nn.Sequential(nn.ReLU(), nn.Linear(in_features=256, out_features=1))
         self._value_out = None
         
-        # RND
-        self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
-        rnd_output_dim = model_config['custom_model_config'].get("rnd_output_dim", 1)
-
-        if self.rnd_weight > 0:
-            self.critic_layers_int = nn.Sequential(nn.ReLU(), nn.Linear(in_features=256, out_features=1))
-            self._value_int_out = None
-            self.rnd_target = nn.Sequential(
-                nn.Linear(in_features=mol_fp_len + self.max_steps, out_features=128),nn.ReLU(),
-                nn.Linear(in_features=128, out_features=128), nn.ReLU(),
-                nn.Linear(in_features=128, out_features=rnd_output_dim))
-            self.rnd_predictor = nn.Sequential(
-                nn.Linear(in_features=mol_fp_len + self.max_steps, out_features=128),nn.ReLU(),
-                nn.Linear(in_features=128, out_features=128), nn.ReLU(),
-                nn.Linear(in_features=128, out_features=rnd_output_dim))
-            self.rnd_obs_stats = RunningMeanStd(shape=(mol_fp_len + self.max_steps))
-            self.rnd_rew_stats = RunningMeanStd(shape=())
-            # Freeze target network
-            self.rnd_target.eval()
-            for param in self.rnd_target.parameters():
-                param.requires_grad = False
-
     def forward(self, input_dict, state, seq_lens):
         # shared molecule embedding
         # weak todo (maksym) use mask before compute
-        if "obs" in input_dict.keys():
-            obs = input_dict["obs"]
-            mol_fp = obs["mol_fp"]
-            stem_fps = obs["stem_fps"]
-            jbond_fps = obs["jbond_fps"]
-            num_steps = obs["num_steps"]
-            action_mask = obs["action_mask"]
-        else:
-            mol_fp = input_dict["mol_fp"]
-            stem_fps = input_dict["stem_fps"]
-            jbond_fps = input_dict["jbond_fps"]
-            num_steps = input_dict["num_steps"]
-            action_mask = input_dict["action_mask"]
+        mol_fp = input_dict["mol_fp"]
+        stem_fps = input_dict["stem_fps"]
+        jbond_fps = input_dict["jbond_fps"]
+        num_steps = input_dict["num_steps"]
+        action_mask = input_dict["action_mask"]
 
         # shared layers
         mol_embed = self.shared_layers(torch.cat([mol_fp, num_steps], 1))
@@ -155,8 +125,6 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         critic_logits = self.critic_layers(mol_embed)
         self._value_out = critic_logits[:, 0]
         
-        if self.rnd_weight > 0:
-            self._value_int_out = self.critic_layers_int(mol_embed)[:, 0]
         # mask not available actions
         masked_actions = (1. - action_mask).to(torch.bool)
         actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
@@ -164,9 +132,6 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
     def value_function(self):
         return self._value_out
-
-    def int_value_function(self):
-        return self._value_int_out
 
     def compute_priors_and_value(self, obs):
         obs = torch.tensor([self.preprocessor.transform(obs)]).float().cuda()
@@ -182,26 +147,6 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
             priors = priors.cpu().numpy()
             value = value.cpu().numpy()
             return priors, value
-    
-    def compute_intrinsic_rewards(self, train_batch):
-        input_dict = restore_original_dimensions(train_batch['obs'], self.obs_space, "torch")
-        obs_ = torch.cat([input_dict['mol_fp'], input_dict['num_steps']], 1)
-        obs_mean = torch.as_tensor(self.rnd_obs_stats.mean, dtype=torch.float32, device=train_batch['obs'].device)
-        obs_var = torch.as_tensor(self.rnd_obs_stats.var, dtype=torch.float32, device=train_batch['obs'].device)
-        obs = ((obs_ - obs_mean) / (torch.sqrt(obs_var))).clamp(-1, 1)
-
-        target_reward = self.rnd_target(obs)
-        predictor_reward = self.rnd_predictor(obs)
-        rnd_loss_ = ((target_reward - predictor_reward) ** 2).sum(1).mean(0)
-        
-        rew_mean = torch.as_tensor(self.rnd_rew_stats.mean, dtype=torch.float32, device=rnd_loss_.device)
-        rew_var = torch.as_tensor(self.rnd_rew_stats.var, dtype=torch.float32, device=rnd_loss_.device)
-        rnd_loss = (rnd_loss_ - rew_mean) / (torch.sqrt(rew_var))
-        
-        self.rnd_obs_stats.update(obs_.clone().detach().cpu().numpy())
-        self.rnd_rew_stats.update(rnd_loss_.clone().detach().cpu().numpy())
-
-        return rnd_loss
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
@@ -372,6 +317,3 @@ class GraphIsomorphismNet(nn.Module):
         out = self.fully_connected(node_out)
 
         return out.view(-1)
-
-
-

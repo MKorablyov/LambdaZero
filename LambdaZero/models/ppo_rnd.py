@@ -186,15 +186,8 @@ def ppo_rnd_surrogate_loss(policy, model, dist_class, train_batch):
     train_batch["int_reward"] = model.compute_intrinsic_rewards(train_batch)
 
     if policy.config["use_gae"]:
-        # num_steps = train_batch["vf_int_pred"].size(0)
-        # discounted_returns = torch.zeros_like(train_batch["vf_int_pred"]).to(train_batch["vf_int_pred"].device)
         vpred_t = torch.cat([train_batch["vf_int_pred"], torch.tensor([0.], device=train_batch["vf_int_pred"].device)])
-        # gae = torch.tensor(0.0).to(vpred_t.device)
-        # for t in range(num_steps -1, -1, -1):
-        #     delta = train_batch["int_reward"][t] + policy.config['gamma'] * vpred_t[t + 1] - vpred_t[t]
-        #     gae = delta + policy.config['gamma'] * policy.config['lambda'] * gae
-        #     discounted_returns[t] += (gae + vpred_t[t])
-        # adv = discounted_returns - vpred_t[:-1]
+
         delta_t = (
             train_batch["int_reward"] + policy.config['gamma'] * vpred_t[1:] - vpred_t[:-1])
         a_coeff = torch.tensor([1.0, 0.0]).to(delta_t[:-1].device)
@@ -212,9 +205,6 @@ def ppo_rnd_surrogate_loss(policy, model, dist_class, train_batch):
 
         train_batch["int_adv"] = int_discounted_returns - rollout["vf_int_pred"]
         train_batch["vf_int_target"] = int_discounted_returns
-
-
-    # train_batch["int_adv"] = train_batch["int_adv"].clone().detach().cpu().numpy()
 
     mask = None
     if state:
@@ -366,20 +356,6 @@ def compute_advantages(rollout: SampleBatch,
             traj[Postprocessing.ADVANTAGES] +
             traj[SampleBatch.VF_PREDS]).copy().astype(np.float32)
 
-        # RND
-        # vpred_t = np.concatenate(
-        #     [rollout["vf_int_pred"],
-        #      np.array([0.])])
-        # delta_t = (
-        #     traj["int_reward"] + gamma * vpred_t[1:] - vpred_t[:-1])
-        # # This formula for the advantage comes from:
-        # # "Generalized Advantage Estimation": https://arxiv.org/abs/1506.02438
-        # traj["int_adv"] = discount(delta_t, gamma * lambda_)
-        # traj["vf_int_target"] = (
-        #     traj["int_adv"] +
-        #     traj["vf_int_pred"]).copy().astype(np.float32)
-
-
     else:
         rewards_plus_v = np.concatenate(
             [rollout[SampleBatch.REWARDS],
@@ -387,37 +363,19 @@ def compute_advantages(rollout: SampleBatch,
         discounted_returns = discount(rewards_plus_v,
                                       gamma)[:-1].copy().astype(np.float32)
         
-        # # RND
-        # int_rewards_plus_v = np.concatenate(
-        #     [rollout["int_reward"],
-        #      np.array([0.])])
-        # int_discounted_returns = discount(rewards_plus_v,
-        #                               gamma)[:-1].copy().astype(np.float32)
-
         if use_critic:
             traj[Postprocessing.
                  ADVANTAGES] = discounted_returns - rollout[SampleBatch.
                                                             VF_PREDS]
             traj[Postprocessing.VALUE_TARGETS] = discounted_returns
 
-            # RND
-            # traj["int_adv"] = discounted_returns - rollout["vf_int_pred"]
-            # traj["vf_int_target"] = discounted_returns
-
         else:
             traj[Postprocessing.ADVANTAGES] = discounted_returns
             traj[Postprocessing.VALUE_TARGETS] = np.zeros_like(
                 traj[Postprocessing.ADVANTAGES])
 
-            # RND
-            # traj["int_adv"] = discounted_returns
-            # traj["vf_int_pred"] = np.zeros_like(
-            #     traj["int_adv"])
-
     traj[Postprocessing.ADVANTAGES] = traj[
         Postprocessing.ADVANTAGES].copy().astype(np.float32)
-
-    # traj["int_adv"] = traj["int_adv"].copy().astype(np.float32)
 
     assert all(val.shape[0] == trajsize for val in traj.values()), \
         "Rollout stacked incorrectly!"

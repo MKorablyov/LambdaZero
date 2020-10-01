@@ -121,7 +121,6 @@ synth_config = {
         "disable_progress_bar": True,
         "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
     },
-    "synth_cutoff": [0, 4]
 }
 
 DEFAULT_CONFIG = {
@@ -135,9 +134,9 @@ DEFAULT_CONFIG = {
         "blocks_file": osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"),
     },
     "reward_config":{
-        # "binding_model": osp.join(datasets_dir,"brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth"),
+        "binding_model": osp.join(datasets_dir,"brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth"),
         "qed_cutoff": [0.2, 0.7],
-        # "synth_cutoff": [0, 4],
+        "synth_cutoff": [0, 4],
         "synth_config": synth_config,
 
         # todo: simulation button; allow dense reward
@@ -183,7 +182,6 @@ class BlockMolEnv_v4:
         self.max_steps = config["max_steps"]
         self.max_simulations = config["max_simulations"]
         self.random_blocks = config["random_blocks"]
-        self.dense_reward = config["dense_reward"]
         #
         self.molMDP = MolMDP(**config["molMDP_config"])
         self.observ = FPObs_v1(config, self.molMDP)
@@ -224,9 +222,6 @@ class BlockMolEnv_v4:
             stem_idx = (action - self.max_blocks)//self.num_blocks
             block_idx = (action - self.max_blocks) % self.num_blocks
             self.molMDP.add_block(block_idx=block_idx, stem_idx=stem_idx)
-
-        if self.dense_reward:
-            simulate = True
 
         self.num_steps += 1
         obs = self.observ(self.molMDP.molecule, self.num_steps)
