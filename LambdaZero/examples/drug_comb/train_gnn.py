@@ -73,20 +73,24 @@ def run_epoch(loader, model, normalizer, x_drug, optim, is_train):
     loss_sum      = 0
     epoch_targets = []
     epoch_preds   = []
-    for i, batch in enumerate(loader):
-        edge_index, edge_classes, edge_attr, y = batch
 
-        y_hat = model(x_drug, edge_index, edge_classes, edge_attr)
-        loss = F.mse_loss(normalizer.tfm(y), y_hat)
+    # Context manager for if we are in train mode and need to pass grad
+    none_ctx = contextmanager(lambda: iter([None]))()
+    with none_ctx if is_train else torch.no_grad():
+	for i, batch in enumerate(loader):
+	    edge_index, edge_classes, edge_attr, y = batch
 
-        if is_train:
-            loss.backward()
-            optim.step()
-            optim.zero_grad()
+	    y_hat = model(x_drug, edge_index, edge_classes, edge_attr)
+	    loss = F.mse_loss(normalizer.tfm(y), y_hat)
 
-        loss_sum += loss.item()
-        epoch_targets.append(y.detach().cpu())
-        epoch_preds.append(normalizer.itfm(y_hat).detach().cpu())
+	    if is_train:
+		loss.backward()
+		optim.step()
+		optim.zero_grad()
+
+	    loss_sum += loss.item()
+	    epoch_targets.append(y.detach().cpu())
+	    epoch_preds.append(normalizer.itfm(y_hat).detach().cpu())
 
     epoch_targets = torch.cat(epoch_targets)
     epoch_preds = torch.cat(epoch_preds)
@@ -102,6 +106,7 @@ class DrugDrugGNNRegressor(tune.Trainable):
     def _setup(self, config):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         dataset = DrugCombEdge().to(device)
+        dataset.set_target(config['target'])
 
         train_idx, val_idx = _get_split(dataset, config)
         train_set = dataset[train_idx]
@@ -118,13 +123,14 @@ class DrugDrugGNNRegressor(tune.Trainable):
         self.var0 = F.mse_loss(val_set.css, train_set.css.mean()).item()
 
         all_css = dataset.data.ddi_edge_attr[:, 0]
-        self.normalizer = MeanVarianceNormalizer((all_css.mean(), all_css.var()))
+        self.train_norm = MeanVarianceNormalizer((train_set.css.mean(), train_set.css.var()))
+        self.val_norm = MeanVarianceNormalizer((val_set.css.mean(), val_set.css.var()))
 
     def _train(self):
-        train_scores = run_epoch(self.train_loader, self.model, self.normalizer,
+        train_scores = run_epoch(self.train_loader, self.model, self.train_norm,
                                  self.x_drugs, self.optim, True)
 
-        eval_scores = run_epoch(self.val_loader, self.model, self.normalizer,
+        eval_scores = run_epoch(self.val_loader, self.model, self.val_norm,
                                 self.x_drugs, self.optim, False)
 
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]

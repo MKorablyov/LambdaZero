@@ -265,6 +265,18 @@ class DrugCombEdge(NewDrugComb):
 
         return self
 
+    def set_target(self, trgt_score):
+        score_name_to_trgt_idx = {
+            'css': 0,
+            'zip': 1,
+            'bliss': 2,
+            'loewe': 3,
+            'hsa': 4,
+        }
+
+        idx = score_name_to_trgt_idx[trgt_score]
+        self.trgt = self.data.edge_attr[:, idx, None]
+
     def use_specific_cell_line(self, cell_line_idx):
         matching_idxs = self.data.ddi_edge_classes == cell_line_idx
 
@@ -292,9 +304,16 @@ class DrugCombEdge(NewDrugComb):
                          "css": edge_attr[:, 0, None],
                          "negative_css": -edge_attr[:, 0, None],
                          "edge_classes": edge_classes[:, None],
+                         "zip": edge_attr[:, 1, None],
+                         "bliss": edge_attr[:, 2, None],
                          "loewe": edge_attr[:, 3, None],
+                         "hsa": edge_attr[:, 4, None],
                          "mol_graphs": self.data.mol_graphs,
                     }
+
+        if hasattr(self, 'trgt'):
+            data_dict['trgt'] = self.trgt
+
         return EdgeData(data_dict)
 
     def download(self):
