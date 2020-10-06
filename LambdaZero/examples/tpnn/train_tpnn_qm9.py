@@ -3,7 +3,6 @@ import sys
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torch_geometric
 
 import ray
 from ray import tune
@@ -15,17 +14,53 @@ import LambdaZero.utils
 import LambdaZero.models
 from LambdaZero.examples.tpnn import config
 
-datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+import torch_geometric
+from LambdaZero.inputs.inputs_op import atomic_num_to_group, atomic_num_to_period, N_GROUPS, N_PERIODS
 
-assert len(sys.argv) == 3, "Execution should be in the form python3 train_tpnn.py model_config_name r_cut"
+datasets_dir, _, summaries_dir = get_external_dirs()
 
-config_name = sys.argv[1]
-r_cut = float(sys.argv[2]) if len(sys.argv) == 3 else None
+config_name = sys.argv[1] if len(sys.argv) >= 2 else "tpnn_default"
 config = getattr(config, config_name)
 
-proc_func = LambdaZero.inputs.tpnn_proc
-transform = LambdaZero.inputs.tpnn_transform
-pre_transform = torch_geometric.transforms.RadiusGraph(r=r_cut, loop=False, max_num_neighbors=64, flow='target_to_source') if r_cut is not None else None
+
+def tpnn_transform_qm9(data):
+    def _group_period(atomic_numbers):
+        groups = torch.tensor([atomic_num_to_group[atomic_number] for atomic_number in atomic_numbers.tolist()])
+        periods = torch.tensor([atomic_num_to_period[atomic_number] for atomic_number in atomic_numbers.tolist()])
+        return groups, periods
+
+    def _one_hot_group_period(groups, periods):
+        groups_one_hot = torch.nn.functional.one_hot(groups - 1, N_GROUPS)
+        periods_one_hot = torch.nn.functional.one_hot(periods - 1, N_PERIODS)
+        return torch.cat((groups_one_hot, periods_one_hot), dim=1).type(torch.float64)
+
+    def _rel_vectors(coordinates, bonds):
+        origin_pos = coordinates[bonds[0]]
+        neighbor_pos = coordinates[bonds[1]]
+        return neighbor_pos - origin_pos
+
+    data = data.clone()
+    data.x = _one_hot_group_period(*_group_period(data.z))
+    data.rel_vec = _rel_vectors(data.pos, data.edge_index).type(torch.float64)
+    data.abs_distances = data.rel_vec.norm(dim=1).type(torch.float64)
+    data.rel_vec = torch.nn.functional.normalize(data.rel_vec, p=2, dim=-1)
+    data.y = data.y[:, 0].type(torch.float64)
+    return data
+
+
+def tpnn_transform_qm9_mpnn(data):
+    def _rel_vectors(coordinates, bonds):
+        origin_pos = coordinates[bonds[0]]
+        neighbor_pos = coordinates[bonds[1]]
+        return neighbor_pos - origin_pos
+
+    data = data.clone()
+    data.x = data.x.type(torch.float64)
+    data.rel_vec = _rel_vectors(data.pos, data.edge_index).type(torch.float64)
+    data.abs_distances = data.rel_vec.norm(dim=1).type(torch.float64)
+    data.rel_vec = torch.nn.functional.normalize(data.rel_vec, p=2, dim=-1)
+    data.y = data.y[:, 0].type(torch.float64)
+    return data
 
 
 def train_epoch(loader, model, optimizer, device, config):
@@ -42,7 +77,7 @@ def train_epoch(loader, model, optimizer, device, config):
 
         optimizer.zero_grad()
         logits = model(data).view(-1)
-        loss = F.mse_loss(logits, normalizer.tfm(targets))
+        loss = F.mse_loss(logits, normalizer.tfm(targets))  # mse_loss # l1_loss
         loss.backward()
         optimizer.step()
 
@@ -76,7 +111,7 @@ def eval_epoch(loader, model, device, config):
         targets = getattr(data, config["target"])
 
         logits = model(data).view(-1)
-        loss = F.mse_loss(logits, normalizer.tfm(targets))
+        loss = F.mse_loss(logits, normalizer.tfm(targets))  # mse_loss # l1_loss
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
@@ -99,25 +134,22 @@ def eval_epoch(loader, model, device, config):
 TPNN_CONFIG = {
     "trainer": TPNNRegressor,
     "trainer_config": {
-        "target": "y",  # gridscore
-        "target_norm": [-49.3, 26.1],  # [-43.042, 7.057],
-        "dataset_split_path": os.path.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),  # os.path.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-        "b_size": 64,
+        "target": "y",  # dipole moment
+        "target_norm": [2.6822, 1.4974],  # mean, std
+        "dataset_split_path": os.path.join(datasets_dir, "QM9", "randsplit_qm9.npy"),
+        "b_size": 16,  # 64,
 
-        "dataset": LambdaZero.inputs.BrutalDock,
+        "dataset": torch_geometric.datasets.QM9,
         "dataset_config": {
-            "root": os.path.join(datasets_dir, f"brutal_dock{'_'+str(r_cut) if r_cut is not None else ''}/mpro_6lze"),
-            "props": ["gridscore", "coord"],
-            "proc_func": proc_func,
-            "transform": transform,
-            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],  # ["Zinc15_2k"]
+            "root": os.path.join(datasets_dir, "QM9"),
+            "transform": tpnn_transform_qm9
         },
 
-        "model": LambdaZero.models.TPNN_v2,
+        "model": LambdaZero.models.TPNN_v3,
         "model_config": {},
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
-            "lr": 0.001
+            "lr": 0.0001  # 0.001
         },
 
         "train_epoch": train_epoch,
@@ -125,9 +157,9 @@ TPNN_CONFIG = {
     },
 
     "summaries_dir": summaries_dir,
-    "memory": 20 * 10 ** 9,
+    "memory": 8 * 10 ** 9,  # 20 * 10 ** 9,
 
-    "stop": {"training_iteration": 120},
+    "stop": {"training_iteration": 100},
     "resources_per_trial": {
         "cpu": 4,  # fixme - calling ray.remote would request resources outside of tune allocation
         "gpu": 1.0
@@ -154,4 +186,4 @@ if __name__ == "__main__":
                         checkpoint_at_end=config["checkpoint_at_end"],
                         local_dir=summaries_dir,
                         checkpoint_freq=config["checkpoint_freq"],
-                        name=f'{config_name}_{str(r_cut) if r_cut is not None else "smi"}')
+                        name=config_name)

@@ -24,9 +24,9 @@ from .global_attention_layer import LowRankAttention
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 from e3nn.point.message_passing import TensorPassingHomogenous
-from e3nn.radial import GaussianRadialModel
+from e3nn.radial import GaussianRadialModel, CosineBasisModel, BesselRadialModel
 from e3nn.point.gate import Gate
-from e3nn.non_linearities.rescaled_act import swish, tanh, sigmoid
+from e3nn.non_linearities.rescaled_act import swish, tanh, sigmoid, relu
 from functools import partial
 
 
@@ -403,7 +403,7 @@ class TPNN_v1(TensorPassingHomogenous):
     def __init__(self, representations, use_set2set=True):
         hidden_size = representations[-1][0][0]
         self.use_set2set = use_set2set
-        radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
+        radial_model = partial(GaussianRadialModel, min_radius=0.7, max_radius=3.2, number_of_basis=10, h=100, L=3, act=swish)
         gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
         super().__init__(representations, radial_model, gate)
         if use_set2set:
@@ -434,8 +434,66 @@ class TPNN_v2(TensorPassingHomogenous):
         hidden_size = representations[-1][0][0]
         input_size = representations[0][0][0]
         representations[0][0] = (emb_size, 0, 0)
-        radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
+        radial_model = partial(GaussianRadialModel, min_radius=1.1, max_radius=2.3, number_of_basis=10, h=100, L=3, act=swish)
         gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
+        super().__init__(representations, radial_model, gate)
+
+        self.emb = nn.Sequential(
+            nn.Linear(input_size, emb_size),
+            nn.Tanh()
+        )
+        self.pooling = Set2Set(hidden_size, processing_steps=3)
+        self.fully_connected = nn.Sequential(
+                nn.Linear(2 * hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, 1)
+        )
+
+    def forward(self, graph):
+        graph.x = self.emb(graph.x)
+        hidden_features = super().forward(graph)
+        pooled_features = self.pooling(hidden_features, graph.batch)
+        output = self.fully_connected(pooled_features)
+        return output
+
+
+class TPNN_v3(TensorPassingHomogenous):
+    def __init__(self, representations, **kwargs):
+        emb_size = 16
+        hidden_size = representations[-1][0][0]
+        input_size = representations[0][0][0]
+        representations[0][0] = (emb_size, 0, 0)
+        radial_model = partial(CosineBasisModel, max_radius=2.3, number_of_basis=10, h=100, L=3, act=swish)
+        gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
+        super().__init__(representations, radial_model, gate)
+
+        self.emb = nn.Sequential(
+            nn.Linear(input_size, emb_size),
+            nn.Tanh()
+        )
+        self.pooling = Set2Set(hidden_size, processing_steps=3)
+        self.fully_connected = nn.Sequential(
+                nn.Linear(2 * hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, 1)
+        )
+
+    def forward(self, graph):
+        graph.x = self.emb(graph.x)
+        hidden_features = super().forward(graph)
+        pooled_features = self.pooling(hidden_features, graph.batch)
+        output = self.fully_connected(pooled_features)
+        return output
+
+
+class TPNN_v4(TensorPassingHomogenous):
+    def __init__(self, representations, **kwargs):
+        emb_size = 16
+        hidden_size = representations[-1][0][0]
+        input_size = representations[0][0][0]
+        representations[0][0] = (emb_size, 0, 0)
+        radial_model = partial(BesselRadialModel, max_radius=2.3, number_of_basis=10, h=100, L=3, act=swish)
+        gate = partial(Gate, scalar_act=relu, tensor_act=relu)
         super().__init__(representations, radial_model, gate)
 
         self.emb = nn.Sequential(
