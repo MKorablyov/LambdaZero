@@ -109,6 +109,7 @@ TPNN_CONFIG = {
             "root": os.path.join(datasets_dir, f"brutal_dock{'_'+str(r_cut) if r_cut is not None else ''}/mpro_6lze"),
             "props": ["gridscore", "coord"],
             "proc_func": proc_func,
+            "pre_transform": pre_transform,
             "transform": transform,
             "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],  # ["Zinc15_2k"]
         },
@@ -125,7 +126,7 @@ TPNN_CONFIG = {
     },
 
     "summaries_dir": summaries_dir,
-    "memory": 20 * 10 ** 9,
+    "memory": 8 * 10 ** 9,
 
     "stop": {"training_iteration": 120},
     "resources_per_trial": {
