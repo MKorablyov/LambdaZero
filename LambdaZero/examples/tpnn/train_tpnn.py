@@ -15,6 +15,16 @@ import LambdaZero.utils
 import LambdaZero.models
 from LambdaZero.examples.tpnn import config
 
+from torch_geometric.utils import degree
+
+
+def add_norm(graph):
+    origin_nodes, _ = graph.edge_index  # origin, neighbor
+    node_degrees = degree(origin_nodes, num_nodes=graph.x.size(0))
+    graph.norm = node_degrees[origin_nodes].type(torch.float64).rsqrt()  # 1 / sqrt(degree(i))
+    return graph
+
+
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 assert len(sys.argv) == 3, "Execution should be in the form python3 train_tpnn.py model_config_name r_cut"
@@ -25,7 +35,10 @@ config = getattr(config, config_name)
 
 proc_func = LambdaZero.inputs.tpnn_proc
 transform = LambdaZero.inputs.tpnn_transform
-pre_transform = torch_geometric.transforms.RadiusGraph(r=r_cut, loop=False, max_num_neighbors=64, flow='target_to_source') if r_cut is not None else None
+pre_transform = torch_geometric.transforms.Compose([
+    torch_geometric.transforms.RadiusGraph(r=r_cut, loop=False, max_num_neighbors=64, flow='target_to_source'),
+    add_norm
+]) if r_cut is not None else None
 
 
 def train_epoch(loader, model, optimizer, device, config):

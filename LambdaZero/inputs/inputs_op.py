@@ -26,6 +26,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 #try:
 from torch_geometric.data import (InMemoryDataset, download_url, extract_zip, Data)
+from torch_geometric.utils import degree
 from sklearn.preprocessing import StandardScaler as sk_StandardScaler
 from sklearn.decomposition import PCA as sk_PCA
 #except Exception as e:
@@ -725,8 +726,12 @@ def create_mol_graph_with_3d_coordinates(smi, props):
     # pos
     coord = ast.literal_eval(props['coord'].decode('utf-8')) if isinstance(props['coord'], bytes) else props['coord']
     pos = torch.tensor(np.vstack(coord), dtype=torch.float64)
+    # norm
+    origin_nodes, _ = edge_index  # origin, neighbor
+    node_degrees = degree(origin_nodes, num_nodes=x.size(0))
+    norm = node_degrees[origin_nodes].type(torch.float64).rsqrt()  # 1 / sqrt(degree(i))
+    return Data(x, edge_index, edge_attr, y, pos, norm)
 
-    return Data(x, edge_index, edge_attr, y, pos)
 
 @ray.remote
 def tpnn_proc(smi, props, pre_filter, pre_transform):
