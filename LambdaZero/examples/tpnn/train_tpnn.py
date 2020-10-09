@@ -128,7 +128,10 @@ TPNN_CONFIG = {
         },
 
         "model": LambdaZero.models.TPNN_v2,
-        "model_config": {},
+        "model_config": {
+            "min_radius": 1.1,
+            "max_radius": r_cut if r_cut is not None else 2.3
+        },
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
             "lr": 0.001

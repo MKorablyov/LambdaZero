@@ -145,7 +145,7 @@ TPNN_CONFIG = {
             "transform": tpnn_transform_qm9
         },
 
-        "model": LambdaZero.models.TPNN_v3,
+        "model": LambdaZero.models.TPNN_v2,
         "model_config": {},
         "optimizer": torch.optim.Adam,
         "optimizer_config": {

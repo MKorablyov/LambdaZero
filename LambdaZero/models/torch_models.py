@@ -434,8 +434,11 @@ class TPNN_v2(TensorPassingHomogenous):
         hidden_size = representations[-1][0][0]
         input_size = representations[0][0][0]
         representations[0][0] = (emb_size, 0, 0)
-        radial_model = partial(GaussianRadialModel, min_radius=1.1, max_radius=2.3, number_of_basis=10, h=100, L=3, act=swish)
-        gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
+        min_radius = kwargs.get('min_radius', 1.1)
+        max_radius = kwargs.get('max_radius', 2.3)
+        number_of_basis = kwargs.get('number_of_basis', int(10*(max_radius - min_radius)))
+        radial_model = partial(GaussianRadialModel, min_radius=min_radius, max_radius=max_radius, number_of_basis=number_of_basis, h=100, L=3, act=swish)
+        gate = partial(Gate, scalar_act=tanh, tensor_act=tanh)
         super().__init__(representations, radial_model, gate)
 
         self.emb = nn.Sequential(
