@@ -15,12 +15,20 @@ import LambdaZero.models
 from LambdaZero.examples.tpnn import config
 
 import torch_geometric
+from torch_geometric.utils import degree
 from LambdaZero.inputs.inputs_op import atomic_num_to_group, atomic_num_to_period, N_GROUPS, N_PERIODS
 
 datasets_dir, _, summaries_dir = get_external_dirs()
 
 config_name = sys.argv[1] if len(sys.argv) >= 2 else "tpnn_default"
 config = getattr(config, config_name)
+
+
+def add_norm(graph):
+    origin_nodes, _ = graph.edge_index  # origin, neighbor
+    node_degrees = degree(origin_nodes, num_nodes=graph.x.size(0))
+    graph.norm = node_degrees[origin_nodes].type(torch.float64).rsqrt()  # 1 / sqrt(degree(i))
+    return graph
 
 
 def tpnn_transform_qm9(data):
@@ -137,19 +145,19 @@ TPNN_CONFIG = {
         "target": "y",  # dipole moment
         "target_norm": [2.6822, 1.4974],  # mean, std
         "dataset_split_path": os.path.join(datasets_dir, "QM9", "randsplit_qm9.npy"),
-        "b_size": 16,  # 64,
+        "b_size": 64,  # 64,
 
         "dataset": torch_geometric.datasets.QM9,
         "dataset_config": {
             "root": os.path.join(datasets_dir, "QM9"),
-            "transform": tpnn_transform_qm9
+            "transform": torch_geometric.transforms.Compose(add_norm, tpnn_transform_qm9)
         },
 
         "model": LambdaZero.models.TPNN_v2,
         "model_config": {},
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
-            "lr": 0.0001  # 0.001
+            "lr": 0.001  # 0.001
         },
 
         "train_epoch": train_epoch,
@@ -159,7 +167,7 @@ TPNN_CONFIG = {
     "summaries_dir": summaries_dir,
     "memory": 8 * 10 ** 9,  # 20 * 10 ** 9,
 
-    "stop": {"training_iteration": 100},
+    "stop": {"training_iteration": 120},
     "resources_per_trial": {
         "cpu": 4,  # fixme - calling ray.remote would request resources outside of tune allocation
         "gpu": 1.0
