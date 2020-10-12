@@ -22,6 +22,7 @@ from LambdaZero.environments.reward import BayesianRewardActor
 # from LambdaZero.examples.bayesian_models.bayes_tune import config
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch_with_targets, eval_epoch, \
     train_mcdrop_rl, mcdrop_mean_variance
+from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -83,14 +84,16 @@ DEFAULT_CONFIG = {
         "b_size": 32,
         'num_mol_retrain': 1000,
         "device": "cuda",
+        "qed_cutoff": [0.2, 0.7],
+        "synth_config": synth_config,
         'regressor_config': {
             "lambda": 6.16e-9,
             "data": dict(data_config, **{"dataset_creator":None}),
             "T": 20,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations": 48,
-            "finetune_iterations": 12,
+            "train_iterations": 64,
+            "finetune_iterations": 16,
             "model": LambdaZero.models.MPNNetDrop,
             "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
             "optimizer": torch.optim.Adam,
@@ -106,7 +109,7 @@ DEFAULT_CONFIG = {
         "regressor": MCDrop,
     },
     "use_dock": False,
-    "pretrained_model": None #  "/home/mjain/scratch/mcdrop_rl/model.pt"       
+    "pretrained_model": None #  "/home/mjain/scratch/mcdrop_rl/model.pt"
 }
 
 config = merge_dicts(DEFAULT_CONFIG, config)

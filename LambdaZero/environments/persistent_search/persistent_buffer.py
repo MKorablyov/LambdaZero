@@ -20,6 +20,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from LambdaZero.environments.molMDP import BlockMoleculeData
+from LambdaZero.environments.block_mol_graph_v1 import BlockMolEnvGraph_v1
 from LambdaZero.environments.block_mol_v3 import BlockMolEnv_v3
 from LambdaZero.environments.persistent_search.fast_sumtree import SumTree
 
@@ -152,3 +153,39 @@ class BlockMolEnv_PersistentBuffer(BlockMolEnv_v3):
             if ray.get(self.searchbuf.contains.remote(self.molMDP.molecule)):
                 reward = 0 # exploration penalty
         return obs, reward, done, info
+
+class BlockMolGraphEnv_PersistentBuffer(BlockMolEnvGraph_v1):
+    mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems"]
+
+    def __init__(self, config=None):
+        super().__init__(config)
+        self.first_reset = True
+        self._reset = super().reset
+        self.random_start_prob = config.get('random_start_prob', 0.75)
+        self.episodes = 0
+
+    def reset(self):
+        self.num_steps = 0
+        self.num_simulations = 0
+        self.episodes += 1
+        epsilon = np.random.uniform(0,1)
+        if self.first_reset or epsilon < self.random_start_prob or self.episodes < 150:
+            self.first_reset = False
+            self._reset()
+            last_reward = 0
+        else:
+            sampled_mol = ray.get(self.reward.reward_learner.sample.remote())
+            if sampled_mol is None:
+                self._reset()
+                last_reward = 0
+            else:
+                self.molMDP.molecule.blocks = None
+                self.molMDP.reset()
+                
+                self.molMDP.molecule = sampled_mol
+                self.molMDP.molecule.blocks = [self.molMDP.block_mols[idx]
+                                            for idx in self.molMDP.molecule.blockidxs]
+                self.molMDP.molecule._mol = None
+        self.reward.reset(0)
+        obs = self._make_obs()
+        return obs

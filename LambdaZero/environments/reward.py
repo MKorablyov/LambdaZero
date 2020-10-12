@@ -17,7 +17,6 @@ import LambdaZero.models
 import LambdaZero.chem
 from LambdaZero.utils import Complete, get_external_dirs
 import logging
-from LambdaZero.utils.fast_sumtree.fast_sumtree import SumTree
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -307,17 +306,21 @@ class PredDockBayesianReward_v1:
         synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
 
         # Binding energy prediction
-        self.reward_learner.add_molecule.remote(molecule, synth_discount * qed_discount)
         # dockscore, log_vals = self._get_dockscore(molecule)
         dockscore_reward, log_vals = self._get_dockscore(molecule)
+
         
         dockscore = self._simulation(mol=mol)
         # dockscore = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
         if self.reward_learner_logs is not None:
+            print(self.reward_learner_logs)
             log_vals = { **log_vals, **self.reward_learner_logs}
             self.reward_learner_logs = None
         # combine rewards
         disc_reward = dockscore_reward * qed_discount * synth_discount
+
+        self.reward_learner.add_molecule.remote(molecule, disc_reward, synth_discount * qed_discount)
+
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
@@ -370,7 +373,7 @@ class _SimDockLet:
         self.attribute = attribute
 
     def eval(self, mol):
-        s = Chem.MolToSmiles(mol[1])
+        s = Chem.MolToSmiles(mol[1].mol)
         print("starting", s)
         try:
             _, r, _ = self.dock.dock(s)
@@ -393,16 +396,24 @@ class BayesianRewardActor():
         self.config = config
         self.regressor_config = config["regressor_config"]
         self.unseen_molecules = []
-        self.train_molecules = []
+        self.aq_molecules = []
         self.mols = 0
         self.use_dock_sim = use_dock_sim
         self.num_threads = 8
         self.max_size = 25000
-        # self.sumtree = SumTree(self.max_size)
+        self.temperature = config.get('temperature', 2)
+        self.aq_indices = []
+        self.unselected_indices = []
+
         self.train_len = 0
         self.prune_factor = 0.2
 
+        self.qed_cutoff = config['qed_cutoff']
+        self.synth_cutoff = config['synth_config']["synth_cutoff"]
+        self.synth_net = LambdaZero.models.ChempropWrapper_v1(config['synth_config'])
+        
         self.regressor = config["regressor"](self.regressor_config)
+        
         if use_dock_sim:
             self.actors = [_SimDockLet.remote(os.environ['SLURM_TMPDIR'], programs_dir, datasets_dir, self.config["data"]["target"])
                        for i in range(self.num_threads)]
@@ -423,21 +434,28 @@ class BayesianRewardActor():
 
         np.random.shuffle(ul_idxs) # randomly acquire batch zero
         train_idxs = ul_idxs[:self.config["aq_size0"]]
+        self.aq_indices.extend(train_idxs)
         ul_idxs = ul_idxs[self.config["aq_size0"]:]
+        self.unselected_indices.extend(ul_idxs)
         train_set = Subset(self.dataset, train_idxs.tolist())
-        self.ul_set = Subset(self.dataset, ul_idxs.tolist())
         val_set = Subset(self.dataset, val_idxs.tolist())
         self.train_len += self.config["aq_size0"]
         train_molecules = []
         for i, data in enumerate(train_set):
             setattr(data, config["data"]["target"], -(getattr(data, config["data"]["target"]) - self.target_norm[0]) / self.target_norm[1])
+            # import pdb; pdb.set_trace();
+            # mol = Chem.MolFromSmiles(getattr(data, "smi"))
             train_molecules.append(data)
-        
-        self.train_loader = DataLoader(train_molecules, shuffle=True, batch_size=config["data"]["b_size"])
+            # train_molecules.append([data, 
+            #     mol,
+            #     getattr(data, config["data"]["target"]) * self.get_discount(mol)
+            # ])
+            # self.sumtree.set(len(train_molecules) - 1, train_molecules[2] / self.temperature)
+        # import pdb;pdb.set_trace()
+        train_loader = DataLoader(train_molecules, shuffle=True, batch_size=config["data"]["b_size"])
         self.val_loader = DataLoader(val_set, batch_size=config["data"]["b_size"])
-        self.ul_loader = DataLoader(self.ul_set, batch_size=config["data"]["b_size"])
-        self.dataset = None
         self.train_molecules = train_molecules
+        # self.dataset = None
         print('BR: Loaded Dataset')
         
         if pretrained_model is not None:
@@ -446,20 +464,41 @@ class BayesianRewardActor():
             print('Loaded pretrained model')
         else:
             print('BR: Running single pretraining step ...')
-            scores, val = self.regressor.fit(self.train_loader, self.val_loader)
+            scores, val = self.regressor.fit(train_loader, self.val_loader)
         print(scores, val)
         self.logs = {**scores, **val}
         print('BR: Loaded Bayesian Reward Actor')
         self.batches = 0
     
+    def get_discount(self, mol):
+        qed = QED.qed(mol)
+        qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
+        qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
+
+        # Synthesizability constraint
+        synth = self.synth_net(mol=mol)
+        synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
+        synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
+
+        return synth_discount * qed_discount
+
     def prune(self):
-        new_mols_idx = np.argsort([i[2] for i in self.unseen_molecules])[int(self.prune_factor * len(self.unseen_molecules)):]
-        # new_sum_tree = SumTree(self.max_size)
+        new_mols_idx = np.argsort([i[2] for i in self.unseen_molecules])[int(self.prune_factor * self.max_size):]
+        if len(self.unseen_molecules) < self.max_size:
+            return
         new_mols = []
         for i, j in enumerate(new_mols_idx):
-            new_mols.append(self.mols[j])
+            new_mols.append(self.unseen_molecules[j])
         self.unseen_molecules = new_mols
-
+        print('pruned', len(self.unseen_molecules))
+    
+    def sample(self):
+        if len(self.aq_molecules) > 0:
+            idx = np.random.randint(len(self.aq_molecules))
+            return self.aq_molecules[idx][1]
+        else:
+            return None
+    
     def _simulation(self, mol):
         atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
         graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
@@ -487,14 +526,14 @@ class BayesianRewardActor():
                 }, self.batches
         return None, None
 
-    def add_molecule(self, molecule, discount):
-        if self.mols > self.max_size:
+    def add_molecule(self, molecule, disc_rew, discount):
+        if len(self.unseen_molecules) > self.max_size:
             self.prune()
         mol = molecule.mol
         atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
         graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
         graph = self.transform(graph)
-        self.unseen_molecules.append([graph, mol, None, discount])
+        self.unseen_molecules.append([graph, molecule, disc_rew, discount])
         self.mols += 1
         if self.mols % self.config['num_mol_retrain'] == 0:
             print('Collected {} mols, performing batch acquisition'.format(self.mols))
@@ -505,16 +544,14 @@ class BayesianRewardActor():
     def acquire_batch(self):
         mols = np.array(self.train_unseen_mols)[:, 0]
         loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
-        mean, var = self.regressor.get_mean_variance(loader, len(self.train_loader.dataset))
+        mean, var = self.regressor.get_mean_variance(loader, self.train_len)
         scores = mean + (self.config["kappa"] * var)
         for i in range(len(self.train_unseen_mols)):
-            # print(scores[i], self.train_unseen_mols[i][3])
             scores[i] = self.train_unseen_mols[i][3] * scores[i]
             self.train_unseen_mols[i][2] = self.train_unseen_mols[i][3] * scores[i]
 
         # noise is not a part of original UCT but is added here
         if self.config["minimize_objective"]: scores = -scores
-        # import pdb; pdb.set_trace();
         idxs = np.argsort(-scores)[:self.config["aq_size"]]
         return idxs
 
@@ -533,7 +570,7 @@ class BayesianRewardActor():
             n = len(mol_set)
             rs = [None] * n
             for i, (graph, mol, _, _) in enumerate(mol_set):
-                r = self._simulation(mol)
+                r = self._simulation(mol.mol)
                 setattr(graph, self.config["data"]["target"], th.FloatTensor([r]))
                 rs[i] = r
                 print(r)
@@ -548,45 +585,53 @@ class BayesianRewardActor():
 
         aq_idx, rews = self.compute_targets(aq_idxs)
         rews = np.array(rews)
-        
-        aq_mask = np.zeros(len(self.ul_set), dtype=np.bool)
-        idx = np.random.choice(len(self.ul_set), len(idxs), replace=False)
-        aq_mask[idx] = True
-        aq_idxs = np.asarray(self.ul_set.indices)[aq_mask].tolist()
-        ul_idxs = np.asarray(self.ul_set.indices)[~aq_mask].tolist()
-        aq_set = Subset(self.ul_set, aq_idxs)
-        self.ul_set = Subset(self.ul_set, ul_idxs)
 
+        if len(self.unselected_indices) == 0:
+            self.unselected_indices = self.aq_indices
+            self.aq_indices = []
+
+        # aq_idxs = np.random.choice(self.unselected_indices, self.config["aq_size"] // 8, replace=False)
+        # self.aq_indices.extend(aq_idxs)
+        # aq_mask = np.zeros(len(self.dataset), dtype=np.bool)
+        # aq_mask[self.aq_indices] = True
+        # self.unselected_indices = np.arange(len(self.dataset))[~aq_mask].tolist()
+        # aq_set = self.dataset[aq_idxs.tolist()]
+        
         loader = DataLoader(np.array(aq_idx)[:,0], shuffle=False, batch_size=self.config["data"]["b_size"])
-        mean, var = self.regressor.get_mean_variance(loader, len(self.train_loader.dataset))
+        mean, var = self.regressor.get_mean_variance(loader, self.train_len)
         mse_before = np.mean((rews - mean) ** 2)
 
-        fine_tune_dataset = aq_idx + [[graph, None, None, None] for graph in aq_set]
-        fine_tune_loader = DataLoader(np.array(fine_tune_dataset)[:,0], shuffle=True, batch_size=self.config["data"]["b_size"])
-
-        self.train_molecules.extend(np.array(fine_tune_dataset)[:, 0].tolist())
-        
-        self.train_loader = DataLoader(self.train_molecules, shuffle=True, batch_size=self.config["data"]["b_size"])
+        # aq_set_arr = np.array([graph for graph in aq_set])
+            # [graph, 
+            # Chem.MolFromSmiles(getattr(graph, "smi")), 
+            # getattr(graph, self.config["data"]["target"]) * self.get_discount(Chem.MolFromSmiles(getattr(graph, "smi")))]
+            # for graph in aq_set])
+        # fine_tune_dataset = np.concatenate((np.array(aq_idx)[:, :1], aq_set_arr), axis=0)
+        self.train_molecules.extend(np.array(aq_idx)[:, :1].reshape(-1).tolist())
+        train_loader = DataLoader(np.array(self.train_molecules), shuffle=True, batch_size=self.config["data"]["b_size"])
+        # import pdb; pdb.set_trace();
         self.unseen_molecules.extend(self.train_unseen_mols)
 
         # fit model to the data
         if self.batches % 5 == 0:
-            scores, val = self.regressor.fine_tune(fine_tune_loader, self.train_loader, self.val_loader, True)
+            scores, val = self.regressor.fit(train_loader, self.val_loader, False)
+            # scores, val = self.regressor.fine_tune(fine_tune_loader, self.val_loader, False)
         else:
-            scores, val = self.regressor.fine_tune(fine_tune_loader, self.train_loader, self.val_loader, False)
+            scores, val = self.regressor.fit(train_loader, self.val_loader, False)
+            # scores, val = self.regressor.fine_tune(fine_tune_loader, self.val_loader, False)
         
         self.train_len += self.config["aq_size"]
-        mean, var = self.regressor.get_mean_variance(loader, len(self.train_loader.dataset))
+        mean, var = self.regressor.get_mean_variance(loader, self.train_len)
         mse_after = np.mean((rews - mean) ** 2)
 
         for i in range(len(aq_idx)):
             rews[i] = rews[i] * aq_idx[i][3]
+        
+        self.aq_molecules.extend(np.array(aq_idx)[:, :3].tolist())
 
         self.logs = {**scores, **val, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 
                         'oracle_max': np.max(rews), 'oracle_mean': np.mean(rews)}
         print(self.logs)
-
-        logging.info(scores)
         return scores
 
     def train(self):

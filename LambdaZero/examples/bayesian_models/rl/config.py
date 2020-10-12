@@ -3,6 +3,7 @@ from copy import deepcopy
 import os
 import os.path as osp
 from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnvGraph_v1
+from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolGraphEnv_PersistentBuffer
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v2, PredDockReward_v3, PredDockBayesianReward_v1
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
@@ -21,7 +22,7 @@ binding_model = osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/va
 
 ppo_bayes_reward_000 = {
     "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
+        "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
             "allow_removal": True,
             "reward": PredDockBayesianReward_v1,
@@ -41,7 +42,7 @@ ppo_bayes_reward_000 = {
 
 ppo_bayes_reward_000_1 = {
     "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
+        "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
             "allow_removal": True,
             "reward": PredDockBayesianReward_v1,
@@ -189,7 +190,7 @@ ppo_bayes_reward_005 = {
 
 ppo_bayes_reward_006 = {
     "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
+        "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
             "allow_removal": True,
             "reward": PredDockBayesianReward_v1,
@@ -212,7 +213,7 @@ ppo_bayes_reward_006 = {
 
 ppo_bayes_reward_008 = {
     "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
+        "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
             "allow_removal": True,
             "reward": PredDockBayesianReward_v1,
@@ -226,7 +227,7 @@ ppo_bayes_reward_008 = {
             "custom_options":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
-        "entropy_coeff": 1e-3,
+        # "entropy_coeff": 1e-3,
         # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
         "framework": "torch",
     },
@@ -238,7 +239,7 @@ ppo_bayes_reward_008 = {
 
 ppo_bayes_reward_007 = {
     "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
+        "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
             "allow_removal": True,
             "reward": PredDockBayesianReward_v1,
@@ -265,7 +266,7 @@ ppo_bayes_reward_007 = {
 
 ppo_bayes_reward_009 = {
     "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
+        "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
             "allow_removal": True,
             "reward": PredDockBayesianReward_v1,
@@ -279,13 +280,13 @@ ppo_bayes_reward_009 = {
             "custom_options":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
-        # "entropy_coeff": 1e-4,
+        "entropy_coeff": 1e-3,
         # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
         "framework": "torch",
     },
-    "reward_learner_config": {
-        "train_iterations": 100
-    },
+    # "reward_learner_config": {
+    #     "train_iterations": 100
+    # },
 }
 
 ppo_bayes_reward_010 = {
