@@ -104,7 +104,6 @@ synth_config = {
         "ensemble_size": 1,
         "atom_messages": False,  # Centers messages on atoms instead of on bonds
         "undirected": False,
-
         "epochs": 150,
         "warmup_epochs": 2.0,  # epochs for which lr increases linearly; afterwards decreases exponentially
         "init_lr": 1e-4,  # Initial learning rate
@@ -122,7 +121,6 @@ synth_config = {
         "disable_progress_bar": True,
         "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_1/model.pt")
     },
-
 }
 
 DEFAULT_CONFIG = {
@@ -188,6 +186,7 @@ class BlockMolEnv_v4:
         self.molMDP = MolMDP(**config["molMDP_config"])
         self.observ = FPObs_v1(config, self.molMDP)
         self.reward = config["reward"](**config["reward_config"])
+
 
         self.action_space = self.observ.action_space
         self.observation_space = self.observ.observation_space

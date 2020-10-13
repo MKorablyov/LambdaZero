@@ -149,7 +149,43 @@ def uniform_sample(data,nsamples,nbins=20,nmargin=1,bin_low=None,bin_high=None):
     # idx = np.random.choice(ndata,nsamples,replace=True,p=data_probs)
     return sele_idxs
 
+class RunningMeanStd(object):
+    def __init__(self, epsilon=1e-4, shape=()):
+        self.mean = np.zeros(shape, 'float32')
+        self.var = np.ones(shape, 'float32')
+        self.count = epsilon
 
+    def update(self, x):
+
+        if len(x.shape) > 0:
+            batch_count = x.shape[0]
+            batch_mean = np.mean(x, axis=0)
+            batch_var = np.var(x, axis=0)
+        else:
+            batch_mean = x
+            batch_var = 0
+            batch_count = 1
+        self.update_from_moments(batch_mean, batch_var, batch_count)
+
+    def update_from_moments(self, batch_mean, batch_var, batch_count):
+        delta = batch_mean - self.mean
+        tot_count = self.count + batch_count
+
+        new_mean = self.mean + delta * batch_count / tot_count
+        m_a = self.var * (self.count)
+        m_b = batch_var * (batch_count)
+        M2 = m_a + m_b + np.square(delta) * self.count * batch_count / (self.count + batch_count)
+        new_var = M2 / (self.count + batch_count)
+
+        new_count = batch_count + self.count
+
+        self.mean = new_mean
+        self.var = new_var
+        self.count = new_count
+
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
+pca_cache = [None]
 def molecule_pca(mol):
     fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
     mat = []
@@ -159,14 +195,12 @@ def molecule_pca(mol):
         mat.append(bitsvec)
     mat = np.array(mat)
 
-    datasets_dir, _, _ = get_external_dirs()
-    pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
-
     pca = pk.load(open(pca_path, 'rb'))
     scaled_data = pca.transform(mat)
     log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
     return (log_vals)
 
+    
 def logP(mu, sigma, x):
     """
     Estimate log likelihood of an estimator
@@ -176,4 +210,15 @@ def logP(mu, sigma, x):
     :return:
     """
     return (-np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) **2))
+
+def dataset_creator_v1(config):
+    # make dataset
+    dataset = config["dataset"](**config["dataset_config"])
+    train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
+
+    train_set = Subset(dataset, train_idxs.tolist())
+    val_set = Subset(dataset, val_idxs.tolist())
+    train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
+    val_loader = DataLoader(val_set, batch_size=config["b_size"])
+    return train_loader, val_loader
 

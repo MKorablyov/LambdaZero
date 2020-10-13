@@ -8,12 +8,13 @@ import pickle
 import subprocess
 import threading
 import time
+import sys
 
 import numpy as np
 import pandas as pd
 import ray
 from rdkit import Chem
-from rdkit.Chem import QED
+from ray.rllib.utils import merge_dicts
 import torch
 from torch_geometric.data import Data, Batch
 
@@ -26,7 +27,11 @@ import LambdaZero.models
 from LambdaZero import chem
 from LambdaZero.environments.molMDP import BlockMoleculeData
 from LambdaZero.environments.reward import PredDockReward
-from LambdaZero.utils import Complete, get_external_dirs
+
+from LambdaZero.utils import get_external_dirs
+from LambdaZero.environments.reward import PredDockReward_v3 as PredReward
+from LambdaZero.environments.block_mol_v3 import DEFAULT_CONFIG as env_v3_cfg, BlockMolEnv_v3
+from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -63,8 +68,8 @@ class Node:
         self.mol = mol
         self.value = 0
         self.fast_reward = -0.5
-        self.qed = None
-        self.synth = None
+        self.mol_info = {}
+        self.discount = 0
         self.pred_dock_reward = None
         self.sim_dock_reward = None
         self.children = {}
@@ -80,9 +85,7 @@ class Node:
         return self.total_return / self.total_leaves
 
     def discounted_reward(self, reward):
-        qed = self.qed[1] if self.qed is not None else 1
-        synth = self.synth[1] if self.synth is not None else 1
-        return min(reward, reward * qed * synth)
+        return min(reward, reward * self.discount)
 
     @property
     def reward(self):
@@ -172,9 +175,49 @@ class PersistentSearchTree:
                         self.take_action(n.id, a, precomputed=r)
                     n = self.nodes[n.children[a]]
 
+        if config.get('restore_nodes', None) is not None:
+            print("Loading restore nodes file...")
+            nodes = pickle.load(gzip.open(config['restore_nodes'], 'rb'))
+            print("Seeding tree", len(nodes))
+            self.nodes = nodes
+            self.root = self.nodes[0]
+            self.num_explored_nodes = max(self.nodes.keys()) + 1
+            def f(n):
+                return 1 + sum(f(self.nodes[cid])
+                               for act, cid in n.children.items()
+                               if act not in n.pruned_children)
+            def f2(n):
+                return 1 + sum(f(self.nodes[cid])
+                               for act, cid in n.children.items()
+                               if cid in self.nodes)
+            def q():
+                print("found", f(self.root), f2(self.root), "reachable nodes")
+
+            def f3(n):
+                rec = []
+                dels = []
+                for i, c in n.children.items():
+                    if i not in n.pruned_children:
+                        if c not in self.nodes:
+                            print('node',c,'doesnt exist')
+                            dels += [i]
+                        else:
+                            rec += [c]
+                for i in dels:
+                    del n.children[i]
+                for i in rec:
+                    f3(self.nodes[i])
+            f3(self.root)
+            self._reach = f
+            self._print_reach = q
+            self._cleanup_pruned = f3
+            q()
+
         if config.get('populate_root', True):
             for action in self.get_legal_actions(self.root.mol):
                 self.take_action(0, action)
+
+        print("tree init done")
 
     def get_mols(self, idxs, return_la_mask=False):
         mols = [self.nodes[i].mol if i in self.nodes else self.dummy_mol for i in idxs]
@@ -248,7 +291,7 @@ class PersistentSearchTree:
                 return node.reward
             max_r = node.reward
             for i, n in node.children.items():
-                if i in node.pruned_children:
+                if i in node.pruned_children or n not in self.nodes:
                     continue
                 n = self.nodes[n]
                 max_r = max(max_r, f(n))
@@ -315,6 +358,7 @@ class PersistentSearchTree:
     def prune_tree(self):
         max_rs = []
         def f(node):
+            dels = []
             if node.n_legal_acts == 0:
                 max_rs.append(node.reward)
                 node.max_descendant_r = node.reward
@@ -323,11 +367,18 @@ class PersistentSearchTree:
             for i, n in node.children.items():
                 if i in node.pruned_children:
                     continue
+                if n not in self.nodes:
+                    print('child node', i, n,'missing from self.nodes?')
+                    print(len(node.mol.blocks))
+                    dels.append(i)
+                    continue
                 n = self.nodes[n]
                 f(n)
                 max_r = max(max_r, n.max_descendant_r)
             max_rs.append(max_r)
             node.max_descendant_r = max_r
+            for i in dels:
+                del node.children[i]
 
         removed_nodes = []
         def remove_subtree(node):
@@ -340,8 +391,14 @@ class PersistentSearchTree:
                     remove_subtree(c)
 
         def prune(node, thresh):
+            dels = []
             for i, n in node.children.items():
                 if i in node.pruned_children:
+                    continue
+                if n not in self.nodes:
+                    print('child node', i, n,'missing from self.nodes?')
+                    print(len(node.mol.blocks))
+                    dels.append(i)
                     continue
                 c = self.nodes[n]
                 if c.max_descendant_r <= thresh:
@@ -355,14 +412,17 @@ class PersistentSearchTree:
                     self.sumtree.set(n, 0)
                 else:
                     prune(c, thresh)
+            for i in dels:
+                del node.children[i]
+        self.nodes_lock.acquire()
         t0 = time.time()
         f(self.root) # compute max_descendant_r
         t1 = time.time()
+        #print("found", len(max_rs), "nodes with rewards")
         # compute kth/N percentile value
         kth = find_kth(max_rs, int(len(max_rs) * self.prune_factor))
         t2 = time.time()
         l0 = len(self.nodes)
-        self.nodes_lock.acquire()
         gc.collect()
         process = psutil.Process(os.getpid())
         print('mem pre', process.memory_info().rss // (1024 * 1024),
@@ -392,7 +452,7 @@ class PersistentSearchTree:
         for i, n in self.nodes.items():
             if i == 0:
                 continue
-            if pred_dock and n.pred_dock_reward is not None and n.qed is not None:
+            if pred_dock and n.pred_dock_reward is not None:
                 continue
             if sim_dock and n.sim_dock_reward is not None:
                 continue
@@ -402,7 +462,7 @@ class PersistentSearchTree:
                 top_k = sorted(top_k, key=lambda x:x[0])[-k:]
         self.nodes_lock.release() # Todo code version without lock
         t1 = time.time()
-        if t1-t0 > 0.1:
+        if t1-t0 > 1.:
             print(f'get_top_k_nodes took {t1-t0:.2f}s', k, sim_dock, pred_dock)
         return top_k
 
@@ -412,12 +472,12 @@ class PersistentSearchTree:
                 self.nodes[i].sim_dock_reward = float(r)
                 self.sumtree.set(i, self.score_fn(self.nodes[i]))
 
-    def set_pred_dock_reward(self, idx, rewards, qeds, synths):
-        for i, r, qed, synth in zip(idx, rewards, qeds, synths):
+    def set_pred_dock_reward(self, idx, rewards, mol_infos):
+        for i, r, info in zip(idx, rewards, mol_infos):
             if i in self.nodes:
                 self.nodes[i].pred_dock_reward = float(r)
-                self.nodes[i].qed = qed
-                self.nodes[i].synth = synth
+                self.nodes[i].discount = info.get('discount', 0)
+                self.nodes[i].mol_info = info
                 self.sumtree.set(i, self.score_fn(self.nodes[i]))
 
     def is_full(self):
@@ -464,7 +524,9 @@ class PersistentSearchTree:
         new_node = Node(0, new_mol, len(legal_actions), idx)
         if precomputed is not None:
             (new_node.fast_reward,
-             new_node.pred_dock_reward, new_node.qed,
+             new_node.pred_dock_reward,
+             new_node.mol_info,
+             new_node.discount,
              new_node.sim_dock_reward) = precomputed
 
         self.nodes_lock.acquire()
@@ -518,7 +580,7 @@ class PersistentSearchTree:
         return np.arange(len(add_mask))[add_mask]
 
     def refresh(self, new_idx):
-        if not new_idx % 1000:
+        if not new_idx % 5000:
             gc.collect()
             process = psutil.Process(os.getpid())
             print('mem', process.memory_info().rss // (1024 * 1024),
@@ -537,16 +599,15 @@ class PersistentSearchTree:
         with gzip.open(f'{path}/final_tree.pkl.gz', 'wb') as f:
             pickle.dump(self.nodes, f, 4)
 
-@ray.remote(num_gpus=0.1)
-class PredDockRewardActor(PredDockReward):
+@ray.remote(num_gpus=0.01)
+class PredDockRewardActor:
 
-    def __init__(self, *a, **k):
-        synth_config = k.pop('synth_config')
-        self.synth_cutoff = k.pop('synth_cutoff')
-        super().__init__(*a, **k)
+    def __init__(self):
+        reward_config = merge_dicts(
+            env_v3_cfg['reward_config'],
+            {"synth_config": synth_config, "dockscore_config": binding_config})
+        self.pred = PredReward(**reward_config)
         self.running = True
-        self.complete = Complete()
-        self.synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
 
     def run(self, tree, n):
         while self.running:
@@ -561,50 +622,39 @@ class PredDockRewardActor(PredDockReward):
             time.sleep(1)
             return
         rewards = []
-        qeds = []
-        synths = []
+        mol_infos = []
         idxs = []
         #t0 = time.time()
         for _, i, mol_ in mols:
             if mol_ is None: continue
             mol = mol_.mol
             if mol.GetNumAtoms() == 1:
-                rewards.append(-0.5); idxs.append(i); qeds.append((0, 0))
+                rewards.append(-0.5); idxs.append(i); mol_infos.append({})
                 continue
-            atmfeat, _, bond, bondfeat = chem.mpnn_feat(mol, ifcoord=False)
-            graph = chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
-            graph = self.complete(graph)
-            batch = Batch.from_data_list([graph]).to(self.device)
-            with torch.no_grad():
-                pred = self.net(batch)
-            qed = QED.qed(mol)
-            qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
-            qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
-
-            # Synthesizability constraint
-            synth = self.synth_net(mol=mol)
-            synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
-            synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
-
-            r = -pred.detach().cpu().numpy().item()
-            rewards.append(r)
+            self.pred.reset(0)
+            reward, mol_info = self.pred(mol_, True, True, 0)
+            rewards.append(mol_info.get("dockscore", -1))
+            mol_infos.append(mol_info)
             idxs.append(i)
-            qeds.append((qed, qed_discount))
-            synths.append((synth, synth_discount))
-        tree.set_pred_dock_reward.remote(idxs, rewards, qeds, synths)
+        if not len(rewards):
+            time.sleep(1)
+            return
+        tree.set_pred_dock_reward.remote(idxs, rewards, mol_infos)
         #t1 = time.time()
-        #print(f"Ran {n} docking preds in {t1-t0:.2f}s ({(t1-t0)/n:.2f}s/mol)")
+        #print(f"Ran {len(rewards)} docking preds in {t1-t0:.2f}s ({(t1-t0)/n:.2f}s/mol)")
         return
 
 @ray.remote
-class SimDockRewardActor:
+class SimDockRewardActor_threaded:
 
     def __init__(self, tmp_dir, programs_dir, datasets_dir, num_threads=1):
         self.dock = chem.Dock_smi(tmp_dir,
                                   osp.join(programs_dir, 'chimera'),
                                   osp.join(programs_dir, 'dock6'),
-                                  osp.join(datasets_dir, 'brutal_dock/d4/docksetup/'))
-        self.target_norm = [-26.3, 12.3]
+                                  osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
+                                  gas_charge=True)
+        #osp.join(datasets_dir, 'brutal_dock/d4/docksetup/'))
+        self.target_norm = binding_config['dockscore_std'] #[-26.3, 12.3]
         self.running = True
         self.num_threads = num_threads
 
@@ -616,20 +666,27 @@ class SimDockRewardActor:
         self.running = False
 
     def do_iterations(self, tree, n):
+        print("dock6 iter", n)
         mols = ray.get(tree.get_top_k_nodes.remote(n, sim_dock=True))
         # mols is a list of BlockMoleculeData objects
         mols = [i for i in mols if i[2] is not None]
         n = len(mols)
+        if n == 0:
+            time.sleep(1)
+            return
         rewards = [None] * n
         idxs = [None] * n
         def f(i, idx):
+            s = Chem.MolToSmiles(mols[i][2].mol)
+            print("starting", i, s)
             try:
-                _, r, _ = self.dock.dock(Chem.MolToSmiles(mols[i][2].mol))
+                _, r, _ = self.dock.dock(s)
             except Exception as e: # Sometimes the prediction fails
-                print(e)
+                print('exception for', i, s, e)
                 r = 0
             rewards[i] = -(r-self.target_norm[0])/self.target_norm[1]
             idxs[i] = idx
+            print("done", i, s, r)
         t0 = time.time()
         threads = []
         thread_at = self.num_threads
@@ -642,17 +699,82 @@ class SimDockRewardActor:
                 threads[thread_at].start()
                 thread_at += 1
             time.sleep(0.5)
+            print('tick', thread_at, rewards, n, self.num_threads)
         t1 = time.time()
         print(f"Ran {n} docking simulations in {t1-t0:.2f}s ({(t1-t0)/n:.2f}s/mol)")
         tree.set_sim_dock_reward.remote(idxs, rewards)
+        print("Done iter")
 
-@ray.remote(num_gpus=0.1)
+
+
+@ray.remote
+class _SimDockLet:
+    def __init__(self, tmp_dir, programs_dir, datasets_dir):
+        self.dock = chem.Dock_smi(tmp_dir,
+                                  osp.join(programs_dir, 'chimera'),
+                                  osp.join(programs_dir, 'dock6'),
+                                  osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
+                                  gas_charge=True)
+        self.target_norm = binding_config['dockscore_std'] #[-26.3, 12.3]
+
+    def eval(self, mol):
+        s = Chem.MolToSmiles(mol.mol)
+        print("starting", s)
+        try:
+            _, r, _ = self.dock.dock(s)
+        except Exception as e: # Sometimes the prediction fails
+            print('exception for', s, e)
+            r = 0
+        reward = -(r-self.target_norm[0])/self.target_norm[1]
+        print("done", s, r)
+        return reward
+
+@ray.remote
+class SimDockRewardActor:
+
+    def __init__(self, tmp_dir, programs_dir, datasets_dir, num_threads=1):
+        self.actors = [_SimDockLet.remote(tmp_dir, programs_dir, datasets_dir)
+                       for i in range(num_threads)]
+        self.pool = ray.util.ActorPool(self.actors)
+        self.running = False
+
+    def run(self, tree, n):
+        self.running = True
+        while self.running:
+            self.do_iterations(tree, n)
+
+    def stop(self):
+        self.running = False
+
+    def do_iterations(self, tree, n):
+        print("dock6 iter", n)
+        mols = ray.get(tree.get_top_k_nodes.remote(n, sim_dock=True))
+        # mols is a list of (reward, idx BlockMoleculeData) tuples
+        mols = [i for i in mols if i[2] is not None]
+        n = len(mols)
+        if n == 0:
+            print("no mols, sleeping")
+            time.sleep(1)
+            return
+        t0 = time.time()
+        rewards = list(self.pool.map(lambda a, m: a.eval.remote(m[2]), mols))
+        idxs = [i[1] for i in mols]
+        t1 = time.time()
+        print(f"Ran {n} docking simulations in {t1-t0:.2f}s ({(t1-t0)/n:.2f}s/mol)")
+        tree.set_sim_dock_reward.remote(idxs, rewards)
+        print("Done iter")
+
+
+@ray.remote(num_gpus=0.01)
 class RLActor:
-    def __init__(self, model, obs_config, device, train_batcher,
+    def __init__(self, model, learning_rate, obs_config, device, train_batcher,
                  act_batcher, tree, temperature, priority_pred):
+        #print("[RLActor] ray.get_gpu_ids(): {}".format(ray.get_gpu_ids()))
+        #print("[RLActor] CUDA_VISIBLE_DEVICES: {}".format(os.environ["CUDA_VISIBLE_DEVICES"]))
+
         self.model = model(obs_config)
         self.model.to(device)
-        self.opt = torch.optim.Adam(self.model.parameters(), 1e-3, weight_decay=1e-5)
+        self.opt = torch.optim.Adam(self.model.parameters(), learning_rate, weight_decay=1e-5)
         self.device = device
         self.train_batcher = train_batcher
         self.act_batcher = act_batcher
@@ -661,8 +783,6 @@ class RLActor:
         self.priority_pred = priority_pred
         # This is a temporary hack because of some annoying warnings
         if 0:
-            import os
-            import sys
             f = open(os.devnull, 'w')
             sys.stdout = f
 
@@ -674,6 +794,12 @@ class RLActor:
 
     def set_parameters(self, state_dict):
         self.model.load_state_dict(state_dict)
+
+    def save_parameters(self, path):
+        pickle.dump(self.model.state_dict(), gzip.open(path, 'wb'))
+
+    def load_parameters(self, path):
+        self.model.load_state_dict(pickle.load(gzip.open(path, 'rb')))
 
     def train(self):
         idx, action_mask, graphs, qsa, qsa_mask, rewards = self.train_batcher.get()
@@ -789,3 +915,85 @@ class RandomRLActor:
 
     def get_pol(self, idxs, update_r=True):
         return np.ones((len(idxs), self.nact)) / self.nact
+
+
+def create_seeding_list_from_exps(root, num_top_k=50_000):
+    def get_act_seq(nodes, n):
+        s = []
+        rs = []
+        while n.id != 0:
+            if type(n.parent) == int:
+                parent = nodes[n.parent]
+            else:
+                parent = n.parent
+            if type(parent.children) == dict:
+                action = [a for a, c in parent.children.items() if c == n.id]
+            elif type(parent.children) == list:
+                action = [a for a, c in parent.children if c == n.id]
+
+            if not len(action):
+                return None, None
+            s.append(action[0])
+            #qed = n.qed
+            rs.append((n.fast_reward, n.pred_dock_reward, n.mol_info if hasattr(n, 'info') else {}, n.discount, n.sim_dock_reward))
+            n = parent
+        return s[::-1], rs[::-1]
+
+    top_k_molecules = [{'reward':-10}]
+    top_10_of_each = {}
+    seen = set()
+    for path in os.listdir(root):
+        p = f'{root}/{path}/final_tree.pkl.gz'
+        if not os.path.exists(p):
+            continue
+        print(path)
+        try:
+            nodes = pickle.load(gzip.open(p,'rb'))
+        except Exception as e:
+            print(e)
+            continue
+        print('loaded', len(nodes), 'nodes')
+        top_10_of_this = [{'reward': -10}]
+        for i, n in nodes.items():
+            if n.reward > top_k_molecules[0]['reward'] or n.reward > top_10_of_this[0]['reward']:
+                seq, rseq = get_act_seq(nodes, n)
+                if seq is None:
+                    continue
+                h = '_'.join(map(str, seq))
+                if h in seen:
+                    continue
+                seen.add(h)
+                top_k_molecules.append({
+                    'reward': n.reward,
+                    'dock6_norm': n.sim_dock_reward,
+                    'chemprop_norm': n.pred_dock_reward,
+                    'fast_norm': n.fast_reward,
+                    'smiles': n.mol.mol,
+                    'blockmoleculedata': {'blockidxs': n.mol.blockidxs,
+                                          'slices': n.mol.slices,
+                                          'numblocks': n.mol.numblocks,
+                                          'jbonds': n.mol.jbonds,
+                                          'stems': n.mol.stems,},
+                    'action_sequence': seq,
+                    'mol_info': n.mol_info if hasattr(n, 'mol_info') else {},
+                    'discount': n.discount,
+                    'ancestors_rewards': rseq})
+                top_10_of_this.append(top_k_molecules[-1])
+                top_10_of_this = sorted(top_10_of_this, key=lambda x:x['reward'])[-10:]
+
+        for i in top_10_of_this:
+            i['smiles'] = Chem.MolToSmiles(i['smiles'])
+        top_10_of_each[path] = top_10_of_this
+        top_k_molecules = sorted(top_k_molecules, key=lambda x:x['reward'])[-num_top_k:]
+    print("Computing smiles...")
+    for i in top_k_molecules:
+        if type(i['smiles']) != str:
+            i['smiles'] = Chem.MolToSmiles(i['smiles'])
+    pickle.dump([top_k_molecules, top_10_of_each],
+                gzip.open(time.strftime(f'top_mols_mpro_%m%b_%d_%H_%M_n{num_top_k}.pkl.gz'), 'wb'))
+
+
+if __name__ == "__main__":
+    if sys.argv[1] == 'create_seeds':
+        create_seeding_list_from_exps('/home/mila/b/bengioe/tmp/lz_3/persistent_search_tree/',
+                                      50_000)

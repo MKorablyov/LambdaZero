@@ -111,7 +111,6 @@ DEFAULT_CONFIG = {
 
 class BlockMolEnv_v3:
     mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems"]
-
     def __init__(self, config=None):
         warnings.warn("BlockMolEnv_v3 is deprecated for BlockMolEnv_v4")
 
