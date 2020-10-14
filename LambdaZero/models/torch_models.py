@@ -23,8 +23,8 @@ from .global_attention_layer import LowRankAttention
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-from e3nn.point.message_passing import TensorPassingHomogenous
-from e3nn.radial import GaussianRadialModel, CosineBasisModel, BesselRadialModel
+from e3nn.point.message_passing import TensorPassingHomogenous, TensorPassingContext, TensorPassingLayer
+from e3nn.radial import GaussianRadialModel, CosineBasisModel
 from e3nn.point.gate import Gate
 from e3nn.non_linearities.rescaled_act import swish, tanh, sigmoid, relu
 from functools import partial
@@ -460,59 +460,42 @@ class TPNN_v2(TensorPassingHomogenous):
         return output
 
 
-class TPNN_v3(TensorPassingHomogenous):
-    def __init__(self, representations, **kwargs):
-        emb_size = 16
-        hidden_size = representations[-1][0][0]
-        input_size = representations[0][0][0]
-        representations[0][0] = (emb_size, 0, 0)
-        radial_model = partial(CosineBasisModel, max_radius=2.3, number_of_basis=10, h=100, L=3, act=swish)
-        gate = partial(Gate, scalar_act=torch.tanh, tensor_act=torch.tanh)
-        super().__init__(representations, radial_model, gate)
+class TPNN_ResNet(TensorPassingContext):
+    def __init__(self, max_z, representations, radial_model, gate):
+        super().__init__(representations)
+        self.max_z = max_z
+        self.emb_size = self.input_representations[0][0][0]  # 1st layer -> scalar representation -> multiplicity
+        self.out_size = self.output_representations[-1][0][0]
 
-        self.emb = nn.Sequential(
-            nn.Linear(input_size, emb_size),
-            nn.Tanh()
-        )
-        self.pooling = Set2Set(hidden_size, processing_steps=3)
+        self.emb_layer = torch.nn.Embedding(num_embeddings=self.max_z, embedding_dim=self.emb_size)
+
+        self.model = torch.nn.ModuleList([
+            TensorPassingLayer(Rs_in, Rs_out, self.named_buffers_pointer, radial_model, gate) for (Rs_in, Rs_out) in zip(self.input_representations[:-1], self.output_representations[:-1])
+        ])
+
+        # no gate on last layer
+        self.model.append(TensorPassingLayer(self.input_representations[-1], self.output_representations[-1], self.named_buffers_pointer, radial_model))
+
+        self.pooling = Set2Set(self.out_size, processing_steps=3)
         self.fully_connected = nn.Sequential(
-                nn.Linear(2 * hidden_size, hidden_size),
-                nn.ReLU(),
-                nn.Linear(hidden_size, 1)
+            nn.Linear(2 * self.out_size, self.out_size),
+            nn.ReLU(),
+            nn.Linear(self.out_size, 1)
         )
 
     def forward(self, graph):
-        graph.x = self.emb(graph.x)
-        hidden_features = super().forward(graph)
-        pooled_features = self.pooling(hidden_features, graph.batch)
-        output = self.fully_connected(pooled_features)
-        return output
+        edge_index = graph.edge_index
+        abs_distances = graph.abs_distances
+        rel_vec = graph.rel_vec
+        norm = graph.norm
 
+        embedding = self.emb_layer(graph.z)
 
-class TPNN_v4(TensorPassingHomogenous):
-    def __init__(self, representations, **kwargs):
-        emb_size = 16
-        hidden_size = representations[-1][0][0]
-        input_size = representations[0][0][0]
-        representations[0][0] = (emb_size, 0, 0)
-        radial_model = partial(BesselRadialModel, max_radius=2.3, number_of_basis=10, h=100, L=3, act=swish)
-        gate = partial(Gate, scalar_act=relu, tensor_act=relu)
-        super().__init__(representations, radial_model, gate)
+        features = self.model[0](edge_index, embedding, abs_distances, rel_vec, norm)
+        for layer in self.model[1:-1]:
+            features = (features + layer(edge_index, features, abs_distances, rel_vec, norm)).mul(0.7071)  # o[n] = (o[n-1] + f[n]) / sqrt(2)
+        features = self.model[-1](edge_index, features, abs_distances, rel_vec, norm)
 
-        self.emb = nn.Sequential(
-            nn.Linear(input_size, emb_size),
-            nn.Tanh()
-        )
-        self.pooling = Set2Set(hidden_size, processing_steps=3)
-        self.fully_connected = nn.Sequential(
-                nn.Linear(2 * hidden_size, hidden_size),
-                nn.ReLU(),
-                nn.Linear(hidden_size, 1)
-        )
-
-    def forward(self, graph):
-        graph.x = self.emb(graph.x)
-        hidden_features = super().forward(graph)
-        pooled_features = self.pooling(hidden_features, graph.batch)
+        pooled_features = self.pooling(features, graph.batch)
         output = self.fully_connected(pooled_features)
         return output
