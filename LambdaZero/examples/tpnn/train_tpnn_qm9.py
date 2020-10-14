@@ -150,7 +150,7 @@ TPNN_CONFIG = {
         "dataset": torch_geometric.datasets.QM9,
         "dataset_config": {
             "root": os.path.join(datasets_dir, "QM9"),
-            "transform": torch_geometric.transforms.Compose(add_norm, tpnn_transform_qm9)
+            "transform": torch_geometric.transforms.Compose([add_norm, tpnn_transform_qm9])
         },
 
         "model": LambdaZero.models.TPNN_v2,
