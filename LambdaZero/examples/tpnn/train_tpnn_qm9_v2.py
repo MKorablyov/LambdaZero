@@ -145,15 +145,19 @@ TPNN_CONFIG = {
             "transform": transform
         },
 
-        "model": LambdaZero.models.TPNN_ResNet_Avg,
+        "model": LambdaZero.models.TPNN_ResNet,
         "model_config": {
-            "max_z": 10,
-            "avg_n_atoms": 18.025
+            "max_z": 10
         },
         "optimizer": torch.optim.Adam,
         "optimizer_config": {
             "lr": 0.0001
         },
+        "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau,
+        "scheduler_config": {
+            "patience": 5
+        },
+        "scheduler_criteria": 'mae',
 
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
