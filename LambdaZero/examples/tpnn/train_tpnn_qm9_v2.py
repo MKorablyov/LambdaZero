@@ -130,7 +130,6 @@ transform = torch_geometric.transforms.Compose([
 ])
 
 
-
 TPNN_CONFIG = {
     "trainer": TPNNRegressor,
     "trainer_config": {
@@ -146,9 +145,10 @@ TPNN_CONFIG = {
             "transform": transform
         },
 
-        "model": LambdaZero.models.TPNN_ResNet,
+        "model": LambdaZero.models.TPNN_ResNet_Avg,
         "model_config": {
-            "max_z": 10
+            "max_z": 10,
+            "avg_n_atoms": 18.025
         },
         "optimizer": torch.optim.Adam,
         "optimizer_config": {

@@ -499,3 +499,39 @@ class TPNN_ResNet(TensorPassingContext):
         pooled_features = self.pooling(features, graph.batch)
         output = self.fully_connected(pooled_features)
         return output
+
+
+class TPNN_ResNet_Avg(TensorPassingContext):
+    def __init__(self, max_z, avg_n_atoms, representations, radial_model, gate):
+        super().__init__(representations)
+        self.max_z = max_z
+        self.register_buffer('avg_n_atoms', torch.tensor([avg_n_atoms], dtype=torch.float64))
+        self.emb_size = self.input_representations[0][0][0]  # 1st layer -> scalar representation -> multiplicity
+        self.out_size = self.output_representations[-1][0][0]
+
+        self.emb_layer = torch.nn.Embedding(num_embeddings=self.max_z, embedding_dim=self.emb_size, padding_idx=0)
+
+        self.model = torch.nn.ModuleList([
+            TensorPassingLayer(Rs_in, Rs_out, self.named_buffers_pointer, radial_model, gate) for (Rs_in, Rs_out) in zip(self.input_representations[:-1], self.output_representations[:-1])
+        ])
+
+        # no gate on last layer
+        self.model.append(TensorPassingLayer(self.input_representations[-1], self.output_representations[-1], self.named_buffers_pointer, radial_model))
+
+        self.pooling = global_mean_pool
+
+    def forward(self, graph):
+        edge_index = graph.edge_index
+        abs_distances = graph.abs_distances
+        rel_vec = graph.rel_vec
+        norm = self.avg_n_atoms  # graph.norm
+
+        embedding = self.emb_layer(graph.z)
+
+        features = self.model[0](edge_index, embedding, abs_distances, rel_vec, norm)
+        for layer in self.model[1:-1]:
+            features = features + layer(edge_index, features, abs_distances, rel_vec, norm)  # o[n] = o[n-1] + f[n]
+        features = self.model[-1](edge_index, features, abs_distances, rel_vec, norm)
+
+        output = self.pooling(features, graph.batch)
+        return output
