@@ -135,7 +135,7 @@ TPNN_CONFIG = {
     "trainer_config": {
         "target": "y",
         "target_norm": [2.68, 1.5],  # mean, std
-        "dataset_split_path": os.path.join(datasets_dir, "QM9", "randsplit_qm9.npy"),
+        "dataset_split_path": os.path.join(datasets_dir, "QM9", "randsplit_qm9_110_10_10_v0.npy"),
         "b_size": 16,  # 64,
 
         "dataset": torch_geometric.datasets.QM9,
@@ -155,7 +155,8 @@ TPNN_CONFIG = {
         },
         "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau,
         "scheduler_config": {
-            "patience": 5
+            "patience": 5,
+            "factor": 0.5
         },
         "scheduler_criteria": 'mae',
 
