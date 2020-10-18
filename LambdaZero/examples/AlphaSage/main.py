@@ -77,7 +77,7 @@ DEFAULT_CONFIG = {
         "num_samples": 1,
         "checkpoint_at_end": False,
     },
-    "memory": 10 * 10 ** 9,
+    "memory": 16 * 10 ** 9,
 }
 
 if __name__ == "__main__":
