@@ -5,7 +5,7 @@ from LambdaZero.examples.drug_comb.models.message_conv_layers import FourMessage
 import os
 # from hyperopt import hp
 from LambdaZero.examples.drug_comb.models.predictors import SharedLayersMLPPredictor, FilmMLPPredictor
-from LambdaZero.examples.drug_comb.utils import get_project_root
+from LambdaZero.utils import get_external_dirs
 from torch.utils.data import TensorDataset, DataLoader
 from LambdaZero.examples.drug_comb.models.acquisition import RandomAcquisition, ExpectedImprovement, GreedyAcquisition
 from ray import tune
@@ -376,7 +376,7 @@ if __name__ == "__main__":
         "n_scoring_forward_passes": 5,
     }
 
-    summaries_dir = get_project_root()
+    _, _, summaries_dir = get_external_dirs()
     configuration = {
         "trainer": ActiveTrainer,
         "trainer_config": {**pipeline_config, **predictor_config, **model_config, **dataset_config,

@@ -1,5 +1,6 @@
 from torch_geometric.data import InMemoryDataset, download_url
-from LambdaZero.examples.drug_comb.utils import get_project_root, get_fingerprint
+from LambdaZero.examples.drug_comb.utils import get_fingerprint
+from LambdaZero.examples.drug_comb.utils import get_external_dirs
 from pubchempy import Compound
 import urllib.request
 from unrar import rarfile
@@ -33,7 +34,8 @@ class AbstractDrugComb(InMemoryDataset):
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
 
-        super().__init__(os.path.join(get_project_root(), 'DrugComb/'), transform, pre_transform)
+        datasets_dir, _, _ = get_external_dirs()
+        super().__init__(os.path.join(datasets_dir, 'DrugComb/'), transform, pre_transform)
 
         self.data, self.slices = torch.load(self.processed_paths[0])
 

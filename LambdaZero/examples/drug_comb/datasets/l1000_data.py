@@ -1,5 +1,5 @@
 from torch_geometric.data import Data, InMemoryDataset, download_url
-from LambdaZero.examples.drug_comb.utils import get_project_root
+from LambdaZero.utils import get_external_dirs
 import pubchempy as pcp
 from cmapPy.pandasGEXpress.parse import parse
 import pickle
@@ -17,7 +17,8 @@ class L1000(InMemoryDataset):
         Dataset object for the LINCS L1000 dataset.
         """
 
-        super().__init__(os.path.join(get_project_root(), 'LINCS/'), transform, pre_transform)
+        datasets_dir, _, _ = get_external_dirs()
+        super().__init__(os.path.join(datasets_dir, 'LINCS/'), transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
         print("L1000 dataset loaded.")
