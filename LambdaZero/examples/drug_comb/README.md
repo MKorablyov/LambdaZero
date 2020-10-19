@@ -16,9 +16,12 @@ and `dataset_config`.
 The `model_config` contains parameters for the the model used for learning representations
 of the graph.  This includes the model type itself.  These models can be found in the file `models/models.py`.
 The `torch.nn.Module` subclasses in the `models/models.py` file are the MPNNs that have been written 
-thus far.  Available models are the `Baseline` model, and the `GiantGraphGCN` model.  The `Baseline` model
-does not do any interesting representation learning and immediately plugs the graph's base features into a
-predictor.  The `GiantGraphGCN` is an MPNN on top of the giant graph (we define here the giant graph as the
+thus far.  Available models are the `Baseline` model, and the `GiantGraphGCN` model.  
+
+- `Baseline`: The `Baseline` model does not do any interesting representation learning and immediately plugs the graph's 
+base features into a predictor.  
+
+- `GiantGraphGCN`: The `GiantGraphGCN` is an MPNN on top of the giant graph (we define here the giant graph as the
 union of the drug drug interaction, drug protein interaction, and protein protein interaction graphs).  It
 has many different options, including whether or not to use LRGA (https://arxiv.org/pdf/2006.07846.pdf), 
 which edge types to pass messages along, and whether or not to backprop through the MPNN only periodically.
@@ -29,6 +32,7 @@ drug and protein graphs.  After we find these representations, we still need to 
 these representations.  The dictionary `predictor_config` contains parameters for the predictor that acts
 on top of the MPNN's learned reprersentations.  So far, we have generally used simple MLPs for final prediction.
 These classes are found in the file `models/predictors.py`, and the `predictor_config` should specify them
-as well as the various parameters required by the predictors in `models/predictors.py`.
+as well as the various parameters required by the predictors in `models/predictors.py`.  Available predictors
+are the `InnerProductPredictor`, `MLPPredictor`
 
 
