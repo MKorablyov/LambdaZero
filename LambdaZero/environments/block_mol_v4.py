@@ -64,6 +64,16 @@ class FPObs_v1:
         add_mask = add_mask.reshape(-1)
         action_mask = np.concatenate([np.ones([1], dtype=np.float32), break_mask, add_mask])
 
+        # add_block             25 x 105
+        # remove_block          25
+        # terminate             1
+
+        # molecule [1,2,4,5,8]
+        # removal:      MLP(graph_feature[1]) -> 1, 1
+        # addition:     MLP(graph_feature[1]) -> 1, 105
+
+        # flatten all actions
+
         obs = {
             "mol_fp": mol_fp,
             "stem_fps": stem_fps,

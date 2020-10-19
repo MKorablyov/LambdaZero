@@ -1,3 +1,4 @@
+import time
 import os.path as osp
 import numpy as np
 import torch
@@ -14,6 +15,7 @@ class BasicRegressor(tune.Trainable):
 
         # make dataset
         dataset = self.config["dataset"](**self.config["dataset_config"])
+
         train_idxs, val_idxs, _ = np.load(self.config["dataset_split_path"], allow_pickle=True)
         # fixme!!!!!!!!!!! --- make mpnn index --- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         train_idxs = train_idxs[train_idxs < len(dataset)]
