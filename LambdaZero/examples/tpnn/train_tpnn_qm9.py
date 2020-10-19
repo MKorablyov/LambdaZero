@@ -6,93 +6,83 @@ import torch.nn.functional as F
 
 import ray
 from ray import tune
-from ray.rllib.utils import merge_dicts
+# from ray.rllib.utils import merge_dicts
 
 from LambdaZero.utils import get_external_dirs, TPNNRegressor
 import LambdaZero.inputs
 import LambdaZero.utils
 import LambdaZero.models
-from LambdaZero.examples.tpnn import config
+
+from LambdaZero.examples.tpnn import configs_representation
+from LambdaZero.examples.tpnn import configs_radial_model
+from LambdaZero.examples.tpnn import configs_gate
+from LambdaZero.examples.tpnn import configs_optimizer
+from LambdaZero.examples.tpnn import configs_scheduler
 
 import torch_geometric
 from torch_geometric.utils import degree
-from LambdaZero.inputs.inputs_op import atomic_num_to_group, atomic_num_to_period, N_GROUPS, N_PERIODS
+
+import e3nn.radial
+import e3nn.point.gate
+
+from functools import partial
 
 datasets_dir, _, summaries_dir = get_external_dirs()
-
-config_name = sys.argv[1] if len(sys.argv) >= 2 else "tpnn_default"
-config = getattr(config, config_name)
+targets_list = [0]  # dipole moment
 
 
-def add_norm(graph):
+def graph_add_norm(graph):
     origin_nodes, _ = graph.edge_index  # origin, neighbor
     node_degrees = degree(origin_nodes, num_nodes=graph.x.size(0))
     graph.norm = node_degrees[origin_nodes].type(torch.float64).rsqrt()  # 1 / sqrt(degree(i))
     return graph
 
 
-def tpnn_transform_qm9(data):
-    def _group_period(atomic_numbers):
-        groups = torch.tensor([atomic_num_to_group[atomic_number] for atomic_number in atomic_numbers.tolist()])
-        periods = torch.tensor([atomic_num_to_period[atomic_number] for atomic_number in atomic_numbers.tolist()])
-        return groups, periods
-
-    def _one_hot_group_period(groups, periods):
-        groups_one_hot = torch.nn.functional.one_hot(groups - 1, N_GROUPS)
-        periods_one_hot = torch.nn.functional.one_hot(periods - 1, N_PERIODS)
-        return torch.cat((groups_one_hot, periods_one_hot), dim=1).type(torch.float64)
-
-    def _rel_vectors(coordinates, bonds):
-        origin_pos = coordinates[bonds[0]]
-        neighbor_pos = coordinates[bonds[1]]
-        return neighbor_pos - origin_pos
-
-    data = data.clone()
-    data.x = _one_hot_group_period(*_group_period(data.z))
-    data.rel_vec = _rel_vectors(data.pos, data.edge_index).type(torch.float64)
-    data.abs_distances = data.rel_vec.norm(dim=1).type(torch.float64)
-    data.rel_vec = torch.nn.functional.normalize(data.rel_vec, p=2, dim=-1)
-    data.y = data.y[:, 0].type(torch.float64)
-    return data
+def graph_add_directions_and_distances(graph):
+    # direction
+    origin_pos = graph.pos[graph.edge_index[0]]
+    neighbor_pos = graph.pos[graph.edge_index[1]]
+    rel_vec = (neighbor_pos - origin_pos).type(torch.float64)
+    graph.rel_vec = torch.nn.functional.normalize(rel_vec, p=2, dim=-1)
+    # distance
+    graph.abs_distances = rel_vec.norm(dim=1)
+    return graph
 
 
-def tpnn_transform_qm9_mpnn(data):
-    def _rel_vectors(coordinates, bonds):
-        origin_pos = coordinates[bonds[0]]
-        neighbor_pos = coordinates[bonds[1]]
-        return neighbor_pos - origin_pos
-
-    data = data.clone()
-    data.x = data.x.type(torch.float64)
-    data.rel_vec = _rel_vectors(data.pos, data.edge_index).type(torch.float64)
-    data.abs_distances = data.rel_vec.norm(dim=1).type(torch.float64)
-    data.rel_vec = torch.nn.functional.normalize(data.rel_vec, p=2, dim=-1)
-    data.y = data.y[:, 0].type(torch.float64)
-    return data
+def select_qm9_targets(graph, target_idx):
+    graph.y = graph.y[0, target_idx].type(torch.float64)
+    return graph
 
 
 def train_epoch(loader, model, optimizer, device, config):
+    def closure():
+        optimizer.zero_grad()
+        preds_normalized = model(data).view(-1)
+        loss = F.mse_loss(preds_normalized, normalizer.tfm(targets))  # mse_loss # l1_loss
+        loss.backward()
+        # LBFGS has operations float(closure_output), so usual way of returning multiple outputs fail
+        # also, apparently closure is called multiple times for LBFGS, so if appends to list occur here it leads to multiple copies
+        nonlocal batch_preds
+        batch_preds = normalizer.itfm(preds_normalized).detach().cpu().numpy()
+        return loss
+
     normalizer = LambdaZero.utils.MeanVarianceNormalizer(config["target_norm"])
     model.train()
 
     metrics = {"loss": 0}
     epoch_targets = []
+    batch_preds = None
     epoch_preds = []
 
     for bidx, data in enumerate(loader):
         data = data.to(device)
         targets = getattr(data, config["target"])
-
-        optimizer.zero_grad()
-        logits = model(data).view(-1)
-        loss = F.mse_loss(logits, normalizer.tfm(targets))  # mse_loss # l1_loss
-        loss.backward()
-        optimizer.step()
+        batch_mean_loss = optimizer.step(closure).item()
 
         # log stuff
-        metrics["loss"] += loss.item() * data.num_graphs
+        metrics["loss"] += batch_mean_loss * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
+        epoch_preds.append(batch_preds)
 
     epoch_targets = np.concatenate(epoch_targets, 0)
     epoch_preds = np.concatenate(epoch_preds, 0)
@@ -118,13 +108,13 @@ def eval_epoch(loader, model, device, config):
         data = data.to(device)
         targets = getattr(data, config["target"])
 
-        logits = model(data).view(-1)
-        loss = F.mse_loss(logits, normalizer.tfm(targets))  # mse_loss # l1_loss
+        preds_normalized = model(data).view(-1)
+        loss = F.mse_loss(preds_normalized, normalizer.tfm(targets))  # mse_loss # l1_loss
 
         # log stuff
         metrics["loss"] += loss.item() * data.num_graphs
         epoch_targets.append(targets.detach().cpu().numpy())
-        epoch_preds.append(normalizer.itfm(logits).detach().cpu().numpy())
+        epoch_preds.append(normalizer.itfm(preds_normalized).detach().cpu().numpy())
 
     epoch_targets = np.concatenate(epoch_targets, 0)
     epoch_preds = np.concatenate(epoch_preds, 0)
@@ -139,26 +129,58 @@ def eval_epoch(loader, model, device, config):
     return metrics
 
 
-TPNN_CONFIG = {
+assert len(sys.argv) == 7, "python3 train_tpnn_qm9.py r_cut representation radial_config gate_config optimizer_config scheduler_config"
+
+r_cut = float(sys.argv[1])
+representation_version, radial_model_version, gate_version, optimizer_version, scheduler_version = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
+representation = getattr(configs_representation, representation_version)
+radial_model_config = getattr(configs_radial_model, radial_model_version)
+gate_config = getattr(configs_gate, gate_version)
+optimizer_config = getattr(configs_optimizer, optimizer_version)
+scheduler_config = getattr(configs_scheduler, scheduler_version)
+
+pre_transform = torch_geometric.transforms.Compose([
+    torch_geometric.transforms.RadiusGraph(r=r_cut, loop=False, max_num_neighbors=64, flow='target_to_source'),
+    graph_add_norm
+])
+transform = torch_geometric.transforms.Compose([
+    graph_add_directions_and_distances,
+    partial(select_qm9_targets, target_idx=torch.tensor(targets_list, dtype=torch.int64))
+])
+
+
+config = {
     "trainer": TPNNRegressor,
     "trainer_config": {
-        "target": "y",  # dipole moment
-        "target_norm": [2.6822, 1.4974],  # mean, std
-        "dataset_split_path": os.path.join(datasets_dir, "QM9", "randsplit_qm9.npy"),
-        "b_size": 64,  # 64,
+        "target": "y",
+        "target_norm": [2.68, 1.5],  # mean, std
+        "dataset_split_path": os.path.join(datasets_dir, "QM9", "randsplit_qm9_small.npy"),
+        "b_size": 16,  # 64,
 
         "dataset": torch_geometric.datasets.QM9,
         "dataset_config": {
             "root": os.path.join(datasets_dir, "QM9"),
-            "transform": torch_geometric.transforms.Compose([add_norm, tpnn_transform_qm9])
+            "pre_transform": pre_transform,
+            "transform": transform
         },
 
-        "model": LambdaZero.models.TPNN_v2,
-        "model_config": {},
-        "optimizer": torch.optim.Adam,
-        "optimizer_config": {
-            "lr": 0.001  # 0.001
+        "model": LambdaZero.models.TPNN_v0,
+        "model_config": {
+            "max_z": 10,
+            "representations": representation,
+            "equivariant_model": LambdaZero.models.TPNN_ResNet,
+            "radial_model": e3nn.radial.CosineBasisModel,
+            "radial_model_config": radial_model_config,
+            "gate": e3nn.point.gate.Gate,
+            "gate_config": gate_config,
+            "pooling": 'set2set',
+            "fc": True
         },
+        "optimizer": torch.optim.LBFGS,
+        "optimizer_config": optimizer_config,
+        "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau,
+        "scheduler_config": scheduler_config,
+        "scheduler_criteria": 'loss',  # on validation set
 
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
@@ -169,7 +191,7 @@ TPNN_CONFIG = {
 
     "stop": {"training_iteration": 120},
     "resources_per_trial": {
-        "cpu": 4,  # fixme - calling ray.remote would request resources outside of tune allocation
+        "cpu": 1,
         "gpu": 1.0
     },
     "keep_checkpoint_num": 2,
@@ -179,8 +201,15 @@ TPNN_CONFIG = {
     "checkpoint_freq": 100000,  # 1;  0 is a default in tune.run
 }
 
-
-config = merge_dicts(TPNN_CONFIG, config)
+config_name = f"{config['trainer_config']['model_config']['equivariant_model'].__name__}" \
+              f"-{r_cut}" \
+              f"-repr_{representation_version}" \
+              f"-{config['trainer_config']['model_config']['radial_model'].__name__}_{radial_model_version}" \
+              f"-gate_{gate_version}" \
+              f"-aggr_{config['trainer_config']['model_config']['pooling']}" \
+              f"-fc_{config['trainer_config']['model_config']['fc']}" \
+              f"-optim_{config['trainer_config']['optimizer'].__name__}_{optimizer_version}" \
+              f"-{config['trainer_config']['scheduler'].__name__}_{scheduler_version}"
 
 
 if __name__ == "__main__":

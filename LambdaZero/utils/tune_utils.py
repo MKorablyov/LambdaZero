@@ -28,7 +28,6 @@ class BasicRegressor(tune.Trainable):
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
         self.scheduler = config["scheduler"](self.optim, **config["scheduler_config"])
-        self.scheduler_criteria = config["scheduler_criteria"]
 
         # make epochs
         self.train_epoch = config["train_epoch"]
@@ -37,7 +36,7 @@ class BasicRegressor(tune.Trainable):
     def _train(self):
         train_scores = self.train_epoch(self.train_loader, self.model, self.optim, self.device, self.config)
         eval_scores = self.eval_epoch(self.val_loader, self.model,  self.device, self.config)
-        self.scheduler.step(eval_scores[self.scheduler_criteria])
+        self.scheduler.step(eval_scores['loss'])
         # rename to make scope
         train_scores = [("train_" + k, v) for k, v in train_scores.items()]
         eval_scores = [("eval_" + k, v) for k, v in eval_scores.items()]
