@@ -21,11 +21,11 @@ class ResidualModule(torch.nn.Module):
                                prot_channels, pass_d2d_msg, pass_d2p_msg,
                                pass_p2d_msg, pass_p2p_msg, data)
 
-    def forward(self, h_drug, h_prot, data):
-        out_drug, out_prot = self.conv1(h_drug, h_prot, data)
+    def forward(self, h_drug, h_prot, data, drug_drug_batch):
+        out_drug, out_prot = self.conv1(h_drug, h_prot, data, drug_drug_batch)
         out_drug = F.relu(out_drug)
         out_prot = F.relu(out_prot)
-        out_drug, out_prot = self.conv2(out_drug, out_prot, data)
+        out_drug, out_prot = self.conv2(out_drug, out_prot, data, drug_drug_batch)
 
         return F.relu(h_drug + out_drug), F.relu(h_prot + out_prot)
 
