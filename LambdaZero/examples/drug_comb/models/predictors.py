@@ -29,8 +29,8 @@ class AbstractPredictor(torch.nn.Module):
 
         super(AbstractPredictor, self).__init__()
 
-    def forward(self, data, drug_drug_batch, h_drug, n_forward_passes=1):
-        batch, cell_lines = self.get_batch(data, drug_drug_batch, h_drug)
+    def forward(self, data, drug_drug_batch, h_drug, h_prot, n_forward_passes=1):
+        batch, cell_lines = self.get_batch(data, drug_drug_batch, h_drug, h_prot)
 
         out = torch.empty([drug_drug_batch[0].shape[0], 0]).to(self.device)
         # Perform several forward passes for MC dropout
@@ -40,9 +40,14 @@ class AbstractPredictor(torch.nn.Module):
 
         return out
 
-    def get_layer_dims(self, predictor_layers, fp_dim, attr_dim, prot_dim):
-        return get_layer_dims(predictor_layers, fp_dim, attr_dim, prot_dim,
-                              with_fp=self.with_fp, with_expr=self.with_expr, with_prot=self.with_prot)
+    def get_layer_dims(self, predictor_layers, data):
+        return get_layer_dims(predictor_layers,
+                              fp_dim=data.x-drugs.shape[1],
+                              attr_dim=data.ddi_edge_attr.shape[1] // 2,
+                              prot_dim=data.x_prots.shape[0],
+                              with_fp=self.with_fp, i
+                              with_expr=self.with_expr,
+                              with_prot=self.with_prot)
 
     def get_batch(self, data, drug_drug_batch, h_drug):
         return get_batch(data, drug_drug_batch, h_drug, self.drug2target_dict,
@@ -117,7 +122,7 @@ class InnerProductPredictor(AbstractPredictor):
 
         return h_drug_1s.matmul(G).matmul(h_drug_2s)[:, 0]
 
-    def get_layer_dims(self, predictor_layers, fp_dim, attr_dim, prot_dim):
+    def get_layer_dims(self, predictor_layers, data):
         predictor_layers[0] = predictor_layers[0] // 2
 
         return predictor_layers
@@ -161,7 +166,7 @@ class ConcentrationOnlyPredictor(MLPPredictor):
         assert not self.with_fp and not self.with_expr, "'with_fp' and 'with_expr' should be set to " \
                                                         "False when using ConcentrationOnly"
 
-    def get_layer_dims(self, predictor_layers, fp_dim, attr_dim, prot_dim):
+    def get_layer_dims(self, predictor_layers, data):
         predictor_layers[0] = 2
 
         return predictor_layers
@@ -179,6 +184,18 @@ class ConcentrationOnlyPredictor(MLPPredictor):
             batch = torch.cat((conc_2, conc_1), dim=1)
 
         return batch, cell_lines
+
+
+class PPIPredictor(MLPPredictor):
+    def __init__(self, data, config):
+        super().__init__(data, config)
+
+    def get_layer_dims(self, predictor_layers, data):
+        predictor_layers[0] = data.h_prot.shape[0] * data.h_prot.shape[1]
+        return predictor_layers
+
+    def get_batch(self, data, drug_drug_batch, h_drug, h_prot):
+        return h_prot.flatten()
 
 
 ########################################################################################################################

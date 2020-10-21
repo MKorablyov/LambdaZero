@@ -110,12 +110,14 @@ class BasePeriodicBackpropModel(AbstractModel):
         raise NotImplementedError
 
     def enable_periodic_backprop(self):
-        assert self.backprop_period is not None
-        self.periodic_backprop_enabled = self.do_periodic_backprop
+        if self.periodic_backprop_enabled:
+            assert self.backprop_period is not None
+            self.periodic_backprop_enabled = self.do_periodic_backprop
 
     def disable_periodic_backprop(self):
-        assert self.backprop_period is not None
-        self.periodic_backprop_enabled = False
+        if self.periodic_backprop_enabled:
+            assert self.backprop_period is not None
+            self.periodic_backprop_enabled = False
 
 ########################################################################################################################
 # Giant Graph GCN
@@ -205,5 +207,109 @@ class GiantGraphGCN(BasePeriodicBackpropModel):
             h_drug, h_prot = F.relu(h_drug_next), F.relu(h_prot_next)
 
         # Predict scores
-        return self.predictor(data, drug_drug_batch, h_drug, n_forward_passes=n_forward_passes)
+        return self.predictor(data, drug_drug_batch, h_drug, h_prot, n_forward_passes=n_forward_passes)
+
+class GraphSignalLearner(BasePeriodicBackpropModel):
+    def __init__(self, data, config):
+        super().__init__(data, config)
+
+        # Learnable protein embeddings
+        self.prot_emb = Parameter(1 / 100 * torch.randn((data.x_prots.shape[0], config["prot_emb_dim"])))
+
+        config.update({
+            'pass_d2d_msg': False,
+            'pass_p2d_msg': False,
+            'pass_d2p_msg': True,
+            'pass_p2p_msg': True,
+        })
+
+        # First Graph convolution layer
+        self.conv1 = ProtDrugProtProtConvLayer(data.x_drugs.shape[1], config["prot_emb_dim"],
+                                               config["residual_layers_dim"], config["residual_layers_dim"],
+                                               config['pass_d2d_msg'], config['pass_d2p_msg'],
+                                               config['pass_p2d_msg'], config['pass_p2p_msg'], data)
+
+        # First Low rank attention layer
+        att_dim_reduce_in_dim = None
+        self.has_attention = config["attention"]
+        if self.has_attention:
+            self.low_rank_attention = []
+            self.dim_reduce = []
+
+            self.dim_reduce.append(self._get_dim_reduce_module(config))
+            self.low_rank_attention.append(LowRankAttention(k=config["attention_rank"],
+                                                            d=data.x_prots.shape[1],
+                                                            dropout=config["dropout_proba"]))
+
+        # Residual layers
+        self.residual_layers = []
+        for i in range(config['num_res_layers']):
+            if self.has_attention:
+                # If attention is used, we must increase the number of drug channels
+                drug_channels += 2 * config["attention_rank"]
+                self.dim_reduce.append(self._get_dim_reduce_module(config))
+                self.low_rank_attention.append(LowRankAttention(k=config["attention_rank"],
+                                                                d=drug_channels,
+                                                                dropout=config["dropout_proba"]))
+
+            self.residual_layers.append(ResidualModule(ConvLayer=ProtDrugProtProtConvLayer,
+                                                       drug_channels=drug_channels,
+                                                       prot_channels=config["residual_layers_dim"],
+                                                       pass_d2d_msg=config["pass_d2d_msg"],
+                                                       pass_d2p_msg=config["pass_d2p_msg"],
+                                                       pass_p2d_msg=config["pass_p2d_msg"],
+                                                       pass_p2p_msg=config["pass_p2p_msg"],
+                                                       data=data))
+
+        # convert to ModuleList
+        self.residual_layers = torch.nn.ModuleList(self.residual_layers)
+        if self.has_attention:
+            self.dim_reduce = torch.nn.ModuleList(self.dim_reduce)
+            self.low_rank_attention = torch.nn.ModuleList(self.low_rank_attention)
+
+        # Compute dimension of input for predictor
+        config["predictor_layers"] = [config["residual_layers_dim"]] + config["predictor_layers"]
+
+        # Response Predictor on top of GCN
+        self.predictor = config["predictor"](data, config)
+
+    @classmethod
+    def _get_dim_reduce_module(cls, config):
+        out_dim = config['residual_layers_dim']
+        in_dim = out_dim + (config['attention_rank'] * 2)
+
+        return torch.nn.Linear(in_dim, out_dim)
+
+    def get_periodic_backprop_vars(self):
+        yield self.prot_emb
+        yield from self.conv1.parameters()
+        yield from self.residual_layers.parameters()
+        if self.has_attention:
+            yield from self.low_rank_attention.parameters()
+            yield from self.dim_reduce.parameters()
+
+    def _forward(self, data, drug_drug_batch, n_forward_passes=1):
+        h_drug = data.x_drugs
+        h_prot = self.prot_emb
+
+        ##########################################
+        # GNN forward pass
+        ##########################################
+        _, h_prot_next = self.conv1(h_drug, h_prot, data)
+        if self.has_attention:
+            att = self.low_rank_attention[0](h_prot)
+            h_prot_next = self.dim_reduce[0](torch.cat((att, h_prot_next), dim=1))
+
+        h_prot = F.relu(h_prot_next)
+
+        for i in range(len(self.residual_layers)):
+            _, h_prot_next = self.residual_layers[i](h_drug, h_prot, data)
+            if self.has_attention:
+                att = self.low_rank_attention[i + 1](h_prot)
+                h_prot_next = self.dim_reduce[i + 1](torch.cat((att, h_prot_next), dim=1))
+
+            h_prot = F.relu(h_prot_next)
+
+        # Predict scores
+        return self.predictor(data, drug_drug_batch, h_drug, h_prot, n_forward_passes=n_forward_passes)
 
