@@ -49,7 +49,7 @@ class AbstractPredictor(torch.nn.Module):
                               with_expr=self.with_expr,
                               with_prot=self.with_prot)
 
-    def get_batch(self, data, drug_drug_batch, h_drug):
+    def get_batch(self, data, drug_drug_batch, h_drug, h_prot):
         return get_batch(data, drug_drug_batch, h_drug, self.drug2target_dict,
                          with_fp=self.with_fp, with_expr=self.with_expr, with_prot=self.with_prot)
 
@@ -86,7 +86,7 @@ class InnerProductPredictor(AbstractPredictor):
         self.predictor_prod = Parameter(1 / 100 * torch.randn((self.num_cell_lines, self.layer_dims[1],
                                                                self.layer_dims[1])))  # Mat for outer product
 
-    def get_batch(self, data, drug_drug_batch, h_drug):
+    def get_batch(self, data, drug_drug_batch, h_drug, h_prot):
         batch_size = drug_drug_batch[0].shape[0]
 
         drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
@@ -171,7 +171,7 @@ class ConcentrationOnlyPredictor(MLPPredictor):
 
         return predictor_layers
 
-    def get_batch(self, data, drug_drug_batch, h_drug):
+    def get_batch(self, data, drug_drug_batch, h_drug, h_prot):
         n_attr = drug_drug_batch[2].shape[1] // 2
         cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
 
