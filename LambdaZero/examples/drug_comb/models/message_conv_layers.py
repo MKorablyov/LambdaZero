@@ -69,7 +69,7 @@ class FourMessageConvLayer(MessagePassing):
                              data.ppi_edge_idx.shape[1] + data.dpi_edge_idx.shape[1] + data.ddi_edge_idx.shape[1]]
         self.pdi_norm = norm[-data.dpi_edge_idx.shape[1]:]
 
-    def forward(self, h_drug, h_prot, data):
+    def forward(self, h_drug, h_prot, data, drug_drug_batch):
         # Linearly transform node feature matrix and set to zero where relevant
         d2d_msg = self.drug_to_drug_mat(h_drug) * data.is_drug * self.pass_d2d_msg
         d2p_msg = self.drug_to_prot_mat(h_drug) * data.is_drug * self.pass_d2p_msg
@@ -108,7 +108,7 @@ class ProtDrugMessageConvLayer(MessagePassing):
         deg_inv = deg.pow(-1)
         self.pdi_norm = deg_inv[col]
 
-    def forward(self, h_drug, h_prot, data):
+    def forward(self, h_drug, h_prot, data, drug_drug_batch):
         p2d_msg = self.prot_to_drug_mat(h_prot) * (1 - data.is_drug)
 
         # Propagating messages.
@@ -133,7 +133,7 @@ class DummyMessageConvLayer(MessagePassing):
         deg_inv = deg.pow(-1)
         self.pdi_norm = deg_inv[col]
 
-    def forward(self, h_drug, h_prot, data):
+    def forward(self, h_drug, h_prot, data, drug_drug_batch):
         p2d_msg = h_prot * (1 - data.is_drug)
 
         # Propagating messages.
@@ -164,9 +164,9 @@ class ProtDrugProtProtConvLayer(MessagePassing):
 
     def forward(self, h_drug, h_prot, data, drug_drug_batch):
         # Linearly transform node feature matrix and set to zero where relevant
-        d2p_msg = self.drug_to_prot_mat(h_drug) * data.is_drug
-        p2p_msg = self.prot_to_prot_mat(h_prot) * (1 - data.is_drug)
-        self_prot_loop_msg = self.self_prot_loop(h_prot) * (1 - data.is_drug) * self.use_prot_self_loop
+        d2p_msg = self.drug_to_prot_mat(h_drug)
+        p2p_msg = self.prot_to_prot_mat(h_prot)
+        self_prot_loop_msg = self.self_prot_loop(h_prot) * self.use_prot_self_loop
 
         # Hack for doing something like torch.isin since pytorch hasn't actually
         # implemented isin yet.
@@ -202,6 +202,6 @@ class ProtDrugProtProtConvLayer(MessagePassing):
 
         return concs
 
-    def message(self, x_j, norm, edge_attr=None):
+    def message(self, x_j, norm):
         return norm.view(-1, 1) * x_j
 

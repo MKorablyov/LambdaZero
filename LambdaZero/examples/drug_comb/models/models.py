@@ -191,7 +191,7 @@ class GiantGraphGCN(BasePeriodicBackpropModel):
         ##########################################
         # GNN forward pass
         ##########################################
-        h_drug_next, h_prot_next = self.conv1(h_drug, h_prot, data)
+        h_drug_next, h_prot_next = self.conv1(h_drug, h_prot, data, drug_drug_batch)
         if self.has_attention:
             att = self.low_rank_attention[0](h_drug[:data.is_drug.sum()])
             att = torch.cat((att, torch.zeros(data.x_prots.shape[0], att.shape[1]).to(self.device)))
@@ -199,7 +199,7 @@ class GiantGraphGCN(BasePeriodicBackpropModel):
         h_drug, h_prot = F.relu(h_drug_next), F.relu(h_prot_next)
 
         for i in range(len(self.residual_layers)):
-            h_drug_next, h_prot_next = self.residual_layers[i](h_drug, h_prot, data)
+            h_drug_next, h_prot_next = self.residual_layers[i](h_drug, h_prot, data, drug_drug_batch)
             if self.has_attention:
                 att = self.low_rank_attention[i + 1](h_drug[:data.is_drug.sum()])
                 att = torch.cat((att, torch.zeros(data.x_prots.shape[0], att.shape[1]).to(self.device)))
@@ -230,7 +230,6 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
                                                config['pass_p2d_msg'], config['pass_p2p_msg'], data)
 
         # First Low rank attention layer
-        att_dim_reduce_in_dim = None
         self.has_attention = config["attention"]
         if self.has_attention:
             self.low_rank_attention = []
@@ -246,14 +245,13 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
         for i in range(config['num_res_layers']):
             if self.has_attention:
                 # If attention is used, we must increase the number of drug channels
-                drug_channels += 2 * config["attention_rank"]
                 self.dim_reduce.append(self._get_dim_reduce_module(config))
                 self.low_rank_attention.append(LowRankAttention(k=config["attention_rank"],
-                                                                d=drug_channels,
+                                                                d=config["residual_layers_dim"],
                                                                 dropout=config["dropout_proba"]))
 
             self.residual_layers.append(ResidualModule(ConvLayer=ProtDrugProtProtConvLayer,
-                                                       drug_channels=drug_channels,
+                                                       drug_channels=config["residual_layers_dim"],
                                                        prot_channels=config["residual_layers_dim"],
                                                        pass_d2d_msg=config["pass_d2d_msg"],
                                                        pass_d2p_msg=config["pass_d2p_msg"],
@@ -295,7 +293,7 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
         ##########################################
         # GNN forward pass
         ##########################################
-        _, h_prot_next = self.conv1(h_drug, h_prot, data)
+        _, h_prot_next = self.conv1(h_drug, h_prot, data, drug_drug_batch)
         if self.has_attention:
             att = self.low_rank_attention[0](h_prot)
             h_prot_next = self.dim_reduce[0](torch.cat((att, h_prot_next), dim=1))
@@ -303,7 +301,7 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
         h_prot = F.relu(h_prot_next)
 
         for i in range(len(self.residual_layers)):
-            _, h_prot_next = self.residual_layers[i](h_drug, h_prot, data)
+            _, h_prot_next = self.residual_layers[i](h_drug, h_prot, data, drug_drug_batch)
             if self.has_attention:
                 att = self.low_rank_attention[i + 1](h_prot)
                 h_prot_next = self.dim_reduce[i + 1](torch.cat((att, h_prot_next), dim=1))
