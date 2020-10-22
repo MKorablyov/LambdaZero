@@ -2,6 +2,7 @@ from pathlib import Path
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import numpy as np
+import torch
 
 
 def get_project_root():
@@ -67,3 +68,8 @@ def get_fingerprint(smile, radius, n_bits):
         return np.array(AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(smile), radius, n_bits))
     except Exception as ex:
         return np.array([-1] * n_bits)
+
+def to_zero_base(v):
+    bins = np.unique(v.cpu().flatten()) + 1
+    return torch.from_numpy(np.digitize(v.cpu(), bins)).to(v.device)
+

@@ -2,7 +2,9 @@ import torch
 import numpy as np
 from torch.nn import functional as F
 from torch.nn import Parameter
+from LambdaZero.examples.drug_comb.utils import to_zero_base
 from LambdaZero.examples.drug_comb.models.utils import ResidualModule, LowRankAttention
+from LambdaZero.examples.drug_comb.models.message_conv_layers import ProtDrugProtProtConvLayer
 from LambdaZero.examples.drug_comb.utils import get_dropout_modules_recursive
 
 
@@ -211,10 +213,17 @@ class GiantGraphGCN(BasePeriodicBackpropModel):
 
 class GraphSignalLearner(BasePeriodicBackpropModel):
     def __init__(self, data, config):
+        # Args seeded by hp.quniform
+        for arg in ["attention_rank", "prot_emb_dim", "residual_layers_dim", "num_res_layers"]:
+            config[arg] = int(config[arg])
+
         super().__init__(data, config)
 
         # Learnable protein embeddings
-        self.prot_emb = Parameter(1 / 100 * torch.randn((data.x_prots.shape[0], config["prot_emb_dim"])))
+        self.prot_emb = Parameter(1 / 100 * torch.randn((data.x_prots.shape[0], int(config["prot_emb_dim"]))))
+
+        data.ppi_edge_idx = to_zero_base(data.ppi_edge_idx)
+        data.dpi_edge_idx[1] = to_zero_base(data.dpi_edge_idx[1])
 
         config.update({
             'pass_d2d_msg': False,
@@ -237,7 +246,7 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
 
             self.dim_reduce.append(self._get_dim_reduce_module(config))
             self.low_rank_attention.append(LowRankAttention(k=config["attention_rank"],
-                                                            d=data.x_prots.shape[1],
+                                                            d=config['prot_emb_dim'],
                                                             dropout=config["dropout_proba"]))
 
         # Residual layers
@@ -251,7 +260,7 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
                                                                 dropout=config["dropout_proba"]))
 
             self.residual_layers.append(ResidualModule(ConvLayer=ProtDrugProtProtConvLayer,
-                                                       drug_channels=config["residual_layers_dim"],
+                                                       drug_channels=data.x_drugs.shape[1],
                                                        prot_channels=config["residual_layers_dim"],
                                                        pass_d2d_msg=config["pass_d2d_msg"],
                                                        pass_d2p_msg=config["pass_d2p_msg"],

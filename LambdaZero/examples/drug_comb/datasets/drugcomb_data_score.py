@@ -10,6 +10,11 @@ from LambdaZero.examples.drug_comb.datasets.drugcomb_data import AbstractDrugCom
 # DrugComb dataset that uses the synergy scores
 ########################################################################################################################
 
+def _get_cell_line_name_to_idx(names):
+    codes = names.astype('category').cat.codes
+    srs = pd.Series(codes.values, index=names).drop_duplicates()
+
+    return srs.to_dict()
 
 class DrugCombScore(AbstractDrugComb):
     def __init__(self, transform=None, pre_transform=None, fp_bits=1024, fp_radius=4, ppi_confidence_thres=0):
@@ -66,6 +71,8 @@ class DrugCombScore(AbstractDrugComb):
 
         data.is_drug = torch.tensor(is_drug, dtype=torch.long)
         data.cid_to_idx_dict = cid_to_idx_dict
+
+        data.cell_line_name_to_idx = _get_cell_line_name_to_idx(self._score_data['cell_line_name'])
 
         data_list = [data]
         if self.pre_transform is not None:

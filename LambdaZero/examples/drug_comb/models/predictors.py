@@ -18,9 +18,7 @@ class AbstractPredictor(torch.nn.Module):
         self.with_fp = config["with_fp"]
         self.with_expr = config["with_expr"]
         self.with_prot = config["with_prot"]
-        self.layer_dims = self.get_layer_dims(config["predictor_layers"], fp_dim=data.x_drugs.shape[1],
-                                              attr_dim=data.ddi_edge_attr.shape[1] // 2,
-                                              prot_dim=data.x_prots.shape[0])
+        self.layer_dims = self.get_layer_dims(config, data)
 
         # Create dictionary linking drug to targets
         self.drug2target_dict = {i: [] for i in range(data.x_drugs.shape[0])}
@@ -40,12 +38,12 @@ class AbstractPredictor(torch.nn.Module):
 
         return out
 
-    def get_layer_dims(self, predictor_layers, data):
-        return get_layer_dims(predictor_layers,
+    def get_layer_dims(self, config, data):
+        return get_layer_dims(config['predictor_layers'],
                               fp_dim=data.x-drugs.shape[1],
                               attr_dim=data.ddi_edge_attr.shape[1] // 2,
                               prot_dim=data.x_prots.shape[0],
-                              with_fp=self.with_fp, i
+                              with_fp=self.with_fp,
                               with_expr=self.with_expr,
                               with_prot=self.with_prot)
 
@@ -122,8 +120,8 @@ class InnerProductPredictor(AbstractPredictor):
 
         return h_drug_1s.matmul(G).matmul(h_drug_2s)[:, 0]
 
-    def get_layer_dims(self, predictor_layers, data):
-        predictor_layers[0] = predictor_layers[0] // 2
+    def get_layer_dims(self, config, data):
+        config['predictor_layers'][0] = config['predictor_layers'][0] // 2
 
         return predictor_layers
 
@@ -166,10 +164,10 @@ class ConcentrationOnlyPredictor(MLPPredictor):
         assert not self.with_fp and not self.with_expr, "'with_fp' and 'with_expr' should be set to " \
                                                         "False when using ConcentrationOnly"
 
-    def get_layer_dims(self, predictor_layers, data):
-        predictor_layers[0] = 2
+    def get_layer_dims(self, config, data):
+        config['predictor_layers'][0] = 2
 
-        return predictor_layers
+        return config['predictor_layers']
 
     def get_batch(self, data, drug_drug_batch, h_drug, h_prot):
         n_attr = drug_drug_batch[2].shape[1] // 2
@@ -190,12 +188,19 @@ class PPIPredictor(MLPPredictor):
     def __init__(self, data, config):
         super().__init__(data, config)
 
-    def get_layer_dims(self, predictor_layers, data):
-        predictor_layers[0] = data.h_prot.shape[0] * data.h_prot.shape[1]
-        return predictor_layers
+    def get_layer_dims(self, config, data):
+        config['predictor_layers'][0] = data.x_prots.shape[0] * config['residual_layers_dim']
+        return config['predictor_layers']
 
     def get_batch(self, data, drug_drug_batch, h_drug, h_prot):
-        return h_prot.flatten()
+        return h_prot.flatten(), None
+
+    def single_forward_pass(self, batch, cell_lines):
+        out = super().single_forward_pass(batch, cell_lines)
+        if len(out.shape) == 1:
+            out = out.unsqueeze(0)
+
+        return out
 
 
 ########################################################################################################################

@@ -1,14 +1,18 @@
 import torch
+from LambdaZero.examples.drug_comb.datasets.utils import specific_cell_line
+from LambdaZero.examples.drug_comb.datasets.drugcomb_data_score import DrugCombScore
 from LambdaZero.examples.drug_comb.datasets.drugcomb_score_l1000_data import DrugCombScoreL1000NoPPI
-from LambdaZero.examples.drug_comb.models.models import GiantGraphGCN
+from LambdaZero.examples.drug_comb.models.models import GiantGraphGCN, GraphSignalLearner
 from LambdaZero.examples.drug_comb.models.message_conv_layers import FourMessageConvLayer
 import os
-# from hyperopt import hp
-from LambdaZero.examples.drug_comb.models.predictors import SharedLayersMLPPredictor, FilmMLPPredictor
+from hyperopt import hp
+from LambdaZero.examples.drug_comb.models.predictors import SharedLayersMLPPredictor, FilmMLPPredictor, PPIPredictor
 from LambdaZero.utils import get_external_dirs
 from torch.utils.data import TensorDataset, DataLoader
 from LambdaZero.examples.drug_comb.models.acquisition import RandomAcquisition, ExpectedImprovement, GreedyAcquisition
 from ray import tune
+from ray.tune.schedulers import ASHAScheduler
+from ray.tune.suggest.hyperopt import HyperOptSearch
 import time
 import ray
 
@@ -119,7 +123,7 @@ class AbstractTrainer(tune.Trainable):
         torch.manual_seed(config["seed"])
 
         self.train_idxs, self.val_idxs, self.test_idxs = dataset.random_split(
-            config["test_set_prop"], config["val_set_prop"]
+            config["test_set_prop"], config["val_set_prop"], self.data.ddi_edge_idx
         )
 
         # Valid loader
@@ -317,21 +321,19 @@ class ActiveTrainer(AbstractTrainer):
 if __name__ == "__main__":
 
     pipeline_config = {
-        "transform": None,
+        "transform": specific_cell_line('K-562'),
         "pre_transform": None,
         "seed": 1,  # tune.grid_search([1, 2, 3]),
         "val_set_prop": 0.2,
-        "test_set_prop": 0.2,
-        "lr": 1e-4,  # tune.grid_search([1e-4, 5e-4]),
+        "test_set_prop": 0.0,
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
-        "weight_decay": 1e-5,
-        "batch_size": 512,  # tune.grid_search([1024, 2048]),
+        "batch_size": 1,  # tune.grid_search([1024, 2048]),
     }
 
     predictor_config = {
-        "predictor": FilmMLPPredictor,
-        "predictor_layers": [1024, 64, 32, 1],
+        "predictor": PPIPredictor,
+        "predictor_layers": [1024, 512, 256, 1],
         # [1024, 512, 256, 1],  # tune.grid_search([[2048, 1024, 1], [4096, 2048, 1024, 1]]),
         "with_fp": False,
         "with_expr": True,
@@ -340,23 +342,17 @@ if __name__ == "__main__":
 
     model_config = {
         # model: GiantGraphGCN, Baseline or Dummy
-        "model": GiantGraphGCN,  # tune.grid_search([MLPBaselineFPExpr, MLPBaselineFPProt]),
-        "conv_layer": FourMessageConvLayer,
+        "model": GraphSignalLearner,  # tune.grid_search([MLPBaselineFPExpr, MLPBaselineFPProt]),
         "attention": True,  # tune.grid_search([False, True]),
-        "attention_rank": 64,  # tune.grid_search([64, 128, 256, 512]),
-        "prot_emb_dim": 16,  # For GCN
-        "residual_layers_dim": 32,  # For GCN
-        "num_res_layers": 0,  # tune.grid_search([0, 1]),  # For GCN
         "pass_d2d_msg": True,
         "pass_d2p_msg": False,
         "pass_p2d_msg": False,
         "pass_p2p_msg": False,
-        "do_periodic_backprop": True,
-        "backprop_period": 4
+        "do_periodic_backprop": False,
     }
 
     dataset_config = {
-        "dataset": DrugCombScoreL1000NoPPI,
+        "dataset": DrugCombScore,
         "target": "css",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
         "fp_bits": 1024,
         "fp_radius": 4,
@@ -378,47 +374,53 @@ if __name__ == "__main__":
 
     _, _, summaries_dir = get_external_dirs()
     configuration = {
-        "trainer": ActiveTrainer,
+        "trainer": BasicTrainer,
         "trainer_config": {**pipeline_config, **predictor_config, **model_config, **dataset_config,
                            **active_learning_config},
         "summaries_dir": summaries_dir,
         "memory": 1800,
         "checkpoint_freq": 20,
-        "stop": {"training_iteration": 4000},
+        "stop": {"training_iteration": 100},
         "checkpoint_at_end": False,
-        "resources_per_trial": {"cpu": 10, "gpu": 1},
-        'asha_metric': "valid_mse",
+        "resources_per_trial": {},#"cpu": 10, "gpu": 1},
+        'asha_metric': "eval_mean",
         'asha_mode': "min",
-        'asha_max_t': 1000,
-        "name": "ActiveLearning"
+        'asha_max_t': 100,
+        "name": "GraphSignalFirstTrial"
     }
 
-    # asha_scheduler = ASHAScheduler(
-    #     time_attr='training_iteration',
-    #     metric=configuration['asha_metric'],
-    #     mode=configuration['asha_mode'],
-    #     max_t=configuration['asha_max_t'],
-    #     grace_period=10,
-    #     reduction_factor=3,
-    #     brackets=1
-    # )
-    #
-    # search_space = {
-    #     "lr": hp.loguniform("lr", -16.118095651, -5.52146091786),
-    #     "batch_size": hp.choice("batch_size", [128, 256, 512, 1024]),
-    # }
-    #
-    # current_best_params = [{
-    #         "lr": 1e-4,
-    #         "batch_size": 1024,
-    # }]
-    #
-    # search_alg = HyperOptSearch(
-    #     search_space,
-    #     metric=configuration['asha_metric'],
-    #     mode=configuration['asha_mode'],
-    #     points_to_evaluate=current_best_params
-    # )
+    asha_scheduler = ASHAScheduler(
+        time_attr='training_iteration',
+        metric=configuration['asha_metric'],
+        mode=configuration['asha_mode'],
+        max_t=configuration['asha_max_t'],
+        grace_period=10,
+        reduction_factor=3,
+        brackets=1
+    )
+
+    search_space = {
+        "lr": hp.loguniform("lr", -16.118095651, -5.52146091786),
+        "attention_rank": hp.quniform("attention_rank", 50, 300, 1),
+        "prot_emb_dim": hp.quniform("prot_emb_dim", 128, 2056, 1),
+        "residual_layers_dim": hp.quniform("residual_layers_dim", 64, 1024, 1),
+        "num_res_layers": hp.quniform("num_res_layers", 0, 3, 1),
+    }
+
+    current_best_params = [{
+        "lr": 1e-4,
+        "attention_rank": 140,
+        "prot_emb_dim": 512,
+        "residual_layers_dim": 512,
+        "num_res_layers": 1,
+    }]
+
+    search_alg = HyperOptSearch(
+        search_space,
+        metric=configuration['asha_metric'],
+        mode=configuration['asha_mode'],
+        points_to_evaluate=current_best_params
+    )
 
     ####################################################################################################################
     # Use tune
@@ -426,7 +428,7 @@ if __name__ == "__main__":
 
     ray.init(num_cpus=40)
 
-    time_to_sleep = 30
+    time_to_sleep = 5
     print("Sleeping for %d seconds" % time_to_sleep)
     time.sleep(time_to_sleep)
     print("Woke up.. Scheduling")
@@ -441,14 +443,13 @@ if __name__ == "__main__":
         checkpoint_at_end=configuration["checkpoint_at_end"],
         local_dir=configuration["summaries_dir"],
         checkpoint_freq=configuration["checkpoint_freq"],
-        # scheduler=asha_scheduler,
-        # search_alg=search_alg,
+        scheduler=asha_scheduler,
+        search_alg=search_alg,
     )
 
     ####################################################################################################################
     # Do not use tune
     ####################################################################################################################
 
-    # trainer = configuration["trainer"](configuration["trainer_config"])
-    # for i in range(10):
-    #     trainer.train()
+    #trainer = configuration["trainer"](configuration["trainer_config"])
+    #trainer.train()

@@ -1,6 +1,6 @@
 from torch_geometric.data import InMemoryDataset, download_url
 from LambdaZero.examples.drug_comb.utils import get_fingerprint
-from LambdaZero.examples.drug_comb.utils import get_external_dirs
+from LambdaZero.utils import get_external_dirs
 from pubchempy import Compound
 import urllib.request
 from unrar import rarfile
@@ -99,7 +99,7 @@ class AbstractDrugComb(InMemoryDataset):
                                 break
                             file.write(file_chunk)
 
-    def random_split(self, test_prob, valid_prob):
+    def random_split(self, test_prob, valid_prob, edge_idx=None):
         """
         We split at the edge index level. the data.ddi_edge_idx attribute contains the "same" edge several times, each
         time corresponding to a specific pair of concentrations for each drug.
@@ -108,7 +108,10 @@ class AbstractDrugComb(InMemoryDataset):
         """
 
         # Get unique edges (one for each drug pair, regardless of cell line)
-        unique_ddi_edge_idx = self.data.ddi_edge_idx.unique(dim=1)
+        if edge_idx is None:
+            edge_idx = self.data.ddi_edge_idx
+
+        unique_ddi_edge_idx = edge_idx.unique(dim=1)
         num_unique_examples = unique_ddi_edge_idx.shape[1]
 
         # train test valid split of unique edges
@@ -136,7 +139,7 @@ class AbstractDrugComb(InMemoryDataset):
                               for i in unique_test_idx}}
 
         # Split for all edges (non unique)
-        all_edges_split = np.array([edge_to_split_dict[tuple(edge.tolist())] for edge in self.data.ddi_edge_idx.T])
+        all_edges_split = np.array([edge_to_split_dict[tuple(edge.tolist())] for edge in edge_idx.T])
 
         train_idx = np.where(all_edges_split == 0)[0]
         val_idx = np.where(all_edges_split == 1)[0]
