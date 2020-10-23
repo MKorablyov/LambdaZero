@@ -211,7 +211,7 @@ class ProtDrugProtProtConvLayer(MessagePassing):
     def message(self, x_j, norm):
         return norm.view(-1, 1) * x_j
 
-    def aggregate(self, inputs, index, ptr, dim_size, is_dpi):
+    def aggregate(self, inputs, index, dim_size, is_dpi):
         if is_dpi:
             dim_size = self.num_prots
 

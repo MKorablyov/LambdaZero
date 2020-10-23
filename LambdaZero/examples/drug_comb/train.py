@@ -329,11 +329,12 @@ if __name__ == "__main__":
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
         "batch_size": 1,  # tune.grid_search([1024, 2048]),
+        "weight_decay": 0,
     }
 
     predictor_config = {
         "predictor": PPIPredictor,
-        "predictor_layers": [1024, 512, 256, 1],
+        "predictor_layers": [150, 512, 256, 1],
         # [1024, 512, 256, 1],  # tune.grid_search([[2048, 1024, 1], [4096, 2048, 1024, 1]]),
         "with_fp": False,
         "with_expr": True,
@@ -439,7 +440,7 @@ if __name__ == "__main__":
         config=configuration["trainer_config"],
         stop=configuration["stop"],
         resources_per_trial=configuration["resources_per_trial"],
-        num_samples=10000,
+        num_samples=1,#0000,
         checkpoint_at_end=configuration["checkpoint_at_end"],
         local_dir=configuration["summaries_dir"],
         checkpoint_freq=configuration["checkpoint_freq"],
