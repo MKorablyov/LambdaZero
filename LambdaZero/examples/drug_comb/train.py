@@ -383,7 +383,7 @@ if __name__ == "__main__":
         "checkpoint_freq": 20,
         "stop": {"training_iteration": 100},
         "checkpoint_at_end": False,
-        "resources_per_trial": {"cpu": 10, "gpu": 1},
+        "resources_per_trial": {},#"cpu": 10, "gpu": 1},
         'asha_metric': "eval_mean",
         'asha_mode': "min",
         'asha_max_t': 100,

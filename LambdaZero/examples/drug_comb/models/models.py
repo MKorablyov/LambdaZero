@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from torch.nn import functional as F
 from torch.nn import Parameter
+from torch_sparse import SparseTensor
 from LambdaZero.examples.drug_comb.utils import to_zero_base
 from LambdaZero.examples.drug_comb.models.utils import ResidualModule, LowRankAttention
 from LambdaZero.examples.drug_comb.models.message_conv_layers import ProtDrugProtProtConvLayer
@@ -224,6 +225,10 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
 
         data.ppi_edge_idx = to_zero_base(data.ppi_edge_idx)
         data.dpi_edge_idx[1] = to_zero_base(data.dpi_edge_idx[1])
+        data.ppi_adj_t = SparseTensor.from_edge_index(
+            data.ppi_edge_idx,
+            sparse_sizes=(data.x_prots.shape[0], data.x_prots.shape[0])
+        ).t()
 
         config.update({
             'pass_d2d_msg': False,
