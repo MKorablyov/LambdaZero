@@ -329,6 +329,7 @@ if __name__ == "__main__":
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
         "batch_size": 1,  # tune.grid_search([1024, 2048]),
+        "weight_decay": 0,
     }
 
     predictor_config = {
@@ -382,7 +383,7 @@ if __name__ == "__main__":
         "checkpoint_freq": 20,
         "stop": {"training_iteration": 100},
         "checkpoint_at_end": False,
-        "resources_per_trial": {"cpu": 10, "gpu": 1},
+        "resources_per_trial": {},#"cpu": 10, "gpu": 1},
         'asha_metric': "eval_mean",
         'asha_mode': "min",
         'asha_max_t': 100,
@@ -439,7 +440,7 @@ if __name__ == "__main__":
         config=configuration["trainer_config"],
         stop=configuration["stop"],
         resources_per_trial=configuration["resources_per_trial"],
-        num_samples=10000,
+        num_samples=1,
         checkpoint_at_end=configuration["checkpoint_at_end"],
         local_dir=configuration["summaries_dir"],
         checkpoint_freq=configuration["checkpoint_freq"],

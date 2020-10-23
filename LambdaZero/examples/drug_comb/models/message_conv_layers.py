@@ -1,6 +1,7 @@
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import degree
 from torch_scatter import scatter
+from torch_sparse import SparseTensor, matmul, mul_
 import torch
 
 ########################################################################################################################
@@ -15,7 +16,7 @@ BATCH_EDGE_IDX_IDX = 0
 # Convolution layers
 ########################################################################################################################
 
-def _compute_norm(edge_idx, num_nodes=None, edge_weight=None, dtype=torch.float32):
+def _compute_norm_dense(edge_idx, num_nodes=None, edge_weight=None, dtype=torch.float32):
     if num_nodes is None:
         num_nodes = torch.max(edge_idx).item()
 
@@ -28,6 +29,23 @@ def _compute_norm(edge_idx, num_nodes=None, edge_weight=None, dtype=torch.float3
     deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.
 
     return deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]
+
+def _compute_norm_sparse(adj_t):
+    if not adj_t.has_value():
+        adj_t.fill_value(1., dtype=dtype)
+
+    deg = sum(adj_t, dim=1)
+    deg_inv_sqrt = deg.pow_(-0.5)
+    deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0.)
+    adj_t = mul_(adj_t, deg_inv_sqrt.view(-1, 1))
+    adj_t = mul_(adj_t, deg_inv_sqrt.view(1, -1))
+    return adj_t
+
+def _compute_norm(edge_idx, num_nodes=None, edge_weight=None, dtype=torch.float32):
+    if isinstance(edge_idx, SparseTensor):
+        return _compute_norm_sparse(edge_idx)
+    else:
+        return _compute_norm_dense(edge_idx, num_nodes, edge_weight, dtype)
 
 class FourMessageConvLayer(MessagePassing):
     def __init__(self, in_drug_channels, in_prot_channels,
@@ -183,9 +201,14 @@ class ProtDrugProtProtConvLayer(MessagePassing):
         # Want to send the attrs (concentrations) to modulate how strong our
         # drug -> protein messages should be
         dpi_attr = self._get_dpi_attr(this_iter_dpi_idx, this_batch_drugs, data)
+        dpi_adj_t = SparseTensor.from_edge_index(
+            this_iter_dpi_idx,
+            edge_attr=dpi_attr,
+            sparse_sizes=(data.x_drugs.shape[0], data.x_prots.shape[0])
+        ).t()
 
-        protein_output = self.propagate(this_iter_dpi_idx, x=d2p_msg, norm=dpi_attr, is_dpi=True) + \
-                         self.propagate(data.ppi_edge_idx, x=p2p_msg, norm=self.ppi_norm, is_dpi=False) + \
+        protein_output = self.propagate(dpi_adj_t, x=d2p_msg) + \
+                         self.propagate(data.ppi_adj_t, x=p2p_msg) + \
                          self_prot_loop_msg
 
         return h_drug, protein_output
@@ -208,12 +231,6 @@ class ProtDrugProtProtConvLayer(MessagePassing):
 
         return concs
 
-    def message(self, x_j, norm):
-        return norm.view(-1, 1) * x_j
-
-    def aggregate(self, inputs, index, ptr, dim_size, is_dpi):
-        if is_dpi:
-            dim_size = self.num_prots
-
-        return scatter(inputs, index, dim=self.node_dim, dim_size=dim_size, reduce=self.aggr)
+    def message_and_aggregate(self, adj_t, x):
+        return matmul(adj_t, x, reduce=self.aggr)
 
