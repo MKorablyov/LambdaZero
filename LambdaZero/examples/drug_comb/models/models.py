@@ -165,6 +165,7 @@ class GiantGraphGCN(BasePeriodicBackpropModel):
                                                        pass_d2p_msg=config["pass_d2p_msg"],
                                                        pass_p2d_msg=config["pass_p2d_msg"],
                                                        pass_p2p_msg=config["pass_p2p_msg"],
+                                                       is_last_module=i == config['num_res_layers'] - 1,
                                                        data=data))
 
         # convert to ModuleList
@@ -271,6 +272,7 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
                                                        pass_d2p_msg=config["pass_d2p_msg"],
                                                        pass_p2d_msg=config["pass_p2d_msg"],
                                                        pass_p2p_msg=config["pass_p2p_msg"],
+                                                       is_last_module=i == config['num_res_layers'] - 1,
                                                        data=data))
 
         # convert to ModuleList

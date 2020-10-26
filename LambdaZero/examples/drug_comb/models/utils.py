@@ -10,7 +10,8 @@ import numpy as np
 
 class ResidualModule(torch.nn.Module):
     def __init__(self, ConvLayer, drug_channels, prot_channels,
-                 pass_d2d_msg, pass_d2p_msg, pass_p2d_msg, pass_p2p_msg, data):
+                 pass_d2d_msg, pass_d2p_msg, pass_p2d_msg, pass_p2p_msg, 
+                 is_last_module, data):
 
         super(ResidualModule, self).__init__()
         self.conv1 = ConvLayer(drug_channels, prot_channels, drug_channels,

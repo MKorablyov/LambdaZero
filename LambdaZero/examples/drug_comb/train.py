@@ -1,11 +1,12 @@
 import torch
-from LambdaZero.examples.drug_comb.datasets.utils import specific_cell_line
+from LambdaZero.examples.drug_comb.datasets.utils import specific_cell_line, take_first_k_vals
 from LambdaZero.examples.drug_comb.datasets.drugcomb_data_score import DrugCombScore
 from LambdaZero.examples.drug_comb.datasets.drugcomb_score_l1000_data import DrugCombScoreL1000NoPPI
 from LambdaZero.examples.drug_comb.models.models import GiantGraphGCN, GraphSignalLearner
 from LambdaZero.examples.drug_comb.models.message_conv_layers import FourMessageConvLayer
 import os
 from hyperopt import hp
+from torch_geometric.transforms import Compose
 from LambdaZero.examples.drug_comb.models.predictors import SharedLayersMLPPredictor, FilmMLPPredictor, PPIPredictor
 from LambdaZero.utils import get_external_dirs
 from torch.utils.data import TensorDataset, DataLoader
@@ -15,6 +16,7 @@ from ray.tune.schedulers import ASHAScheduler
 from ray.tune.suggest.hyperopt import HyperOptSearch
 import time
 import ray
+import gc
 
 
 ########################################################################################################################
@@ -334,11 +336,12 @@ if __name__ == "__main__":
 
     predictor_config = {
         "predictor": PPIPredictor,
-        "predictor_layers": [150, 512, 256, 1],
+        "predictor_layers": [1024, 512, 256, 1],
         # [1024, 512, 256, 1],  # tune.grid_search([[2048, 1024, 1], [4096, 2048, 1024, 1]]),
         "with_fp": False,
         "with_expr": True,
-        "with_prot": True
+        "with_prot": True,
+        "average_prot_embeddings": True
     }
 
     model_config = {
@@ -357,7 +360,7 @@ if __name__ == "__main__":
         "target": "css",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
         "fp_bits": 1024,
         "fp_radius": 4,
-        "ppi_confidence_thres": 0,
+        "ppi_confidence_thres": 0.9,
     }
 
     active_learning_config = {
@@ -383,7 +386,7 @@ if __name__ == "__main__":
         "checkpoint_freq": 20,
         "stop": {"training_iteration": 100},
         "checkpoint_at_end": False,
-        "resources_per_trial": {},#"cpu": 10, "gpu": 1},
+        "resources_per_trial": {"cpu": 10, "gpu": 1},
         'asha_metric': "eval_mean",
         'asha_mode': "min",
         'asha_max_t': 100,
@@ -440,7 +443,7 @@ if __name__ == "__main__":
         config=configuration["trainer_config"],
         stop=configuration["stop"],
         resources_per_trial=configuration["resources_per_trial"],
-        num_samples=1,#0000,
+        num_samples=10000,
         checkpoint_at_end=configuration["checkpoint_at_end"],
         local_dir=configuration["summaries_dir"],
         checkpoint_freq=configuration["checkpoint_freq"],

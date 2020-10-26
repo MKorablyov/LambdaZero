@@ -11,6 +11,7 @@ import torch
 # Index in drug_drug_batch tuple in which the drug-drug
 # edge index for the batch lies
 BATCH_EDGE_IDX_IDX = 0
+BATCH_CONCS_IDX = 2
 
 ########################################################################################################################
 # Convolution layers
@@ -200,7 +201,7 @@ class ProtDrugProtProtConvLayer(MessagePassing):
 
         # Want to send the attrs (concentrations) to modulate how strong our
         # drug -> protein messages should be
-        dpi_attr = self._get_dpi_attr(this_iter_dpi_idx, this_batch_drugs, data)
+        dpi_attr = self._get_dpi_attr(this_iter_dpi_idx, this_batch_drugs, drug_drug_batch[BATCH_CONCS_IDX])
         dpi_adj_t = SparseTensor.from_edge_index(
             this_iter_dpi_idx,
             edge_attr=dpi_attr,
@@ -218,16 +219,14 @@ class ProtDrugProtProtConvLayer(MessagePassing):
     #
     #   (data.ddi_edge_idx[..., None, None] == batch_drugs).any(-1).any(-1).all(0)
     #
-    def _get_dpi_attr(self, dpi_idx, batch_drugs, data):
+    def _get_dpi_attr(self, dpi_idx, batch_drugs, batch_concs):
         # Super slow but will be fine while we have batch size of just 1
         concs = torch.zeros((dpi_idx.shape[1],), device=dpi_idx.device)
         for i in range(batch_drugs.shape[0]):
             pair = batch_drugs[i]
-            edge_attr = data.ddi_edge_attr[(data.ddi_edge_idx == pair.reshape(2, 1)).all(0)].squeeze()
-            assert len(edge_attr.shape) == 1
 
-            concs[(dpi_idx[0] == pair[0])] = edge_attr[0]
-            concs[(dpi_idx[0] == pair[1])] = edge_attr[1]
+            concs[(dpi_idx[0] == pair[0])] = batch_concs[i, 0]
+            concs[(dpi_idx[0] == pair[1])] = batch_concs[i, 1]
 
         return concs
 

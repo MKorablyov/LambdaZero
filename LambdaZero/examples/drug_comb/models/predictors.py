@@ -144,7 +144,8 @@ class MLPPredictor(MLPAbstractPredictor):
             layers.append(nn.Linear(self.layer_dims[i], self.layer_dims[i+1]))
             if i != len(self.layer_dims) - 2:
                 layers.append(nn.ReLU())
-                layers.append(torch.nn.Dropout(p=config["dropout_proba"]))
+                if i == len(self.layer_dims) - 3:
+                    layers.append(torch.nn.Dropout(p=config["dropout_proba"]))
 
         self.mlp = nn.Sequential(*layers)
 
@@ -186,14 +187,18 @@ class ConcentrationOnlyPredictor(MLPPredictor):
 
 class PPIPredictor(MLPPredictor):
     def __init__(self, data, config):
+        self.avg_embeddings = config['average_prot_embeddings']
         super().__init__(data, config)
 
     def get_layer_dims(self, config, data):
-        config['predictor_layers'][0] = data.x_prots.shape[0] * config['residual_layers_dim']
+        multiplier = 1 if self.avg_embeddings else data.x_prots.shape[0]
+        config['predictor_layers'][0] = multiplier * config['residual_layers_dim']
+
         return config['predictor_layers']
 
     def get_batch(self, data, drug_drug_batch, h_drug, h_prot):
-        return h_prot.flatten(), None
+        batch = h_prot.mean(dim=0) if self.avg_embeddings else h_prot.flatten()
+        return batch, None
 
     def single_forward_pass(self, batch, cell_lines):
         out = super().single_forward_pass(batch, cell_lines)
