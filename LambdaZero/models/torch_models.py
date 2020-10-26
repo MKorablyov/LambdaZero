@@ -11,7 +11,7 @@ from ray.rllib.utils import try_import_torch
 #from torch_geometric.nn import GINEConv
 from torch_geometric.nn import NNConv
 from torch_geometric.nn import Set2Set
-
+import torch.nn.functional as F
 
 # import torch and torch.nn using ray utils
 torch, nn = try_import_torch()

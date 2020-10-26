@@ -17,6 +17,8 @@ import LambdaZero.models
 import LambdaZero.chem
 from LambdaZero.utils import Complete, get_external_dirs
 import logging
+import pickle
+import gzip
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -399,6 +401,7 @@ class BayesianRewardActor():
         self.transform = transform
         self.config = config
         self.regressor_config = config["regressor_config"]
+        self.mol_dump_loc = config["mol_dump_loc"]
         self.unseen_molecules = []
         self.aq_molecules = []
         self.mols = 0
@@ -627,10 +630,11 @@ class BayesianRewardActor():
         self.train_len += self.config["aq_size"]
         mean, var = self.regressor.get_mean_variance(loader, self.train_len)
         mse_after = np.mean((rews - mean) ** 2)
-
+        smiles = []
         for i in range(len(aq_idx)):
+            smiles.append([Chem.MolToSmiles(aq_idx[i][1].mol), rews[i]])
             rews[i] = rews[i] * aq_idx[i][3]
-        
+        pickle.dump(smiles, gzip.open(os.path.join(self.mol_dump_loc, f'batch-{self.batches+1}.pkl.gz'), 'wb'))
         self.aq_molecules.extend(np.array(aq_idx)[:, :3].tolist())
 
         self.logs = {**scores, **val, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 
