@@ -187,17 +187,28 @@ class ConcentrationOnlyPredictor(MLPPredictor):
 
 class PPIPredictor(MLPPredictor):
     def __init__(self, data, config):
-        self.avg_embeddings = config['average_prot_embeddings']
+        self.global_pooling_fxn = None
+        if 'global_pooling' in config:
+            self.global_pooling_fxn = construct_pooling(config['global_pooling'], config, data)
+
         super().__init__(data, config)
 
     def get_layer_dims(self, config, data):
-        multiplier = 1 if self.avg_embeddings else data.x_prots.shape[0]
-        config['predictor_layers'][0] = multiplier * config['residual_layers_dim']
+        if self.global_pooling_fxn is not None and hasattr(self.global_pooling_fxn, 'output_dim'):
+            in_channels = getattr(self.global_pooling_fxn, 'output_dim')
+        else:
+            multiplier = 1 if self.global_pooling_fxn else data.x_prots.shape[0]
+            in_channels = multiplier * config['residual_layers_dim']
 
+        config['predictor_layers'].insert(0, in_channels)
         return config['predictor_layers']
 
     def get_batch(self, data, drug_drug_batch, h_drug, h_prot):
-        batch = h_prot.mean(dim=0) if self.avg_embeddings else h_prot.flatten()
+        if self.global_pooling_fxn is not None:
+            batch = self.global_pooling_fxn(h_prot)
+        else:
+            batch = h_prot.flatten()
+
         return batch, None
 
     def single_forward_pass(self, batch, cell_lines):
