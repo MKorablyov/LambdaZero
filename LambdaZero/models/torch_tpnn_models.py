@@ -8,13 +8,13 @@ from functools import partial
 
 
 class TPNN_v0(torch.nn.Module):
-    def __init__(self, max_z, representations, equivariant_model, radial_model, radial_model_config, gate, gate_config, pooling, fc):
+    def __init__(self, max_z, representations, equivariant_model, radial_model, gate, pooling, fc):
         super().__init__()
 
         assert pooling in ['avg', 'set2set'], "Pooling can be either 'avg' or 'set2set'"
 
-        radial_model = partial(radial_model, **radial_model_config)
-        gate = partial(gate, **gate_config)
+        radial_model = partial(radial_model['type'], **radial_model['config'])
+        gate = partial(gate['type'], **gate['config'])
         self.equivariant_model = equivariant_model(representations, radial_model, gate)
 
         self.max_z = max_z

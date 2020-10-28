@@ -1,9 +1,26 @@
-v0 = {"lr": 1e-4}
+from torch.optim import Adam, SGD, LBFGS
+
+adam_v0 = {
+    "type": Adam,
+    "config": {
+        "lr": 1e-4
+    }
+}
+
+sgd_v0 = {
+    "type": SGD,
+    "config": {
+        "lr": 1e-4
+    }
+}
 
 lbfgs_v0 = {
-    "lr": 1e-4,
-    "history_size": 10,
-    "max_iter": 4,
-    "line_search_fn": 'strong_wolfe'
+    "type": LBFGS,
+    "config": {
+        "lr": 1e-4,
+        "history_size": 10,
+        "max_iter": 4,
+        "line_search_fn": 'strong_wolfe'
+    }
 }
 
