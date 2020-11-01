@@ -1,4 +1,5 @@
 import torch
+import math
 import numpy as np
 from torch.nn import functional as F
 from torch.nn import Parameter
@@ -215,115 +216,71 @@ class GiantGraphGCN(BasePeriodicBackpropModel):
 
 class GraphSignalLearner(BasePeriodicBackpropModel):
     def __init__(self, data, config):
-        # Args seeded by hp.quniform
-        for arg in ["attention_rank", "prot_emb_dim", "residual_layers_dim", "num_res_layers"]:
+        for arg in IntParamRegistrar.get_registered_args():
             config[arg] = int(config[arg])
 
         super().__init__(data, config)
 
         # Learnable protein embeddings
-        self.prot_emb = Parameter(1 / 100 * torch.randn((data.x_prots.shape[0], int(config["prot_emb_dim"]))))
+        pre_embs = torch.randn((data.x_prots.shape[0], config["prot_emb_dim"])
+        self.prot_emb = Parameter(1 / 100 * pre_embs))
 
-        data.ppi_edge_idx = to_zero_base(data.ppi_edge_idx)
-        data.dpi_edge_idx[1] = to_zero_base(data.dpi_edge_idx[1])
-        data.ppi_adj_t = SparseTensor.from_edge_index(
-            data.ppi_edge_idx,
-            sparse_sizes=(data.x_prots.shape[0], data.x_prots.shape[0])
-        ).t()
+        self.atts = torch.nn.ModuleList(build_attentions(data, config))
+        self.pooling = torch.nn.ModuleList(build_non_residual_pooling(data, config))
+        self.convs = torch.nn.ModuleList(
+            build_non_residual_convs(data, config) +
+            build_residual_modules(data, config)
+        )
 
-        config.update({
-            'pass_d2d_msg': False,
-            'pass_p2d_msg': False,
-            'pass_d2p_msg': True,
-            'pass_p2p_msg': True,
-        })
+        # Must have less non residual attention and pooling layers than
+        # non residual conv layers
+        assert len(self.atts) <= len(self.convs)
+        assert len(self.pooling) <= math.ceil(len(self.convs) / self.pooling_periodicity)
 
-        # First Graph convolution layer
-        self.conv1 = ProtDrugProtProtConvLayer(data.x_drugs.shape[1], config["prot_emb_dim"],
-                                               config["residual_layers_dim"], config["residual_layers_dim"],
-                                               config['pass_d2d_msg'], config['pass_d2p_msg'],
-                                               config['pass_p2d_msg'], config['pass_p2p_msg'], data)
+    def _forward(self, data, drug_drug_batch):
+        h_drug, h_prot, h_prot_last = data.x_drugs, self.prot_emb, self.prot_emb
+        ppi_adj_t = data.ppi_adj_t
 
-        # First Low rank attention layer
-        self.has_attention = config["attention"]
-        if self.has_attention:
-            self.low_rank_attention = []
-            self.dim_reduce = []
+        have_pooled = False
+        for i in len(self.convs):
+            _, h_prot = self.convs[i](h_drug, h_prot, ppi_adj_t,
+                                      data, drug_drug_batch, have_pooled)
 
-            self.dim_reduce.append(self._get_dim_reduce_module(config))
-            self.low_rank_attention.append(LowRankAttention(k=config["attention_rank"],
-                                                            d=config['prot_emb_dim'],
-                                                            dropout=config["dropout_proba"]))
+            att_idx = len(self.atts) - i
+            if att_idx > 0:
+                h_prot = self.atts[att_idx](h_prot_last, h_prot)
 
-        # Residual layers
-        self.residual_layers = []
-        for i in range(config['num_res_layers']):
-            if self.has_attention:
-                # If attention is used, we must increase the number of drug channels
-                self.dim_reduce.append(self._get_dim_reduce_module(config))
-                self.low_rank_attention.append(LowRankAttention(k=config["attention_rank"],
-                                                                d=config["residual_layers_dim"],
-                                                                dropout=config["dropout_proba"]))
+            # For now, let's put the activation before pooling. I don't
+            # think it will change much, but we can keep an eye on it
+            h_prot = F.relu(h_prot)
 
-            self.residual_layers.append(ResidualModule(ConvLayer=ProtDrugProtProtConvLayer,
-                                                       drug_channels=data.x_drugs.shape[1],
-                                                       prot_channels=config["residual_layers_dim"],
-                                                       pass_d2d_msg=config["pass_d2d_msg"],
-                                                       pass_d2p_msg=config["pass_d2p_msg"],
-                                                       pass_p2d_msg=config["pass_p2d_msg"],
-                                                       pass_p2p_msg=config["pass_p2p_msg"],
-                                                       is_last_module=i == config['num_res_layers'] - 1,
-                                                       data=data))
+            # pool_idx is returned as -1 if we shouldn't do pooling this layer
+            pool_idx = self._get_pooling_idx(i)
+            if pool_idx != -1:
+                h_prot, ppi_adj_t = self.pooling[pool_idx](h_prot, ppi_adj_t)
+                have_pooled = True
 
-        # convert to ModuleList
-        self.residual_layers = torch.nn.ModuleList(self.residual_layers)
-        if self.has_attention:
-            self.dim_reduce = torch.nn.ModuleList(self.dim_reduce)
-            self.low_rank_attention = torch.nn.ModuleList(self.low_rank_attention)
+        return self.predictor(data, drug_drug_batch, h_drug, h_prot, n_forward_passes=n_forward_passes)
 
-        # Compute dimension of input for predictor
-        config["predictor_layers"] = [config["residual_layers_dim"]] + config["predictor_layers"]
+    def _get_pooling_idx(self, curr_idx):
+        """
+        If we shouldn't pool this layer we'll return -1, otherwise
+        the idx of the pooling layer corresponding to curr_idx
+        """
+        max_conv_idx = len(self.convs) - 1
+        is_wrong_periodicity = (max_conv_idx - curr_idx) % self.pooling_periodicity != 0
 
-        # Response Predictor on top of GCN
-        self.predictor = config["predictor"](data, config)
+        first_lyr_idx = max_conv_idx - ((len(self.pooling) - 1) * self.pooling_periodicity)
+        lyr_is_too_early = curr_idx - first_lyr_idx < 0
 
-    @classmethod
-    def _get_dim_reduce_module(cls, config):
-        out_dim = config['residual_layers_dim']
-        in_dim = out_dim + (config['attention_rank'] * 2)
-
-        return torch.nn.Linear(in_dim, out_dim)
+        if is_wrong_periodicity or lyr_is_too_early:
+            return -1
+        else:
+            return int((curr_idx - first_lyr_idx) / self.pooling_periodicity)
 
     def get_periodic_backprop_vars(self):
         yield self.prot_emb
-        yield from self.conv1.parameters()
-        yield from self.residual_layers.parameters()
-        if self.has_attention:
-            yield from self.low_rank_attention.parameters()
-            yield from self.dim_reduce.parameters()
-
-    def _forward(self, data, drug_drug_batch, n_forward_passes=1):
-        h_drug = data.x_drugs
-        h_prot = self.prot_emb
-
-        ##########################################
-        # GNN forward pass
-        ##########################################
-        _, h_prot_next = self.conv1(h_drug, h_prot, data, drug_drug_batch)
-        if self.has_attention:
-            att = self.low_rank_attention[0](h_prot)
-            h_prot_next = self.dim_reduce[0](torch.cat((att, h_prot_next), dim=1))
-
-        h_prot = F.relu(h_prot_next)
-
-        for i in range(len(self.residual_layers)):
-            _, h_prot_next = self.residual_layers[i](h_drug, h_prot, data, drug_drug_batch)
-            if self.has_attention:
-                att = self.low_rank_attention[i + 1](h_prot)
-                h_prot_next = self.dim_reduce[i + 1](torch.cat((att, h_prot_next), dim=1))
-
-            h_prot = F.relu(h_prot_next)
-
-        # Predict scores
-        return self.predictor(data, drug_drug_batch, h_drug, h_prot, n_forward_passes=n_forward_passes)
+        yield from self.convs.parameters()
+        yield from self.atts.parameters()
+        yield from self.pooling.parameters()
 

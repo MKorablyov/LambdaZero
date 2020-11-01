@@ -197,8 +197,11 @@ class PPIPredictor(MLPPredictor):
         if self.global_pooling_fxn is not None and hasattr(self.global_pooling_fxn, 'output_dim'):
             in_channels = getattr(self.global_pooling_fxn, 'output_dim')
         else:
-            multiplier = 1 if self.global_pooling_fxn else data.x_prots.shape[0]
-            in_channels = multiplier * config['residual_layers_dim']
+            num_prots = data.x_prots.shape[0]
+            for _ in range(config['num_pooling_modules']):
+                num_prots = math.ceil(num_prots * config['pooling_ratio'])
+
+            in_channels = num_prots * config['residual_layers_dim']
 
         config['predictor_layers'].insert(0, in_channels)
         return config['predictor_layers']
