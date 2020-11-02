@@ -4,11 +4,31 @@ import numpy as np
 from torch.nn import functional as F
 from torch.nn import Parameter
 from torch_sparse import SparseTensor
-from LambdaZero.examples.drug_comb.utils import to_zero_base
-from LambdaZero.examples.drug_comb.models.utils import ResidualModule, LowRankAttention
+from LambdaZero.examples.drug_comb.utils import to_zero_base, IntParamRegistrar
 from LambdaZero.examples.drug_comb.models.message_conv_layers import ProtDrugProtProtConvLayer
 from LambdaZero.examples.drug_comb.utils import get_dropout_modules_recursive
+from LambdaZero.examples.drug_comb.models.utils import (
+    ResidualModule,
+    LowRankAttention,
+    build_attentions,
+    build_poolings,
+    build_non_residual_convs,
+    build_residual_modules,
+)
 
+def config_params_to_int(config):
+    args = [
+        'num_pooling_modules',
+        'attention_rank',
+        'prot_emb_dim',
+        'residual_layers_dim',
+        'num_non_residual_convs',
+        'num_residual_blocks',
+        'pooling_periodicity',
+    ]
+
+    for arg in args:
+        config[arg] = int(config[arg])
 
 ########################################################################################################################
 # Abstract Model
@@ -216,17 +236,25 @@ class GiantGraphGCN(BasePeriodicBackpropModel):
 
 class GraphSignalLearner(BasePeriodicBackpropModel):
     def __init__(self, data, config):
-        for arg in IntParamRegistrar.get_registered_args():
-            config[arg] = int(config[arg])
-
+        config_params_to_int(config)
         super().__init__(data, config)
 
-        # Learnable protein embeddings
-        pre_embs = torch.randn((data.x_prots.shape[0], config["prot_emb_dim"])
-        self.prot_emb = Parameter(1 / 100 * pre_embs))
+        # Mutate data object (tbh this arguably shouldn't be in here)
+        data.ppi_edge_idx = to_zero_base(data.ppi_edge_idx)
+        data.dpi_edge_idx[1] = to_zero_base(data.dpi_edge_idx[1])
+        data.ppi_adj_t = SparseTensor.from_edge_index(
+            data.ppi_edge_idx,
+            sparse_sizes=(data.x_prots.shape[0], data.x_prots.shape[0])
+        ).t()
 
+        # Learnable protein embeddings
+        pre_embs = torch.randn((data.x_prots.shape[0], config["prot_emb_dim"]))
+        self.prot_emb = Parameter(1 / 100 * pre_embs)
+
+        self.pooling_periodicity = config['pooling_periodicity']
+        self.predictor = config["predictor"](data, config)
         self.atts = torch.nn.ModuleList(build_attentions(data, config))
-        self.pooling = torch.nn.ModuleList(build_non_residual_pooling(data, config))
+        self.pooling = torch.nn.ModuleList(build_poolings(data, config))
         self.convs = torch.nn.ModuleList(
             build_non_residual_convs(data, config) +
             build_residual_modules(data, config)
@@ -237,17 +265,18 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
         assert len(self.atts) <= len(self.convs)
         assert len(self.pooling) <= math.ceil(len(self.convs) / self.pooling_periodicity)
 
-    def _forward(self, data, drug_drug_batch):
-        h_drug, h_prot, h_prot_last = data.x_drugs, self.prot_emb, self.prot_emb
+    def _forward(self, data, drug_drug_batch, n_forward_passes):
+        h_drug, h_prot = data.x_drugs, self.prot_emb
         ppi_adj_t = data.ppi_adj_t
 
         have_pooled = False
-        for i in len(self.convs):
+        for i in range(len(self.convs)):
+            h_prot_last = h_prot
             _, h_prot = self.convs[i](h_drug, h_prot, ppi_adj_t,
                                       data, drug_drug_batch, have_pooled)
 
-            att_idx = len(self.atts) - i
-            if att_idx > 0:
+            att_idx = self._get_attention_idx(i)
+            if att_idx != -1:
                 h_prot = self.atts[att_idx](h_prot_last, h_prot)
 
             # For now, let's put the activation before pooling. I don't
@@ -257,7 +286,9 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
             # pool_idx is returned as -1 if we shouldn't do pooling this layer
             pool_idx = self._get_pooling_idx(i)
             if pool_idx != -1:
-                h_prot, ppi_adj_t = self.pooling[pool_idx](h_prot, ppi_adj_t)
+                pool_res = self.pooling[pool_idx](h_prot, ppi_adj_t)
+                h_prot, ppi_adj_t = pool_res[0], pool_res[1]
+
                 have_pooled = True
 
         return self.predictor(data, drug_drug_batch, h_drug, h_prot, n_forward_passes=n_forward_passes)
@@ -277,6 +308,13 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
             return -1
         else:
             return int((curr_idx - first_lyr_idx) / self.pooling_periodicity)
+
+    def _get_attention_idx(self, curr_idx):
+        first_att_idx = len(self.convs) - len(self.atts)
+        if curr_idx < first_att_idx:
+            return -1
+        else:
+            return curr_idx - first_att_idx
 
     def get_periodic_backprop_vars(self):
         yield self.prot_emb

@@ -1,5 +1,7 @@
 import torch
 from torch.nn import functional as F
+from LambdaZero.examples.drug_comb.models.message_conv_layers import ProtDrugProtProtConvLayer
+from LambdaZero.examples.drug_comb.models.pooling import construct_pooling
 import numpy as np
 
 
@@ -21,17 +23,15 @@ class ResidualModule(torch.nn.Module):
             for _ in range(num_lyrs)
         ])
 
-    def forward(self, h_drug, h_prot, data, drug_drug_batch):
+    def forward(self, h_drug, h_prot, ppi_adj_t, data, drug_drug_batch, have_pooled):
         for i in range(len(self.convs)):
-            out_drug, out_prot = self.convs[i](h_drug, h_prot, data, drug_drug_batch)
-
-            if i == len(self.convs) - 1:
-                out_drug, out_prot = out_drug + h_drug, out_prot + h_prot
+            out_drug, out_prot = self.convs[i](h_drug, h_prot, ppi_adj_t,
+                                               data, drug_drug_batch, have_pooled)
 
             if i != len(self.convs) - 1:
                 out_drug, out_prot = F.relu(out_drug), F.relu(out_prot)
 
-        return out_drug, out_prot
+        return out_drug + h_drug, out_prot + h_prot
 
 
 class LowRankAttention(torch.nn.Module):
@@ -64,7 +64,7 @@ class LRGAWithDimReduce(LowRankAttention):
 
     def forward(self, pre_conv_x, post_conv_x):
         att = super().forward(pre_conv_x)
-        return self.dim_reduce(torch.cat((att, post_conv_x)))
+        return self.dim_reduce(torch.cat((att, post_conv_x), dim=1))
 
 
 def joint_normalize2(U, V_T):
@@ -185,25 +185,41 @@ def build_attentions(data, config):
     kwargs = {
         'out_dim': config['residual_layers_dim'],
         'k': config['attention_rank'],
-        'd': config['residual_layers_dim'],
+        'd': config['prot_emb_dim'],
         'dropout': config['dropout_proba'],
     }
 
-    return [LRGAWithDimReduce(**kwargs) for _ in range(config['num_attention_modules'])]
+    num_convs = config['num_non_residual_convs'] + config['num_residual_blocks']
+    if config.get('attention_all_layers'):
+        num_atts = num_convs
+    elif 'num_attention_modules' in config:
+        num_atts = config['num_attention_modules']
+    else:
+        num_atts = 0
+
+    atts = []
+    for i in range(num_atts):
+        if i != 0 or num_atts != num_convs:
+            kwargs['d'] = kwargs['out_dim']
+
+        atts.append(LRGAWithDimReduce(**kwargs))
+
+    return atts
 
 def build_poolings(data, config):
-    pooling_obj = config['pooling_layer']
+    pooling_obj = config.get('pooling_layer')
     req_param_to_conf_param = {
+        'in_channels': 'residual_layers_dim',
         'GNN': 'pooling_gnn',
         'ratio': 'pooling_ratio',
     }
 
     return [
-        construct_pooling(pooling_obj, config, data, req_param_to_conf_param)
-        for _ in range(config['num_pooling_modules'])
+        construct_pooling(pooling_obj, data, config, req_param_to_conf_param)
+        for _ in range(config.get('num_pooling_modules') or 0)
     ]
 
-def build_non_residual_convs(data, config, is_residual):
+def build_non_residual_convs(data, config):
     kwargs = {
         'in_drug_channels': data.x_drugs.shape[1],
         'in_prot_channels': config['prot_emb_dim'],
@@ -216,12 +232,19 @@ def build_non_residual_convs(data, config, is_residual):
         'data': data,
     }
 
-    return [ProtDrugProtProtConvLayer(**kwargs) for _ in range(config['num_non_residual_convs'])]
+    convs = []
+    for i in range(config['num_non_residual_convs']):
+        if i > 0:
+            kwargs['in_prot_channels'] = config['residual_layers_dim']
+
+        convs.append(ProtDrugProtProtConvLayer(**kwargs))
+
+    return convs
 
 def build_residual_modules(data, config):
     kwargs = {
         'ConvLayer': ProtDrugProtProtConvLayer,
-        'drug_channels': config['residual_layers_dim'],
+        'drug_channels': data.x_drugs.shape[1],
         'prot_channels': config['residual_layers_dim'],
         'pass_d2d_msg': config['pass_d2d_msg'],
         'pass_d2p_msg': config['pass_d2p_msg'],

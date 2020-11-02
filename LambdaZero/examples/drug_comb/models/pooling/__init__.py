@@ -1,4 +1,4 @@
-from LambdaZero.examples.drug_comb.pooling.global_pooling import (
+from LambdaZero.examples.drug_comb.models.pooling.global_pooling import (
     global_add_pool,
     global_max_pool,
     global_mean_pool,
@@ -6,8 +6,8 @@ from LambdaZero.examples.drug_comb.pooling.global_pooling import (
     Set2Set,
 )
 
-from LambdaZero.examples.drug_comb.pooling.pooling_layers import SAGPooling, TopKPooling
-from LambdaZero.examples.drug_comb.pooling.utils import construct_pooling
+from LambdaZero.examples.drug_comb.models.pooling.pooling_layers import SAGPooling, TopKPooling
+from LambdaZero.examples.drug_comb.models.pooling.utils import construct_pooling
 
 __all__ = [
     global_add_pool,

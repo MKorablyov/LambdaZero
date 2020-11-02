@@ -1,5 +1,8 @@
+import torch
 from torch_geometric.nn import SAGPooling, TopKPooling, GCNConv
+from torch_geometric.utils import add_remaining_self_loops
 from torch_sparse import SparseTensor
+from torch_scatter import scatter_add, scatter_max
 
 """
 This file contains some really naive implementations of a couple
@@ -11,8 +14,7 @@ and reimplemented to actually make use of spase tensors most efficiently.
 But I'm short on time now, so this will have to do.
 """
 
-def maybe_num_nodes(index: torch.Tensor,
-                    num_nodes: Optional[int] = None) -> int:
+def maybe_num_nodes(index, num_nodes=None) -> int:
     return int(index.max()) + 1 if num_nodes is None else num_nodes
 
 def topk(x, ratio, batch, min_score=None, tol=1e-7):
@@ -72,9 +74,9 @@ def filter_adj(edge_index, edge_attr, perm, num_nodes=None):
     return torch.stack([row, col], dim=0), edge_attr
 
 class SAGPooling(SAGPooling):
-   def __init__(self, in_channels, pooling_ratio=0.5, GNN=GCNConv, min_score=None,
+    def __init__(self, in_channels, pooling_ratio=0.5, GNN=GCNConv, min_score=None,
                 multiplier=1, nonlinearity=torch.tanh, **kwargs):
-        super().__init__(in_channels, ratio, GNN, min_score,
+        super().__init__(in_channels, pooling_ratio, GNN, min_score,
                          multiplier, nonlinearity, **kwargs)
 
     def forward(self, x, edge_index, edge_attr=None, batch=None, attn=None):
@@ -82,7 +84,7 @@ class SAGPooling(SAGPooling):
         is_sparse = isinstance(edge_index, SparseTensor)
         if batch is None:
             if is_sparse:
-                batch = torch.zeros(x.size(0), dtype=edge_index.dtype(), device=edge_index.device())
+                batch = torch.zeros(x.size(0), dtype=torch.int64, device=edge_index.device())
             else:
                 batch = edge_index.new_zeros(x.size(0))
 
@@ -107,6 +109,7 @@ class SAGPooling(SAGPooling):
         edge_index, edge_attr = filter_adj(edge_index, edge_attr, perm,
                                            num_nodes=score.size(0))
 
+        edge_index, edge_attr = add_remaining_self_loops(edge_index, edge_attr)
         if is_sparse:
             edge_index = SparseTensor.from_edge_index(edge_index, edge_attr).t()
             edge_attr = None
@@ -148,6 +151,7 @@ class TopKPooling(TopKPooling):
         edge_index, edge_attr = filter_adj(edge_index, edge_attr, perm,
                                            num_nodes=score.size(0))
 
+        edge_index, edge_attr = add_remaining_self_loops(edge_index, edge_attr)
         if is_sparse:
             edge_index = SparseTensor.from_edge_index(edge_index, edge_attr).t()
             edge_attr = None

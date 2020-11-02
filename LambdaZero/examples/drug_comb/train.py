@@ -1,23 +1,36 @@
+import time
+import ray
+import gc
 import torch
+import sklearn.metrics
+import numpy as np
+import os
+from hyperopt import hp
+from torch_geometric.transforms import Compose
+from torch_geometric.nn import GCNConv
+from LambdaZero.utils import get_external_dirs
+from torch.utils.data import TensorDataset, DataLoader
+from ray import tune
+from ray.tune.schedulers import ASHAScheduler
+from ray.tune.suggest.hyperopt import HyperOptSearch
+
+from LambdaZero.examples.drug_comb.utils import IntParamRegistrar
 from LambdaZero.examples.drug_comb.datasets.utils import specific_cell_line, take_first_k_vals
 from LambdaZero.examples.drug_comb.datasets.drugcomb_data_score import DrugCombScore
 from LambdaZero.examples.drug_comb.datasets.drugcomb_score_l1000_data import DrugCombScoreL1000NoPPI
 from LambdaZero.examples.drug_comb.models.models import GiantGraphGCN, GraphSignalLearner
 from LambdaZero.examples.drug_comb.models.message_conv_layers import FourMessageConvLayer
-import os
-from hyperopt import hp
-from torch_geometric.transforms import Compose
 from LambdaZero.examples.drug_comb.models.predictors import SharedLayersMLPPredictor, FilmMLPPredictor, PPIPredictor
-from LambdaZero.utils import get_external_dirs
-from torch.utils.data import TensorDataset, DataLoader
 from LambdaZero.examples.drug_comb.models.acquisition import RandomAcquisition, ExpectedImprovement, GreedyAcquisition
-from ray import tune
-from ray.tune.schedulers import ASHAScheduler
-from ray.tune.suggest.hyperopt import HyperOptSearch
-import time
-import ray
-import gc
-
+from LambdaZero.examples.drug_comb.models.pooling import (
+    global_mean_pool,
+    global_max_pool,
+    global_add_pool,
+    GlobalAttention,
+    Set2Set,
+    SAGPooling,
+    TopKPooling,
+)
 
 ########################################################################################################################
 # Epoch loops
@@ -56,6 +69,9 @@ def train_epoch(data, loader, model, optim, max_examp_per_epoch=None, n_forward_
 
 
 def eval_epoch(data, loader, model, acquisition=None, n_forward_passes=1):
+    # const
+    TARGET_IDX = 3
+
     model.eval()
     model.disable_periodic_backprop()
     if acquisition is not None:
@@ -65,6 +81,8 @@ def eval_epoch(data, loader, model, acquisition=None, n_forward_passes=1):
     r_squared = 0
     num_batches = len(loader)
     active_scores = torch.empty(0)
+    epoch_targets = []
+    epoch_preds = []
 
     with torch.no_grad():
         for i, drug_drug_batch in enumerate(loader):
@@ -77,17 +95,24 @@ def eval_epoch(data, loader, model, acquisition=None, n_forward_passes=1):
             epoch_loss += loss.item()
 
             # Explained variance
-            var = drug_drug_batch[3].var().item()
-            r_squared += (var - loss.item()) / var
+            epoch_targets.append(drug_drug_batch[TARGET_IDX].detach().cpu().numpy())
+            epoch_preds.append(out.detach().cpu().numpy())
 
     print('Mean valid loss: {:.4f}'.format(epoch_loss / num_batches))
 
-    summary_dict = {"loss_sum": epoch_loss, "loss_mean": epoch_loss / num_batches, "r_squared": r_squared / num_batches}
+    epoch_targets = np.concatenate(epoch_targets, 0)
+    epoch_preds = np.concatenate(epoch_preds, 0)
+
+    summary_dict = {
+        "loss_sum": epoch_loss,
+        "loss_mean": epoch_loss / num_batches,
+        "r_squared": sklearn.metrics.r2_score(epoch_targets, epoch_preds)
+    }
 
     if acquisition is not None:
         return summary_dict, active_scores
-    return summary_dict
 
+    return summary_dict
 
 ########################################################################################################################
 # Abstract trainer
@@ -323,7 +348,7 @@ class ActiveTrainer(AbstractTrainer):
 if __name__ == "__main__":
 
     pipeline_config = {
-        "transform": specific_cell_line('K-562'),
+        "transform": Compose([specific_cell_line('K-562'), take_first_k_vals(10)]),
         "pre_transform": None,
         "seed": 1,  # tune.grid_search([1, 2, 3]),
         "val_set_prop": 0.2,
@@ -341,7 +366,7 @@ if __name__ == "__main__":
         "with_fp": False,
         "with_expr": True,
         "with_prot": True,
-        "average_prot_embeddings": True
+        "average_prot_embeddings": True,
     }
 
     model_config = {
@@ -353,11 +378,15 @@ if __name__ == "__main__":
         "pass_p2d_msg": False,
         "pass_p2p_msg": False,
         "do_periodic_backprop": False,
+        'residual_block_length': 1,
+        'pooling_gnn': GCNConv,
+        'attention_all_layers': True,
+        'num_set2set_steps': 5,
     }
 
     dataset_config = {
         "dataset": DrugCombScore,
-        "target": "css",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
+        "target": "zip",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
         "fp_bits": 1024,
         "fp_radius": 4,
         "ppi_confidence_thres": 0.9,
@@ -386,7 +415,7 @@ if __name__ == "__main__":
         "checkpoint_freq": 20,
         "stop": {"training_iteration": 100},
         "checkpoint_at_end": False,
-        "resources_per_trial": {"cpu": 10, "gpu": 1},
+        "resources_per_trial": {},#"cpu": 10, "gpu": 1},
         'asha_metric': "eval_mean",
         'asha_mode': "min",
         'asha_max_t': 100,
@@ -408,7 +437,13 @@ if __name__ == "__main__":
         "attention_rank": hp.quniform("attention_rank", 50, 300, 1),
         "prot_emb_dim": hp.quniform("prot_emb_dim", 128, 2056, 1),
         "residual_layers_dim": hp.quniform("residual_layers_dim", 64, 1024, 1),
-        "num_res_layers": hp.quniform("num_res_layers", 0, 3, 1),
+        'num_non_residual_convs': hp.quniform('num_non_residual_convs', 1, 3, 1),
+        'num_residual_blocks': hp.quniform('num_residual_blocks', 0, 3, 1),
+        'pooling_periodicity': hp.quniform('pooling_periodicity', 1, 3, 1),
+        'pooling_ratio': hp.uniform('pooling_ratio', .5, .85),
+        'pooling_layer': hp.choice('pooling_layer', [SAGPooling, TopKPooling]),
+        'global_pooling': hp.choice('global_pooling', [None, global_max_pool, global_mean_pool, GlobalAttention, Set2Set]),
+        'num_pooling_modules': hp.quniform('num_pooling_modules', 0, 5, 1),
     }
 
     current_best_params = [{
@@ -416,7 +451,13 @@ if __name__ == "__main__":
         "attention_rank": 140,
         "prot_emb_dim": 512,
         "residual_layers_dim": 512,
-        "num_res_layers": 1,
+        'num_non_residual_convs': 2,
+        'num_residual_blocks': 2,
+        'pooling_periodicity': 1,
+        'pooling_ratio': .5,
+        'pooling_layer': 0,
+        'global_pooling': 0,
+        'num_pooling_modules': 3,
     }]
 
     search_alg = HyperOptSearch(
@@ -443,7 +484,7 @@ if __name__ == "__main__":
         config=configuration["trainer_config"],
         stop=configuration["stop"],
         resources_per_trial=configuration["resources_per_trial"],
-        num_samples=10000,
+        num_samples=1,
         checkpoint_at_end=configuration["checkpoint_at_end"],
         local_dir=configuration["summaries_dir"],
         checkpoint_freq=configuration["checkpoint_freq"],

@@ -60,6 +60,52 @@ class MeanVarianceNormalizer:
         x = (x_norm * self.std) + self.mean
         return x
 
+class IntParamRegistrar:
+    _instance = None
+
+    class _IntParamRegistrar:
+        def __init__(self):
+            self.registered_args = set()
+
+        def register_arg(self, arg):
+            self.registered_args.add(arg)
+
+        def get_registered_args(self):
+            return self.registered_args
+
+    @staticmethod
+    def _get_instance():
+        """
+        How this method looks with the IntParamRegistrars is
+        why I hate python's staticmethod
+        """
+        if IntParamRegistrar._instance is None:
+            IntParamRegistrar._instance = IntParamRegistrar._IntParamRegistrar()
+
+        return IntParamRegistrar._instance
+
+    @staticmethod
+    def register_arg(arg):
+        IntParamRegistrar._get_instance().register_arg(arg)
+
+    @staticmethod
+    def register_args(args):
+        for arg in args:
+            IntParamRegistrar._get_instance().register_arg(arg)
+
+    @staticmethod
+    def get_registered_args():
+        return IntParamRegistrar._get_instance().get_registered_args()
+
+    @staticmethod
+    def register_hp_best_params(best_params, exceptions=set()):
+        # Should be a list of length 1
+        assert isinstance(best_params, list) and len(best_params) == 1
+
+        exceptions = set(exceptions)
+        for argname, value in best_params[0].items():
+            if isinstance(value, int) and argname not in exceptions:
+                IntParamRegistrar.register_arg(argname)
 
 def get_fingerprint(smile, radius, n_bits):
     if smile == 'none':

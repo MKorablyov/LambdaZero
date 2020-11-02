@@ -12,22 +12,20 @@ def construct_pooling(pooling_obj, data, config, req_param_to_conf_param={}):
     kwargs = {}
     sig = inspect.signature(pooling_obj.__init__)
     for param in sig.parameters.values():
-        if param.name == 'self':
+        if param.name in ['self', 'args', 'kwargs']:
             continue
 
-        mapped_name = None if param.name not in req_param_to_conf_param \
-                           else req_param_to_conf_param[param.name]
+        conf_name = param.name if param.name not in req_param_to_conf_param \
+                               else req_param_to_conf_param[param.name]
 
-        if param.name in config:
-            kwargs[param.name] = config[param.name]
-        elif mapped_name is not None and mapped_name in config:
-            kwargs[param.name] = config[param.name]
-        elif hasattr(data, param.name):
-            kwargs[param.name] = getattr(data, param.name)
-        elif param.value is inspect.Parameter.empty:
+        if conf_name in config:
+            kwargs[param.name] = config[conf_name]
+        elif hasattr(data, conf_name):
+            kwargs[param.name] = getattr(data, conf_name)
+        elif param.default is inspect.Parameter.empty:
             raise RuntimeError(
-                'Could not find non-default init argument %s of class %s ' +
-                'in config or data object' % (arg, pooling_obj.__name__)
+                'Could not find non-default init argument ' +
+                '%s of class %s in config or data object' % (conf_name, pooling_obj.__name__)
             )
 
     return pooling_obj(**kwargs)

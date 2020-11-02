@@ -187,30 +187,33 @@ class ProtDrugProtProtConvLayer(MessagePassing):
                                       num_nodes=data.x_prots.shape[0],
                                       dtype=data.x_prots.dtype)
 
-    def forward(self, h_drug, h_prot, data, drug_drug_batch):
-        # Linearly transform node feature matrix and set to zero where relevant
-        d2p_msg = self.drug_to_prot_mat(h_drug)
+    def forward(self, h_drug, h_prot, ppi_adj_t, data, drug_drug_batch, have_pooled):
         p2p_msg = self.prot_to_prot_mat(h_prot)
         self_prot_loop_msg = self.self_prot_loop(h_prot)
 
-        # Hack for doing something like torch.isin since pytorch hasn't actually
-        # implemented isin yet.
-        this_batch_drugs = drug_drug_batch[BATCH_EDGE_IDX_IDX]
-        matching_drugs_dpi = (data.dpi_edge_idx[0][..., None] == this_batch_drugs.flatten()).any(-1)
-        this_iter_dpi_idx = data.dpi_edge_idx[:, matching_drugs_dpi]
+        protein_output = self.propagate(ppi_adj_t, x=p2p_msg) + self_prot_loop_msg
 
-        # Want to send the attrs (concentrations) to modulate how strong our
-        # drug -> protein messages should be
-        dpi_attr = self._get_dpi_attr(this_iter_dpi_idx, this_batch_drugs, drug_drug_batch[BATCH_CONCS_IDX])
-        dpi_adj_t = SparseTensor.from_edge_index(
-            this_iter_dpi_idx,
-            edge_attr=dpi_attr,
-            sparse_sizes=(data.x_drugs.shape[0], data.x_prots.shape[0])
-        ).t()
+        if not have_pooled:
+            # Linearly transform node feature matrix and set to zero where relevant
+            d2p_msg = self.drug_to_prot_mat(h_drug)
 
-        protein_output = self.propagate(dpi_adj_t, x=d2p_msg) + \
-                         self.propagate(data.ppi_adj_t, x=p2p_msg) + \
-                         self_prot_loop_msg
+            # Hack for doing something like torch.isin since pytorch hasn't actually
+            # implemented isin yet.
+            this_batch_drugs = drug_drug_batch[BATCH_EDGE_IDX_IDX]
+            matching_drugs_dpi = (data.dpi_edge_idx[0][..., None] == this_batch_drugs.flatten()).any(-1)
+            this_iter_dpi_idx = data.dpi_edge_idx[:, matching_drugs_dpi]
+
+            # Want to send the attrs (concentrations) to modulate how strong our
+            # drug -> protein messages should be
+            dpi_attr = self._get_dpi_attr(this_iter_dpi_idx, this_batch_drugs, drug_drug_batch[BATCH_CONCS_IDX])
+            dpi_adj_t = SparseTensor.from_edge_index(
+                this_iter_dpi_idx,
+                edge_attr=dpi_attr,
+                sparse_sizes=(data.x_drugs.shape[0], data.x_prots.shape[0])
+            ).t()
+
+            protein_output = protein_output + self.propagate(dpi_adj_t, x=d2p_msg)
+
 
         return h_drug, protein_output
 

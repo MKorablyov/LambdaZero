@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
+import math
 from torch.nn import functional as F
 from torch.nn import Parameter, ParameterList
 import numpy as np
 from LambdaZero.examples.drug_comb.models.utils import get_batch, get_layer_dims
+from LambdaZero.examples.drug_comb.models.pooling import construct_pooling
 
 
 ########################################################################################################################
@@ -188,17 +190,20 @@ class ConcentrationOnlyPredictor(MLPPredictor):
 class PPIPredictor(MLPPredictor):
     def __init__(self, data, config):
         self.global_pooling_fxn = None
-        if 'global_pooling' in config:
+        if config.get('global_pooling'):
             self.global_pooling_fxn = construct_pooling(config['global_pooling'], config, data)
 
         super().__init__(data, config)
 
     def get_layer_dims(self, config, data):
-        if self.global_pooling_fxn is not None and hasattr(self.global_pooling_fxn, 'output_dim'):
-            in_channels = getattr(self.global_pooling_fxn, 'output_dim')
+        if self.global_pooling_fxn is not None:
+            if hasattr(self.global_pooling_fxn, 'output_dim'):
+                in_channels = getattr(self.global_pooling_fxn, 'output_dim')
+            else:
+                in_channels = config['residual_layers_dim']
         else:
             num_prots = data.x_prots.shape[0]
-            for _ in range(config['num_pooling_modules']):
+            for _ in range(config.get('num_pooling_modules') or 0):
                 num_prots = math.ceil(num_prots * config['pooling_ratio'])
 
             in_channels = num_prots * config['residual_layers_dim']
