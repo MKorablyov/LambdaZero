@@ -272,7 +272,8 @@ class GraphSignalLearner(BasePeriodicBackpropModel):
         have_pooled = False
         for i in range(len(self.convs)):
             h_prot_last = h_prot
-            _, h_prot = self.convs[i](h_drug, h_prot, ppi_adj_t,
+            ppi_adj_conv = ppi_adj_t.clone()
+            _, h_prot = self.convs[i](h_drug, h_prot, ppi_adj_conv,
                                       data, drug_drug_batch, have_pooled)
 
             att_idx = self._get_attention_idx(i)

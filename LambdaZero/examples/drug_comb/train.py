@@ -46,22 +46,23 @@ def train_epoch(data, loader, model, optim, max_examp_per_epoch=None, n_forward_
 
     examples_seen = 0
 
-    for i, drug_drug_batch in enumerate(loader):
-        optim.zero_grad()
+    with torch.autograd.set_detect_anomaly(True):
+        for i, drug_drug_batch in enumerate(loader):
+            optim.zero_grad()
 
-        out = model.forward(data, drug_drug_batch, n_forward_passes=n_forward_passes)
-        loss = model.loss(out, drug_drug_batch)
+            out = model.forward(data, drug_drug_batch, n_forward_passes=n_forward_passes)
+            loss = model.loss(out, drug_drug_batch)
 
-        loss.backward()
-        optim.step()
+            loss.backward()
+            optim.step()
 
-        epoch_loss += loss.item()
+            epoch_loss += loss.item()
 
-        # If we have seen enough examples in this epoch, break
-        examples_seen += drug_drug_batch[0].shape[0]
-        if max_examp_per_epoch is not None:
-            if examples_seen >= max_examp_per_epoch:
-                break
+            # If we have seen enough examples in this epoch, break
+            examples_seen += drug_drug_batch[0].shape[0]
+            if max_examp_per_epoch is not None:
+                if examples_seen >= max_examp_per_epoch:
+                    break
 
     print('Mean train loss: {:.4f}'.format(epoch_loss / num_batches))
 
@@ -348,10 +349,10 @@ class ActiveTrainer(AbstractTrainer):
 if __name__ == "__main__":
 
     pipeline_config = {
-        "transform": Compose([specific_cell_line('K-562'), take_first_k_vals(10)]),
+        "transform": specific_cell_line('K-562'),
         "pre_transform": None,
         "seed": 1,  # tune.grid_search([1, 2, 3]),
-        "val_set_prop": 0.2,
+        "val_set_prop": 0.75,
         "test_set_prop": 0.0,
         "train_epoch": train_epoch,
         "eval_epoch": eval_epoch,
@@ -361,7 +362,7 @@ if __name__ == "__main__":
 
     predictor_config = {
         "predictor": PPIPredictor,
-        "predictor_layers": [1024, 512, 256, 1],
+        "predictor_layers": [1024, 256, 128, 1],
         # [1024, 512, 256, 1],  # tune.grid_search([[2048, 1024, 1], [4096, 2048, 1024, 1]]),
         "with_fp": False,
         "with_expr": True,
@@ -413,12 +414,12 @@ if __name__ == "__main__":
         "summaries_dir": summaries_dir,
         "memory": 1800,
         "checkpoint_freq": 20,
-        "stop": {"training_iteration": 100},
+        "stop": {"training_iteration": 20},
         "checkpoint_at_end": False,
-        "resources_per_trial": {},#"cpu": 10, "gpu": 1},
+        "resources_per_trial": {"cpu": 10, "gpu": 1},
         'asha_metric': "eval_mean",
         'asha_mode': "min",
-        'asha_max_t': 100,
+        'asha_max_t': 20,
         "name": "GraphSignalFirstTrial"
     }
 
@@ -440,7 +441,7 @@ if __name__ == "__main__":
         'num_non_residual_convs': hp.quniform('num_non_residual_convs', 1, 3, 1),
         'num_residual_blocks': hp.quniform('num_residual_blocks', 0, 3, 1),
         'pooling_periodicity': hp.quniform('pooling_periodicity', 1, 3, 1),
-        'pooling_ratio': hp.uniform('pooling_ratio', .5, .85),
+        'pooling_ratio': hp.uniform('pooling_ratio', .1, .4),
         'pooling_layer': hp.choice('pooling_layer', [SAGPooling, TopKPooling]),
         'global_pooling': hp.choice('global_pooling', [None, global_max_pool, global_mean_pool, GlobalAttention, Set2Set]),
         'num_pooling_modules': hp.quniform('num_pooling_modules', 0, 5, 1),
@@ -454,7 +455,7 @@ if __name__ == "__main__":
         'num_non_residual_convs': 2,
         'num_residual_blocks': 2,
         'pooling_periodicity': 1,
-        'pooling_ratio': .5,
+        'pooling_ratio': .2,
         'pooling_layer': 0,
         'global_pooling': 0,
         'num_pooling_modules': 3,
@@ -484,7 +485,7 @@ if __name__ == "__main__":
         config=configuration["trainer_config"],
         stop=configuration["stop"],
         resources_per_trial=configuration["resources_per_trial"],
-        num_samples=1,
+        num_samples=10000,
         checkpoint_at_end=configuration["checkpoint_at_end"],
         local_dir=configuration["summaries_dir"],
         checkpoint_freq=configuration["checkpoint_freq"],

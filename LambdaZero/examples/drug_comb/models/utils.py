@@ -31,7 +31,10 @@ class ResidualModule(torch.nn.Module):
             if i != len(self.convs) - 1:
                 out_drug, out_prot = F.relu(out_drug), F.relu(out_prot)
 
-        return out_drug + h_drug, out_prot + h_prot
+        try:
+            return out_drug + h_drug, out_prot + h_prot
+        except:
+            import pdb; pdb.set_trace()
 
 
 class LowRankAttention(torch.nn.Module):

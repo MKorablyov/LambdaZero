@@ -189,11 +189,12 @@ class ProtDrugProtProtConvLayer(MessagePassing):
 
     def forward(self, h_drug, h_prot, ppi_adj_t, data, drug_drug_batch, have_pooled):
         p2p_msg = self.prot_to_prot_mat(h_prot)
-        self_prot_loop_msg = self.self_prot_loop(h_prot)
-
-        protein_output = self.propagate(ppi_adj_t, x=p2p_msg) + self_prot_loop_msg
+        protein_output = self.propagate(ppi_adj_t, x=p2p_msg)
 
         if not have_pooled:
+            self_prot_loop_msg = self.self_prot_loop(h_prot)
+            protein_output = protein_output + self_prot_loop_msg
+
             # Linearly transform node feature matrix and set to zero where relevant
             d2p_msg = self.drug_to_prot_mat(h_drug)
 

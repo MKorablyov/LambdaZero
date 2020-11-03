@@ -1,7 +1,7 @@
 from torch_geometric.data import Data, InMemoryDataset, download_url
 from LambdaZero.utils import get_external_dirs
 import pubchempy as pcp
-from cmapPy.pandasGEXpress.parse import parse
+#from cmapPy.pandasGEXpress.parse import parse
 import pickle
 import pandas as pd
 import torch

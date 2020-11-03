@@ -3,7 +3,7 @@ from LambdaZero.examples.drug_comb.utils import get_fingerprint
 from LambdaZero.utils import get_external_dirs
 from pubchempy import Compound
 import urllib.request
-from unrar import rarfile
+#from unrar import rarfile
 import ssl
 import numpy as np
 import pandas as pd

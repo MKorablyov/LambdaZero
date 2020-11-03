@@ -76,6 +76,7 @@ def filter_adj(edge_index, edge_attr, perm, num_nodes=None):
 class SAGPooling(SAGPooling):
     def __init__(self, in_channels, pooling_ratio=0.5, GNN=GCNConv, min_score=None,
                 multiplier=1, nonlinearity=torch.tanh, **kwargs):
+        kwargs['add_self_loops'] = False
         super().__init__(in_channels, pooling_ratio, GNN, min_score,
                          multiplier, nonlinearity, **kwargs)
 
@@ -109,12 +110,13 @@ class SAGPooling(SAGPooling):
         edge_index, edge_attr = filter_adj(edge_index, edge_attr, perm,
                                            num_nodes=score.size(0))
 
-        edge_index, edge_attr = add_remaining_self_loops(edge_index, edge_attr)
+        edge_index, edge_attr = add_remaining_self_loops(edge_index, edge_attr,
+                                                         num_nodes=x.shape[0])
         if is_sparse:
-            edge_index = SparseTensor.from_edge_index(edge_index, edge_attr).t()
-            edge_attr = None
-
-        return x, edge_index, edge_attr, batch, perm, score[perm]
+            adj_t = SparseTensor.from_edge_index(edge_index, edge_attr).t()
+            return x, adj_t, None, batch, perm, score[perm]
+        else:
+            return x, edge_index, edge_attr, batch, perm, score[perm]
 
 class TopKPooling(TopKPooling):
     def __init__(self, in_channels, pooling_ratio=0.5, min_score=None, multiplier=1,
@@ -126,7 +128,7 @@ class TopKPooling(TopKPooling):
         is_sparse = isinstance(edge_index, SparseTensor)
         if batch is None:
             if is_sparse:
-                batch = torch.zeros(x.size(0), dtype=edge_index.dtype(), device=edge_index.device())
+                batch = torch.zeros(x.size(0), dtype=torch.int64, device=edge_index.device())
             else:
                 batch = edge_index.new_zeros(x.size(0))
 
@@ -151,7 +153,10 @@ class TopKPooling(TopKPooling):
         edge_index, edge_attr = filter_adj(edge_index, edge_attr, perm,
                                            num_nodes=score.size(0))
 
-        edge_index, edge_attr = add_remaining_self_loops(edge_index, edge_attr)
+        edge_index, edge_attr = add_remaining_self_loops(edge_index, edge_attr,
+                                                         num_nodes=x.shape[0])
+        if torch.unique(edge_index).shape[0] != x.shape[0]:
+            import pdb; pdb.set_trace()
         if is_sparse:
             edge_index = SparseTensor.from_edge_index(edge_index, edge_attr).t()
             edge_attr = None
