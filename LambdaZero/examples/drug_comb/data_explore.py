@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import LambdaZero.utils
 from matplotlib import pyplot as plt
+import seaborn as sns
 
 datasets_dir, _, _ = LambdaZero.utils.get_external_dirs()
 
@@ -58,9 +59,31 @@ drugcomb_data = pd.read_csv(os.path.join(cfg.raw_dir, cfg.raw_file_names[1]), lo
 #     print("study", studies_unq[i], "raw_count", raw_counts[i])
 
 # look at fit data
-cell_line_summar = pd.read_csv(osp.join(datasets_dir,"NewDrugComb/cell_line_summary.csv"))
+#cell_line_summar = pd.read_csv(osp.join(datasets_dir,"NewDrugComb/cell_line_summary.csv"))
 
 #cell_line_summar.sort_values("synergy_zip_001_found",inplace=True,ascending=False)
 #cell_line_summar.reset_index(drop=True,inplace=True)
-pd.set_option('display.max_columns', 10)
-print(cell_line_summar)
+#pd.set_option('display.max_columns', 10)
+#print(cell_line_summar)
+
+
+
+#print(np.log10(10))
+# almanac data: https://wiki.nci.nih.gov/display/NCIDTPdata/NCI-ALMANAC
+almanac = pd.read_csv("/home/maksym/Datasets/ALMANAC/ComboDrugGrowth_Nov2017.csv")
+print(almanac.columns)
+print(set(almanac["CONCUNIT1"].to_list()))
+print(set(almanac["CONCUNIT2"].to_list()))
+
+#mask = almanac["CONC1"].to_numpy() > 0.005
+#almanac = almanac[mask]
+#print(set(almanac["CONCINDEX1"]))
+#print(set(almanac["CONCINDEX2"]))
+#print(min(almanac["CONC1"].to_list()))
+#print(max(almanac["CONC2"].to_list()))
+
+sns.distplot(np.log10(almanac["CONC1"].to_list()))
+plt.xlabel("log concentration M")
+plt.ylabel("count")
+
+plt.savefig("/home/maksym/Datasets/ALMANAC/concentrations.png")
