@@ -15,9 +15,9 @@ def graph_add_rsqrt_degree_norm(graph):
     Output:
         graph (modified in-place) - torch_geometric.data.Data
     """
-    # assumed flow: ''
     origin_nodes, _ = graph.edge_index  # origin, neighbor
-    node_degrees = degree(origin_nodes, num_nodes=graph.x.size(0), dtype=torch.get_default_dtype())
+    num_nodes = graph.x.size(0) if graph.x is not None else graph.z.size(0)
+    node_degrees = degree(origin_nodes, num_nodes=num_nodes, dtype=torch.get_default_dtype())
     graph.norm = node_degrees[origin_nodes].rsqrt()  # 1 / sqrt(degree(i))
     return graph
 
