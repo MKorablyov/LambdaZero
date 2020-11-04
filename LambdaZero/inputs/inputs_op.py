@@ -635,14 +635,14 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
 
     natm = len(mol.GetAtoms())
     # featurize elements
-    atmfeat = pd.DataFrame(index=range(natm),columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic",
-                                                      "sp", "sp2", "sp3", "num_hs"])
+    atmfeat = pd.DataFrame(index=range(natm), columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic",
+                                                       "sp", "sp2", "sp3", "num_hs"])
 
     # featurize
     fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
     factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
-    for i,atom in enumerate(mol.GetAtoms()):
-        type_idx = atomtypes.get(atom.GetSymbol(),5)
+    for i, atom in enumerate(mol.GetAtoms()):
+        type_idx = atomtypes.get(atom.GetSymbol(), 5)
         atmfeat["type_idx"][i] = onehot([type_idx], num_classes=len(atomtypes) + 1)[0]
         atmfeat["atomic_number"][i] = atom.GetAtomicNum()
         atmfeat["aromatic"][i] = 1 if atom.GetIsAromatic() else 0
@@ -673,27 +673,27 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     # get bonds and bond features
     bond = np.asarray([[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()] for bond in mol.GetBonds()])
     bondfeat = [bondtypes[bond.GetBondType()] for bond in mol.GetBonds()]
-    bondfeat = onehot(bondfeat,num_classes=len(bondtypes))
+    bondfeat = onehot(bondfeat, num_classes=len(bondtypes))
 
     # convert atmfeat to numpy matrix
     if not panda_fmt:
-        type_idx = np.stack(atmfeat["type_idx"].values,axis=0)
-        atmfeat = atmfeat[["atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3","num_hs"]]
-        atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
+        type_idx = np.stack(atmfeat["type_idx"].values, axis=0)
+        atmfeat = atmfeat[["atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3", "num_hs"]]
+        atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)], axis=1)
     return atmfeat, coord, bond, bondfeat
 
 
 def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
-    "convert to PyTorch geometric module"
+    """convert to PyTorch geometric module"""
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
     atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
-    edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=torch.int64)
-    edge_attr = torch.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=torch.float32)
+    edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)], axis=1), dtype=torch.int64)
+    edge_attr = torch.tensor(np.concatenate([bondfeat, bondfeat], axis=0), dtype=torch.float32)
     edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
     # make torch data
     if coord is not None:
-        coord = torch.tensor(coord,dtype=torch.float32)
+        coord = torch.tensor(coord, dtype=torch.float32)
         data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
@@ -701,8 +701,8 @@ def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
 
 
 def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
-    "mol to graph convertor"
-    mol,_,_ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
+    """mol to graph convertor"""
+    mol, _, _ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
     if feat == "mpnn":
         atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
     else:
@@ -713,8 +713,8 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
 
 def create_mol_graph_with_3d_coordinates(smi, props):
     mol = rdkit.Chem.rdmolfiles.MolFromSmiles(smi)
-    # x (tmp)
-    x = torch.tensor([a.GetAtomicNum() for a in mol.GetAtoms()], dtype=torch.int64)
+    # z
+    z = torch.tensor([a.GetAtomicNum() for a in mol.GetAtoms()], dtype=torch.int64)
     # edge index
     bonds = np.asarray([[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()] for bond in mol.GetBonds()])
     bonds = np.vstack((bonds, bonds[:, ::-1]))
@@ -728,9 +728,9 @@ def create_mol_graph_with_3d_coordinates(smi, props):
     pos = torch.tensor(np.vstack(coord), dtype=torch.float64)
     # norm
     origin_nodes, _ = edge_index  # origin, neighbor
-    node_degrees = degree(origin_nodes, num_nodes=x.size(0))
+    node_degrees = degree(origin_nodes, num_nodes=z.size(0))
     norm = node_degrees[origin_nodes].type(torch.float64).rsqrt()  # 1 / sqrt(degree(i))
-    return Data(x, edge_index, edge_attr, y, pos, norm)
+    return Data(None, edge_index, edge_attr, y, pos, norm, z=z)
 
 
 @ray.remote
@@ -819,7 +819,7 @@ class BrutalDock(InMemoryDataset):
         for raw_path, processed_path in zip(self.raw_paths, self.processed_paths):
             docked_index = pd.read_feather(raw_path)
             smis = docked_index["smi"].tolist()
-            props = {pr:docked_index[pr].tolist() for pr in self._props}
+            props = {pr: docked_index[pr].tolist() for pr in self._props}
             tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
                                            self.pre_filter, self.pre_transform) for j in range(len(smis))]
             graphs = ray.get(tasks)
