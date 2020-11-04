@@ -45,13 +45,13 @@ transform = torch_geometric.transforms.Compose([
 
 
 config = {
-    "trainer": RegressorWithSchedulerOnBatch,
+    "trainer": RegressorWithSchedulerOnEpoch,
     "trainer_config": {
         "dtype": torch.float64,
         "target": "y",
         "target_norm": [2.68, 1.5],  # mean, std
-        "dataset_split_path": os.path.join(datasets_dir, "QM9", "randsplit_qm9_small.npy"),
-        "batch_size": 2,  # 64,
+        "dataset_split_path": os.path.join(datasets_dir, "QM9", "randsplit_qm9_110_10_10_v0.npy"),
+        "batch_size": 16,  # 64,
 
         "dataset": torch_geometric.datasets.QM9,
         "dataset_config": {
@@ -80,7 +80,7 @@ config = {
     "summaries_dir": summaries_dir,
     "memory": 8 * 10 ** 9,  # 20 * 10 ** 9,
 
-    "stop": {"training_iteration": 40},
+    "stop": {"training_iteration": 120},
     "resources_per_trial": {
         "cpu": 1,
         "gpu": 1.0
@@ -104,7 +104,7 @@ config_name = f"{config['trainer_config']['model_config']['equivariant_model']._
 
 
 if __name__ == "__main__":
-    ray.init(local_mode=True, memory=config["memory"])
+    ray.init(memory=config["memory"])
 
     analysis = tune.run(config["trainer"],
                         config=config["trainer_config"],
