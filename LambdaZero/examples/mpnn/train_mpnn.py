@@ -66,7 +66,7 @@ config = merge_dicts(DEFAULT_CONFIG, config)
 
 
 if __name__ == "__main__":
-    ray.init(local_mode=True, memory=config["memory"])
+    ray.init(memory=config["memory"])
     analysis = tune.run(config["trainer"],
                         config=config["trainer_config"],
                         stop=config["stop"],
