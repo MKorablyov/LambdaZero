@@ -1,5 +1,5 @@
 from abc import ABC
-import os, time
+import os
 
 import numpy as np
 from ray.rllib.models.model import restore_original_dimensions
@@ -7,7 +7,7 @@ from ray.rllib.models.preprocessors import get_preprocessor
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
 
-#from torch_geometric.nn import GINEConv
+# from torch_geometric.nn import GINEConv
 from torch_geometric.nn import NNConv
 from torch_geometric.nn import Set2Set
 
@@ -21,6 +21,7 @@ from .global_attention_layer import LowRankAttention
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 def convert_to_tensor(arr):
     tensor = torch.from_numpy(np.asarray(arr))
@@ -136,7 +137,6 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
         return actor_logits, state
 
-
     def value_function(self):
         return self._value_out
 
@@ -193,6 +193,7 @@ class MPNNet(nn.Module):
         out = nn.functional.relu(self.lin1(out))
         out = self.lin2(out)
         return out.view(-1)
+
 
 class MPNNetDrop(nn.Module):
     """
@@ -267,7 +268,6 @@ class MPNNetDropLRGA(nn.Module):
         self.lrga = nn.ModuleList([LowRankAttention(30, 14, drop_prob),
                      LowRankAttention(30, 14, drop_prob),
                      LowRankAttention(30, 14, drop_prob)])
-
         self.lrga_lin = nn.ModuleList([nn.Linear(60 + dim, dim),
                                        nn.Linear(60 + dim, dim),
                                        nn.Linear(60 + dim, dim)])
