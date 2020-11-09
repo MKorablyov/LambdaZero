@@ -17,7 +17,6 @@ import LambdaZero.models
 import LambdaZero.chem
 from LambdaZero.utils import Complete, get_external_dirs
 import logging
-from LambdaZero.utils.fast_sumtree.fast_sumtree import SumTree
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
