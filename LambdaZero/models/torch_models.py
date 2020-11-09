@@ -386,9 +386,5 @@ class GraphIsomorphismNet(nn.Module):
         node_out = self.set2set2(node_out, data.batch)
         # fully-connected layer for output
         out = self.fully_connected(node_out)
-<<<<<<< HEAD
 
         return out.view(-1)
-=======
-        return out.view(-1)
->>>>>>> 1b9837d4af7d97954b7aff8aacee2856f85ff1a1
