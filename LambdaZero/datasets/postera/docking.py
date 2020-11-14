@@ -1,4 +1,4 @@
-import os,time, random, string
+import os,sys,time, random, string
 import os.path as osp
 import numpy as np
 import pandas as pd
@@ -12,10 +12,57 @@ from sklearn.metrics import roc_curve, auc, roc_auc_score
 
 
 
+
+
+# class GenMolFile_v1:
+#     def __init__(self, outpath, num_conf):
+#         self.outpath = outpath
+#         self.num_conf = num_conf
+#     def __call__(self, smi,mol_name):
+#         mol = Chem.MolFromSmiles(smi)
+#         Chem.SanitizeMol(mol)
+#         mol_h = Chem.AddHs(mol)
+#         AllChem.EmbedMultipleConfs(mol_h, numConfs=self.num_conf)
+#         [AllChem.MMFFOptimizeMolecule(mol_h, confId=i) for i in range(self.num_conf)]
+#         mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
+#         # choose minimum energy conformer
+#         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy()
+#                         for i in range(self.num_conf)])
+#         mol = Chem.RemoveHs(mol_h)
+#         # save file in .mol format
+#         mol_file = os.path.join(self.outpath, mol_name + ".mol")
+#         print(Chem.MolToMolBlock(mol, confId=int(mi)), file=open(mol_file, 'w+'))
+#         return mol_file
+
+
+
+# class GenMolFile_v1:
+#     def __init__(self, outpath, num_conf):
+#         self.outpath = outpath
+#         self.num_conf = num_conf
+#     def __call__(self, smi,mol_name):
+#         mol = Chem.MolFromSmiles(smi)
+#         Chem.SanitizeMol(mol)
+#         mol_h = Chem.AddHs(mol)
+#         AllChem.EmbedMultipleConfs(mol_h, numConfs=1)
+#         [AllChem.MMFFOptimizeMolecule(mol_h, confId=i) for i in range(1)]
+#         #mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
+#         # choose minimum energy conformer
+#         #mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy()
+#         #                for i in range(self.num_conf)])
+#         #mol = Chem.RemoveHs(mol_h)
+#         # save file in .mol format
+#         mol_file = os.path.join(self.outpath, mol_name + ".mol")
+#         print(Chem.MolToMolBlock(mol, confId=0), file=open(mol_file, 'w+'))
+#         return mol_file
+
+
 class GenMolFile_v1:
-    def __init__(self, outpath, num_conf):
+    def __init__(self, mgltools, outpath, num_conf):
+        self.mgltools = mgltools
         self.outpath = outpath
         self.num_conf = num_conf
+
     def __call__(self, smi,mol_name):
         mol = Chem.MolFromSmiles(smi)
         Chem.SanitizeMol(mol)
@@ -26,11 +73,19 @@ class GenMolFile_v1:
         # choose minimum energy conformer
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy()
                         for i in range(self.num_conf)])
-        mol = Chem.RemoveHs(mol_h)
-        # save file in .mol format
-        mol_file = os.path.join(self.outpath, mol_name + ".mol")
-        print(Chem.MolToMolBlock(mol, confId=int(mi)), file=open(mol_file, 'w+'))
-        return mol_file
+        lname = os.path.join(self.outpath, mol_name)
+        print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(lname + ".sdf", 'w+'))
+        os.system('babel -isdf {0} -omol2 {1}'.format(lname + ".sdf", lname + ".mol2"))
+        prepare_ligand4 = osp.join(self.mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
+        os.system("pythonsh {} -l {} -o {}".format(prepare_ligand4,
+                                                   lname + ".mol2",
+                                                   lname + ".pdbqt"))
+        return lname + ".pdbqt"
+
+
+#sys.path.append("/home/maksym/Programs/mgltools_i86Linux2_1.5.6/MGLToolsPckgs")
+#from AutoDockTools import
+
 
 
 class DockVina_smi:
@@ -53,6 +108,8 @@ class DockVina_smi:
                 format(self.config["smina_bin"],rec_file,dock_file,lig_file,sminaord_file)
             dock_cmd = dock_cmd + " " + self.config["dock_pars"]
 
+            print(dock_cmd)
+
             # dock
             cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
             cl.wait()
@@ -71,18 +128,27 @@ class DockVina_smi:
 
 
 if __name__ == "__main__":
+    # smina no hydrogens + relaxation: 0.86
+    # vina no hydrogens 0.83
+    # vina hydorgens 0.86
+    # vina hydrogens + relaxation 0.856
+
+    # Maria's vina: 0.92
+
+
     config = {
         "outpath":"/home/maksym/Datasets/seh/4jnc/docked",
-        "smina_bin":"/home/maksym/Programs/smina/smina.static",
+        "smina_bin":
+            #"/home/maksym/Programs/vina/bin/vina",
+            "/home/maksym/Programs/smina/smina.static",
         "docksetup_dir":"/home/maksym/Datasets/seh/4jnc",
-        "dock_pars": "",#"--exhaustiveness 8 --cpu 1",
+        "dock_pars": "--scoring vina",#"--exhaustiveness 8 --cpu 1",
         "gen_molfile": GenMolFile_v1,
         "gen_molfile_par": {
+            "mgltools": "/home/maksym/Programs/mgltools_i86Linux2_1.5.6/MGLToolsPckgs/",
             "outpath":"/home/maksym/Datasets/seh/4jnc/docked",
             "num_conf":20,
         }}
-
-
 
     data = pd.read_csv("/home/maksym/Datasets/seh/seh_chembl.csv", sep=";")
     binding = data[["Smiles", "Standard Value", "Ligand Efficiency BEI", "Ligand Efficiency SEI"]].copy()
@@ -91,27 +157,27 @@ if __name__ == "__main__":
     binding["Ligand Efficiency SEI"] = pd.to_numeric(binding["Ligand Efficiency SEI"], errors="coerce")
     binding = binding.dropna()
     ic50 = binding["Standard Value"].to_numpy()
+
     binders = ic50 < 1
     decoys = ic50 > 10000
     binding = pd.concat([binding[binders], binding[decoys]])
     binding.reset_index(inplace=True)
     smis = binding["Smiles"].to_numpy()
-    print(len(smis))
+
 
     dock_smi = DockVina_smi(config)
     dockscore = pd.DataFrame({"dockscore":[dock_smi.dock(smi) for smi in smis]})
     binding = pd.concat([binding, dockscore],axis=1)
     binding.to_feather(os.path.join(config["outpath"], "seh.ftr"))
-    binding = pd.read_feather(os.path.join(config["dock_out"], "seh.ftr"))
+    binding = pd.read_feather(os.path.join(config["outpath"], "seh.ftr"))
     #binding = pd.read_feather("/home/maksym/Datasets/seh/4jnc/docked/seh_v1.ftr")
     binding = binding.dropna()
 
-
     fpr, tpr, _ = roc_curve(binding["Standard Value"] < 1, -binding["dockscore"])
     roc_auc = auc(fpr,tpr)
-    plt.plot(fpr,tpr)
-    plt.show()
-    #print(roc_auc)
+    # plt.plot(fpr,tpr)
+    # plt.show()
+    print(roc_auc)
     #print(roc_auc_score(binding["Standard Value"] < 1, -binding["dockscore"]))
     #plt.scatter(np.log(binding["Standard Value"]), binding["dockscore"])
     #plt.show()
@@ -119,7 +185,7 @@ if __name__ == "__main__":
 
 
 
-
+# import prody as pr
 #     # make the ligand with the order of atoms shuffled how Vina wants it, but with heavy atoms being in the same place
 #     reorder_cmd = smina_cmd + " --score_only" + " -o " + os.path.join(init.db_root, init.out_dir, uid + "_sminaord.pdb")
 #     # make the actual docking command
