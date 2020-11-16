@@ -68,12 +68,14 @@ class GenMolFile_v1:
         Chem.SanitizeMol(mol)
         mol_h = Chem.AddHs(mol)
         AllChem.EmbedMultipleConfs(mol_h, numConfs=self.num_conf)
-        #[AllChem.MMFFOptimizeMolecule(mol_h, confId=i) for i in range(self.num_conf)]
+        [AllChem.MMFFOptimizeMolecule(mol_h, confId=i) for i in range(self.num_conf)]
         mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
         # choose minimum energy conformer
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy()
                         for i in range(self.num_conf)])
         lname = os.path.join(self.outpath, mol_name)
+        #print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(lname + ".mol", 'w+'))
+        #return lname + ".mol"
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(lname + ".sdf", 'w+'))
         os.system('babel -isdf {0} -omol2 {1}'.format(lname + ".sdf", lname + ".mol2"))
         prepare_ligand4 = osp.join(self.mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
@@ -102,7 +104,6 @@ class DockVina_smi:
                 mol_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
             #make mol file to dock
             dock_file = self.gen_molfile(smi, mol_name)
-
             #lig_file = osp.join(self.config["docksetup_dir"], "lig.pdb")
             sminaord_file = osp.join(self.config["outpath"], mol_name + "_sminaord.pdb")
             dock_cmd = self.dock_cmd.format(dock_file,sminaord_file)
@@ -113,10 +114,10 @@ class DockVina_smi:
             # parse energy
             with open(os.path.join(sminaord_file)) as f: smina_out = f.readlines()
             if smina_out[1].startswith(
-                    #"REMARK VINA RESULT"):
-                    "REMARK minimizedAffinity"):
-                #dockscore = float(smina_out[1].split()[3])
-                dockscore = float(smina_out[1].split(" ")[-1]) # fixme
+                    "REMARK VINA RESULT"):
+                    #"REMARK minimizedAffinity"):
+                dockscore = float(smina_out[1].split()[3])
+                #dockscore = float(smina_out[1].split(" ")[-1]) # fixme
             else:
                 raise Exception("can't correctly parse docking energy")
             print("docskscore", dockscore)
@@ -134,6 +135,8 @@ if __name__ == "__main__":
     # vina + hydrogens + relaxation + Masha's script + bounding box + masha's pdbqt 0.847
     # vina + hydrogens + relaxation + Masha's script + bounding box + masha's pdbqt + original vina binary 0.9
     # vina + hydrogens + Masha's script + bounding box + masha's pdbqt + original vina binary 0.9
+    # smina + hydrogens 0.819
+    # Maksym repeat Maria's docking setup: 0.910
     # Maria's vina: 0.92
 
     # todo: strip salts
@@ -141,8 +144,8 @@ if __name__ == "__main__":
     config = {
         "outpath":"/home/maksym/Datasets/seh/4jnc/docked",
         "vina_bin":
-            #"/home/maksym/Programs/vina/bin/vina",
-            "/home/maksym/Programs/smina/smina.static",
+            "/home/maksym/Programs/vina/bin/vina",
+            #"/home/maksym/Programs/smina/smina.static",
         "rec_file": "/home/maksym/Datasets/seh/4jnc/4jnc.nohet.aligned.pdbqt",
         "bindsite": [-13.4, 26.3, -13.3, 20.013, 16.3, 18.5],
         "docksetup_dir":"/home/maksym/Datasets/seh/4jnc",
