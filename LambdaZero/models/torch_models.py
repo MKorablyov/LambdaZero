@@ -4,6 +4,7 @@ import os
 import numpy as np
 from ray.rllib.models.model import restore_original_dimensions
 from ray.rllib.models.preprocessors import get_preprocessor
+from ray.rllib.utils.annotations import override
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
 
@@ -22,6 +23,7 @@ from .global_attention_layer import LowRankAttention
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+from LambdaZero.utils import RunningMeanStd
 
 def convert_to_tensor(arr):
     tensor = torch.from_numpy(np.asarray(arr))
@@ -73,10 +75,9 @@ class ActorCriticModel(TorchModelV2, nn.Module, ABC):
 
 
 class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
-    def __init__(self, obs_space, action_space, num_outputs, model_config, name):
+    def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kwargs):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
-
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         mol_fp_len = obs_space.original_space["mol_fp"].shape[0]
         stem_fp_len = obs_space.original_space["stem_fps"].shape[1]
@@ -99,11 +100,10 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         # build critic
         self.critic_layers = nn.Sequential(nn.ReLU(), nn.Linear(in_features=256, out_features=1))
         self._value_out = None
-
+        
     def forward(self, input_dict, state, seq_lens):
         # shared molecule embedding
         # weak todo (maksym) use mask before compute
-
         mol_fp = input_dict["mol_fp"]
         stem_fps = input_dict["stem_fps"]
         jbond_fps = input_dict["jbond_fps"]
@@ -131,7 +131,7 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         # compute value
         critic_logits = self.critic_layers(mol_embed)
         self._value_out = critic_logits[:, 0]
-
+        
         # mask not available actions
         masked_actions = (1. - action_mask).to(torch.bool)
         actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf

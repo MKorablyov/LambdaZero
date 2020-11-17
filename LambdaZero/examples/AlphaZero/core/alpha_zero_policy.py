@@ -112,11 +112,12 @@ class AlphaZeroPolicy(TorchPolicy):
 
         loss_out, policy_loss, value_loss = self._loss(
             self, self.model, self.dist_class, train_batch)
-        self._optimizer.zero_grad()
-        loss_out.backward()
+        for i, opt in enumerate(self._optimizers):
+            opt.zero_grad()
+            loss_out.backward()
 
-        grad_process_info = self.extra_grad_process()
-        self._optimizer.step()
+            grad_process_info = self.extra_grad_process(opt, loss_out)
+            opt.step()
 
         grad_info = self.extra_grad_info(train_batch)
         grad_info.update(grad_process_info)
