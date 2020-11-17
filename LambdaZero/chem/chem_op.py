@@ -311,6 +311,7 @@ class Dock_smi:
                  vdw_defn_file="parameters/vdw_AMBER_parm99.defn",
                  flex_defn_file="parameters/flex.defn",
                  flex_drive_file="parameters/flex_drive.tbl"):
+
         # output path
         self.outpath = outpath
         if gas_charge:
@@ -394,7 +395,7 @@ class Dock_smi:
         # parse dock energy
         with open(dock_out_file) as f: lines = f.read().splitlines()
         gridscores = [float(line[38:]) for line in lines if line.startswith("                          Grid_Score")]
-        assert len(gridscores) == 1, "could not parse docking output - something wrong with docking"
+        assert len(gridscores) == 1, "could not parse docking output - something happened while running dock binary"
         gridscore = gridscores[0]
 
         # parse dock coords

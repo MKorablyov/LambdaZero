@@ -178,6 +178,11 @@ class MolMDP:
                 block_idx = np.random.choice(np.arange(self.num_blocks))
                 stem_idx = None
                 self.add_block(block_idx=block_idx, stem_idx=stem_idx)
+                if self.molecule.numblocks >= length:
+                    if self.molecule.slices[-1] > 1:
+                        done = True
+                    else:
+                        self.reset()
             elif len(self.molecule.stems) > 0:
                 block_idx = np.random.choice(np.arange(self.num_blocks))
                 stem_idx = np.random.choice(len(self.molecule.stems))

@@ -9,7 +9,7 @@ def random_split(num_samples, probs):
     splits = [[] for _ in range(len(probs))]
 
     for i in range(num_samples):
-        choice = np.random.choice(np.arange(3),1, p=probs)[0]
+        choice = np.random.choice(np.arange(len(probs)),1, p=probs)[0]
         splits[choice].append(i)
     splits = [np.asarray(s) for s in splits]
     return splits

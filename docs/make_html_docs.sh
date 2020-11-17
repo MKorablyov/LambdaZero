@@ -1,7 +1,7 @@
-replace_static() {
-    # This function replaces the word "_static" by the word "static" in all html files in current folder
+replacestatic() {
+    # This function replaces the word "static" by the word "static" in all html files in current folder
     for file in `ls | grep .html`; do
-        sed 's/_static/static/' $file > tmp
+        sed 's/static/static/' $file > tmp
         mv tmp $file
     done
    }
@@ -13,12 +13,12 @@ make clean
 sphinx-apidoc -f -o source/generated/ ../LambdaZero
 make html
 
-# replace _static with static everywhere; folders starting with an underscore (like _static) are ignored by github.io
+# replace static with static everywhere; folders starting with an underscore (like static) are ignored by github.io
 cd ./build/html/
-mv _static/ static/
-replace_static
+mv static/ static/
+replacestatic
 cd ./generated/
-replace_static
+replacestatic
 cd ../../../
 
 # remove all the needless rst files

@@ -1,4 +1,5 @@
-import os,time
+import ast
+import os
 import numpy as np
 import pandas as pd
 import torch
@@ -11,6 +12,8 @@ from rdkit.Chem.rdchem import HybridizationType
 from rdkit import RDConfig
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem.rdchem import BondType as BT
+from torch.utils.data import Subset
+from torch_geometric.data import DataLoader
 
 import ray
 rdBase.DisableLog('rdApp.error')
@@ -23,6 +26,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 #try:
 from torch_geometric.data import (InMemoryDataset, download_url, extract_zip, Data)
+from torch_geometric.utils import degree
 from sklearn.preprocessing import StandardScaler as sk_StandardScaler
 from sklearn.decomposition import PCA as sk_PCA
 #except Exception as e:
@@ -617,7 +621,6 @@ atomic_num_to_period.update(dict.fromkeys(list(range(19, 36+1)), 4))
 atomic_num_to_period.update(dict.fromkeys(list(range(37, 54+1)), 5))
 
 
-
 def onehot(arr, num_classes, dtype=np.int):
     arr = np.asarray(arr, dtype=np.int)
     assert arr.ndim == 1, "dims other than 1 not implemented"
@@ -625,20 +628,21 @@ def onehot(arr, num_classes, dtype=np.int):
     onehot_arr[np.arange(arr.size), arr] = 1
     return onehot_arr
 
+
 def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     atomtypes = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
     bondtypes = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
 
     natm = len(mol.GetAtoms())
     # featurize elements
-    atmfeat = pd.DataFrame(index=range(natm),columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic",
-                                                      "sp", "sp2", "sp3", "num_hs"])
+    atmfeat = pd.DataFrame(index=range(natm), columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic",
+                                                       "sp", "sp2", "sp3", "num_hs"])
 
     # featurize
     fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
     factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
-    for i,atom in enumerate(mol.GetAtoms()):
-        type_idx = atomtypes.get(atom.GetSymbol(),5)
+    for i, atom in enumerate(mol.GetAtoms()):
+        type_idx = atomtypes.get(atom.GetSymbol(), 5)
         atmfeat["type_idx"][i] = onehot([type_idx], num_classes=len(atomtypes) + 1)[0]
         atmfeat["atomic_number"][i] = atom.GetAtomicNum()
         atmfeat["aromatic"][i] = 1 if atom.GetIsAromatic() else 0
@@ -669,34 +673,36 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     # get bonds and bond features
     bond = np.asarray([[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()] for bond in mol.GetBonds()])
     bondfeat = [bondtypes[bond.GetBondType()] for bond in mol.GetBonds()]
-    bondfeat = onehot(bondfeat,num_classes=len(bondtypes))
+    bondfeat = onehot(bondfeat, num_classes=len(bondtypes))
 
     # convert atmfeat to numpy matrix
     if not panda_fmt:
-        type_idx = np.stack(atmfeat["type_idx"].values,axis=0)
-        atmfeat = atmfeat[["atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3","num_hs"]]
-        atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)],axis=1)
+        type_idx = np.stack(atmfeat["type_idx"].values, axis=0)
+        atmfeat = atmfeat[["atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3", "num_hs"]]
+        atmfeat = np.concatenate([type_idx, atmfeat.to_numpy(dtype=np.int)], axis=1)
     return atmfeat, coord, bond, bondfeat
 
+
 def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
-    "convert to PyTorch geometric module"
+    """convert to PyTorch geometric module"""
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
     atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
-    edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)],axis=1),dtype=torch.int64)
-    edge_attr = torch.tensor(np.concatenate([bondfeat,bondfeat], axis=0),dtype=torch.float32)
+    edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)], axis=1), dtype=torch.int64)
+    edge_attr = torch.tensor(np.concatenate([bondfeat, bondfeat], axis=0), dtype=torch.float32)
     edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
     # make torch data
     if coord is not None:
-        coord = torch.tensor(coord,dtype=torch.float32)
+        coord = torch.tensor(coord, dtype=torch.float32)
         data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
     else:
         data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
     return data
 
+
 def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
-    "mol to graph convertor"
-    mol,_,_ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
+    """mol to graph convertor"""
+    mol, _, _ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
     if feat == "mpnn":
         atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
     else:
@@ -704,27 +710,28 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
     return graph
 
+
 def create_mol_graph_with_3d_coordinates(smi, props):
     mol = rdkit.Chem.rdmolfiles.MolFromSmiles(smi)
-        
-    # x (tmp)
-    x = torch.tensor([a.GetAtomicNum() for a in mol.GetAtoms()], dtype=torch.int64)
-
+    # z
+    z = torch.tensor([a.GetAtomicNum() for a in mol.GetAtoms()], dtype=torch.int64)
     # edge index
     bonds = np.asarray([[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()] for bond in mol.GetBonds()])
     bonds = np.vstack((bonds, bonds[:, ::-1]))
     edge_index = torch.tensor(bonds.T, dtype=torch.int64)
-
     # edge_attr (tmp)
     edge_attr = None
-
     # y
     y = torch.tensor([props['gridscore']], dtype=torch.float64)
-
     # pos
-    pos = torch.tensor(np.vstack(props['coord']), dtype=torch.float64) 
+    coord = ast.literal_eval(props['coord'].decode('utf-8')) if isinstance(props['coord'], bytes) else props['coord']
+    pos = torch.tensor(np.vstack(coord), dtype=torch.float64)
+    # norm
+    origin_nodes, _ = edge_index  # origin, neighbor
+    node_degrees = degree(origin_nodes, num_nodes=z.size(0))
+    norm = node_degrees[origin_nodes].type(torch.float64).rsqrt()  # 1 / sqrt(degree(i))
+    return Data(None, edge_index, edge_attr, y, pos, norm, z=z)
 
-    return Data(x, edge_index, edge_attr, y, pos)
 
 @ray.remote
 def tpnn_proc(smi, props, pre_filter, pre_transform):
@@ -738,6 +745,7 @@ def tpnn_proc(smi, props, pre_filter, pre_transform):
         graph = pre_transform(graph)
     return graph
 
+
 @ray.remote
 def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
     try:
@@ -749,6 +757,7 @@ def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
     if pre_transform is not None:
         graph = pre_transform(graph)
     return graph
+
 
 def tpnn_transform(data):
     def _group_period(atomic_numbers):
@@ -769,9 +778,12 @@ def tpnn_transform(data):
     
     data = data.clone()
     data.x = _one_hot_group_period(*_group_period(data.x))
-    data.edge_attr = _rel_vectors(data.pos, data.edge_index)
+    data.rel_vec = _rel_vectors(data.pos, data.edge_index)
+    data.abs_distances = data.rel_vec.norm(dim=1)
+    data.rel_vec = torch.nn.functional.normalize(data.rel_vec, p=2, dim=-1)
 
     return data
+
 
 class BrutalDock(InMemoryDataset):
     # own internal dataset
@@ -807,10 +819,22 @@ class BrutalDock(InMemoryDataset):
         for raw_path, processed_path in zip(self.raw_paths, self.processed_paths):
             docked_index = pd.read_feather(raw_path)
             smis = docked_index["smi"].tolist()
-            props = {pr:docked_index[pr].tolist() for pr in self._props}
+            props = {pr: docked_index[pr].tolist() for pr in self._props}
             tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
                                            self.pre_filter, self.pre_transform) for j in range(len(smis))]
             graphs = ray.get(tasks)
             graphs = [g for g in graphs if g is not None]
             # save to the disk
             torch.save(self.collate(graphs), processed_path)
+
+
+def dataset_creator_v1(config):
+    # make dataset
+    dataset = config["dataset"](**config["dataset_config"])
+    train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
+
+    train_set = Subset(dataset, train_idxs.tolist())
+    val_set = Subset(dataset, val_idxs.tolist())
+    train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
+    val_loader = DataLoader(val_set, batch_size=config["b_size"])
+    return train_loader, val_loader
