@@ -100,7 +100,7 @@ if __name__ == "__main__":
         "dock_pars": "",  # "--scoring vina", # "--exhaustiveness 8 --cpu 1",
         "gen_molfile": GenMolFile_v1,
         "gen_molfile_par": {
-            "mgltools": os.path.join(programs_dir, "mgltools_i86Linux2_1.5.6/MGLToolsPckgs"),
+            "mgltools": os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6/MGLToolsPckgs"),
             "outpath": os.path.join(datasets_dir, "seh/4jnc/docked"),
             "num_conf": 20,
         }}
