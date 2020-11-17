@@ -1,66 +1,28 @@
-import os  # , sys, time
+import os
 import random
 import string
 import numpy as np
 import pandas as pd
-# from matplotlib import pyplot as plt
+
 import subprocess
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-# from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from sklearn.metrics import roc_curve, auc  # , roc_auc_score
 
-
-# class GenMolFile_v1:
-#     def __init__(self, outpath, num_conf):
-#         self.outpath = outpath
-#         self.num_conf = num_conf
-#     def __call__(self, smi,mol_name):
-#         mol = Chem.MolFromSmiles(smi)
-#         Chem.SanitizeMol(mol)
-#         mol_h = Chem.AddHs(mol)
-#         AllChem.EmbedMultipleConfs(mol_h, numConfs=self.num_conf)
-#         [AllChem.MMFFOptimizeMolecule(mol_h, confId=i) for i in range(self.num_conf)]
-#         mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
-#         # choose minimum energy conformer
-#         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy()
-#                         for i in range(self.num_conf)])
-#         mol = Chem.RemoveHs(mol_h)
-#         # save file in .mol format
-#         mol_file = os.path.join(self.outpath, mol_name + ".mol")
-#         print(Chem.MolToMolBlock(mol, confId=int(mi)), file=open(mol_file, 'w+'))
-#         return mol_file
-
-
-# class GenMolFile_v1:
-#     def __init__(self, outpath, num_conf):
-#         self.outpath = outpath
-#         self.num_conf = num_conf
-#     def __call__(self, smi,mol_name):
-#         mol = Chem.MolFromSmiles(smi)
-#         Chem.SanitizeMol(mol)
-#         mol_h = Chem.AddHs(mol)
-#         AllChem.EmbedMultipleConfs(mol_h, numConfs=1)
-#         [AllChem.MMFFOptimizeMolecule(mol_h, confId=i) for i in range(1)]
-#         #mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
-#         # choose minimum energy conformer
-#         #mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy()
-#         #                for i in range(self.num_conf)])
-#         #mol = Chem.RemoveHs(mol_h)
-#         # save file in .mol format
-#         mol_file = os.path.join(self.outpath, mol_name + ".mol")
-#         print(Chem.MolToMolBlock(mol, confId=0), file=open(mol_file, 'w+'))
-#         return mol_file
+from LambdaZero.utils import get_external_dirs
+datasets_dir, programs_dir, _ = get_external_dirs()
 
 
 class GenMolFile_v1:
     def __init__(self, mgltools, outpath, num_conf):
         self.mgltools = mgltools
+        self.prepare_ligand4 = os.path.join(self.mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
         self.outpath = outpath
         self.num_conf = num_conf
 
     def __call__(self, smi, mol_name):
+        lname = os.path.join(self.outpath, mol_name)
         mol = Chem.MolFromSmiles(smi)
         Chem.SanitizeMol(mol)
         mol_h = Chem.AddHs(mol)
@@ -68,15 +30,11 @@ class GenMolFile_v1:
         [AllChem.MMFFOptimizeMolecule(mol_h, confId=i) for i in range(self.num_conf)]
         mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
         # choose minimum energy conformer
-        mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy()
-                        for i in range(self.num_conf)])
-        lname = os.path.join(self.outpath, mol_name)
+        mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(self.num_conf)])
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(lname + ".sdf", 'w+'))
-        os.system('babel -isdf {0} -omol2 {1}'.format(lname + ".sdf", lname + ".mol2"))
-        prepare_ligand4 = os.path.join(self.mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
-        os.system("pythonsh {} -l {} -o {}".format(prepare_ligand4,
-                                                   lname + ".mol2",
-                                                   lname + ".pdbqt"))
+        os.system(f"babel -isdf {lname}.sdf -omol2 {lname}.mol2")
+
+        os.system(f"pythonsh {self.prepare_ligand4} -l {lname}.mol2 -o {lname}.pdbqt")
         return lname + ".pdbqt"
 
 
@@ -135,20 +93,20 @@ if __name__ == "__main__":
     # todo: strip salts
 
     config = {
-        "outpath": "/home/maksym/Datasets/seh/4jnc/docked",
-        "vina_bin": "/home/maksym/Programs/vina/bin/vina",
-        "rec_file": "/home/maksym/Datasets/seh/4jnc/4jnc.nohet.aligned.pdbqt",
+        "outpath": os.path.join(datasets_dir, "seh/4jnc/docked"),
+        "vina_bin": os.path.join(programs_dir, "vina/bin/vina"),
+        "rec_file": os.path.join(datasets_dir, "seh/4jnc/4jnc.nohet.aligned.pdbqt"),
         "bindsite": [-13.4, 26.3, -13.3, 20.013, 16.3, 18.5],
-        "docksetup_dir": "/home/maksym/Datasets/seh/4jnc",
+        "docksetup_dir": os.path.join(datasets_dir, "seh/4jnc"),
         "dock_pars": "",  # "--scoring vina", # "--exhaustiveness 8 --cpu 1",
         "gen_molfile": GenMolFile_v1,
         "gen_molfile_par": {
-            "mgltools": "/home/maksym/Programs/mgltools_i86Linux2_1.5.6/MGLToolsPckgs/",
-            "outpath": "/home/maksym/Datasets/seh/4jnc/docked",
+            "mgltools": os.path.join(programs_dir, "mgltools_i86Linux2_1.5.6/MGLToolsPckgs"),
+            "outpath": os.path.join(datasets_dir, "seh/4jnc/docked"),
             "num_conf": 20,
         }}
 
-    data = pd.read_csv("/home/maksym/Datasets/seh/seh_chembl.csv", sep=";")
+    data = pd.read_csv(os.path.join(datasets_dir, "seh/seh_chembl.csv"), sep=";")
     binding = data[["Smiles", "Standard Value", "Ligand Efficiency BEI", "Ligand Efficiency SEI"]].copy()
     binding["Standard Value"] = pd.to_numeric(binding["Standard Value"], errors="coerce")
     binding["Ligand Efficiency BEI"] = pd.to_numeric(binding["Ligand Efficiency BEI"], errors="coerce")
@@ -167,7 +125,7 @@ if __name__ == "__main__":
     binding = pd.concat([binding, dockscore], axis=1)
     binding.to_feather(os.path.join(config["outpath"], "seh.ftr"))
     binding = pd.read_feather(os.path.join(config["outpath"], "seh.ftr"))
-    # binding = pd.read_feather("/home/maksym/Datasets/seh/4jnc/docked/seh_v1.ftr")
+    # binding = pd.read_feather(os.path.join(datasets_dir, "seh/4jnc/docked/seh_v1.ftr"))
     binding = binding.dropna()
 
     fpr, tpr, _ = roc_curve(binding["Standard Value"] < 1, -binding["dockscore"])
