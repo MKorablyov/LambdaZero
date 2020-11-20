@@ -69,7 +69,7 @@ class DockVina_smi:
                 # dockscore = float(smina_out[1].split(" ")[-1]) # fixme
             else:
                 raise Exception("can't correctly parse docking energy")
-            print("docskscore", dockscore)
+            # print("docskscore", dockscore)
             return dockscore
         except Exception as e:
             print(e)
