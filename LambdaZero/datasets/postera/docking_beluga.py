@@ -25,6 +25,12 @@ class GenMolFile_v1:
         os.makedirs(os.path.join(outpath, "mol2"), exist_ok=True)
         os.makedirs(os.path.join(outpath, "pdbqt"), exist_ok=True)
 
+    def obabel(self, sdf_file, mol2_file):
+        os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
+
+    def pythonsh(self, mol2_file, pdbqt_file):
+        os.system(f"pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+
     def __call__(self, smi, mol_name):
         sdf_file = os.path.join(self.outpath, "sdf", f"{mol_name}.sdf")
         mol2_file = os.path.join(self.outpath, "mol2", f"{mol_name}.mol2")
@@ -41,6 +47,8 @@ class GenMolFile_v1:
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
         os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
         os.system(f"pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+        # self.obabel(sdf_file, mol2_file)
+        # self.pythonsh(mol2_file, pdbqt_file)
         return pdbqt_file
 
 
@@ -58,6 +66,7 @@ class DockVina_smi:
 
     def dock(self, smi, mol_name=None):
         try:
+            print(smi)
             # generate random molecule name if needed
             mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
             # make mol file to dock
