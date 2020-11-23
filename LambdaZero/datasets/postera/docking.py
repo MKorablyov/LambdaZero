@@ -16,13 +16,19 @@ datasets_dir, programs_dir, _ = get_external_dirs()
 
 class GenMolFile_v1:
     def __init__(self, mgltools, outpath, num_conf):
-        self.mgltools = mgltools
-        self.prepare_ligand4 = os.path.join(self.mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
+        self.prepare_ligand4 = os.path.join(mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
         self.outpath = outpath
         self.num_conf = num_conf
 
+        os.makedirs(os.path.join(outpath, "sdf"), exist_ok=True)
+        os.makedirs(os.path.join(outpath, "mol2"), exist_ok=True)
+        os.makedirs(os.path.join(outpath, "pdbqt"), exist_ok=True)
+
     def __call__(self, smi, mol_name):
-        lname = os.path.join(self.outpath, mol_name)
+        sdf_file = os.path.join(self.outpath, "sdf", f"{mol_name}.sdf")
+        mol2_file = os.path.join(self.outpath, "mol2", f"{mol_name}.mol2")
+        pdbqt_file = os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt")
+
         mol = Chem.MolFromSmiles(smi)
         Chem.SanitizeMol(mol)
         mol_h = Chem.AddHs(mol)
@@ -31,16 +37,17 @@ class GenMolFile_v1:
         mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
         # choose minimum energy conformer
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(self.num_conf)])
-        print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(lname + ".sdf", 'w+'))
-        os.system(f"obabel -isdf {lname}.sdf -omol2 -O {lname}.mol2")
-        os.system(f"pythonsh {self.prepare_ligand4} -l {lname}.mol2 -o {lname}.pdbqt")
-        return lname + ".pdbqt"
+        print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
+        os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
+        os.system(f"pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+        return pdbqt_file
 
 
 class DockVina_smi:
     def __init__(self, config):
-        self.config = config
         self.gen_molfile = config["gen_molfile"](**config["gen_molfile_par"])
+        self.outpath = config["outpath"]
+        self.dock_pars = config["dock_pars"]
         # make vina command
         self.dock_cmd = "{} --receptor {} " \
                         "--center_x {} --center_y {} --center_z {} " \
@@ -53,23 +60,20 @@ class DockVina_smi:
             # generate random molecule name if needed
             mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
             # make mol file to dock
-            dock_file = self.gen_molfile(smi, mol_name)
-            # lig_file = os.path.join(self.config["docksetup_dir"], "lig.pdb")
-            sminaord_file = os.path.join(self.config["outpath"], mol_name + "_sminaord.pdb")
-            dock_cmd = self.dock_cmd.format(dock_file, sminaord_file)
-            dock_cmd = dock_cmd + " " + self.config["dock_pars"]
+            input_file = self.gen_molfile(smi, mol_name)
+            docked_file = os.path.join(self.outpath, f"{mol_name}.pdb")
+            dock_cmd = self.dock_cmd.format(input_file, docked_file)
+            dock_cmd = dock_cmd + " " + self.dock_pars
             # dock
             cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
             cl.wait()
             # parse energy
-            with open(os.path.join(sminaord_file)) as f:
+            with open(docked_file) as f:
                 smina_out = f.readlines()
             if smina_out[1].startswith("REMARK VINA RESULT"):
                 dockscore = float(smina_out[1].split()[3])
-                # dockscore = float(smina_out[1].split(" ")[-1]) # fixme
             else:
-                raise Exception("can't correctly parse docking energy")
-            # print("docskscore", dockscore)
+                raise Exception("Can't parse docking energy")
             return dockscore
         except Exception as e:
             print(e)
