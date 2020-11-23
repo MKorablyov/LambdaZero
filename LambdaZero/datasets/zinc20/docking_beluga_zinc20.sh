@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --account=rrg-bengioy-ad
-#SBATCH --array=0-57334%1000
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=2G
-#SBATCH --time=12:00:00
+#SBATCH --array=0-999
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=4G
+#SBATCH --time=6-23:00:00
 #SBATCH -o /home/mkkr/scratch/docking/log/%A_%a.out
 
 module load python/3.6
@@ -37,7 +37,7 @@ export PATH=$SLURM_TMPDIR/Programs/mgltools_x86_64Linux2_1.5.6/bin:$PATH
 export PYTHONPATH="${PYTHONPATH}:/home/mkkr/scratch/docking/LambdaZeroDev/"
 
 cd /home/mkkr/scratch/docking/LambdaZeroDev/LambdaZero/datasets/zinc20/
-python3 docking_beluga.py 100 $SLURM_ARRAY_TASK_ID
+python3 docking_beluga.py 5734 $SLURM_ARRAY_TASK_ID
 
 cd $SLURM_TMPDIR/Datasets/zinc20
 tar -czf sdf_${SLURM_ARRAY_TASK_ID}.tar.gz sdf
