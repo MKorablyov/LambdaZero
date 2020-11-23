@@ -40,13 +40,13 @@ cd /home/mkkr/scratch/docking/LambdaZeroDev/LambdaZero/datasets/zinc20/
 python3 docking_beluga.py 10 $SLURM_ARRAY_TASK_ID
 
 cd $SLURM_TMPDIR/Datasets/zinc20
-tar -czf sdf_%a.tar.gz sdf
-tar -czf mol2_%a.tar.gz mol2
-tar -czf pdbqt_%a.tar.gz pdbqt
-tar -czf docked_%a.tar.gz docked
+tar -czf sdf_${SLURM_ARRAY_TASK_ID}.tar.gz sdf
+tar -czf mol2_${SLURM_ARRAY_TASK_ID}.tar.gz mol2
+tar -czf pdbqt_${SLURM_ARRAY_TASK_ID}.tar.gz pdbqt
+tar -czf docked_${SLURM_ARRAY_TASK_ID}.tar.gz docked
 
-scp sdf_%a.tar.gz /home/mkkr/scratch/docking/sdf_subsets
-scp mol2_%a.tar.gz /home/mkkr/scratch/docking/mol2_subsets
-scp pdbqt_%a.tar.gz /home/mkkr/scratch/docking/pdbqt_subsets
-scp docked_%a.tar.gz /home/mkkr/scratch/docking/docked_subsets
-scp subset_%a.csv /home/mkkr/scratch/docking/score_subsets
+scp sdf_${SLURM_ARRAY_TASK_ID}.tar.gz /home/mkkr/scratch/docking/sdf_subsets
+scp mol2_${SLURM_ARRAY_TASK_ID}.tar.gz /home/mkkr/scratch/docking/mol2_subsets
+scp pdbqt_${SLURM_ARRAY_TASK_ID}.tar.gz /home/mkkr/scratch/docking/pdbqt_subsets
+scp docked_${SLURM_ARRAY_TASK_ID}.tar.gz /home/mkkr/scratch/docking/docked_subsets
+scp subset_${SLURM_ARRAY_TASK_ID}.csv /home/mkkr/scratch/docking/score_subsets
