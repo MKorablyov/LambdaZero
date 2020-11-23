@@ -112,4 +112,4 @@ if __name__ == "__main__":
 
     docking_results = [dock_smi.dock(smi, idx) for smi, idx in zip(data['smiles'], data['int_zinc_id'])]
     docking_results = pd.DataFrame(docking_results, columns=['int_zinc_id', 'smiles', 'dockscore', 'status'])
-    docking_results.to_csv(os.path.join(datasets_dir, "zinc20", f"subset_{batch_idx}.csv"))
+    docking_results.to_csv(os.path.join(datasets_dir, "zinc20", f"subset_{batch_idx}.csv"), index=False)
