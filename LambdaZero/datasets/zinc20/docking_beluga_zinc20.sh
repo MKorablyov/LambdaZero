@@ -22,7 +22,7 @@ mkdir Datasets
 mkdir Datasets/zinc20
 scp /home/mkkr/projects/rrg-bengioy-ad/mkkr/Programs/vina/bin/vina Programs/vina/bin/
 scp /home/mkkr/projects/rrg-bengioy-ad/mkkr/Programs/mgltools_x86_64Linux2_1.5.6.tar.gz Programs/
-scp /home/mkkr/projects/rrg-bengioy-ad/lsky/Datasets/seh.tar.gz Datasets/
+scp /home/mkkr/projects/rrg-bengioy-ad/mkkr/Datasets/seh.tar.gz Datasets/
 
 cd $SLURM_TMPDIR/Datasets
 tar -xzf seh.tar.gz
