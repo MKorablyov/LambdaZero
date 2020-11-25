@@ -3,7 +3,6 @@ from torch_geometric.data import Batch, DataLoader
 import numpy as np
 import copy
 import ray
-import pdb
 import time
 import os.path as osp
 import os
@@ -19,8 +18,7 @@ import LambdaZero.models
 import LambdaZero.chem
 from LambdaZero.utils import Complete, get_external_dirs
 import logging
-# from LambdaZero.utils.fast_sumtree.fast_sumtree import SumTree
-device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
+
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 class PredDockReward:
@@ -54,14 +52,15 @@ class PredDockReward:
         qed = QED.qed(mol)
         qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
         qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
-        disc_reward = min(reward, reward * natm_discount * qed_discount) # don't appy to negative rewards
+        discount = natm_discount * qed_discount
+        disc_reward = min(reward, reward * discount) # don't appy to negative rewards
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, qed
+        return disc_reward, qed, discount
 
     def _simulation(self, molecule):
         mol = molecule.mol
@@ -82,15 +81,16 @@ class PredDockReward:
         else:
             simulate = simulate
 
+        discount = 0
         if simulate:
             reward = self._simulation(molecule)
             if reward is not None:
-                discounted_reward, qed = self._discount(molecule.mol, reward)
+                discounted_reward, qed, discount = self._discount(molecule.mol, reward)
             else:
                 reward, discounted_reward, qed = -0.5, -0.5, -0.5
         else:
             reward, discounted_reward, qed = 0.0, 0.0, 0.0
-        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed}
+        return discounted_reward, {"reward": reward, "discounted_reward": discounted_reward, "QED": qed, "discount": discount}
 
 class PredDockReward_v2:
     def __init__(self, binding_model, qed_cutoff, synth_cutoff, synth_config,
@@ -177,7 +177,7 @@ class PredDockReward_v2:
 
 class PredDockReward_v3:
     def __init__(self, qed_cutoff, synth_config, dockscore_config,
-                 soft_stop, exp, delta, simulation_cost, device, transform=T.Compose([LambdaZero.utils.Complete()])):
+                 soft_stop, exp, delta, simulation_cost, device, transform=T.Compose([LambdaZero.utils.Complete()]), **unused):
 
         self.qed_cutoff = qed_cutoff
         self.soft_stop = soft_stop
@@ -207,17 +207,19 @@ class PredDockReward_v3:
 
         # Binding energy prediction
         dockscore = self.binding_net(mol=mol)
-        dockscore_reward = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
+        dockscore_normalized = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
 
         # combine rewards
-        disc_reward = dockscore_reward * qed_discount * synth_discount
+        discount = qed_discount * synth_discount
+        disc_reward = dockscore_normalized * discount
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"dockscore_reward": dockscore_reward, "qed": qed, "synth": synth}
+        return disc_reward, {"dockscore": dockscore_normalized, "qed": qed, "synth": synth,
+                             "discount": discount}
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:
@@ -228,8 +230,8 @@ class PredDockReward_v3:
         if simulate:
             if (molecule.mol is not None) and (len(molecule.jbonds) > 0):
                 discounted_reward, log_vals = self._discount(molecule.mol)
-                pca = LambdaZero.utils.molecule_pca(molecule.mol)
-                log_vals = {**pca, **log_vals}
+                # pca = LambdaZero.utils.molecule_pca(molecule.mol)
+                # log_vals = {**pca, **log_vals}
             else:
                 discounted_reward, log_vals = 0.0, {}
         else:
@@ -520,7 +522,7 @@ class BayesianRewardActor():
         idxs = np.argsort(-scores)[:self.config["aq_size"]]
         return idxs
 
-    def compute_targets(self, mol_set, print_out = False):
+    def compute_targets(self, mol_set):
         if self.use_dock_sim:
             n = len(mol_set)
             t0 = time.time()
@@ -538,18 +540,18 @@ class BayesianRewardActor():
                 r = self._simulation(mol)
                 setattr(graph, self.config["data"]["target"], th.FloatTensor([r]))
                 rs[i] = r
-                if print_out: print(r)
+                print(r)
         return mol_set, rs
 
     def update_with_seen(self, idxs):
         aq_mask = np.zeros(len(self.train_unseen_mols), dtype=np.bool)
         aq_mask[idxs] = True
-        # pdb.set_trace()
+        # import pdb; pdb.set_trace();
         aq_idxs = np.asarray(self.train_unseen_mols)[aq_mask].tolist()
         ul_idxs = np.asarray(self.train_unseen_mols)[~aq_mask].tolist()
         self.train_unseen_mols = np.asarray(self.train_unseen_mols)[~aq_mask].tolist()
 
-        aq_idx, rews = self.compute_targets(aq_idxs, print_out = True)
+        aq_idx, rews = self.compute_targets(aq_idxs)
         ul_idx, _ = self.compute_targets(ul_idxs)
         rews = np.array(rews)
         
@@ -559,8 +561,7 @@ class BayesianRewardActor():
         aq_idxs = np.asarray(self.ul_set.indices)[aq_mask].tolist()
         ul_idxs = np.asarray(self.ul_set.indices)[~aq_mask].tolist()
         aq_set = Subset(self.ul_set, aq_idxs)
-        # self.ul_set = Subset(self.ul_set, ul_idxs)
-        # fff = DataLoader(self.ul_set, shuffle = False, batch_size = self.config['data']['b_size'])
+        self.ul_set = Subset(self.ul_set, ul_idxs)
 
         loader = DataLoader(np.array(aq_idx)[:,0], shuffle=False, batch_size=self.config["data"]["b_size"])
         mean, var = self.regressor.get_mean_variance(loader, len(self.train_loader.dataset))
@@ -598,7 +599,6 @@ class BayesianRewardActor():
 
         expected_scores = self.th_aq_regret(th_train_set, th_ul_loader, self.config['data']['target'])
 
-
         # fit model to the data
         if self.batches % 5 == 0:
             scores, val = self.regressor.fine_tune(fine_tune_loader, self.train_loader, self.val_loader, True)
@@ -613,7 +613,7 @@ class BayesianRewardActor():
 
         for i in range(len(aq_idx)):
             rews[i] = rews[i] * aq_idx[i][3]
-        print('dude. the expected indices are these: {} if they arent here they idk cry about it'.format(str(expected_idxs)))
+
         self.logs = {**scores, **val, **expected_scores, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 
                         'oracle_max': np.max(rews), 'oracle_mean': np.mean(rews)}
         print(self.logs)
@@ -686,24 +686,24 @@ class BayesianRewardActor():
 
     def th_aq_regret(self, train_loader, ul_loader, target_name):
         # import pdb; pdb.set_trace()
-        try:
-            train_targets = np.concatenate([d['gridscore'].cpu().numpy() for d in train_loader.dataset], 0)#np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in train_loader.dataset],0)
-            ul_targets = np.concatenate([d['gridscore'].cpu().numpy() for d in ul_loader.dataset], 0)#np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in ul_loader.dataset],0)
-            all_targets = np.concatenate([train_targets, ul_targets],0)
-            train_sorted = train_targets[np.argsort(train_targets)]
-            all_sorted = all_targets[np.argsort(all_targets)]
+        # try:
+        train_targets = np.concatenate([d['gridscore'].cpu().numpy() for d in train_loader.dataset], 0)#np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in train_loader.dataset],0)
+        ul_targets = np.concatenate([d['gridscore'].cpu().numpy() for d in ul_loader.dataset], 0)#np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in ul_loader.dataset],0)
+        all_targets = np.concatenate([train_targets, ul_targets],0)
+        train_sorted = train_targets[np.argsort(train_targets)]
+        all_sorted = all_targets[np.argsort(all_targets)]
 
-            top15_regret = np.median(train_sorted[:15]) - np.median(all_sorted[:15])
-            top50_regret = np.median(train_sorted[:50]) - np.median(all_sorted[:50])
-            aq_top15 = np.median(train_sorted[:15])
-            aq_top50 = np.median(train_sorted[:15])
+        top15_regret = np.median(train_sorted[:15]) - np.median(all_sorted[:15])
+        top50_regret = np.median(train_sorted[:50]) - np.median(all_sorted[:50])
+        aq_top15 = np.median(train_sorted[:15])
+        aq_top50 = np.median(train_sorted[:15])
 
-            n = int(all_targets.shape[0] * 0.01)
-            frac_top1percent = np.asarray(train_sorted[:n] <= all_sorted[n],dtype=np.float).mean()
-            return {"th_aq_top15_regret":top15_regret, "th_aq_top50_regret":top50_regret, "th_aq_top15":aq_top15, 
-                    "th_aq_top50":aq_top50, "th_aq_frac_top1_percent":frac_top1percent}
-        except:
-            import pdb; pdb.set_trace()
+        n = int(all_targets.shape[0] * 0.01)
+        frac_top1percent = np.asarray(train_sorted[:n] <= all_sorted[n],dtype=np.float).mean()
+        return {"th_aq_top15_regret":top15_regret, "th_aq_top50_regret":top50_regret, "th_aq_top15":aq_top15, 
+                "th_aq_top50":aq_top50, "th_aq_frac_top1_percent":frac_top1percent}
+        # except:
+        #     import pdb; pdb.set_trace()
 
 
 class QEDReward:
