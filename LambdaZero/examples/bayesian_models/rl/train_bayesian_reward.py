@@ -1,7 +1,7 @@
 import sys, os, time, socket
 import ray
 import os.path as osp
-
+import pprint
 from ray import tune
 from ray.rllib.models.catalog import ModelCatalog
 from ray.rllib.agents.ppo import PPOTrainer
@@ -55,13 +55,13 @@ DEFAULT_CONFIG = {
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
         "num_workers": 8,
-        "num_gpus_per_worker": 0.25,
-        "num_gpus": 1,
+        "num_gpus_per_worker":0.25,
+        "num_gpus":1,
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
-        "framework": "torch",
+        # "framework": "torch",
         "lr": 5e-5,
     },
     "summaries_dir": summaries_dir,
@@ -131,7 +131,8 @@ if __name__ == "__main__":
     config['rllib_config']['env_config']['reward_config']['regressor_config'] = config['reward_learner_config']['regressor_config']
     config['rllib_config']['env_config']['reward_config']['kappa'] = config['reward_learner_config']['kappa']
     config['rllib_config']['env_config']['reward_config']['sync_freq'] = config['reward_learner_config']['sync_freq']
-
+    pp = pprint.PrettyPrinter(indent = 4)
+    pp.pprint(config)
     tune.run(config["trainer"],
         stop=config["stop"],
         max_failures=0,

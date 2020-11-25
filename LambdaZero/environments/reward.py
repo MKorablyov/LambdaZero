@@ -7,6 +7,7 @@ import time
 import os.path as osp
 import os
 import threading
+from sklearn import linear_model
 from rdkit import Chem
 from rdkit.Chem import QED, AllChem
 from rdkit import DataStructs
@@ -547,9 +548,11 @@ class BayesianRewardActor():
         aq_mask[idxs] = True
         # import pdb; pdb.set_trace();
         aq_idxs = np.asarray(self.train_unseen_mols)[aq_mask].tolist()
+        ul_idxs = np.asarray(self.train_unseen_mols)[~aq_mask].tolist()
         self.train_unseen_mols = np.asarray(self.train_unseen_mols)[~aq_mask].tolist()
 
         aq_idx, rews = self.compute_targets(aq_idxs)
+        ul_idx, _ = self.compute_targets(ul_idxs)
         rews = np.array(rews)
         
         aq_mask = np.zeros(len(self.ul_set), dtype=np.bool)
@@ -567,10 +570,34 @@ class BayesianRewardActor():
         fine_tune_dataset = aq_idx + [[graph, None, None, None] for graph in aq_set]
         fine_tune_loader = DataLoader(np.array(fine_tune_dataset)[:,0], shuffle=True, batch_size=self.config["data"]["b_size"])
 
+        ul_tune_dataset = ul_idx + [[graph, None, None, None] for graph in self.ul_set]
+        ul_tune_loader = DataLoader(np.array(ul_tune_dataset)[:,0], shuffle=True, batch_size=self.config["data"]["b_size"])
+
         self.train_molecules.extend(np.array(fine_tune_dataset)[:, 0].tolist())
         
         self.train_loader = DataLoader(self.train_molecules, shuffle=True, batch_size=self.config["data"]["b_size"])
         self.unseen_molecules.extend(self.train_unseen_mols)
+
+        expected_idxs = self.thompson_acquire_batch(seen = fine_tune_loader, unseen = ul_tune_loader, size = self.config['aq_size'])
+        th_aq_mask = np.zeros(len(self.ul_set.dataset), dtype=np.bool)
+        th_aq_mask[expected_idxs] = True
+        th_aq_idxs = th_aq_mask.nonzero()[0].tolist()
+        th_ul_idxs = (th_aq_mask == False).nonzero()[0].tolist()
+        th_aq_set = Subset(self.ul_set, th_aq_idxs)
+        th_ul_set = Subset(self.ul_set, th_ul_idxs)
+        th_train_set  = DataLoader(th_aq_set, shuffle=False, batch_size=1)
+        th_ul_loader = DataLoader(th_ul_set, shuffle=False, batch_size=1)
+
+        """
+        Current problem: the th_aq_set and the th_ul_set subsets seem to be empty.
+        th_aq_idxs is a list of 32 indices. If one of the elements in the list is 256,
+        256 will be present in self.ul_set.indices. However, trying to print self.ul_set[256] will
+        yield an IndexError. This occurs for all of the indices in th_aq_idxs. The same thing happens
+        with th_ul_idxs and the th_ul_loader. They loaders have a len but return nothing when trying to
+        iterate over them. Even next(iter(th_ul_loader)) returns index out of range.
+        """
+
+        expected_scores = self.th_aq_regret(th_train_set, th_ul_loader, self.config['data']['target'])
 
         # fit model to the data
         if self.batches % 5 == 0:
@@ -578,6 +605,8 @@ class BayesianRewardActor():
         else:
             scores, val = self.regressor.fine_tune(fine_tune_loader, self.train_loader, self.val_loader, False)
         
+        self.ul_set = Subset(self.ul_set, ul_idxs)
+
         self.train_len += self.config["aq_size"]
         mean, var = self.regressor.get_mean_variance(loader, len(self.train_loader.dataset))
         mse_after = np.mean((rews - mean) ** 2)
@@ -585,7 +614,7 @@ class BayesianRewardActor():
         for i in range(len(aq_idx)):
             rews[i] = rews[i] * aq_idx[i][3]
 
-        self.logs = {**scores, **val, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 
+        self.logs = {**scores, **val, **expected_scores, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 
                         'oracle_max': np.max(rews), 'oracle_mean': np.mean(rews)}
         print(self.logs)
 
@@ -600,6 +629,81 @@ class BayesianRewardActor():
         self.update_with_seen(idx)
         print('Bayesian Reward Actor: Retrained')
         self.batches += 1
+
+    def thompson_acquire_batch(self, seen, unseen, size=500):
+        idxs = []
+        try:
+            for _ in range(size):
+                embs = []
+                y = np.concatenate([getattr(d, 'gridscore').cpu().numpy() for d in seen.dataset],0)
+                for bidx, data in enumerate(seen):
+                    data = data.to(device)
+                    emb = self.regressor.model.get_embed(data, False)
+                    embs.append(emb.detach().cpu().numpy())
+                embs = np.concatenate(embs, 0)
+
+                ul_embs = []
+
+                for bidx, data in enumerate(unseen):
+                    data = data.to(device)
+                    emb = self.regressor.model.get_embed(data, False)
+                    ul_embs.append(emb.detach().cpu().numpy())
+                ul_embs = np.concatenate(ul_embs, 0)
+
+                brr = linear_model.BayesianRidge()
+                brr.fit(embs, y)
+                out = brr.predict(ul_embs)
+                y_star = out.argsort()
+                for i in y_star:
+                    if i not in idxs:
+                        idx = i
+                        break
+                
+                # score = self.update_with_seen(idx)
+                # idx = self.get_posterior_sample(X_in = ul_embs,X_trn = embs, y = y, idxs = idxs, X_feature_size = 64, sigma_y = 0.2)
+                if idx: idxs.append(int(idx))
+        except:
+            pdb.set_trace()
+        return idxs
+
+    # def get_posterior_sample(self, X_in, X_trn, y, idxs, X_feature_size,sigma_y):
+
+    #     w_0 = np.zeros(X_feature_size)
+    #     V_0 = np.diag([sigma_y] * X_feature_size)**2
+    #     V0_inv = np.linalg.inv(V_0)
+    #     V_n = sigma_y**2 * np.linalg.inv(sigma_y**2 * V0_inv + (X_trn.T @ X_trn))
+    #     w_n = V_n @ V0_inv @ w_0 + 1 / (sigma_y**2) * V_n @ X_trn.T @ y
+
+    #     #sample w from distribution N(w_n,V_n)
+    #     samples = np.random.multivariate_normal(w_n, V_n, size = 1)
+    #     #pick the argmax of expectation of y* which is x*w
+    #     y_star = X_in @ samples.T
+    #     #add best the train set
+    #     y_star = y_star.argsort()
+    #     for i in y_star:
+    #         if i not in idxs:
+    #             return i
+
+    def th_aq_regret(self, train_loader, ul_loader, target_name):
+        # import pdb; pdb.set_trace()
+        # try:
+        train_targets = np.concatenate([d['gridscore'].cpu().numpy() for d in train_loader.dataset], 0)#np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in train_loader.dataset],0)
+        ul_targets = np.concatenate([d['gridscore'].cpu().numpy() for d in ul_loader.dataset], 0)#np.concatenate([getattr(d, config["data"]["target"]).cpu().numpy() for d in ul_loader.dataset],0)
+        all_targets = np.concatenate([train_targets, ul_targets],0)
+        train_sorted = train_targets[np.argsort(train_targets)]
+        all_sorted = all_targets[np.argsort(all_targets)]
+
+        top15_regret = np.median(train_sorted[:15]) - np.median(all_sorted[:15])
+        top50_regret = np.median(train_sorted[:50]) - np.median(all_sorted[:50])
+        aq_top15 = np.median(train_sorted[:15])
+        aq_top50 = np.median(train_sorted[:15])
+
+        n = int(all_targets.shape[0] * 0.01)
+        frac_top1percent = np.asarray(train_sorted[:n] <= all_sorted[n],dtype=np.float).mean()
+        return {"th_aq_top15_regret":top15_regret, "th_aq_top50_regret":top50_regret, "th_aq_top15":aq_top15, 
+                "th_aq_top50":aq_top50, "th_aq_frac_top1_percent":frac_top1percent}
+        # except:
+        #     import pdb; pdb.set_trace()
 
 
 class QEDReward:
