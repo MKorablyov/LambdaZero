@@ -19,6 +19,8 @@ from LambdaZero.utils import Complete, get_external_dirs
 import logging
 import pickle
 import gzip
+from LambdaZero.examples.bayesian_models.bayes_tune.deep_ensemble import DeepEnsemble
+from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -263,10 +265,10 @@ class PredDockBayesianReward_v1:
         self.net.to(device)
         self.net.load_state_dict(th.load(binding_model, map_location=th.device(device)))
         self.net.eval()
-        
+        # if isinstance(regressor, MCDrop):
         self.regressor = regressor(regressor_config)
         # self.regressor.train_loader = ray.get(reward_learner.get_dataset.remote())
-        self.regressor.model.load_state_dict(ray.get(reward_learner.get_weights.remote()))
+        self.regressor.set_weights(ray.get(reward_learner.get_weights.remote()))
         self.reward_learner_logs = ray.get(reward_learner.get_logs.remote())
         self.reward_learner = reward_learner
 
@@ -282,7 +284,8 @@ class PredDockBayesianReward_v1:
         if self.episodes % self.weight_sync_freq == 0:
             updates, aq_batches = ray.get(self.reward_learner.sync_weights.remote(self.aq_batches))
             if updates:
-                self.regressor.model.load_state_dict(updates['weights'])
+                # self.regressor.set_weights(updates['weights'])
+                self.regressor.set_weights(updates['weights'])
                 self.reward_learner_logs = updates['logs']
                 self.train_len = updates['train_len']
                 # self.regressor.train_loader = ray.get(self.reward_learner.get_dataset.remote())
@@ -394,7 +397,7 @@ class _SimDockLet:
 
 @ray.remote(num_gpus=1, num_cpus=4)
 class BayesianRewardActor():
-    def __init__(self, config, use_dock_sim, binding_model, 
+    def __init__(self, config, use_dock_sim, binding_model,
                     pretrained_model=None, transform=T.Compose([LambdaZero.utils.Complete()])):
         
         self.device = config["device"]
@@ -418,9 +421,7 @@ class BayesianRewardActor():
         self.qed_cutoff = config['qed_cutoff']
         self.synth_cutoff = config['synth_config']["synth_cutoff"]
         self.synth_net = LambdaZero.models.ChempropWrapper_v1(config['synth_config'])
-        
-        self.regressor = config["regressor"](self.regressor_config)
-        
+                
         if use_dock_sim:
             self.actors = [_SimDockLet.remote(os.environ['SLURM_TMPDIR'], programs_dir, datasets_dir, self.config["data"]["target"])
                        for i in range(self.num_threads)]
@@ -436,9 +437,12 @@ class BayesianRewardActor():
         print('BR: Loaded Oracle Network')
         print('BR: Loading Dataset ...')
 
+
         self.dataset = config["data"]["dataset"](**config["data"]["dataset_config"])
         ul_idxs, val_idxs, test_idxs = np.load(self.config["data"]["dataset_split_path"], allow_pickle=True)
+        print('BR: Loaded Dataset ...')
 
+        print('BR: Preparing Dataset ...')
         np.random.shuffle(ul_idxs) # randomly acquire batch zero
         train_idxs = ul_idxs[:self.config["aq_size0"]]
         self.aq_indices.extend(train_idxs)
@@ -457,13 +461,14 @@ class BayesianRewardActor():
             #     mol,
             #     getattr(data, config["data"]["target"]) * self.get_discount(mol)
             # ])
-            # self.sumtree.set(len(train_molecules) - 1, train_molecules[2] / self.temperature)
         # import pdb;pdb.set_trace()
         train_loader = DataLoader(train_molecules, shuffle=True, batch_size=config["data"]["b_size"])
         self.val_loader = DataLoader(val_set, batch_size=config["data"]["b_size"])
         self.train_molecules = train_molecules
         # self.dataset = None
-        print('BR: Loaded Dataset')
+        print('BR: Prepared Dataset')
+        
+        self.regressor = config["regressor"](self.regressor_config)
         
         if pretrained_model is not None:
             self.regressor.model.load_state_dict(th.load(pretrained_model))
@@ -472,6 +477,7 @@ class BayesianRewardActor():
         else:
             print('BR: Running single pretraining step ...')
             scores, val = self.regressor.fit(train_loader, self.val_loader)
+        # import pdb; pdb.set_trace()
         print(scores, val)
         self.logs = {**scores, **val}
         print('BR: Loaded Bayesian Reward Actor')
@@ -516,7 +522,7 @@ class BayesianRewardActor():
         return reward
 
     def get_weights(self):
-        return self.regressor.model.state_dict()
+        return self.regressor.get_weights()
 
     def get_logs(self):
         return self.logs
@@ -527,7 +533,7 @@ class BayesianRewardActor():
     def sync_weights(self, aq_batches):
         if self.batches > aq_batches:
             return {
-                'weights': self.regressor.model.state_dict(),
+                'weights': self.get_weights(),
                 'logs': self.logs,
                 'train_len': self.train_len
                 }, self.batches
@@ -635,6 +641,7 @@ class BayesianRewardActor():
             smiles.append([Chem.MolToSmiles(aq_idx[i][1].mol), rews[i]])
             rews[i] = rews[i] * aq_idx[i][3]
         pickle.dump(smiles, gzip.open(os.path.join(self.mol_dump_loc, f'batch-{self.batches+1}.pkl.gz'), 'wb'))
+        self.regressor.save(self.mol_dump_loc)
         self.aq_molecules.extend(np.array(aq_idx)[:, :3].tolist())
 
         self.logs = {**scores, **val, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 

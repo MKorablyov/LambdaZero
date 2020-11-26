@@ -14,7 +14,7 @@ import torch
 import torch_geometric.transforms as T
 
 # from LambdaZero.environments import block_mol_v3
-from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
+from LambdaZero.examples.bayesian_models.bayes_tune.deep_ensemble import DeepEnsemble
 from LambdaZero.examples.bayesian_models.rl import config
 from LambdaZero.environments.reward import BayesianRewardActor
 
@@ -54,8 +54,8 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 8,
-        "num_gpus_per_worker": 0.25,
+        "num_workers": 0,
+        "num_gpus_per_worker": 1,
         "num_gpus": 1,
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -70,7 +70,7 @@ DEFAULT_CONFIG = {
     "checkpoint_freq": 250,
     "stop":{"training_iteration": 2000000},
     "reward_learner_config": {
-        "aq_size0": 3000,
+        "aq_size0": 50,
         "data": dict(data_config, **{"dataset_creator":None}),
         "aq_size": 32,
         "mol_dump_loc": "",
@@ -84,15 +84,15 @@ DEFAULT_CONFIG = {
         "qed_cutoff": [0.2, 0.7],
         "synth_config": synth_config,
         'regressor_config': {
-            "lambda": 6.16e-9,
+            "lambda": 0,
             "data": dict(data_config, **{"dataset_creator":None}),
-            "T": 20,
+            "num_members": 2,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations": 64,
+            "train_iterations": 8,
             "finetune_iterations": 16,
             "model": LambdaZero.models.MPNNetDrop,
-            "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
+            "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.0},
             "optimizer": torch.optim.Adam,
             "optimizer_config": {
                 "lr": 0.001
@@ -100,10 +100,9 @@ DEFAULT_CONFIG = {
             "train_epoch": train_epoch_with_targets,
             "eval_epoch": eval_epoch,
             "train": train_mcdrop_rl,
-            "get_mean_variance": mcdrop_mean_variance,
-            "is_reward_model": True
+            "get_mean_variance": mcdrop_mean_variance
         },
-        "regressor": MCDrop,
+        "regressor": DeepEnsemble,
     },
     "use_dock": False,
     "pretrained_model": None #  "/home/mjain/scratch/mcdrop_rl/model.pt"
@@ -131,7 +130,7 @@ if __name__ == "__main__":
                                                 config["use_dock"], 
                                                 config["rllib_config"]['env_config']['reward_config']['binding_model'],
                                                 config["pretrained_model"])
-
+    
     config['rllib_config']['env_config']['reward_config']['reward_learner'] = reward_learner
     config['rllib_config']['env_config']['reward_config']['regressor'] = config['reward_learner_config']['regressor']
     config['rllib_config']['env_config']['reward_config']['regressor_config'] = config['reward_learner_config']['regressor_config']
