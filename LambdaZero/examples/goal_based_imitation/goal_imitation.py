@@ -35,6 +35,12 @@ from LambdaZero.environments.block_mol_v3 import DEFAULT_CONFIG as env_v3_cfg, B
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
 from LambdaZero.utils import get_external_dirs
 
+
+from LambdaZero.examples.goal_based_imitation import model_atom, model_block, model_fingerprint
+
+import importlib
+importlib.reload(model_atom)
+
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 
@@ -45,6 +51,7 @@ parser.add_argument("--mbsize", default=32, help="Minibatch size", type=int)
 parser.add_argument("--nemb", default=32, help="#hidden", type=int)
 parser.add_argument("--num_iterations", default=100000, type=int)
 parser.add_argument("--array", default='')
+parser.add_argument("--repr_type", default='block_graph')
 parser.add_argument("--run", default=0, help="run", type=int)
 parser.add_argument("--save_path", default='/miniscratch/bengioe/LambdaZero/imitation_learning/')
 parser.add_argument("--print_array_length", default=False, action='store_true')
@@ -131,107 +138,45 @@ class MolMDPNC(MolMDP):
         self.molecule = BlockMoleculeDataNoCache()
         return None
 
-    def post_init(self, device):
+    def post_init(self, device, repr_type):
         self.device = device
+        self.repr_type = repr_type
         #self.max_bond_atmidx = max([max(i) for i in self.block_rs])
         self.max_num_atm = max(self.block_natm)
         self.stem_type_offset = np.int32([0] + list(np.cumsum([max(i)+1 for i in self.block_rs])))
         self.num_stem_types = self.stem_type_offset[-1]
         #print(self.max_num_atm, self.num_stem_types)
 
-    def mol2blockgraph(self, mol=None):
+    def mols2batch(self, mols):
+        if self.repr_type == 'block_graph':
+            return model_block.mols2batch(mols, self)
+        elif self.repr_type == 'atom_graph':
+            return model_atom.mols2batch(mols, self)
+        elif self.repr_type == 'morgan_fingerprint':
+            return model_fingerprint.mols2batch(mols, self)
+
+    def mol2repr(self, mol=None):
         if mol is None:
             mol = self.molecule
-        f = lambda x: torch.tensor(x, dtype=torch.long, device=self.device)
-        if len(mol.blockidxs) == 0:
-            data = Data(# There's an extra block embedding for the empty molecule
-                x=f([self.num_blocks]),
-                edge_index=f([[],[]]),
-                edge_attr=f([]).reshape((0,2)),
-                stems=f([(0,0)]),
-                stemtypes=f([self.num_stem_types])) # also extra stem type embedding
-            return data
-        edges = [(i[0], i[1]) for i in mol.jbonds]
-        #edge_attrs = [self.bond_type_offset[i[2]] +  i[3] for i in mol.jbonds]
-        if 0:
-            edge_attrs = [((self.stem_type_offset[mol.blockidxs[i[0]]] + i[2]) * self.num_stem_types +
-                           (self.stem_type_offset[mol.blockidxs[i[1]]] + i[3]))
-                          for i in mol.jbonds]
-        else:
-            edge_attrs = [(self.stem_type_offset[mol.blockidxs[i[0]]] + i[2],
-                           self.stem_type_offset[mol.blockidxs[i[1]]] + i[3])
-                          for i in mol.jbonds]
-        stemtypes = [self.stem_type_offset[mol.blockidxs[i[0]]] + i[1] for i in mol.stems]
-
-        data = Data(x=f(mol.blockidxs),
-                    edge_index=f(edges).T if len(edges) else f([[],[]]),
-                    edge_attr=f(edge_attrs) if len(edges) else f([]).reshape((0,2)),
-                    stems=f(mol.stems) if len(mol.stems) else f([(0,0)]),
-                    stemtypes=f(stemtypes) if len(mol.stems) else f([self.num_stem_types]))
-        #print(data)
-        return data
-
-
-class GraphAgent(nn.Module):
-
-    def __init__(self, nemb, nvec, out_per_stem, out_per_mol, num_conv_steps, mdp_cfg):
-        super().__init__()
-        self.embeddings = nn.ModuleList([
-            nn.Embedding(mdp_cfg.num_blocks + 1, nemb),
-            nn.Embedding(mdp_cfg.num_stem_types + 1, nemb),
-            nn.Embedding(mdp_cfg.num_stem_types, nemb)])
-        self.conv = gnn.NNConv(nemb, nemb, nn.Sequential(), aggr='mean')
-        self.block2emb = nn.Sequential(nn.Linear(nemb + nvec, nemb), nn.LeakyReLU(),
-                                       nn.Linear(nemb, nemb))
-        self.gru = nn.GRU(nemb, nemb)
-        self.stem2pred = nn.Sequential(nn.Linear(nemb * 2, nemb), nn.LeakyReLU(),
-                                       nn.Linear(nemb, nemb), nn.LeakyReLU(),
-                                       nn.Linear(nemb, out_per_stem))
-        self.global2pred = nn.Sequential(nn.Linear(nemb, nemb), nn.LeakyReLU(),
-                                         nn.Linear(nemb, out_per_mol))
-        #self.set2set = Set2Set(nemb, processing_steps=3)
-        self.num_conv_steps = num_conv_steps
-        self.nemb = nemb
-
-
-    def forward(self, graph_data, vec_data):
-        blockemb, stememb, bondemb = self.embeddings
-        graph_data.x = blockemb(graph_data.x)
-        graph_data.stemtypes = stememb(graph_data.stemtypes)
-        graph_data.edge_attr = bondemb(graph_data.edge_attr)
-        graph_data.edge_attr = (
-            graph_data.edge_attr[:, 0][:, :, None] * graph_data.edge_attr[:, 1][:, None, :]
-        ).reshape((graph_data.edge_index.shape[1], self.nemb**2))
-        batch_vec = vec_data[graph_data.batch]
-        out = graph_data.x
-        out = self.block2emb(torch.cat([out, batch_vec], 1))
-        h = out.unsqueeze(0)
-
-        for i in range(self.num_conv_steps):
-            m = F.leaky_relu(self.conv(out, graph_data.edge_index, graph_data.edge_attr))
-            out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
-            out = out.squeeze(0)
-
-        # Index of the origin block of each stem in the batch (each
-        # stem is a pair [block idx, stem atom type], we need to
-        # adjust for the batch packing)
-        stem_block_batch_idx = (
-            torch.tensor(graph_data.__slices__['x'], device=out.device)[graph_data.stems_batch]
-            + graph_data.stems[:, 0])
-        stem_out_cat = torch.cat([out[stem_block_batch_idx], graph_data.stemtypes], 1)
-        stem_preds = self.stem2pred(stem_out_cat)
-        mol_preds = self.global2pred(gnn.global_mean_pool(out, graph_data.batch))
-        return stem_preds, mol_preds
+        if self.repr_type == 'block_graph':
+            return model_block.mol2graph(mol, self)
+        elif self.repr_type == 'atom_graph':
+            return model_atom.mol2graph(mol, self)
+        elif self.repr_type == 'morgan_fingerprint':
+            return model_fingerprint.mol2fp(mol, self)
 
 
 
 class MolEpisode:
-    def __init__(self, actions, rewards, goal, reached):
+    def __init__(self, actions, rewards, goal, reached, time=0, gtype=None):
         self.actions = actions
         self.rewards = np.float32(rewards) # the state that was reached
         self.goal = goal # the goal given to the agent
         self.reached = reached # 1 if goal ~ rewards
         self.gdist = ((np.float32(goal)-self.rewards)**2).mean()
+        self.time = time # how many training steps/training time has
+                         # the agent generating this mol had
+        self.gtype = gtype # The type of generating episode
 
 
     def sample(self, mdp, t=None):
@@ -252,18 +197,19 @@ class MolEpisode:
 
 class ReplayBuffer:
 
-    def __init__(self, bpath, device):
+    def __init__(self, bpath, device, repr_type):
         self.episodes = []
         self.test_episodes = []
         self.mdp = MolMDPNC(bpath)
-        self.mdp.post_init(device)
+        self.mdp.post_init(device, repr_type)
+        self._device = device
         self.epsilon = 0.05
         self.seen_molecules = set()
         self._mahash = lambda actions: '.'.join(','.join(map(str,i)) for i in actions)
 
-    def add_episode(self, actions, rewards, goal, reached):
+    def add_episode(self, actions, rewards, goal, reached, time=0, gtype=None):
         self.seen_molecules.add(self._mahash(actions))
-        self.episodes.append(MolEpisode(actions, rewards, goal, reached))
+        self.episodes.append(MolEpisode(actions, rewards, goal, reached, time, gtype))
 
     def contains(self, actions):
         return self._mahash(actions) in self.seen_molecules
@@ -277,6 +223,8 @@ class ReplayBuffer:
         ts = self._iterate_test_set()
         while True:
             s = [i for _, i in zip(range(n), ts)]
+            if len(s) == 0:
+                break
             yield self.sample2batch(zip(*s))
             if len(s) < n:
                 break
@@ -288,15 +236,12 @@ class ReplayBuffer:
 
     def sample2batch(self, mb):
         s, a, g = mb
-        to_graphs = lambda x: Batch.from_data_list(
-            [self.mdp.mol2blockgraph(i) for i in x], follow_batch=['stems'])
-        s = to_graphs(s)
-        s.to(self._sampler_device)
-        a = torch.tensor(a, device=self._sampler_device).long()
-        g = torch.tensor(g, device=self._sampler_device).float()
+        s = self.mdp.mols2batch([self.mdp.mol2repr(i) for i in s])
+        a = torch.tensor(a, device=self._device).long()
+        g = torch.tensor(g, device=self._device).float()
         return s, a, g
 
-    def load_raw_episodes(self, episodes, test_ratio=0.05):
+    def load_raw_episodes(self, episodes, test_ratio=0.02):
         for acts, rewards in episodes:
             if self.contains(acts):
                 continue
@@ -320,12 +265,11 @@ class ReplayBuffer:
         self.num_loaded_episodes = len(self.episodes)
 
 
-    def start_samplers(self, n, mbsize, device):
+    def start_samplers(self, n, mbsize):
         self.ready_events = [threading.Event() for i in range(n)]
         self.resume_events = [threading.Event() for i in range(n)]
         self.results = [None] * n
         self.stop_event = threading.Event()
-        self._sampler_device = device
         def f(idx):
             while not self.stop_event.is_set():
                 self.results[idx] = self.sample2batch(self.sample(mbsize))
@@ -361,11 +305,12 @@ class ReplayBuffer:
         return raw
 
 class RolloutActor(threading.Thread):
-    def __init__(self, bpath, device, model, stop_event, replay, synth_net, sample_type):
+    def __init__(self, bpath, device, repr_type, model, stop_event, replay, synth_net, sample_type,
+                 stop_after=0):
         super().__init__()
         self.device = torch.device(device)
         self.mdp = MolMDPNC(bpath)
-        self.mdp.post_init(self.device)
+        self.mdp.post_init(self.device, repr_type)
         self.max_blocks = 5, 13
         self.goal_bounds = np.float32([[0, 8], [0.1, 1], [0.1, 1]]).T
         self.greedy_goal_bounds = np.float32([[6, 8], [0.5, 1], [0.7, 1]]).T
@@ -377,6 +322,8 @@ class RolloutActor(threading.Thread):
         self.failed = False
         self.sample_type = sample_type
         self.beam_max = 6
+        self.stop_after = stop_after
+        self.episodes_done = 0
 
 
     def run(self):
@@ -385,6 +332,9 @@ class RolloutActor(threading.Thread):
                 self._sample_episode()
             elif self.sample_type == 'beam':
                 self._beam_episode()
+            self.episodes_done += 1
+            if self.stop_after > 0 and self.episodes_done >= self.stop_after:
+                break
 
 
     def _sample_episode(self):
@@ -399,8 +349,7 @@ class RolloutActor(threading.Thread):
                 len(self.mdp.molecule.blocks) > 0 and len(self.mdp.molecule.stems) == 0):
                 actions.append((-1, 0))
                 break
-            batch = Batch.from_data_list([self.mdp.mol2blockgraph()], follow_batch=['stems'])
-            batch.to(self.device)
+            batch = self.mdp.mols2batch([self.mdp.mol2repr()])
             stem_o, stop_o = self.model(batch, goal)
             logits = torch.cat([stop_o.reshape(-1), stem_o.reshape(-1)])
             if torch.isnan(logits).any():
@@ -426,7 +375,8 @@ class RolloutActor(threading.Thread):
         reached_state = np.float32((energy, synth, qed))
         print(reached_state, goal)
         goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
-        self.replay.add_episode(actions, reached_state, goal, goal_reached)
+        self.replay.add_episode(actions, reached_state, goal, goal_reached,
+                                self.model.training_steps, 'sample')
 
 
     def _beam_episode(self):
@@ -451,8 +401,8 @@ class RolloutActor(threading.Thread):
                     actions += [(-1, 0)]
                 done.append((mol, logprob, actions))
                 continue
-            batch = Batch.from_data_list([self.mdp.mol2blockgraph(mol)], follow_batch=['stems'])
-            batch.to(self.device)
+
+            batch = self.mdp.mols2batch([self.mdp.mol2repr()])
             stem_o, stop_o = self.model(batch, goal)
             logits = F.log_softmax(torch.cat([stop_o.reshape(-1), stem_o.reshape(-1)]), 0)
             if torch.isnan(logits).any():
@@ -485,7 +435,8 @@ class RolloutActor(threading.Thread):
             reached_state = np.float32((energy, synth, qed))
             print('beam', reached_state, goal, lp)
             goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
-            self.replay.add_episode(actions, reached_state, goal, goal_reached)
+            self.replay.add_episode(actions, reached_state, goal, goal_reached,
+                                    self.model.training_steps, 'beam')
 
 
 
@@ -512,7 +463,7 @@ def main(args):
 
     device = torch.device('cuda')
     mdp = MolMDPNC(bpath)
-    mdp.post_init(device)
+    mdp.post_init(device, args.repr_type)
 
     synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
 
@@ -520,26 +471,35 @@ def main(args):
     os.makedirs(exp_dir, exist_ok=True)
 
 
-    replay = ReplayBuffer(bpath, device)
+    replay = ReplayBuffer(bpath, device, args.repr_type)
     #replay.epsilon = 0.95
 
     #past_ep = pickle.load(gzip.open('replays/random_1000.pkl.gz', 'rb'))
-    past_ep = pickle.load(gzip.open('replays/latest_oct_22_5.pkl.gz', 'rb'))
-    replay.load_initial_episodes(past_ep)
+    # This includes the tree search mols, to be seen...
+    past_ep = pickle.load(gzip.open('raw_dump.pkl.gz', 'rb'))
+    replay.load_raw_episodes(past_ep)
+    #past_ep = pickle.load(gzip.open('replays/latest_oct_22_5.pkl.gz', 'rb'))
+    #replay.load_initial_episodes(past_ep)
     print(len(replay.episodes), 'episodes')
 
 
     stop_event = threading.Event()
 
-    model = GraphAgent(args.nemb, 3, mdp.num_blocks, 1, 6, mdp)
-    model.to(device)
+    if args.repr_type == 'block_graph':
+        model = model_block.GraphAgent(args.nemb, 3, mdp.num_blocks, 1, 6, mdp)
+        model.to(device)
+    elif args.repr_type == 'atom_graph':
+        model = model_atom.MolAC_GCN(args.nemb, 3, mdp.num_blocks, 1)
+        model.to(device)
 
     opt = torch.optim.Adam(model.parameters(), args.learning_rate, weight_decay=1e-4)
 
     rollout_threads = (
-        [RolloutActor(bpath, device, model, stop_event, replay, synth_net, 'categorical')
+        [RolloutActor(bpath, device, args.repr_type, model,
+                      stop_event, replay, synth_net, 'categorical')
          for i in range(6)] +
-        [RolloutActor(bpath, device, model, stop_event, replay, synth_net, 'beam')
+        [RolloutActor(bpath, device, args.repr_type, model,
+                      stop_event, replay, synth_net, 'beam')
          for i in range(2)])
 
     [i.start() for i in rollout_threads]
@@ -550,22 +510,11 @@ def main(args):
         pickle.dump(replay.episodes, gzip.open('replays/random_1000.pkl.gz', 'wb'))
         return
 
-    def model_negloglikelihood(s, a, g, stem_o, mol_o):
-        stem_e = torch.exp(stem_o - 2)
-        mol_e = torch.exp(mol_o[:, 0] - 2)
-        Z = gnn.global_add_pool(stem_e, s.stems_batch).sum(1) + mol_e
-        mol_lsm = torch.log(mol_e / Z)
-        stem_lsm = torch.log(stem_e / Z[s.stems_batch, None])
-        return -(
-            stem_lsm[tint(s.__slices__['stems'][:-1]) + a[:, 1]][
-                ar[:a.shape[0]], a[:, 0]] * (a[:, 0] >= 0)
-            + mol_lsm * (a[:, 0] == -1))
-
     tf = lambda x: torch.tensor(x, device=device).float()
     tint = lambda x: torch.tensor(x, device=device).long()
     mbsize = args.mbsize
     ar = torch.arange(mbsize)
-    sampler = replay.start_samplers(4, mbsize, device)
+    sampler = replay.start_samplers(4, mbsize)
     gamma = 0.99
     last_losses = []
 
@@ -575,15 +524,28 @@ def main(args):
         [i.join() for i in rollout_threads]
         replay.stop_samplers_and_join()
 
+    def save_stuff():
+        pickle.dump(replay.episodes[replay.num_loaded_episodes:],
+                    gzip.open(f'{exp_dir}/replay.pkl.gz', 'wb'))
+
+        pickle.dump({'train_losses': train_losses,
+                     'test_losses': test_losses,
+                     'time_start': time_start,
+                     'time_now': time.time(),
+                     'args': args,},
+                    gzip.open(f'{exp_dir}/info.pkl.gz', 'wb'))
 
     train_losses = []
     test_losses = []
     time_start = time.time()
 
     for i in range(args.num_iterations):
-        s, a, g = sampler()
+        if 1:
+            s, a, g = sampler()
+        else:
+            s, a, g = replay.sample2batch(replay.sample(mbsize))
         stem_o, mol_o = model(s, g)
-        negloglike = model_negloglikelihood(s, a, g, stem_o, mol_o).mean()
+        negloglike = model.action_negloglikelihood(s, a, g, stem_o, mol_o).mean()
         logit_reg = (mol_o.pow(2).sum() + stem_o.pow(2).sum()) / (np.prod(mol_o.shape) + np.prod(stem_o.shape))
 
         (negloglike + logit_reg * 1e-1).backward()
@@ -591,6 +553,7 @@ def main(args):
         train_losses.append(negloglike.item())
         opt.step()
         opt.zero_grad()
+        model.training_steps = i + 1
         #if any([torch.isnan(i).any() for i in model.parameters()]):
         #    stop_event.set()
         #    pdb.set_trace()
@@ -625,24 +588,25 @@ def main(args):
             for s, a, g in replay.iterate_test(mbsize):
                 with torch.no_grad():
                     stem_o, mol_o = model(s, g)
-                total_test_loss += model_negloglikelihood(s, a, g, stem_o, mol_o).sum().item()
+                total_test_loss += model.action_negloglikelihood(s, a, g, stem_o, mol_o).sum().item()
                 total_test_n += g.shape[0]
             test_nll = total_test_loss / total_test_n
             print('test NLL:', test_nll)
             test_losses.append(test_nll)
-
-            pickle.dump(replay.episodes[replay.num_loaded_episodes:],
-                        gzip.open(f'{exp_dir}/replay.pkl.gz', 'wb'))
-
-            pickle.dump({'train_losses': train_losses,
-                         'test_losses': test_losses,
-                         'time_start': time_start,
-                         'time_now': time.time(),
-                         'args': args,},
-                        gzip.open(f'{exp_dir}/info.pkl.gz', 'wb'))
+            save_stuff()
 
 
     stop_everything()
+
+    print("Running final beam search")
+    rollout_threads = (
+        [RolloutActor(bpath, device, args.repr_type, model,
+                      stop_event, replay, synth_net, 'beam',
+                      stop_after=1)
+         for i in range(8)])
+    [i.join() for i in rollout_threads]
+    save_stuff()
+    print('Done.')
 
 
 def array_nov_3(args):
@@ -654,6 +618,20 @@ def array_nov_3(args):
      }
     for lr in [1e-4, 1e-3, 1e-5]
     for nemb in [16, 32, 64]
+  ])
+  return all_hps
+
+def array_nov_25(args):
+  all_hps = ([
+    {'mbsize': 32,
+     'learning_rate': lr,
+     'num_iterations': 200_000,
+     'nemb': nemb,
+     'repr_type': repr_type,
+     }
+    for lr in [1e-4, 1e-3]
+    for nemb in [16, 32, 64]
+    for repr_type in ['block_graph', 'atom_graph']
   ])
   return all_hps
 
