@@ -121,7 +121,7 @@ if machine == "Ikarus":
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
-    mol_dump_loc = '/scratch/mjain/lambdabo_mol_dump/'
+    mol_dump_loc = '/scratch/leofeng/lambdabo_mol_dump/'
     curr_trial =  config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
     
     if not osp.exists(osp.join(mol_dump_loc, curr_trial)):

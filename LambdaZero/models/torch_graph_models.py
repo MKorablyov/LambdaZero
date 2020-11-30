@@ -23,7 +23,7 @@ def convert_to_tensor(arr):
         tensor = tensor.float()
     return tensor
 
-
+# Running pdb - set # of workers to 0
 class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kw):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
@@ -64,7 +64,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
             for param in self.rnd_target.parameters():
                 param.requires_grad = False
 
-    def forward(self, input_dict, state, seq_lens):
+    def forward(self, input_dict, state, seq_lens): # Torch geometric - takes list of edges
         obs = input_dict['obs']
         device = obs["mol_graph"].device
 
@@ -81,7 +81,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         num_steps = obs["num_steps"]
         action_mask = obs["action_mask"]
 
-        data = fast_from_data_list(graphs)
+        data = fast_from_data_list(graphs) # Leo: Check -- Can I run it w/ debugging -- pdb. Num_workers = 1?
         data = data.to(device)
         # </end of expensive unpacking> The rest of this is the
         # forward pass (~5ms) and then a backward pass + update (which
@@ -89,7 +89,8 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         scalar_outs, data = self.model(data)
 
-        stop_logit = scalar_outs[:, 1:2]
+        stop_logit = scalar_outs[:, 1] # Leo: what's this stop_logit and isn't this just [:, 1]. Maybe just calling docking?
+        # Ends rollout -- and give agent rew.
         add_logits = data.stem_preds.reshape((data.num_graphs, -1))
         break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
 
@@ -109,7 +110,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     def value_function(self):
         return self._value_out
 
-    def int_value_function(self):
+    def int_value_function(self): # Intrinsic value function?
         return self._value_int
 
     def compute_priors_and_value(self, obs):
@@ -136,7 +137,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         device = obs_["mol_graph"].device
 
         enc_graphs = obs_["mol_graph"].data.cpu().numpy().astype(np.uint8)
-        graphs = [self.space.unpack(i) for i in enc_graphs]
+        graphs = [self.space.unpack(i) for i in enc_graphs] 
 
         data = fast_from_data_list(graphs)
         data = data.to(device)
@@ -167,6 +168,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
 
+
 class MPNNet_Parametric(nn.Module):
 
     def __init__(self, num_feat=14, dim=64, num_out_per_stem=105, rnd=False):
@@ -183,21 +185,23 @@ class MPNNet_Parametric(nn.Module):
         self.node2jbond = nn.Sequential(
             nn.Linear(dim, dim), nn.LeakyReLU(), nn.Linear(dim, 1))
 
-        self.set2set = Set2Set(dim, processing_steps=1)
+
+        self.set2set = Set2Set(dim, processing_steps=1) # Leo: What's this? -- Look into this 
         if rnd:
             # 3 = [v, simulate logit, v_int]
             self.lin_out = nn.Linear(dim * 2, 3)
         else:
             # 2 = [v, simulate logit]
-            self.lin_out = nn.Linear(dim * 2, 2)
+            self.lin_out = nn.Linear(dim * 2, 2) # Leo: What's a simulate logit?
 
     def forward(self, data):
         out = F.leaky_relu(self.lin0(data.x))
         h = out.unsqueeze(0)
-
-        for i in range(6):
-            m = F.leaky_relu(self.conv(out, data.edge_index, data.edge_attr))
-            out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
+        # 2 main functions for GNN - pooling and aggregation
+        for i in range(6): # -- \# of message passes. What's the GRU for -- propagating messages 
+            # edge_attr - features for the edge
+            m = F.leaky_relu(self.conv(out, data.edge_index, data.edge_attr)) # Conv -- generates the messages - takes the adjacency matrix and performs conv.
+            out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous()) # a -> b - m      b -> c - m2
             out = out.squeeze(0)
 
         data.stem_preds = self.node2stem(out[data.stem_atmidx])

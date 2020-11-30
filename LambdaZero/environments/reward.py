@@ -256,7 +256,7 @@ class PredDockBayesianReward_v1:
         self.kappa = kappa
 
         self.synth_cutoff = synth_config["synth_cutoff"]
-        self.dockscore_std = [-43.042, 7.057]
+        self.dockscore_std = [-43.042, 7.057] # Mean and the standard deviation
         self.synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
         
         self.net = LambdaZero.models.MPNNet()
@@ -264,7 +264,7 @@ class PredDockBayesianReward_v1:
         self.net.load_state_dict(th.load(binding_model, map_location=th.device(device)))
         self.net.eval()
         
-        self.regressor = regressor(regressor_config)
+        self.regressor = regressor(regressor_config) # This is a Bayesian Model
         # self.regressor.train_loader = ray.get(reward_learner.get_dataset.remote())
         self.regressor.model.load_state_dict(ray.get(reward_learner.get_weights.remote()))
         self.reward_learner_logs = ray.get(reward_learner.get_logs.remote())
