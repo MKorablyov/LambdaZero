@@ -28,6 +28,7 @@ from ray.rllib.utils.framework import try_import_torch
 
 import os
 
+from ray.rllib.agents.dqn.dqn_torch_model import DQNTorchModel
 import numpy as np
 from ray.rllib.models.model import restore_original_dimensions
 from ray.rllib.models.preprocessors import get_preprocessor
@@ -45,7 +46,7 @@ from LambdaZero.utils import RunningMeanStd
 torch, nn = try_import_torch()
 
 # Running pdb - set # of workers to 0
-class GraphMolDQN_thv1(DQNTorchModel, nn.Module, ABC): # Not sure what _thv1 meant
+class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
     def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kw):
         DQNTorchModel.__init__(self, obs_space, action_space, num_outputs, model_config, name) # How is num_outputs determined? -- Why is this supposed to be 256?
         nn.Module.__init__(self)
@@ -74,11 +75,11 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module, ABC): # Not sure what _thv1 mea
                                     nn.Linear(256, 256) #temp hardcoded
                             )
         self.q_function = nn.Sequential(
-                                value_function_base,
+                                self.function_base,
                                 nn.Linear(256, self.dim_action) 
                             )
-        self.value_function = nn.Sequential(
-                                value_function_base,
+        self.value_network = nn.Sequential(
+                                self.function_base,
                                 nn.Linear(256, 1)
                             )
 
@@ -123,8 +124,8 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module, ABC): # Not sure what _thv1 mea
         # but this references it https://docs.ray.io/en/master/rllib-concepts.html?highlight=dqn#building-policies-in-tensorflow
         """Returns the state value prediction for the given state embedding."""
         print("This is used only for dueling-Q")
-        return self.value_function(model_out)
-
+        value_output =  self.value_network(model_out)
+        return value_output
 
     def get_q_value_distributions(self, model_out): # TODO: Temporarily ignoring this "get_state_value"
         """Returns distributional values for Q(s, a) given a state embedding.
@@ -138,7 +139,9 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module, ABC): # Not sure what _thv1 mea
             (action_scores, logits, dist) if num_atoms == 1, otherwise
             (action_scores, z, support_logits_per_action, logits, dist)
         """
-        
+
+        import pdb; pdb.set_trace()
+
         state_embeddings = model_out
         action_scores = self.q_function(state_embeddings) # Takes as input the embedding? Where does this embedding come from?
 

@@ -28,7 +28,6 @@ DEFAULT_CONFIG = {
         "num_gpus": 3,
         "model": {
             "custom_model": "GraphMolDQN_thv1",
-            "dueling": False,
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
         "framework": "torch",
@@ -50,7 +49,7 @@ if machine == "Ikarus":
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
-    time.sleep(120)
+    # time.sleep(120)
     # ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     # ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
     ModelCatalog.register_custom_model("GraphMolDQN_thv1", GraphMolDQN_thv1)
