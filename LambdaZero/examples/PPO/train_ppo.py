@@ -15,7 +15,7 @@ import LambdaZero.utils
 from LambdaZero.examples.PPO import config
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo_mpro_v001"
+else: config_name = "ppo_graph_000"
 config = getattr(config,config_name)
 
 _, _, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -50,9 +50,8 @@ if machine == "Ikarus":
 
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
-    time.sleep(120)
-    ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
-    # ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
+    # time.sleep(120)
+    # ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     tune.run(config["trainer"],
         stop=config["stop"],

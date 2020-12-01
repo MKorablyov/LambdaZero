@@ -26,6 +26,7 @@ def convert_to_tensor(arr):
 # Running pdb - set # of workers to 0
 class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kw):
+        # obs_space: Box(18307,), action_space: Discrete(2107), num_outputs: 2107
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
@@ -42,7 +43,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
-                                       kw.get('num_hidden', 64),
+                                       kw.get('num_hidden', 64), # For some reason I need 128... for DQN -- but not for this :/ 
                                        self.num_blocks,
                                        self.rnd)
         self._value_out = None

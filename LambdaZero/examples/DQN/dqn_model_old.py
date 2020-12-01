@@ -1,6 +1,4 @@
 '''
- I honestly just dug myself in a hole and buried myself in it and kept digging
-
 
  Why is this entering a different policy's get_q_values... returns (1, 2107)
 
@@ -45,9 +43,9 @@ from LambdaZero.utils import RunningMeanStd
 torch, nn = try_import_torch()
 
 # Running pdb - set # of workers to 0
-class GraphMolDQN_thv1(DQNTorchModel, nn.Module, ABC): # Not sure what _thv1 meant
+class GraphMolDQN_thv1(TorchModelV2, nn.Module, ABC): # Not sure what _thv1 meant
     def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kw):
-        DQNTorchModel.__init__(self, obs_space, action_space, num_outputs, model_config, name) # How is num_outputs determined? -- Why is this supposed to be 256?
+        TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name) # How is num_outputs determined? -- Why is this supposed to be 256?
         nn.Module.__init__(self)
         # self.obs_space = obs_space # This is Box(18307,)
         # self.action_space = action_space # This is Discrete(2107) -- something like this...
@@ -69,20 +67,11 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module, ABC): # Not sure what _thv1 mea
         # self.dim_action = self.max_branches * self.num_blocks + 6 + 1 # Calculated based on debugging... PPO - product of branches and blocks, break_logit, and stop_logit
         self.dim_action = self.max_blocks + self.max_branches * self.num_blocks # This is the calculation used in the block mol environment - future just copy from action_space
 
-        
-        self.function_base = nn.Sequential(
-                                    nn.Linear(256, 256) #temp hardcoded
-                            )
-        self.q_function = nn.Sequential(
-                                value_function_base,
-                                nn.Linear(256, self.dim_action) 
-                            )
-        self.value_function = nn.Sequential(
-                                value_function_base,
-                                nn.Linear(256, 1)
-                            )
+        # self.q_function = nn.Linear(self.dim_hidden * 2 + self.dim_action, 1) # Linear layer temporarily -- todo
+        self.q_function = nn.Linear(self.dim_hidden * 2 + self.dim_action, 1) # Not sure why this is the dimension of actions... -- Need to figure this out :/
+        self._value_out = None
 
-        self.action_mask_dict = {}
+        self.action_mask = None
 
 
     def forward(self, input_dict, state, seq_lens): # Torch geometric - takes list of edges
@@ -111,21 +100,36 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module, ABC): # Not sure what _thv1 mea
         # forward pass (~5ms) and then a backward pass + update (which
         # I can't measure directly but seems to take at most ~20ms)
 
+        import pdb; pdb.set_trace() # Check that the output of the state_embedder is 2 * dim_hidden -- CORRECT
         state_embeddings, data = self.state_embedder(data)
-        self.action_mask_dict[state_embeddings] = action_mask # Hack to get this working
-
         # Leo: Need to think about "stopping"/"testing" -- this should be an "action" in itself
         # Set of Actions: (Picking a stem and adding a part, Stopping and evaluating, Breaking logit -- prolly means delete)
 
-        return state_embeddings, state 
+
+        # stop_logit = scalar_outs[:, 1] # Leo: what's this stop_logit and isn't this just [:, 1]. Maybe just calling docking?
+        # # Ends rollout -- and give agent rew.
+        # add_logits = data.stem_preds.reshape((data.num_graphs, -1))
+        # break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
+
+        # actor_logits = torch.cat([stop_logit,
+        #                           add_logits,
+        #                           break_logits], 1)
+
+        return state_embeddings, state # I'm guessing I should be returning the actual value: Q(s, a)
+
+    # def value_function(self):
+    #     return self._value_out # Leo: TODO -- needs replacing
 
     def get_state_value(self, model_out): # Leo: This shouldn't be necessary for normal DQN...
-        # but this references it https://docs.ray.io/en/master/rllib-concepts.html?highlight=dqn#building-policies-in-tensorflow
+    # but this references it https://docs.ray.io/en/master/rllib-concepts.html?highlight=dqn#building-policies-in-tensorflow
         """Returns the state value prediction for the given state embedding."""
-        print("This is used only for dueling-Q")
-        return self.value_function(model_out)
+
+        # return self.value_module(model_out)
+        return None # Temporarily... apparently this isn't very liked :/ 
 
 
+
+    # 
     def get_q_value_distributions(self, model_out): # TODO: Temporarily ignoring this "get_state_value"
         """Returns distributional values for Q(s, a) given a state embedding.
 
@@ -138,16 +142,20 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module, ABC): # Not sure what _thv1 mea
             (action_scores, logits, dist) if num_atoms == 1, otherwise
             (action_scores, z, support_logits_per_action, logits, dist)
         """
+        # Embedding... now what about the possible actions? -- Are these one hot encodings? -- TODO -- pretty sure yes -- Run on Beluga w/ num_workers = 0, import pdb; pdb.set_trace()
         
+        import pdb; pdb.set_trace()
         state_embeddings = model_out
-        action_scores = self.q_function(state_embeddings) # Takes as input the embedding? Where does this embedding come from?
-
-        action_mask = self.action_mask_dict[state_embeddings]
-        self.action_mask_dict[state_embeddings] = None # Temporary hack that needs to be removed later...
+        # Should I be appending the onehot encoding of actions? While ignoring the impossible actions.
+        model_in = state_embeddings # Leo -- should be a concat of state action pairs (I think) TODO ####### 
+        action_scores = self.q_function(model_in) # Takes as input the embedding? Where does this embedding come from?
 
         masked_actions = (1. - action_mask)
 
-        action_scores = action_scores * masked_actions # TODO -- Perhaps instead of setting Q(s, a) = 0 for illegal actions, we can simply ignore them... -- and maybe the function'll be smoother.
+        action_scores = action_scores * masked_actions # TODO -- Perhaps instead of setting Q(s, a) = 0 for illegal actions, we can simply ignore them -- and maybe the function'll be smoother.
+
+
+
 
         # I'm not sure what the point of these logits are... (besides being used in the dueling DQN)
         # And why were these logits all 1 in the original code?
@@ -186,6 +194,15 @@ class MPNNet_Parametric(nn.Module): # this should output a Q(s, a) instead.
 
         self.set2set = Set2Set(dim, processing_steps=1) # Leo: What's this? -- Look into this...
 
+
+        # Now needs a FFN for (embedding, action)
+        # self.dim_action = dim_action
+        # self.num_input = num_feat + (num_out_per_stem + 1) + 1 # (s, a) 14 + 105 + 1 + 1 -- one hot action encoding
+
+
+        # 2 = [simulate logit] - value, logit for whether to end or not
+        # Leo: Not sure why it's dim * 2 though
+        # self.lin_out = nn.Linear(dim * 2 + dim_action, 1) # Leo: What's a simulate logit? --- this is an action too!
 
     def forward(self, data):
         out = F.leaky_relu(self.lin0(data.x))
@@ -249,5 +266,115 @@ def fast_from_data_list(data_list,
                                dim=cd)
 
     return batch.contiguous()
+
+
+
+
+
+
+# torch, nn = try_import_torch()
+
+
+# class DQNTorchModel(TorchModelV2, nn.Module):
+#     """Extension of standard TorchModelV2 to provide dueling-Q functionality.
+#     """
+
+#     def __init__(
+#             self,
+#             obs_space,
+#             action_space,
+#             num_outputs,
+#             model_config,
+#             name,
+#             *,
+#             q_hiddens=(256, ),
+#             dueling=False,
+#             dueling_activation="relu",
+#             num_atoms=1,
+#             use_noisy=False,
+#             v_min=-10.0,
+#             v_max=10.0,
+#             sigma0=0.5,
+#             # TODO(sven): Move `add_layer_norm` into ModelCatalog as
+#             #  generic option, then error if we use ParameterNoise as
+#             #  Exploration type and do not have any LayerNorm layers in
+#             #  the net.
+#             add_layer_norm=False):
+#         """Initialize variables of this model.
+
+#         Extra model kwargs:
+#             q_hiddens (List[int]): List of layer-sizes after(!) the
+#                 Advantages(A)/Value(V)-split. Hence, each of the A- and V-
+#                 branches will have this structure of Dense layers. To define
+#                 the NN before this A/V-split, use - as always -
+#                 config["model"]["fcnet_hiddens"].
+#             dueling (bool): Whether to build the advantage(A)/value(V) heads
+#                 for DDQN. If True, Q-values are calculated as:
+#                 Q = (A - mean[A]) + V. If False, raw NN output is interpreted
+#                 as Q-values.
+#             dueling_activation (str): The activation to use for all dueling
+#                 layers (A- and V-branch). One of "relu", "tanh", "linear".
+#             num_atoms (int): If >1, enables distributional DQN.
+#             use_noisy (bool): Use noisy layers.
+#             v_min (float): Min value support for distributional DQN.
+#             v_max (float): Max value support for distributional DQN.
+#             sigma0 (float): Initial value of noisy layers.
+#             add_layer_norm (bool): Enable layer norm (for param noise).
+#         """
+#         nn.Module.__init__(self)
+#         super(DQNTorchModel, self).__init__(obs_space, action_space,
+#                                             num_outputs, model_config, name)
+
+#         self.dueling = dueling
+#         self.num_atoms = num_atoms
+#         self.v_min = v_min
+#         self.v_max = v_max
+#         self.sigma0 = sigma0
+#         ins = num_outputs # What is this number of outputs? -- Should be a scalar for normal DQN but a distribution for distributional DQN
+
+#         self.value_module = MPNNet_Parametric(self.space.num_node_feat, # Q(s, a)
+#                                        kw.get('num_hidden', 64),
+#                                        self.num_blocks,
+#                                        self.rnd)
+
+
+#     def get_q_value_distributions(self, model_out):
+#         """Returns distributional values for Q(s, a) given a state embedding.
+
+#         Override this in your custom model to customize the Q output head.
+
+#         Args:
+#             model_out (Tensor): Embedding from the model layers.
+
+#         Returns:
+#             (action_scores, logits, dist) if num_atoms == 1, otherwise
+#             (action_scores, z, support_logits_per_action, logits, dist)
+#         """
+#         action_scores = self.advantage_module(model_out). # Takes as input the embedding? Where does this embedding come from?
+
+#         if self.num_atoms > 1:
+#             # Distributional Q-learning uses a discrete support z
+#             # to represent the action value distribution
+#             z = torch.range(0.0, self.num_atoms - 1, dtype=torch.float32)
+#             z = self.v_min + \
+#                 z * (self.v_max - self.v_min) / float(self.num_atoms - 1)
+
+#             support_logits_per_action = torch.reshape(
+#                 action_scores, shape=(-1, self.action_space.n, self.num_atoms))
+#             support_prob_per_action = nn.functional.softmax(
+#                 support_logits_per_action)
+#             action_scores = torch.sum(z * support_prob_per_action, dim=-1)
+#             logits = support_logits_per_action
+#             probs = support_prob_per_action
+#             return action_scores, z, support_logits_per_action, logits, probs
+#         else:
+#             # This should be non-distributional...
+#             logits = torch.unsqueeze(torch.ones_like(action_scores), -1)
+#             return action_scores, logits, logits # Why are all the logits 1? How is this useful at all... I suppose more useful for other extensions of DQN?
+
+#     def get_state_value(self, model_out): # Leo: Is this necessary?
+#         """Returns the state value prediction for the given state embedding."""
+
+#         return self.value_module(model_out)
 
 

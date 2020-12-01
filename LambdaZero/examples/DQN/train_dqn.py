@@ -8,7 +8,7 @@ from ray.rllib.agents.dqn import DQNTrainer
 from ray.rllib.utils import merge_dicts
 
 # from LambdaZero.models.torch_graph_models import GraphMolDQN_thv1
-from LambdaZero.examples.DQN.dqn_model import GraphMolDQN
+from LambdaZero.examples.DQN.dqn_model import GraphMolDQN_thv1
 import LambdaZero.utils
 
 from LambdaZero.examples.DQN import config
@@ -23,11 +23,12 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 11,
+        "num_workers": 0, # Temporarily set to 0 -- for debugging
         "num_gpus_per_worker": 0.075,
         "num_gpus": 3,
         "model": {
-            "custom_model": "GraphMolDQN",
+            "custom_model": "GraphMolDQN_thv1",
+            "dueling": False,
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
         "framework": "torch",

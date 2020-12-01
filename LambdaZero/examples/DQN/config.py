@@ -32,7 +32,7 @@ dqn_graph_000 = {
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__,
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
