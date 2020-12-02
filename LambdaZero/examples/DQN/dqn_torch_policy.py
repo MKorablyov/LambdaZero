@@ -17,11 +17,13 @@ from ray.rllib.utils.framework import try_import_torch
 from ray.rllib.utils.torch_ops import huber_loss, reduce_mean_ignore_inf, \
     softmax_cross_entropy_with_logits
 
-from ray.rllib.agents.dqn.dqn import GenericOffPolicyTrainer, DEFAULT_CONFIG # Leo: edit
-from ray.rllib.agents.dqn.dqn_torch_policy import build_q_losses, build_q_model_and_distribution, \
+from ray.rllib.agents.dqn.dqn import DEFAULT_CONFIG # Leo: edit
+from ray.rllib.agents.dqn.dqn_torch_policy import validate_config, execution_plan \
+    build_q_losses, build_q_model_and_distribution, \
     build_q_stats, postprocess_nstep_and_prio, adam_optimizer, grad_process_and_td_error_fn, \
-    extra_action_out_fn, \
+    extra_action_out_fn, compute_q_values, \
     setup_early_mixins, after_init, TargetNetworkMixin, ComputeTDErrorMixin, LearningRateSchedule
+from ray.rllib.agents.trainer_template import build_trainer
 
 
 def get_action_sampler(policy, model, obs_batch, explore, timestep, is_training=False):
@@ -33,12 +35,17 @@ def get_action_sampler(policy, model, obs_batch, explore, timestep, is_training=
 
 
 
+def get_policy_class(config):
+    # Overriding the original
+    return CustomDQNTorchPolicy
+
+
 CustomDQNTorchPolicy = build_torch_policy(
-    name="DQNTorchPolicy",
+    name="CustomDQNTorchPolicy",
     loss_fn=build_q_losses,
     get_default_config=lambda: ray.rllib.agents.dqn.dqn.DEFAULT_CONFIG,
     make_model_and_action_dist=build_q_model_and_distribution,
-    # action_distribution_fn=get_distribution_inputs_and_class,
+    action_distribution_fn=None,
     action_sampler_fn=get_action_sampler,
     stats_fn=build_q_stats,
     postprocess_fn=postprocess_nstep_and_prio,
@@ -54,9 +61,17 @@ CustomDQNTorchPolicy = build_torch_policy(
         LearningRateSchedule,
     ])
 
+GenericOffPolicyTrainer = build_trainer(
+    name="GenericOffPolicyAlgorithm",
+    default_policy=None,
+    get_policy_class=get_policy_class,
+    default_config=DEFAULT_CONFIG,
+    validate_config=validate_config,
+    execution_plan=execution_plan)
+
 
 CustomDQNTrainer = GenericOffPolicyTrainer.with_updates(
-    name="DQN", default_policy=CustomDQNTorchPolicy, default_config=DEFAULT_CONFIG)
+    name="CustomDQNTrainer", default_policy=CustomDQNTorchPolicy, default_config=DEFAULT_CONFIG)
 
 
 
