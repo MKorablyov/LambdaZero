@@ -9,8 +9,7 @@ from rdkit import Chem
 
 import argparse
 
-# root = os.environ['SLURM_TMPDIR']
-root = "/media/lsky/HDD/Datasets/zinc20"
+root = os.environ['SLURM_TMPDIR']
 
 
 def _parse_sdf(path):
@@ -89,4 +88,4 @@ if __name__ == "__main__":
     records = records[records.status == "ok"][['int_zinc_id', 'smiles']]
 
     data = [_construct_graph(int_zinc_id, smiles) for int_zinc_id, smiles in zip(records.int_zinc_id, records.smiles)]
-    torch.save(data, os.path.join(root, f"{batch_idx}.pth"))
+    torch.save(data, os.path.join(root, "graphs", f"{batch_idx}.pth"))

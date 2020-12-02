@@ -14,6 +14,7 @@ conda activate docking
 
 cd $SLURM_TMPDIR
 mkdir score_subsets
+mkdir graphs
 scp /home/mkkr/scratch/docking/score_subsets/subset_${SLURM_ARRAY_TASK_ID}.csv $SLURM_TMPDIR/score_subsets/
 
 tar -xzf sdf_${SLURM_ARRAY_TASK_ID}.tar.gz
@@ -25,4 +26,4 @@ export PYTHONPATH="${PYTHONPATH}:/home/mkkr/scratch/docking/LambdaZeroDev/"
 cd /home/mkkr/scratch/docking/LambdaZeroDev/LambdaZero/datasets/zinc20/
 python3 extract_coordinates_noh.py $SLURM_ARRAY_TASK_ID
 
-scp ${SLURM_ARRAY_TASK_ID}.pth /home/mkkr/scratch/docking/graphs
+scp $SLURM_TMPDIR/graphs/${SLURM_ARRAY_TASK_ID}.pth /home/mkkr/scratch/docking/graphs
