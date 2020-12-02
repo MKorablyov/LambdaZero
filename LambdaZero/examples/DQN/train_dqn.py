@@ -9,6 +9,7 @@ from ray.rllib.utils import merge_dicts
 
 # from LambdaZero.models.torch_graph_models import GraphMolDQN_thv1
 from LambdaZero.examples.DQN.dqn_model import GraphMolDQN_thv1
+from LambdaZero.examples.DQN.dqn_torch_policy import CustomDQNTrainer
 import LambdaZero.utils
 
 from LambdaZero.examples.DQN import config
@@ -34,7 +35,7 @@ DEFAULT_CONFIG = {
     },
     "summaries_dir": summaries_dir,
     "memory": 60 * 10 ** 9,
-    "trainer": DQNTrainer,
+    "trainer": CustomDQNTrainer,
     "checkpoint_freq": 250,
     "stop": {"training_iteration": 2000000},
 }
