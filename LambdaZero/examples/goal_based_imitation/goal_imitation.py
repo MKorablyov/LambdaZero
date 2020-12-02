@@ -28,6 +28,7 @@ import torch_geometric.nn as gnn
 
 import LambdaZero.models
 from LambdaZero import chem
+from LambdaZero.chem import chem_op
 from LambdaZero.environments.molMDP import BlockMoleculeData, MolMDP
 from LambdaZero.environments.reward import PredDockReward
 from LambdaZero.environments.reward import PredDockReward_v3 as PredReward
@@ -39,7 +40,8 @@ from LambdaZero.utils import get_external_dirs
 from LambdaZero.examples.goal_based_imitation import model_atom, model_block, model_fingerprint
 
 import importlib
-importlib.reload(model_atom)
+importlib.reload(model_fingerprint)
+importlib.reload(chem_op)
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -459,6 +461,8 @@ def dump_episodes(args):
 
 
 def main(args):
+    debug_no_threads = True
+
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 
     device = torch.device('cuda')
@@ -491,6 +495,9 @@ def main(args):
     elif args.repr_type == 'atom_graph':
         model = model_atom.MolAC_GCN(args.nemb, 3, mdp.num_blocks, 1)
         model.to(device)
+    elif args.repr_type == 'morgan_fingerprint':
+        model = model_fingerprint.MFP_MLP(args.nemb, 3, mdp.num_blocks, 1)
+        model.to(device)
 
     opt = torch.optim.Adam(model.parameters(), args.learning_rate, weight_decay=1e-4)
 
@@ -501,8 +508,8 @@ def main(args):
         [RolloutActor(bpath, device, args.repr_type, model,
                       stop_event, replay, synth_net, 'beam')
          for i in range(2)])
-
-    [i.start() for i in rollout_threads]
+    if not debug_no_threads:
+        [i.start() for i in rollout_threads]
     if 0:
         while len(replay.episodes) < 1000:
             time.sleep(10)
@@ -514,7 +521,8 @@ def main(args):
     tint = lambda x: torch.tensor(x, device=device).long()
     mbsize = args.mbsize
     ar = torch.arange(mbsize)
-    sampler = replay.start_samplers(4, mbsize)
+    if not debug_no_threads:
+        sampler = replay.start_samplers(4, mbsize)
     gamma = 0.99
     last_losses = []
 
@@ -539,8 +547,8 @@ def main(args):
     test_losses = []
     time_start = time.time()
 
-    for i in range(args.num_iterations):
-        if 1:
+    for i in range(args.num_iterations+1):
+        if not debug_no_threads:
             s, a, g = sampler()
         else:
             s, a, g = replay.sample2batch(replay.sample(mbsize))
@@ -562,7 +570,7 @@ def main(args):
                 stop_event.set()
                 pdb.set_trace()
 
-        if not i % 1000:
+        if not i % 500:
             recent_best = np.argmax([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
             recent_best_m = np.max([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
             last_losses = np.mean(last_losses)
@@ -574,7 +582,7 @@ def main(args):
             qed_cutoff = [0.2, 0.7]
             synth_cutoff = [0, 0.4]
             all_rs = []
-            for ep in replay.episodes:
+            for ep in replay.episodes[replay.num_loaded_episodes:]:
                 nrg, synth, qed = ep.rewards
                 qed_discount = (qed - qed_cutoff[0]) / (qed_cutoff[1] - qed_cutoff[0])
                 qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
@@ -582,6 +590,9 @@ def main(args):
                 synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
                 all_rs.append(nrg * synth_discount * qed_discount)
             print(np.mean(all_rs), sorted(all_rs)[-10:])
+
+            if i % 5000:
+                continue
 
             total_test_loss = 0
             total_test_n = 0
@@ -604,7 +615,9 @@ def main(args):
                       stop_event, replay, synth_net, 'beam',
                       stop_after=1)
          for i in range(8)])
-    [i.join() for i in rollout_threads]
+    if not debug_no_threads:
+        [i.start() for i in rollout_threads]
+        [i.join() for i in rollout_threads]
     save_stuff()
     print('Done.')
 

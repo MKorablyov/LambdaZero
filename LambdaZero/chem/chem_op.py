@@ -457,7 +457,7 @@ class FPEmbedding_v2:
         self.stem_fp_len = stem_fp_len
         self.stem_fp_radiis = stem_fp_radiis
 
-    def __call__(self, molecule):
+    def __call__(self, molecule, non_empty=False):
         mol = molecule.mol
         mol_fp = get_fp(mol, self.mol_fp_len, self.mol_fp_radiis)
 
@@ -470,8 +470,10 @@ class FPEmbedding_v2:
                      for idx in molecule.jbond_atmidxs]
 
         if len(stem_fps) > 0: stem_fps = np.stack(stem_fps, 0)
+        elif non_empty: stem_fps = np.zeros(shape=[1, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
         else: stem_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
         if len(jbond_fps) > 0: jbond_fps = np.stack(jbond_fps, 0)
+        elif non_empty: jbond_fps = np.zeros(shape=[1, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
         else: jbond_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
         return mol_fp, stem_fps, jbond_fps
 
