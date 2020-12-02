@@ -140,22 +140,18 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
             (action_scores, z, support_logits_per_action, logits, dist)
         """
 
-        import pdb; pdb.set_trace()
-
         state_embeddings = model_out
         action_scores = self.q_function(state_embeddings) # Takes as input the embedding? Where does this embedding come from?
 
         action_mask = self.action_mask_dict[state_embeddings]
         self.action_mask_dict[state_embeddings] = None # Temporary hack that needs to be removed later...
 
-        masked_actions = (1. - action_mask)
-
-        action_scores = action_scores * masked_actions # TODO -- Perhaps instead of setting Q(s, a) = 0 for illegal actions, we can simply ignore them... -- and maybe the function'll be smoother.
+        action_scores = action_scores + action_mask*10000 # TODO -- Perhaps instead of setting Q(s, a) = 0 for illegal actions, we can simply ignore them... -- and maybe the function'll be smoother.
 
         # I'm not sure what the point of these logits are... (besides being used in the dueling DQN)
         # And why were these logits all 1 in the original code?
         logits = torch.unsqueeze(torch.ones_like(action_scores), -1)
-
+        assert action_mask[action_mask > 0].shape == action_scores[action_scores > 1000].shape
         return action_scores, logits, logits 
 
     def _save(self, checkpoint_dir):

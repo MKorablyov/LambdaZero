@@ -17,9 +17,8 @@ from ray.rllib.utils.framework import try_import_torch
 from ray.rllib.utils.torch_ops import huber_loss, reduce_mean_ignore_inf, \
     softmax_cross_entropy_with_logits
 
-from ray.rllib.agents.dqn.dqn import DEFAULT_CONFIG # Leo: edit
-from ray.rllib.agents.dqn.dqn_torch_policy import validate_config, execution_plan \
-    build_q_losses, build_q_model_and_distribution, \
+from ray.rllib.agents.dqn.dqn import DEFAULT_CONFIG, validate_config, execution_plan # Leo: edit
+from ray.rllib.agents.dqn.dqn_torch_policy import build_q_losses, build_q_model_and_distribution, \
     build_q_stats, postprocess_nstep_and_prio, adam_optimizer, grad_process_and_td_error_fn, \
     extra_action_out_fn, compute_q_values, \
     setup_early_mixins, after_init, TargetNetworkMixin, ComputeTDErrorMixin, LearningRateSchedule
@@ -29,8 +28,9 @@ from ray.rllib.agents.trainer_template import build_trainer
 def get_action_sampler(policy, model, obs_batch, explore, timestep, is_training=False):
     q_vals = compute_q_values(policy, model, obs_batch, explore, is_training)
     q_vals = q_vals[0] if isinstance(q_vals, tuple) else q_vals
+    policy.q_values = q_vals
     # Ensure that you don't sample the actions that are illegal (i.e. action_mask... )
-    actions = q_vals.argmax(dim=1), None
+    actions = q_vals.argmax(dim=1)
     return actions, None # returns actions, logp
 
 
