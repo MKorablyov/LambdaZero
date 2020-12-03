@@ -20,19 +20,69 @@ from ray.rllib.utils.torch_ops import huber_loss, reduce_mean_ignore_inf, \
 from ray.rllib.agents.dqn.dqn import DEFAULT_CONFIG, validate_config, execution_plan # Leo: edit
 from ray.rllib.agents.dqn.dqn_torch_policy import build_q_losses, build_q_model_and_distribution, \
     build_q_stats, postprocess_nstep_and_prio, adam_optimizer, grad_process_and_td_error_fn, \
-    extra_action_out_fn, compute_q_values, \
+    extra_action_out_fn, \
     setup_early_mixins, after_init, TargetNetworkMixin, ComputeTDErrorMixin, LearningRateSchedule
 from ray.rllib.agents.trainer_template import build_trainer
 
+import random
+import numpy.ma as ma
+
+eps = 0.05
 
 def get_action_sampler(policy, model, obs_batch, explore, timestep, is_training=False):
-    q_vals = compute_q_values(policy, model, obs_batch, explore, is_training)
-    q_vals = q_vals[0] if isinstance(q_vals, tuple) else q_vals
+    # We are ignoring explore in this case
+    q_vals, _, action_mask = compute_q_values(policy, model, obs_batch, explore, is_training)
     policy.q_values = q_vals
     # Ensure that you don't sample the actions that are illegal (i.e. action_mask... )
-    actions = q_vals.argmax(dim=1)
+    action_mask = action_mask.squeeze(-1).astype(np.bool)
+    masked_q_vals = ma.masked_array(q_vals, action_mask, fill_value=1e-20)
+
+    import pdb; pdb.set_trace()
+    
+    # Epsilon-Greedy
+    if random.random() < eps:
+        sampled_idxs = np.random.choice(np.arange(q_vals.shape[1])[action_mask])
+        actions = masked_q_vals[sampled_idxs]
+    else:
+        actions = masked_q_vals.argmax(dim=1) 
     return actions, None # returns actions, logp
 
+
+def compute_q_values(policy, model, obs, explore, is_training=False):
+    config = policy.config
+
+    model_out, state = model({ 
+        SampleBatch.CUR_OBS: obs, 
+        "is_training": is_training,
+    }, [], None) # Where's the action? Q(s, a), but I don't see the action...
+
+    (action_scores, logits,
+     probs_or_logits) = model.get_q_value_distributions(model_out) # Not sure how logits or (probs or logits) are anything but 1
+
+    if config["dueling"]: # TODO
+        state_score = model.get_state_value(model_out)
+        if policy.config["num_atoms"] > 1:
+            support_logits_per_action_mean = torch.mean(
+                support_logits_per_action, dim=1)
+            support_logits_per_action_centered = (
+                support_logits_per_action - torch.unsqueeze(
+                    support_logits_per_action_mean, dim=1))
+            support_logits_per_action = torch.unsqueeze(
+                state_score, dim=1) + support_logits_per_action_centered
+            support_prob_per_action = nn.functional.softmax(
+                support_logits_per_action)
+            value = torch.sum(z * support_prob_per_action, dim=-1)
+            logits = support_logits_per_action
+            probs_or_logits = support_prob_per_action
+        else:
+            advantages_mean = reduce_mean_ignore_inf(action_scores, 1)
+            advantages_centered = action_scores - torch.unsqueeze(
+                advantages_mean, 1)
+            value = state_score + advantages_centered
+    else:
+        value = action_scores # Literally just this
+
+    return value, logits, probs_or_logits
 
 
 def get_policy_class(config):

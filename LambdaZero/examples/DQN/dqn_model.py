@@ -1,22 +1,9 @@
 '''
- I honestly just dug myself in a hole and buried myself in it and kept digging
-
-
- Why is this entering a different policy's get_q_values... returns (1, 2107)
-
-
- How did torch_graph_models (PPO) handle the stop_logits and done_logits... this doesn't seem to be here :/ in the 2107
-
- Somehow calculated a get_state_score too... without ours...
-
-
- Issue 1: It's using this model's forward, but is not using this model's get_q_value_dist and not using get_state_value
- Issue 2: num_outputs for this one is preset to 256... I've got no idea where this parameter is set or what it means -- I'm guessing the embedding size?
-                -- Ah maybe I don't need to calculate this get_q_values and it'll do the "actions for me"...
-                   - First off, I need to replace this to override the "impossible" actions (action_mask)
-                -- But strangely, it seems to want output of forward() to be of size (None, num_outputs) = (?, 256) -- why though? 256 is a standard batch size but it's not a standard matrix notiation, typically (256, 1) 
-
- Issue 3: PPO seems to work? The num_outputs seems to be 2107 (# of actions as expected... intended)
+ Issue 1: num_outputs for this one is preset to 256... This is an embedding size that should be updatable 
+   - Maybe larger embedding size and network is better -- we have 2107 possible actions...
+ Issue 2: epsilon greedy (some kind of this)
+ Issue 3: Ensure that only from action_mask are sampled.
+ Issue 4: FIX THE PCA.PKL (re-install?)
 '''
 
 
@@ -113,7 +100,7 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         # I can't measure directly but seems to take at most ~20ms)
 
         state_embeddings, data = self.state_embedder(data)
-        self.action_mask_dict[state_embeddings] = action_mask # Hack to get this working
+        self.action_mask_dict[obs] = action_mask # Hack to get this working
 
         # Leo: Need to think about "stopping"/"testing" -- this should be an "action" in itself
         # Set of Actions: (Picking a stem and adding a part, Stopping and evaluating, Breaking logit -- prolly means delete)
@@ -144,7 +131,7 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         action_scores = self.q_function(state_embeddings) # Takes as input the embedding? Where does this embedding come from?
 
         action_mask = self.action_mask_dict[state_embeddings]
-        self.action_mask_dict[state_embeddings] = None # Temporary hack that needs to be removed later...
+        self.action_mask_dict[state_embeddings] = None
 
         action_scores = action_scores + action_mask*10000 # TODO -- Perhaps instead of setting Q(s, a) = 0 for illegal actions, we can simply ignore them... -- and maybe the function'll be smoother.
 
@@ -152,7 +139,7 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         # And why were these logits all 1 in the original code?
         logits = torch.unsqueeze(torch.ones_like(action_scores), -1)
         assert action_mask[action_mask > 0].shape == action_scores[action_scores > 1000].shape
-        return action_scores, logits, logits 
+        return action_scores, logits, torch.unsqueeze(action_mask, -1)
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
