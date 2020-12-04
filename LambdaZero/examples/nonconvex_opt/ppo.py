@@ -20,11 +20,16 @@ DEFAULT_CONFIG = \
         "rllib_config":{
             "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
             "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-            "num_workers": 4,
-            "num_gpus_per_worker": 0.075,
+            "num_workers": 1,
+            "num_gpus_per_worker": 0.1,
             "num_gpus": 0.4,
             #"model": {"custom_model": "MolActorCritic_tfv1"},
             "env": DummyNonConvex,
+            "env_config":{"num_dims": 10,
+                          "discretize": 7,
+                          "max_steps": 10,
+                          "ksize": 0.15,
+                          }
             #"callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}
         },
         "memory":  15 * 10**9,

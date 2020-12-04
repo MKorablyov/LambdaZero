@@ -279,6 +279,8 @@ if __name__ == '__main__':
                   "synergy_zip_001": [synergy_zip_001],
                   "synergy_zip_001_found": [synergy_zip_001_regret],
                 }
+        if summar["explained variance"] is not None: print(summar)
+
         cell_line_summar.append(summar)
         #splits = random_split(len(dataset_cell), [0.8, 0.1, 0.1])
         #split_path = osp.join(datasets_dir + "/NewDrugComb/raw", str(cell_line_idx) + "_split.npy")
