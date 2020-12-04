@@ -17,7 +17,6 @@ tf = try_import_tf()
 torch, nn = try_import_torch()
 logger = logging.getLogger(__name__)
 
-
 def on_episode_start(info):
     # save env state when an episode starts
     env = info["env"].get_unwrapped()[0]
@@ -29,7 +28,7 @@ def on_episode_start(info):
 # __sphinx_doc_begin__
 DEFAULT_CONFIG = with_common_config({
     # Use pytorch
-    "use_pytorch": True,
+    "framework": "torch",
     # Size of batches collected from each worker
     "rollout_fragment_length": 200,
     # Number of timesteps collected for each SGD round
@@ -67,6 +66,7 @@ DEFAULT_CONFIG = with_common_config({
         "dirichlet_noise": 0.03,
         "argmax_tree_policy": False,
         "add_dirichlet_noise": True,
+        "policy_optimization": False
     },
 
     # === Ranked Rewards ===
@@ -119,7 +119,9 @@ def choose_policy_optimizer(workers, config):
 
 def alpha_zero_loss(policy, model, dist_class, train_batch):
     # get inputs unflattened inputs
-    input_dict = restore_original_dimensions(train_batch["obs"], policy.observation_space, "torch")
+    input_dict = {
+        'obs': restore_original_dimensions(train_batch["obs"], policy.observation_space, "torch")
+    }
     # forward pass in model
     model_out = model.forward(input_dict, None, [1])
     logits, _ = model_out

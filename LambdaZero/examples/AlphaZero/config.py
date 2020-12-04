@@ -1,24 +1,499 @@
-from LambdaZero.environments import BlockMolEnv_v3
+import socket
+from copy import deepcopy
+import os
+import os.path as osp
+from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnv_v4, BlockMolEnvGraph_v1
+from LambdaZero.environments.persistent_search import BlockMolGraphEnv_PersistentBuffer
+from LambdaZero.utils import get_external_dirs
+from LambdaZero.environments import PredDockReward_v3
+from LambdaZero.examples.synthesizability.vanilla_chemprop import DEFAULT_CONFIG as chemprop_cfg
+from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
+# datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+# binding_config = deepcopy(chemprop_cfg)
+# binding_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
+# synth_config = deepcopy(chemprop_cfg)
+# synth_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 
 az000 = {
     "rllib_config":{
         "env": BlockMolEnv_v3,
-        "env_config":  {
-            "obs_config":{
-            "mol_fp_len": 512,
-            "mol_fp_radiis": [2,3],
-            "stem_fp_len": 64,
-            "stem_fp_radiis": [2,3,4]
-            },
-            "max_blocks": 7,
-            "reward_config": {"soft_stop":True,"device":"cuda"},
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                # "synth_cutoff": [0, 4],
+                # "ebind_cutoff": [42.5, 109.1], #8.5 std away
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
         },
         "sample_batch_size": 128,
         "mcts_config": {
-            "num_simulations": 2
+            "num_simulations": 10
         },
     }
 }
+
+
+az034 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnv_v3,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                # "synth_cutoff": [0, 4],
+                # "ebind_cutoff": [42.5, 109.1], #8.5 std away
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
+
+        },
+        "num_sgd_iter": 3
+    }
+}
+
+az000 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "sample_batch_size": 128,
+        "mcts_config": {
+            "num_simulations": 2,
+            "policy_optimization": True
+        },
+    }
+}
+
+az001 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 800,
+            "policy_optimization": False,
+        },
+    }
+}
+
+az002 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 200,
+            "policy_optimization": False,
+        },
+    }
+}
+
+az003 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 100,
+            "policy_optimization": False,
+        },
+    }
+}
+
+
+az001_po = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 800,
+            "policy_optimization": True,
+        },
+    }
+}
+
+az002_po = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 200,
+            "policy_optimization": True,
+        },
+    }
+}
+
+az003_po = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 100,
+            "policy_optimization": True,
+        },
+    }
+}
+
+az004 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 50,
+            "policy_optimization": False,
+        },
+    }
+}
+
+az004_po = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 50,
+            "policy_optimization": True,
+        },
+    }
+}
+
+az005 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "train_batch_size": 1500,
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 20,
+            "policy_optimization": False,
+        },
+    }
+}
+
+az005_po = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 20,
+            "policy_optimization": True,
+        },
+    }
+}
+
+az006_po = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 10,
+            "policy_optimization": True,
+        },
+    }
+}
+
+az006_po_buff = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 0.6,
+            "random_start_prob": 0.5
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 10,
+            "policy_optimization": True,
+        },
+    },
+    "buffer_size": 500_000
+}
+
+az006_po_buff_1 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolGraphEnv_PersistentBuffer,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            },
+            "threshold": 0.6,
+            "random_start_prob": 0
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 10,
+            "policy_optimization": True,
+        },
+    },
+    "buffer_size": 500_000
+}
+
+az006_po_lre4 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "lr": 1e-4,
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 10,
+            "policy_optimization": True,
+        },
+    }
+}
+
+az006_po_lre5 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "lr": 1e-5,
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 10,
+            "policy_optimization": True,
+        },
+    }
+}
+
+az006 = {
+    # eval max      3.1
+    # eval mean     2.7
+    # eval mean     2.8
+    # eval max      3.1
+    # max           3.3
+    # mean          2.4
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "dockscore_config": binding_config,
+                "synth_config": synth_config
+            }
+        },
+        "num_sgd_iter": 3,
+        "mcts_config": {
+            "num_simulations": 10,
+            "policy_optimization": False,
+        },
+    }
+}
+
 
 # az001 = { # killed OOM
 #     "base_env_config": mol_blocks_v3_config,
@@ -226,28 +701,6 @@ az000 = {
 # }
 #
 #
-az034 = {
-    # eval max      3.1
-    # eval mean     2.7
-    # eval mean     2.8
-    # eval max      3.1
-    # max           3.3
-    # mean          2.4
-    "rllib_config":{
-        "env": BlockMolEnv_v3,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockReward_v2,
-            "reward_config":{
-                "synth_cutoff":[0, 5],
-                "synth_config": chemprop_cfg
-            }
-
-        },
-        "num_sgd_iter": 3
-    }
-
-}
 #
 # az035 = {
 #     "base_env_config": mol_blocks_v3_config,

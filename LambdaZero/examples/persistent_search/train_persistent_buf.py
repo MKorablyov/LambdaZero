@@ -7,10 +7,11 @@ from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.utils import merge_dicts
 
 from LambdaZero.models.torch_models import MolActorCritic_thv1
+from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 import LambdaZero.utils
 
 from LambdaZero.environments import block_mol_v3
-from LambdaZero.examples.persistent_search import config
+from LambdaZero.examples.PPO_RND import config
 from LambdaZero.environments.persistent_search import PersistentSearchBuffer
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
@@ -23,15 +24,21 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 5,
+        "num_workers": 11,
+        "num_envs_per_worker": 2,
         "num_gpus_per_worker": 0.075,
-        "num_gpus": 0.4,
-        "model": {"custom_model": "MolActorCritic_thv1"},
+        "num_gpus": 2,
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+        },
+        "env_config": {
+            "threshold": 0.7
+        },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
         "framework": "torch",
         },
     "summaries_dir": summaries_dir,
-    "memory": 60 * 10 ** 9,
+    "memory": 70 * 10 ** 9,
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
     "stop":{"training_iteration": 2000000},
@@ -49,10 +56,11 @@ if machine == "Ikarus":
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
-
-    searchbuf = ray.remote(PersistentSearchBuffer).remote(
+    ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
+    searchbuf = ray.remote(num_gpus=1)(PersistentSearchBuffer).remote(
         {'blocks_file': block_mol_v3.DEFAULT_CONFIG['molMDP_config']['blocks_file'],
-         'max_size': config['buffer_size']})
+         'max_size': config['buffer_size'],
+         'threshold': config["rllib_config"]['env_config']['threshold']})
     config['rllib_config']['env_config']['searchbuf'] = searchbuf
 
     tune.run(config["trainer"],
