@@ -100,7 +100,7 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         # I can't measure directly but seems to take at most ~20ms)
 
         state_embeddings, data = self.state_embedder(data)
-        self.action_mask_dict[obs] = action_mask # Hack to get this working
+        self.action_mask_dict[state_embeddings] = action_mask # Hack to get this working
 
         # Leo: Need to think about "stopping"/"testing" -- this should be an "action" in itself
         # Set of Actions: (Picking a stem and adding a part, Stopping and evaluating, Breaking logit -- prolly means delete)

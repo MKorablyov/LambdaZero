@@ -26,26 +26,33 @@ from ray.rllib.agents.trainer_template import build_trainer
 
 import random
 import numpy.ma as ma
+import numpy as np
+
+torch, nn = try_import_torch()
 
 eps = 0.05
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def get_action_sampler(policy, model, obs_batch, explore, timestep, is_training=False):
     # We are ignoring explore in this case
     q_vals, _, action_mask = compute_q_values(policy, model, obs_batch, explore, is_training)
     policy.q_values = q_vals
     # Ensure that you don't sample the actions that are illegal (i.e. action_mask... )
-    action_mask = action_mask.squeeze(-1).astype(np.bool)
-    masked_q_vals = ma.masked_array(q_vals, action_mask, fill_value=1e-20)
+    action_mask = (1. - action_mask).squeeze(-1).cpu().numpy().astype(np.bool)
+    masked_q_vals = ma.masked_array(q_vals.cpu().numpy(), action_mask, fill_value=1e-20)
 
-    import pdb; pdb.set_trace()
+#    import pdb; pdb.set_trace()
     
     # Epsilon-Greedy
     if random.random() < eps:
-        sampled_idxs = np.random.choice(np.arange(q_vals.shape[1])[action_mask])
-        actions = masked_q_vals[sampled_idxs]
+        try:
+            allowed_actions = (1 - action_mask).astype(np.bool)
+            actions = np.array([np.random.choice(np.arange(q_vals.shape[1])[allowed_actions[i]]) for i in range(allowed_actions.shape[0])])
+        except:
+            import pdb; pdb.set_trace()
     else:
-        actions = masked_q_vals.argmax(dim=1) 
-    return actions, None # returns actions, logp
+        actions = masked_q_vals.argmax(axis=1) 
+    return torch.tensor(actions).to(device), None # returns actions, logp
 
 
 def compute_q_values(policy, model, obs, explore, is_training=False):
