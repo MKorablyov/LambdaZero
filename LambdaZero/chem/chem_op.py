@@ -19,6 +19,8 @@ from rdkit.Chem.rdchem import BondType as BT
 from rdkit.Chem.rdchem import HybridizationType
 
 from LambdaZero.chem.chimera_op import _add_hydrogens_and_compute_gasteiger_charges_with_chimera
+from LambdaZero.utils import get_external_dirs
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 rdBase.DisableLog('rdApp.error')
 
@@ -307,7 +309,7 @@ class Dock_smi:
                  gas_charge=True,
                  rec_site_file="2_site/selected_spheres.sph",
                  grid_prefix="3_grid/grid",
-                 dock_in_template = "4_dock/anchor_and_grow.in",
+                 dock_in_template="4_dock/anchor_and_grow.in",
                  vdw_defn_file="parameters/vdw_AMBER_parm99.defn",
                  flex_defn_file="parameters/flex.defn",
                  flex_drive_file="parameters/flex_drive.tbl"):
@@ -320,7 +322,8 @@ class Dock_smi:
             self.charge_method = "am1-bcc"
 
         if not trustme:
-            if not os.path.exists(outpath): os.makedirs(outpath)
+            if not os.path.exists(outpath):
+                os.makedirs(outpath)
         # chimera bin
         self.chimera_bin = os.path.join(chimera_dir, "bin/chimera")
         if not trustme:
@@ -393,7 +396,8 @@ class Dock_smi:
         process.wait()
 
         # parse dock energy
-        with open(dock_out_file) as f: lines = f.read().splitlines()
+        with open(dock_out_file) as f:
+            lines = f.read().splitlines()
         gridscores = [float(line[38:]) for line in lines if line.startswith("                          Grid_Score")]
         assert len(gridscores) == 1, "could not parse docking output - something happened while running dock binary"
         gridscore = gridscores[0]
@@ -410,6 +414,115 @@ class Dock_smi:
         noh = np.where(noh)[0]
         coord = np.asarray([mol.GetConformer(0).GetAtomPosition(int(idx)) for idx in noh])
         return gridscore, coord
+
+
+class GenMolFile:
+    def __init__(self, outpath, mgltools):
+        self.outpath = outpath
+        self.prepare_ligand4 = os.path.join(mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
+
+        os.makedirs(os.path.join(outpath, "sdf"), exist_ok=True)
+        os.makedirs(os.path.join(outpath, "mol2"), exist_ok=True)
+        os.makedirs(os.path.join(outpath, "pdbqt"), exist_ok=True)
+
+    def __call__(self, smi, mol_name, num_conf):
+        sdf_file = os.path.join(self.outpath, "sdf", f"{mol_name}.sdf")
+        mol2_file = os.path.join(self.outpath, "mol2", f"{mol_name}.mol2")
+        pdbqt_file = os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt")
+
+        mol = Chem.MolFromSmiles(smi)
+        Chem.SanitizeMol(mol)
+        mol_h = Chem.AddHs(mol)
+        AllChem.EmbedMultipleConfs(mol_h, numConfs=num_conf)
+        for i in range(num_conf):
+            AllChem.MMFFOptimizeMolecule(mol_h, confId=i)
+        mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
+        # choose minimum energy conformer
+        mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
+        print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
+        os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
+        os.system(f"pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+        return pdbqt_file
+
+
+class DockVina_smi:
+    def __init__(self,
+                 outpath,
+                 mgltools_dir=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
+                 vina_dir=os.path.join(programs_dir, "vina"),
+                 docksetup_dir=os.path.join(datasets_dir, "seh/4jnc"),
+                 rec_file="4jnc.nohet.aligned.pdbqt",
+                 bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
+                 dock_pars="",
+                 cleanup=True):
+
+        self.outpath = outpath
+        self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
+        self.vina_bin = os.path.join(vina_dir, "bin/vina")
+        self.rec_file = os.path.join(docksetup_dir, rec_file)
+        self.bindsite = bindsite
+        self.dock_pars = dock_pars
+        self.cleanup = cleanup
+
+        self.gen_molfile = GenMolFile(self.outpath, self.mgltools)
+        # make vina command
+        self.dock_cmd = "{} --receptor {} " \
+                        "--center_x {} --center_y {} --center_z {} " \
+                        "--size_x {} --size_y {} --size_z {} "
+        self.dock_cmd = self.dock_cmd.format(self.vina_bin, self.rec_file, *self.bindsite)
+        self.dock_cmd += " --ligand {} --out {}"
+
+        os.makedirs(os.path.join(self.outpath, "docked"), exist_ok=True)
+
+    def dock(self, smi, mol_name=None, molgen_conf=20):
+        mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+        dockscore = float('nan')
+        coord = None
+        try:
+            docked_file = os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
+            input_file = self.gen_molfile(smi, mol_name, molgen_conf)
+            # complete docking query
+            dock_cmd = self.dock_cmd.format(input_file, docked_file)
+            dock_cmd = dock_cmd + " " + self.dock_pars
+            # dock
+            cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
+            cl.wait()
+            # parse energy
+            with open(docked_file) as f:
+                docked_pdb = f.readlines()
+            if docked_pdb[1].startswith("REMARK VINA RESULT"):
+                dockscore = float(docked_pdb[1].split()[3])
+            else:
+                raise Exception("Can't parse docking energy")
+            # parse coordinates
+            # TODO: fix order
+            coord = []
+            endmodel_idx = 0
+            for idx, line in enumerate(docked_pdb):
+                if line.startswith("ENDMDL"):
+                    endmodel_idx = idx
+                    break
+
+            docked_pdb_model_1 = docked_pdb[:endmodel_idx]  # take only the model corresponding to the best energy
+            docked_pdb_model_1_atoms = [line for line in docked_pdb_model_1 if line.startswith("ATOM") and line.split()[2][0] != 'H']  # ignore hydrogen
+            coord.append([line.split()[-7:-4] for line in docked_pdb_model_1_atoms])
+            coord = np.array(coord, dtype=np.float32)
+
+        finally:
+            if self.cleanup:
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, "sdf", f"{mol_name}.sdf"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
+
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
+
+        return mol_name, dockscore, coord
 
 
 class ScaffoldSplit:
