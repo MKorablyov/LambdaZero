@@ -110,7 +110,7 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
     def get_state_value(self, model_out): # Leo: This shouldn't be necessary for normal DQN...
         # but this references it https://docs.ray.io/en/master/rllib-concepts.html?highlight=dqn#building-policies-in-tensorflow
         """Returns the state value prediction for the given state embedding."""
-        print("This is used only for dueling-Q")
+#        print("This is used only for dueling-Q")
         value_output =  self.value_network(model_out)
         return value_output
 
@@ -131,14 +131,12 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         action_scores = self.q_function(state_embeddings) # Takes as input the embedding? Where does this embedding come from?
 
         action_mask = self.action_mask_dict[state_embeddings]
-        self.action_mask_dict[state_embeddings] = None
-
-        action_scores = action_scores + action_mask*10000 # TODO -- Perhaps instead of setting Q(s, a) = 0 for illegal actions, we can simply ignore them... -- and maybe the function'll be smoother.
+        self.action_mask_dict.pop(state_embeddings, None)
 
         # I'm not sure what the point of these logits are... (besides being used in the dueling DQN)
         # And why were these logits all 1 in the original code?
         logits = torch.unsqueeze(torch.ones_like(action_scores), -1)
-        assert action_mask[action_mask > 0].shape == action_scores[action_scores > 1000].shape
+        # assert action_mask[action_mask > 0].shape == action_scores[action_scores > 1000].shape
         return action_scores, logits, torch.unsqueeze(action_mask, -1)
 
     def _save(self, checkpoint_dir):

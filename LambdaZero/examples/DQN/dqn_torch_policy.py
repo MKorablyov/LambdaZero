@@ -20,7 +20,7 @@ from ray.rllib.utils.torch_ops import huber_loss, reduce_mean_ignore_inf, \
 from ray.rllib.agents.dqn.dqn import DEFAULT_CONFIG, validate_config, execution_plan # Leo: edit
 from ray.rllib.agents.dqn.dqn_torch_policy import build_q_model_and_distribution, \
     build_q_stats, postprocess_nstep_and_prio, adam_optimizer, grad_process_and_td_error_fn, \
-    extra_action_out_fn, \
+    extra_action_out_fn, QLoss, \
     setup_early_mixins, after_init, TargetNetworkMixin, ComputeTDErrorMixin, LearningRateSchedule
 from ray.rllib.agents.trainer_template import build_trainer
 
@@ -29,6 +29,10 @@ import numpy.ma as ma
 import numpy as np
 
 torch, nn = try_import_torch()
+F = None
+if nn:
+    F = nn.functional
+
 
 eps = 0.05
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
