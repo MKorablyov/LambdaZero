@@ -18,7 +18,7 @@ from ray.rllib.utils.torch_ops import huber_loss, reduce_mean_ignore_inf, \
     softmax_cross_entropy_with_logits
 
 from ray.rllib.agents.dqn.dqn import DEFAULT_CONFIG, validate_config, execution_plan # Leo: edit
-from ray.rllib.agents.dqn.dqn_torch_policy import build_q_losses, build_q_model_and_distribution, \
+from ray.rllib.agents.dqn.dqn_torch_policy import build_q_model_and_distribution, \
     build_q_stats, postprocess_nstep_and_prio, adam_optimizer, grad_process_and_td_error_fn, \
     extra_action_out_fn, \
     setup_early_mixins, after_init, TargetNetworkMixin, ComputeTDErrorMixin, LearningRateSchedule
@@ -91,6 +91,67 @@ def compute_q_values(policy, model, obs, explore, is_training=False):
 
     return value, logits, probs_or_logits
 
+def build_q_losses(policy, model, _, train_batch):
+    config = policy.config
+    # Q-network evaluation.
+    q_t, q_logits_t, q_probs_t = compute_q_values(
+        policy,
+        policy.q_model,
+        train_batch[SampleBatch.CUR_OBS],
+        explore=False,
+        is_training=True)
+
+    # Target Q-network evaluation.
+    q_tp1, q_logits_tp1, q_probs_tp1 = compute_q_values(
+        policy,
+        policy.target_q_model,
+        train_batch[SampleBatch.NEXT_OBS],
+        explore=False,
+        is_training=True)
+
+    # Q scores for actions which we know were selected in the given state.
+    one_hot_selection = F.one_hot(
+        train_batch[SampleBatch.ACTIONS], policy.action_space.n)
+    q_t_selected = torch.sum(
+        torch.where(q_t > -float("inf"), q_t, torch.tensor(0.0).to(device)) *
+        one_hot_selection, 1)
+    q_logits_t_selected = torch.sum(
+        q_logits_t * torch.unsqueeze(one_hot_selection, -1), 1)
+
+    # compute estimate of best possible value starting from state at t + 1
+    if config["double_q"]:
+        q_tp1_using_online_net, q_logits_tp1_using_online_net, \
+            q_dist_tp1_using_online_net = compute_q_values(
+                policy,
+                policy.q_model,
+                train_batch[SampleBatch.NEXT_OBS],
+                explore=False,
+                is_training=True)
+        q_tp1_best_using_online_net = torch.argmax(q_tp1_using_online_net, 1)
+        q_tp1_best_one_hot_selection = F.one_hot(
+            q_tp1_best_using_online_net, policy.action_space.n)
+        q_tp1_best = torch.sum(
+            torch.where(q_tp1 > -float("inf"), q_tp1, torch.tensor(0.0).to(device)) *
+            q_tp1_best_one_hot_selection, 1)
+        q_probs_tp1_best = torch.sum(
+            q_probs_tp1 * torch.unsqueeze(q_tp1_best_one_hot_selection, -1), 1)
+    else:
+        q_tp1_best_one_hot_selection = F.one_hot(
+            torch.argmax(q_tp1, 1), policy.action_space.n)
+        q_tp1_best = torch.sum(
+            torch.where(q_tp1 > -float("inf"), q_tp1, torch.tensor(0.0).to(device)) *
+            q_tp1_best_one_hot_selection, 1)
+        q_probs_tp1_best = torch.sum(
+            q_probs_tp1 * torch.unsqueeze(q_tp1_best_one_hot_selection, -1), 1)
+
+    policy.q_loss = QLoss(
+        q_t_selected, q_logits_t_selected, q_tp1_best, q_probs_tp1_best,
+        train_batch[PRIO_WEIGHTS], train_batch[SampleBatch.REWARDS],
+        train_batch[SampleBatch.DONES].float(), config["gamma"],
+        config["n_step"], config["num_atoms"],
+        config["v_min"], config["v_max"])
+
+    return policy.q_loss.loss
 
 def get_policy_class(config):
     # Overriding the original
