@@ -524,6 +524,20 @@ class DockVina_smi:
 
         return mol_name, dockscore, coord
 
+    def __del__(self):
+        if self.cleanup:
+            with contextlib.suppress(FileNotFoundError):
+                os.rmdir(os.path.join(self.outpath, "sdf"))
+
+            with contextlib.suppress(FileNotFoundError):
+                os.rmdir(os.path.join(self.outpath, "mol2"))
+
+            with contextlib.suppress(FileNotFoundError):
+                os.rmdir(os.path.join(self.outpath, "pdbqt"))
+
+            with contextlib.suppress(FileNotFoundError):
+                os.rmdir(os.path.join(self.outpath, "docked"))
+
 
 class ScaffoldSplit:
     def __init__(self, mols_smiles, incude_chirality=False):
