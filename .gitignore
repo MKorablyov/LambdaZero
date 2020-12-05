@@ -57,3 +57,5 @@ share/python-wheels/
 logs/
 results/
 mlruns/
+
+*.so

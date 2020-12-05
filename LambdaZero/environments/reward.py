@@ -245,7 +245,7 @@ class PredDockReward_v3:
 class PredDockBayesianReward_v1:
     def __init__(self, qed_cutoff, synth_config, binding_model, kappa,
                  soft_stop, exp, delta, simulation_cost, reward_learner, regressor_config,
-                 regressor, sync_freq, 
+                 regressor, sync_freq, dense_rewards,
                  device, transform=T.Compose([LambdaZero.utils.Complete()])):
 
         self.qed_cutoff = qed_cutoff
@@ -277,6 +277,8 @@ class PredDockBayesianReward_v1:
         self.weight_sync_freq = sync_freq
         self.reward_learner_logs = None
         self.train_len = 1000
+        self.previous_reward = 0
+        self.dense_rewards = dense_rewards
 
     def reset(self, previous_reward=0.0):
         self.previous_reward = previous_reward
@@ -348,12 +350,7 @@ class PredDockBayesianReward_v1:
         return reward
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
-        if self.soft_stop:
-            simulate = simulate or env_stop
-        else:
-            simulate = simulate
-
-        if simulate:
+        if self.dense_rewards:
             if (molecule.mol is not None) and (len(molecule.jbonds) > 0):
                 # self.reward_learner.add_molecule.remote(molecule)
                 # reward, log_vals = ray.get(self.reward_learner.get_reward.remote(molecule))
@@ -365,7 +362,24 @@ class PredDockBayesianReward_v1:
             else:
                 reward, log_vals = 0.0, {}
         else:
-            reward, log_vals = 0.0, {}
+            if self.soft_stop:
+                simulate = simulate or env_stop
+            else:
+                simulate = simulate
+
+            if simulate:
+                if (molecule.mol is not None) and (len(molecule.jbonds) > 0):
+                    # self.reward_learner.add_molecule.remote(molecule)
+                    # reward, log_vals = ray.get(self.reward_learner.get_reward.remote(molecule))
+                    # reward = reward.item()
+                    # import pdb;pdb.set_trace();
+                    reward, log_vals = self._discount(molecule)
+                    # pca = LambdaZero.utils.molecule_pca(molecule.mol)
+                    # log_vals = {}
+                else:
+                    reward, log_vals = 0.0, {}
+            else:
+                reward, log_vals = 0.0, {}
 
         return reward, log_vals
 
@@ -389,10 +403,10 @@ class _SimDockLet:
         except Exception as e: # Sometimes the prediction fails
             print('exception for', s, e)
             r = 0
-        setattr(mol[0], 'gridscore', th.FloatTensor([-(r - self.target_norm[0]) / self.target_norm[1]]))
+        setattr(mol[0], 'gridscore', th.FloatTensor([max(0, -(r - self.target_norm[0]) / self.target_norm[1])]))
         reward = -(r-self.target_norm[0])/self.target_norm[1]
         print("done", s, r)
-        return mol, reward
+        return mol, max(0, reward)
 
 
 @ray.remote(num_gpus=1, num_cpus=4)
