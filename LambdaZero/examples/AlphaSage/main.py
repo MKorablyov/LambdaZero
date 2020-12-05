@@ -29,15 +29,18 @@ class AlphaSageTrainer(tune.Trainable):
             norm_dist = (g.max_dist - 10) / 8.5
             # message loss
             message_loss = ((dist_hat[:,0] - norm_dist) ** 2)
+            #print("message loss", message_loss.shape)
             message_loss_mean = message_loss.mean()
-            # policy gradient loss
+            # policy gradient
+            # sum_actions_in_traj (-logP * reward_of_traj)
+            #print("walk log p shape",walk_logp.shape)
             policy_loss_mean = (walk_logp * message_loss[:,None].detach()).sum(1).mean()
             message_loss_mean.backward(retain_graph=True)
             policy_loss_mean.backward()
             self.optim.step()
             message_losses.append(message_loss_mean.detach().cpu().numpy())
             policy_losses.append(policy_loss_mean.detach().cpu().numpy())
-        return {"loss":np.mean(message_losses), "policy_loss":np.mean(policy_losses)}
+        return {"loss": np.mean(message_losses), "policy_loss": np.mean(policy_losses)}
 
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -64,31 +67,28 @@ DEFAULT_CONFIG = {
             "device":"cuda",
         },
         "local_dir": summaries_dir,
-        "stop": {"training_iteration": 50
+        "stop": {"training_iteration": 100
                  },
         "resources_per_trial": {
-            "cpu": 6,
-            "gpu": 1.0
+            "cpu": 2,
+            "gpu": 0.2
         },
         "checkpoint_score_attr":"train_loss",
         "num_samples": 1,
         "checkpoint_at_end": False,
     },
-    "memory": 10 * 10 ** 9,
+    "memory": 16 * 10 ** 9,
 }
 
 if __name__ == "__main__":
     # todo: atom embeddings have large numbers and could better be normalized
-
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "pg001"
+    else: config_name = "pg003"
     config = getattr(config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
-
-    # #trainer = AlphaSageTrainer(config["trainer_config"])
-    # #metrics = trainer._train()
+    #trainer = AlphaSageTrainer(config["regressor_config"])
+    #metrics = trainer._train()
     ray.init(memory=config["memory"])
-    print(config["regressor_config"])
-
+    #print(config["regressor_config"])
     tune.run(**config["regressor_config"])
