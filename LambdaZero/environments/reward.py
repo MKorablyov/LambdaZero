@@ -19,6 +19,7 @@ from LambdaZero.utils import Complete, get_external_dirs
 import logging
 import pickle
 import gzip
+import pandas as pd
 from LambdaZero.examples.bayesian_models.bayes_tune.deep_ensemble import DeepEnsemble
 from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
 
@@ -387,12 +388,17 @@ class PredDockBayesianReward_v1:
 @ray.remote
 class _SimDockLet:
     def __init__(self, tmp_dir, programs_dir, datasets_dir, attribute):
-        self.dock = LambdaZero.chem.Dock_smi(tmp_dir,
-                                  osp.join(programs_dir, 'chimera'),
-                                  osp.join(programs_dir, 'dock6'),
-                                  osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
-                                  gas_charge=True)
-        self.target_norm = [-43.042, 7.057]
+        # self.dock = LambdaZero.chem.Dock_smi(tmp_dir,
+        #                           osp.join(programs_dir, 'chimera'),
+        #                           osp.join(programs_dir, 'dock6'),
+        #                           osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
+        #                           gas_charge=True)
+        print(programs_dir, "mgltools_x86_64Linux2_1.5.6")
+        self.dock = LambdaZero.chem.DockVina_smi(tmp_dir,
+                                                osp.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
+                                                osp.join(programs_dir, "vina"),
+                                                osp.join(datasets_dir, "seh/4jnc"))
+        self.target_norm = [-8.3, 1.10]
         self.attribute = attribute
 
     def eval(self, mol):
@@ -446,40 +452,41 @@ class BayesianRewardActor():
             self.net.to(config['device'])
             self.net.load_state_dict(th.load(binding_model, map_location=th.device(config['device'])))
             self.net.eval()
-        self.target_norm = [-43.042, 7.057]
+        self.target_norm = [-8.3, 1.10]
 
         print('BR: Loaded Oracle Network')
         print('BR: Loading Dataset ...')
 
 
-        self.dataset = config["data"]["dataset"](**config["data"]["dataset_config"])
-        ul_idxs, val_idxs, test_idxs = np.load(self.config["data"]["dataset_split_path"], allow_pickle=True)
+        # self.dataset = config["data"]["dataset"](**config["data"]["dataset_config"])
+        # ul_idxs, val_idxs, test_idxs = np.load(self.config["data"]["dataset_split_path"], allow_pickle=True)
         print('BR: Loaded Dataset ...')
 
         print('BR: Preparing Dataset ...')
-        np.random.shuffle(ul_idxs) # randomly acquire batch zero
-        train_idxs = ul_idxs[:self.config["aq_size0"]]
-        self.aq_indices.extend(train_idxs)
-        ul_idxs = ul_idxs[self.config["aq_size0"]:]
-        self.unselected_indices.extend(ul_idxs)
-        train_set = Subset(self.dataset, train_idxs.tolist())
-        val_set = Subset(self.dataset, val_idxs.tolist())
+        # np.random.shuffle(ul_idxs) # randomly acquire batch zero
+        # train_idxs = ul_idxs[:self.config["aq_size0"]]
+        # self.aq_indices.extend(train_idxs)
+        # ul_idxs = ul_idxs[self.config["aq_size0"]:]
+        # self.unselected_indices.extend(ul_idxs)
+        # train_set = Subset(self.dataset, train_idxs.tolist())
+        # val_set = Subset(self.dataset, val_idxs.tolist())
         self.train_len += self.config["aq_size0"]
-        train_molecules = []
-        for i, data in enumerate(train_set):
-            setattr(data, config["data"]["target"], -(getattr(data, config["data"]["target"]) - self.target_norm[0]) / self.target_norm[1])
-            # import pdb; pdb.set_trace();
-            # mol = Chem.MolFromSmiles(getattr(data, "smi"))
-            train_molecules.append(data)
-            # train_molecules.append([data, 
-            #     mol,
-            #     getattr(data, config["data"]["target"]) * self.get_discount(mol)
-            # ])
-        # import pdb;pdb.set_trace()
-        train_loader = DataLoader(train_molecules, shuffle=True, batch_size=config["data"]["b_size"])
-        self.val_loader = DataLoader(val_set, batch_size=config["data"]["b_size"])
-        self.train_molecules = train_molecules
+        # train_molecules = []
+        # for i, data in enumerate(train_set):
+        #     setattr(data, config["data"]["target"], -(getattr(data, config["data"]["target"]) - self.target_norm[0]) / self.target_norm[1])
+        #     # import pdb; pdb.set_trace();
+        #     # mol = Chem.MolFromSmiles(getattr(data, "smi"))
+        #     train_molecules.append(data)
+        #     # train_molecules.append([data, 
+        #     #     mol,
+        #     #     getattr(data, config["data"]["target"]) * self.get_discount(mol)
+        #     # ])
+        # # import pdb;pdb.set_trace()
+        # train_loader = DataLoader(train_molecules, shuffle=True, batch_size=config["data"]["b_size"])
+        # self.val_loader = DataLoader(val_set, batch_size=config["data"]["b_size"])
+        # self.train_molecules = train_molecules
         # self.dataset = None
+        self.train_molecules, train_loader, self.val_loader = self.construct_dataset(os.path.join(datasets_dir, 'zinc20', 'zinc20_docked.csv'))
         print('BR: Prepared Dataset')
         
         self.regressor = config["regressor"](self.regressor_config)
@@ -497,6 +504,32 @@ class BayesianRewardActor():
         print('BR: Loaded Bayesian Reward Actor')
         self.batches = 0
     
+    def construct_dataset(self, path):
+        df = pd.read_csv(path)
+        train = df.sample(n=self.config['aq_size0'])
+        val = df.sample(n=self.config['aq_size0'])
+        train_mols = []
+        # import pdb; pdb.set_trace()
+        for index, row in train.iterrows():
+            mol = Chem.MolFromSmiles(row['smiles'])
+            atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
+            graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
+            graph = self.transform(graph)
+            setattr(graph, self.config["data"]["target"], th.FloatTensor([-(row['dockscore'] - self.target_norm[0]) / self.target_norm[1]]))
+            train_mols.append(graph)
+        train_loader =  DataLoader(train_mols, shuffle=True, batch_size=self.config["data"]["b_size"])
+
+        val_mols = []
+        for i, row in val.iterrows():
+            mol = Chem.MolFromSmiles(row['smiles'])
+            atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
+            graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
+            graph = self.transform(graph)
+            setattr(graph, self.config["data"]["target"], -(row['dockscore'] - self.target_norm[0]) / self.target_norm[1])
+            val_mols.append(graph)
+        val_loader =  DataLoader(val_mols, shuffle=True, batch_size=self.config["data"]["b_size"])
+        return train_mols, train_loader, val_loader
+
     def get_discount(self, mol):
         qed = QED.qed(mol)
         qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
@@ -634,8 +667,9 @@ class BayesianRewardActor():
             # getattr(graph, self.config["data"]["target"]) * self.get_discount(Chem.MolFromSmiles(getattr(graph, "smi")))]
             # for graph in aq_set])
         # fine_tune_dataset = np.concatenate((np.array(aq_idx)[:, :1], aq_set_arr), axis=0)
+        # import pdb; pdb.set_trace()
         self.train_molecules.extend(np.array(aq_idx)[:, :1].reshape(-1).tolist())
-        train_loader = DataLoader(np.array(self.train_molecules), shuffle=True, batch_size=self.config["data"]["b_size"])
+        train_loader = DataLoader(self.train_molecules, shuffle=True, batch_size=self.config["data"]["b_size"])
         # import pdb; pdb.set_trace();
         self.unseen_molecules.extend(self.train_unseen_mols)
 
