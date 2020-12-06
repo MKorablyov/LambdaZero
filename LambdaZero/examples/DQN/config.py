@@ -32,7 +32,32 @@ dqn_graph_000 = {
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__,
+            "custom_options":{"num_hidden": 64,
+                              "dqn_rew_type": "DQN"} # does a **kw to __init__,
+        },
+        "lr": 5e-5,
+        # "entropy_coeff": 1e-4,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "checkpoint_freq": 25,
+}
+
+max_dqn_graph_000 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockReward_v3,
+            "reward_config": {
+                "synth_config": synth_config,
+                "dockscore_config": binding_config,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolDQN_thv1",
+            "custom_options":{"num_hidden": 64,
+                              "dqn_rew_type": "MaxDQN"} # does a **kw to __init__,
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,

@@ -40,7 +40,7 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         # self.obs_space = obs_space # This is Box(18307,)
         # self.action_space = action_space # This is Discrete(2107) -- something like this...
         # self.num_outputs = num_outputs # What is this number of outputs supposed to mean?
-
+        self.dqn_rew_type = kw.get('dqn_rew_type', 'DQN') # Default is 
 
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         self.max_steps = obs_space.original_space["num_steps"].n
@@ -71,6 +71,9 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
                             )
 
         self.action_mask_dict = {}
+
+        self.eps_lowerlim = 0.05
+        self.anneal_timelength = int(1e4)
 
 
     def forward(self, input_dict, state, seq_lens): # Torch geometric - takes list of edges

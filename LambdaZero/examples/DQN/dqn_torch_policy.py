@@ -34,7 +34,39 @@ if nn:
     F = nn.functional
 
 
-eps = 0.05
+
+class MaxQLoss:
+    def __init__(self,
+                 q_t_selected,
+                 q_logits_t_selected,
+                 q_tp1_best,
+                 q_probs_tp1_best,
+                 importance_weights,
+                 rewards,
+                 done_mask,
+                 gamma=0.99,
+                 n_step=1,
+                 num_atoms=1,
+                 v_min=-10.0,
+                 v_max=10.0):
+
+        q_tp1_best_masked = (1.0 - done_mask) * q_tp1_best
+
+        # compute RHS of bellman equation
+        q_t_selected_target = np.maximum(rewards, gamma**n_step * q_tp1_best_masked)
+
+        # compute the error (potentially clipped)
+        self.td_error = q_t_selected - q_t_selected_target.detach()
+        self.loss = torch.mean(
+            importance_weights.float() * huber_loss(self.td_error))
+        self.stats = {
+            "mean_q": torch.mean(q_t_selected),
+            "min_q": torch.min(q_t_selected),
+            "max_q": torch.max(q_t_selected),
+            "mean_td_error": torch.mean(self.td_error),
+        }
+
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def get_action_sampler(policy, model, obs_batch, explore, timestep, is_training=False):
@@ -47,6 +79,7 @@ def get_action_sampler(policy, model, obs_batch, explore, timestep, is_training=
 
 #    import pdb; pdb.set_trace()
     
+    eps = model.eps_lowerlim + (1.0 - model.eps_lowerlim) * max(0, model.anneal_timelength - timestep) / model.anneal_timelength
     # Epsilon-Greedy
     if random.random() < eps:
         try:
@@ -148,12 +181,23 @@ def build_q_losses(policy, model, _, train_batch):
         q_probs_tp1_best = torch.sum(
             q_probs_tp1 * torch.unsqueeze(q_tp1_best_one_hot_selection, -1), 1)
 
-    policy.q_loss = QLoss(
-        q_t_selected, q_logits_t_selected, q_tp1_best, q_probs_tp1_best,
-        train_batch[PRIO_WEIGHTS], train_batch[SampleBatch.REWARDS],
-        train_batch[SampleBatch.DONES].float(), config["gamma"],
-        config["n_step"], config["num_atoms"],
-        config["v_min"], config["v_max"])
+    if model.dqn_rew_type == 'DQN':
+        policy.q_loss = QLoss(
+            q_t_selected, q_logits_t_selected, q_tp1_best, q_probs_tp1_best,
+            train_batch[PRIO_WEIGHTS], train_batch[SampleBatch.REWARDS],
+            train_batch[SampleBatch.DONES].float(), config["gamma"],
+            config["n_step"], config["num_atoms"],
+            config["v_min"], config["v_max"])
+    elif model.dqn_rew_type == 'MaxDQN':
+        policy.q_loss = MaxQLoss(
+            q_t_selected, q_logits_t_selected, q_tp1_best, q_probs_tp1_best,
+            train_batch[PRIO_WEIGHTS], train_batch[SampleBatch.REWARDS],
+            train_batch[SampleBatch.DONES].float(), config["gamma"],
+            config["n_step"], config["num_atoms"],
+            config["v_min"], config["v_max"])
+    else:
+        raise NotImplementedError
+
 
     return policy.q_loss.loss
 

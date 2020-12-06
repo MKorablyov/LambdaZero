@@ -15,7 +15,7 @@ import LambdaZero.utils
 from LambdaZero.examples.DQN import config
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "dqn_graph_000"
+else: config_name = "dqn_graph_000" 
 config = getattr(config,config_name)
 
 _, _, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -25,7 +25,7 @@ DEFAULT_CONFIG = {
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
         "num_workers": 1, # Temporarily set to 0 -- for debugging
-        "num_gpus_per_worker": 0.075,
+        "num_gpus_per_worker": 0.075, 
         "num_gpus": 3,
         "model": {
             "custom_model": "GraphMolDQN_thv1",
