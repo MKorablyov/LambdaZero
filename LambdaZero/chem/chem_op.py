@@ -610,6 +610,19 @@ class FPEmbedding_v2:
         return mol_fp, stem_fps, jbond_fps
 
 
+class MakeFP(object):
+    """makes a fingerprint for molecule"""
+    def __call__(self, data, fp_length=1024, radii=3):
+        try:
+            mol = Chem.MolFromSmiles(data.smi)
+            fp = get_fp(mol, fp_length=1024, fp_radiis=[radii])
+        except Exception as e:
+            fp = np.zeros(fp_length, dtype=np.float32)
+
+        data.fp = fp
+        return data
+
+
 # def get_fingerprint(smiles, radius=2,length=1024):
 # fixme: make a part of get_fp
 #
