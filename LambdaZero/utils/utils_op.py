@@ -6,11 +6,8 @@ import torch
 from torch_geometric.utils import remove_self_loops
 
 from rdkit.Chem import AllChem
-from sklearn.decomposition import PCA
+
 import pickle as pk
-from rdkit import Chem
-import LambdaZero.utils
-import LambdaZero.chem
 
 
 def get_external_dirs():
@@ -98,19 +95,6 @@ class Complete(object):
         edge_index, edge_attr = remove_self_loops(edge_index, edge_attr)
         data.edge_attr = edge_attr
         data.edge_index = edge_index
-        return data
-
-
-class MakeFP(object):
-    """makes a fingerprint for molecule"""
-    def __call__(self, data, fp_length=1024, radii=3):
-        try:
-            mol = Chem.MolFromSmiles(data.smi)
-            fp = LambdaZero.chem.get_fp(mol, fp_length=1024, fp_radiis=[radii])
-        except Exception as e:
-            fp = np.zeros(fp_length, dtype=np.float32)
-
-        data.fp = fp
         return data
 
 

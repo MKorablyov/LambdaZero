@@ -524,6 +524,20 @@ class DockVina_smi:
 
         return mol_name, dockscore, coord
 
+    def __del__(self):
+        if self.cleanup:
+            with contextlib.suppress(FileNotFoundError):
+                os.rmdir(os.path.join(self.outpath, "sdf"))
+
+            with contextlib.suppress(FileNotFoundError):
+                os.rmdir(os.path.join(self.outpath, "mol2"))
+
+            with contextlib.suppress(FileNotFoundError):
+                os.rmdir(os.path.join(self.outpath, "pdbqt"))
+
+            with contextlib.suppress(FileNotFoundError):
+                os.rmdir(os.path.join(self.outpath, "docked"))
+
 
 class ScaffoldSplit:
     def __init__(self, mols_smiles, incude_chirality=False):
@@ -594,6 +608,19 @@ class FPEmbedding_v2:
         else:
             jbond_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)], dtype=np.float32)
         return mol_fp, stem_fps, jbond_fps
+
+
+class MakeFP(object):
+    """makes a fingerprint for molecule"""
+    def __call__(self, data, fp_length=1024, radii=3):
+        try:
+            mol = Chem.MolFromSmiles(data.smi)
+            fp = get_fp(mol, fp_length=1024, fp_radiis=[radii])
+        except Exception as e:
+            fp = np.zeros(fp_length, dtype=np.float32)
+
+        data.fp = fp
+        return data
 
 
 # def get_fingerprint(smiles, radius=2,length=1024):

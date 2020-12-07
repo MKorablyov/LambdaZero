@@ -7,6 +7,7 @@ from ray import tune
 from LambdaZero.inputs import random_split
 import LambdaZero.inputs
 import LambdaZero.utils
+import LambdaZero.chem
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import *
 # from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 
@@ -57,7 +58,7 @@ DEFAULT_CONFIG = {
         "dataset_config": {
             "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
             "props": ["gridscore", "smi"],
-            "transform": T.Compose([LambdaZero.utils.Complete(),LambdaZero.utils.MakeFP()]),
+            "transform": T.Compose([LambdaZero.utils.Complete(), LambdaZero.chem.MakeFP()]),
             "file_names": ["Zinc15_2k"],
             #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
         },
