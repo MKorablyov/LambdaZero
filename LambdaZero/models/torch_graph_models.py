@@ -90,7 +90,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         scalar_outs, data = self.model(data)
 
-        stop_logit = scalar_outs[:, 1] # Leo: what's this stop_logit and isn't this just [:, 1]. Maybe just calling docking?
+        stop_logit = scalar_outs[:, 1].unsqueeze(1) # Leo: what's this stop_logit and isn't this just [:, 1]. Maybe just calling docking?
         # Ends rollout -- and give agent rew.
         add_logits = data.stem_preds.reshape((data.num_graphs, -1))
         break_logits = data.jbond_preds.reshape((data.num_graphs, -1))

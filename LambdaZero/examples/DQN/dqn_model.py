@@ -39,8 +39,8 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         nn.Module.__init__(self)
         # self.obs_space = obs_space # This is Box(18307,)
         # self.action_space = action_space # This is Discrete(2107) -- something like this...
-        # self.num_outputs = num_outputs # What is this number of outputs supposed to mean?
-        self.dqn_rew_type = kw.get('dqn_rew_type', 'DQN') # Default is 
+        # self.num_outputs # refers to the size of the state embedding 
+        self.dqn_rew_type = kw.get('dqn_rew_type', 'DQN')
 
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         self.max_steps = obs_space.original_space["num_steps"].n
@@ -59,26 +59,25 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
 
         
         self.function_base = nn.Sequential(
-                                    nn.Linear(256, 256) #temp hardcoded
+                                    nn.Linear(256, 512) #temp hardcoded
                             )
         self.q_function = nn.Sequential(
                                 self.function_base,
-                                nn.Linear(256, self.dim_action) 
+                                nn.Linear(512, self.dim_action) 
                             )
         self.value_network = nn.Sequential(
                                 self.function_base,
-                                nn.Linear(256, 1)
+                                nn.Linear(512, 1)
                             )
 
         self.action_mask_dict = {}
 
-        self.eps_lowerlim = 0.05
-        self.anneal_timelength = int(1e4)
+        self.eps_lowerlim = kw.get('eps_lowerlim', 0.05)
+        self.anneal_timelength = kw.get('eps_anneal_timelength', int(1e4))
 
 
     def forward(self, input_dict, state, seq_lens): # Torch geometric - takes list of edges
-        # Leo: This is possibly supposed to output an embedding...
-        #           This returns a state embedding (refer to "compute_q_values" in dqn_torch_policy in ray rllib)! 
+        # Returns a state embedding (refer to "compute_q_values" in dqn_torch_policy in ray rllib)
 
         obs = input_dict['obs']
         device = obs["mol_graph"].device
@@ -136,10 +135,7 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         action_mask = self.action_mask_dict[state_embeddings]
         self.action_mask_dict.pop(state_embeddings, None)
 
-        # I'm not sure what the point of these logits are... (besides being used in the dueling DQN)
-        # And why were these logits all 1 in the original code?
         logits = torch.unsqueeze(torch.ones_like(action_scores), -1)
-        # assert action_mask[action_mask > 0].shape == action_scores[action_scores > 1000].shape
         return action_scores, logits, torch.unsqueeze(action_mask, -1)
 
     def _save(self, checkpoint_dir):
@@ -164,11 +160,6 @@ class MPNNet_Parametric(nn.Module): # this should output a Q(s, a) instead.
         self.conv = NNConv(dim, dim, net, aggr='mean')
         self.gru = nn.GRU(dim, dim)
 
-        # self.node2stem = nn.Sequential(
-        #     nn.Linear(dim, dim), nn.LeakyReLU(), nn.Linear(dim, num_out_per_stem)) # the thing is... these are actions!
-        # self.node2jbond = nn.Sequential(
-        #     nn.Linear(dim, dim), nn.LeakyReLU(), nn.Linear(dim, 1)) # the thing is... these are actions!
-
         
 
         self.set2set = Set2Set(dim, processing_steps=1) # Leo: What's this? -- Look into this...
@@ -184,13 +175,7 @@ class MPNNet_Parametric(nn.Module): # this should output a Q(s, a) instead.
             out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous()) # a -> b - m      b -> c - m2
             out = out.squeeze(0)
 
-        # data.stem_preds = self.node2stem(out[data.stem_atmidx])
-        # data.jbond_preds = self.node2jbond(out[data.jbond_atmidx.flatten()]) \
-        #                        .reshape((data.jbond_atmidx.shape)) \
-        #                        .mean(1) # mean pooling of the 2 jbond atom preds
-
-        out = self.set2set(out, data.batch) # Leo: Not sure what this set2set does... and what data.batch is
-        # out = self.lin_out(out)
+        out = self.set2set(out, data.batch) 
         return out, data # this should return an embedding of size dim x 2?
 
 
