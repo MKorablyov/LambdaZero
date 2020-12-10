@@ -398,7 +398,7 @@ class _SimDockLet:
                                                 osp.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
                                                 osp.join(programs_dir, "vina"),
                                                 osp.join(datasets_dir, "seh/4jnc"))
-        self.target_norm = [-8.3, 1.10]
+        self.target_norm = [-8.6, 1.10]
         self.attribute = attribute
 
     def eval(self, mol):
@@ -452,7 +452,7 @@ class BayesianRewardActor():
             self.net.to(config['device'])
             self.net.load_state_dict(th.load(binding_model, map_location=th.device(config['device'])))
             self.net.eval()
-        self.target_norm = [-8.3, 1.10]
+        self.target_norm = [-8.6, 1.10]
 
         print('BR: Loaded Oracle Network')
         print('BR: Loading Dataset ...')
@@ -506,7 +506,8 @@ class BayesianRewardActor():
     
     def construct_dataset(self, path):
         df = pd.read_csv(path)
-        train = df.sample(n=self.config['aq_size0'])
+        # train = df.sample(n=self.config['aq_size0'])
+        train = df.nsmallest(self.config['aq_size0'], 'dockscore')
         val = df.sample(n=self.config['aq_size0'])
         train_mols = []
         # import pdb; pdb.set_trace()

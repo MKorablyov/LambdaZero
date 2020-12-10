@@ -409,7 +409,6 @@ ppo_bayes_reward_010 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -464,7 +463,6 @@ ppo_bayes_reward_011 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -519,7 +517,6 @@ ppo_bayes_reward_012 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -574,7 +571,6 @@ ppo_bayes_reward_013 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -602,7 +598,6 @@ ppo_bayes_reward_014 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -630,7 +625,6 @@ ppo_bayes_reward_015 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -658,7 +652,6 @@ ppo_bayes_reward_016 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -686,7 +679,6 @@ ppo_bayes_reward_017 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
