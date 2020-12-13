@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
     "discretize": 15,
     "max_steps": 20,
     "ksize": 0.05,
+    "sparse_reward":True,
 }
 
 class DummyNonConvex:
@@ -32,7 +33,7 @@ class DummyNonConvex:
         self._discretize = config["discretize"]
         self._ksize = config["ksize"]
         self._max_steps = config["max_steps"]
-
+        self._sparse_reward = config["sparse_reward"]
         # left, stop, right for each dimension to step
         self.action_space = Discrete(2 ** self._num_dims)
         # observation is 1/(1 + distance) for each dimension
@@ -47,8 +48,13 @@ class DummyNonConvex:
         return obs
 
     def _reward(self):
-        pos = torch.tensor(self._pos/ self._discretize, dtype=torch.float)[None,:]
-        reward = - schwefel(pos).cpu().numpy()[0]
+        pos = torch.tensor(self._pos / self._discretize, dtype=torch.float)[None,:]
+
+        if self._sparse_reward and self.istep != self._max_steps:
+            reward = 0.0
+        else:
+            reward = -schwefel(pos).cpu().numpy()[0]
+
         return reward
 
     def step(self, action):
@@ -68,4 +74,15 @@ class DummyNonConvex:
     def reset(self):
         self.istep = 0
         self._pos = np.random.randint(low=0, high=self._discretize, size=self._num_dims)
+
+
+        # rewards = []
+        # for i in range(self._discretize):
+        #     for j in range(self._discretize):
+        #         self._pos = np.array([i,j])
+        #         rewards.append(self._reward())
+        #         print(self._reward(), i, j)
+        # print("max rewards", max(rewards))
+
+
         return self._make_obs()

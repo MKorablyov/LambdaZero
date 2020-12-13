@@ -1,5 +1,5 @@
 from abc import ABC
-import os, time
+import os
 
 import numpy as np
 from ray.rllib.models.model import restore_original_dimensions
@@ -8,7 +8,7 @@ from ray.rllib.utils.annotations import override
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
 
-#from torch_geometric.nn import GINEConv
+# from torch_geometric.nn import GINEConv
 from torch_geometric.nn import NNConv
 from torch_geometric.nn import Set2Set
 import torch.nn.functional as F
@@ -21,6 +21,8 @@ from .global_attention_layer import LowRankAttention
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+from LambdaZero.utils import RunningMeanStd
 
 def convert_to_tensor(arr):
     tensor = torch.from_numpy(np.asarray(arr))
@@ -191,6 +193,7 @@ class MPNNet(nn.Module):
         out = self.lin2(out)
         return out.view(-1)
 
+
 class MPNNetDrop(nn.Module):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
@@ -264,7 +267,6 @@ class MPNNetDropLRGA(nn.Module):
         self.lrga = nn.ModuleList([LowRankAttention(30, 14, drop_prob),
                      LowRankAttention(30, 14, drop_prob),
                      LowRankAttention(30, 14, drop_prob)])
-
         self.lrga_lin = nn.ModuleList([nn.Linear(60 + dim, dim),
                                        nn.Linear(60 + dim, dim),
                                        nn.Linear(60 + dim, dim)])
@@ -386,5 +388,4 @@ class GraphIsomorphismNet(nn.Module):
         node_out = self.set2set2(node_out, data.batch)
         # fully-connected layer for output
         out = self.fully_connected(node_out)
-
         return out.view(-1)

@@ -60,6 +60,15 @@ class MCDrop(tune.Trainable):
         else:
             return all_scores[-1], {}
 
+    def save(self, path):
+        torch.save(self.model.state_dict(), os.path.join(path, f'model.pt'))
+
+    def get_weights(self):
+        return self.model.state_dict()
+
+    def set_weights(self, weights):
+        self.model.load_state_dict(weights)
+
     def fit(self, train_loader, val_loader, validate=False):
         # update internal dataset
         self.train_loader, self.val_loader = train_loader, val_loader
