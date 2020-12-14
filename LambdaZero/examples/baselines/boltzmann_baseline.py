@@ -1,41 +1,42 @@
 import numpy as np
-import multiprocessing
+import sys
 import os.path as osp
 from rdkit import Chem
 from scipy import special
 import LambdaZero.chem
 import LambdaZero.utils
-from LambdaZero.environments import BlockMolEnv_v3, BlockMolEnv_v4
-from LambdaZero.environments.block_mol_v4 import DEFAULT_CONFIG as env_config
+from LambdaZero.examples.baselines import config
 
 import ray
-from ray import util
-
-default_config = {
-    "env": BlockMolEnv_v4,
-    "env_config": env_config,
-    "temperature": 1.,
-    "steps": 8,
-    "env_eval_config":{
-        "dockscore_norm": [-43.042, 7.057]}
-}
-
+from ray import tune
+# import multiprocessing
+# from ray import util
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 out_dir = osp.join(summaries_dir, "dock_eval")
-dock6_dir = osp.join(programs_dir, "dock6")
-chimera_dir = osp.join(programs_dir, "chimera")
-docksetup_dir = osp.join(datasets_dir, "brutal_dock/d4/docksetup")
 
+# # for dock6 # # principally, could put in config as well
+# dock6_dir = osp.join(programs_dir, "dock6")
+# chimera_dir = osp.join(programs_dir, "chimera")
+# docksetup_dir = osp.join(datasets_dir, "brutal_dock/d4/docksetup")
+
+# for smina
+mgltools_dir=osp.join(programs_dir, "mgltools_x86_64Linux2_1.5.6")
+vina_dir=osp.join(programs_dir, "vina")
+docksetup_dir=osp.join(datasets_dir, "seh/4jnc")
 
 class EnvEval:
     def __init__(self, env, config):
         self.env = env
-        self.dock_smi = LambdaZero.chem.Dock_smi(outpath=out_dir,
-                                            chimera_dir=chimera_dir,
-                                            dock6_dir=dock6_dir,
-                                            docksetup_dir=osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
-                                            gas_charge=True)
+        # self.dock_smi = LambdaZero.chem.Dock_smi(outpath=out_dir,
+        #                                     chimera_dir=chimera_dir,
+        #                                     dock6_dir=dock6_dir,
+        #                                     docksetup_dir=osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
+        #                                     gas_charge=True)
+        self.dock_smi = LambdaZero.chem.DockVina_smi(outpath=out_dir,
+                 mgltools_dir=mgltools_dir,
+                 vina_dir=vina_dir,
+                 docksetup_dir=docksetup_dir)
         self.dockscore_norm = config["dockscore_norm"]
         self._num_evals = 0
 
@@ -52,44 +53,70 @@ class EnvEval:
             return self.env.reward.previous_reward
 
 
-@ray.remote
-class Boltzmann_opt:
-    def __init__(self, config):
+#@ray.remote
+class Boltzmann_opt(tune.Trainable):
+    def setup(self, config):
         config["env_config"]["reward_config"]["device"] = "cpu"
         self.env = config["env"](config["env_config"])
+
         self.temperature = config["temperature"]
         self.steps = config["steps"]
-
+        self.docking = config["docking"]
         self.env_eval = EnvEval(self.env, config["env_eval_config"])
 
-    def enumerate_actions(self, obs):
+    def reset_setup(self, config):
+        self.steps = config["steps"]
+        self.docking = config["docking"]
+        return True
+
+    def enumerate_actions(self):
         state = self.env.get_state()
-        actions = np.where(obs["action_mask"])[0]
+        actions = np.where(self.obs["action_mask"])[0]
         values = []
         for i, a in enumerate(actions):
-            obs, reward, _, info = self.env.step(a)
-            values.append(self.env_eval(docking=False))
+            temp_obs, reward, _, info = self.env.step(a)
+            values.append(self.env_eval(docking=self.docking))
             self.env.set_state(state)
         probs = special.softmax(np.divide(values, self.temperature))
         a = np.random.choice(actions.shape[0], p=probs)
         return actions[a], values[a]
 
     def optimize_molecule(self):  # __call__(self):
-        values = []
+        # values = []
         # observations = []
-        obs = self.env.reset()
+        self.obs = self.env.reset()
         for i in range(self.steps):
-            action, value = self.enumerate_actions(obs)
-            obs, reward, _, info = self.env.step(action)
-            # or evaluate the value of the chosen action only
-            # value = self.env_eval(docking=False)
-            values.append(value)
-            # observations.append(obs)
-        return values
+            self.step()
+            # action, value = self.enumerate_actions()
+            # self.obs, reward, _, info = self.env.step(action)
+            # # or evaluate the value of the chosen action only
+            # # value = self.env_eval(docking=False)
+            # values.append(value)
+            # # observations.append(obs)
+        #return values
+        return None
+
+    def step(self):
+        action, value = self.enumerate_actions()
+        self.obs, reward, _, info = self.env.step(action)
+        log_vals = {**{"reward":value, "molecule":Chem.MolToSmiles(info["molecule"].mol)}, **info["log_vals"]}
+        return log_vals
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 2:
+        config_name = sys.argv[1]
+    else:
+        config_name = "boltzmann_config_001"
+    config = getattr(config, config_name)
+
     ray.init()
-    config = default_config
+    analysis=tune.run(
+        Boltzmann_opt,
+        config=config["boltzmann_config"],
+        reuse_actors=config["reuse_actors"],
+        num_samples=config["num_samples"],
+        local_dir=summaries_dir,
+    )
 
     # # for a single actor:
     # actor = Boltzmann_opt.remote(config)
@@ -101,15 +128,15 @@ if __name__ == "__main__":
     #     result = ray.get(result_id)
     #     results.append(result)
 
-
-    # # for an actor pool
-    actors = [Boltzmann_opt.remote(config) for _ in range(multiprocessing.cpu_count())]
-    pool = util.ActorPool(actors)
-    for i in range(10000):
-        pool.submit(lambda a, v: a.optimize_molecule.remote(), 0)
-
-    results = []
-    while pool.has_next():
-        result = pool.get_next_unordered()
-        print(result)
-        results.append(result)
+    # #
+    # # # for an actor pool
+    # actors = [Boltzmann_opt.remote(config) for _ in range(multiprocessing.cpu_count())]
+    # pool = util.ActorPool(actors)
+    # for i in range(10000):
+    #     pool.submit(lambda a, v: a.optimize_molecule.remote(), 0)
+    #
+    # results = []
+    # while pool.has_next():
+    #     result = pool.get_next_unordered()
+    #     print(result)
+    #     results.append(result)
