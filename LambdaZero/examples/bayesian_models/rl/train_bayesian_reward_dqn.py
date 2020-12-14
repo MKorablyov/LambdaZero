@@ -50,7 +50,7 @@ data_config = {
 
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "dqn_bayes_reward_000"
+else: config_name = "dqn_bayes_reward_001"
 config = getattr(config,config_name)
 
 DEFAULT_CONFIG = {
