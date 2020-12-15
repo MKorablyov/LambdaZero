@@ -771,7 +771,8 @@ dqn_bayes_reward_000 = {
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
-            "custom_options":{"dqn_rew_type": "DQN"} # does a **kw to __init__,
+            "custom_options":{"dqn_rew_type": "DQN",
+                              "eps_anneal_timelength": int(5e4)} # does a **kw to __init__,
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -858,7 +859,8 @@ max_dqn_bayes_reward_000= {
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
-            "custom_options":{"dqn_rew_type": "MaxDQN"} # does a **kw to __init__,
+            "custom_options":{"dqn_rew_type": "MaxDQN",
+                              "eps_anneal_timelength": int(5e4)} # does a **kw to __init__,
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
