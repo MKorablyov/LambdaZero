@@ -13,8 +13,6 @@ boltzmann_config_000 = {
             #"dockscore_norm": [-43.042, 7.057]}
             "dockscore_norm": [-8.6, 1.10]},
     },
-    "reuse_actors": True,
-    "num_samples": 200,
 }
 
 boltzmann_config_001 = {
@@ -28,7 +26,27 @@ boltzmann_config_001 = {
             #"dockscore_norm": [-43.042, 7.057]}
             "dockscore_norm": [-8.6, 1.10]},
     },
-    "reuse_actors": True,
-    "num_samples": 200,
+}
+
+mcts_config_000 = {
+    "mcts_opt_config": {
+        "env": BlockMolEnv_v4,
+        "env_config": env_config,  # can change the reward if needed
+        "steps": 200,
+        "docking": False,
+        "mcts_config": {
+            "puct_coefficient": 1.5,
+            "num_simulations": 800,
+            "temperature": 1.0,
+            "dirichlet_epsilon": 0.020,
+            "dirichlet_noise": 0.003,
+            "argmax_tree_policy": False,
+            "add_dirichlet_noise": True,
+            "policy_optimization": False,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+        },
+    },
 }
 

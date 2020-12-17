@@ -9,6 +9,7 @@ from LambdaZero.examples.baselines import config
 
 import ray
 from ray import tune
+from ray.rllib.utils import merge_dicts
 # import multiprocessing
 # from ray import util
 
@@ -93,14 +94,31 @@ class Boltzmann_opt(tune.Trainable):
             # # value = self.env_eval(docking=False)
             # values.append(value)
             # # observations.append(obs)
-        #return values
-        return None
+        # return values
+        # return None
 
     def step(self):
         action, value = self.enumerate_actions()
         self.obs, reward, _, info = self.env.step(action)
         log_vals = {**{"reward":value, "molecule":Chem.MolToSmiles(info["molecule"].mol)}, **info["log_vals"]}
-        return log_vals
+        tune.report(log_vals)
+        # return log_vals
+
+def boltzmann_opt_wrapper(config):
+    boltzmann_opt = Boltzmann_opt(config)
+    boltzmann_opt.optimize_molecule()
+
+DEFAULT_CONFIG = {
+    "summaries_dir": summaries_dir,
+    "memory": 60 * 10 ** 9,
+    "reuse_actors": True,
+    "num_samples": 200,
+    "resources_per_trial": {
+        "cpu": 4,
+        "gpu": 0.4,
+        # usually, request 40 cpus, 4 gpus (entire node on Beluga)
+    },
+}
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2:
@@ -108,14 +126,16 @@ if __name__ == "__main__":
     else:
         config_name = "boltzmann_config_001"
     config = getattr(config, config_name)
+    config = merge_dicts(DEFAULT_CONFIG, config)
 
-    ray.init()
+    ray.init(memory=config["memory"])
     analysis=tune.run(
         Boltzmann_opt,
         config=config["boltzmann_config"],
-        reuse_actors=config["reuse_actors"],
         num_samples=config["num_samples"],
-        local_dir=summaries_dir,
+        reuse_actors=config["reuse_actors"],
+        resources_per_trial=config["resources_per_trial"],
+        local_dir=config["summaries_dir"],
     )
 
     # # for a single actor:
