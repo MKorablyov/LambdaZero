@@ -78,6 +78,7 @@ DEFAULT_CONFIG = {
 
     "reward_config": {
         # "binding_model": osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth"),
+        "binding_model": osp.join(datasets_dir,"brutal_dock/seh/trained_weights/vanilla_mpnn/model.pth"),
         "qed_cutoff": [0.2, 0.7],
         # "synth_cutoff": [0, 4],
         "synth_config": synth_config,
