@@ -733,10 +733,7 @@ ppo_bayes_reward_019 = {
             "reward_config": {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
-                "delta": True,
-                "dense_rewards": True
             },
-            "random_steps": 0,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -749,7 +746,7 @@ ppo_bayes_reward_019 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 1
+        "kappa": 0.1
     },
     "use_dock": True
 }
@@ -776,10 +773,10 @@ ppo_bayes_reward_020 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 0
-    }
+        "kappa": 1
+    },
+    "use_dock": True
 }
-
 
 ########### DQN CONFIGS
 dqn_bayes_reward_000 = {
@@ -791,8 +788,6 @@ dqn_bayes_reward_000 = {
             "reward_config": {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
-                "delta": True,
-                "dense_rewards": True
             },
         },
         "model": {
@@ -807,7 +802,7 @@ dqn_bayes_reward_000 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 5
+        "kappa": 0.1
     },
 }
 
@@ -820,37 +815,6 @@ dqn_bayes_reward_001 = {
             "reward_config": {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
-                "delta": True,
-                "dense_rewards": True
-            },
-        },
-        "model": {
-            "custom_model": "GraphMolDQN_thv1",
-            "custom_options":{"dqn_rew_type": "DQN"} # does a **kw to __init__,
-        },
-        "lr": 5e-5,
-        # "entropy_coeff": 1e-4,
-        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
-        "framework": "torch",
-    },
-    "reward_learner_config": {
-        "num_mol_retrain": 1000,
-        "kappa": 5
-    },
-    "use_dock": True
-}
-
-dqn_bayes_reward_002 = {
-    "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockBayesianReward_v1,
-            "reward_config": {
-                "synth_config": synth_config,
-                "binding_model": binding_model,
-                "delta": True,
-                "dense_rewards": True
             },
         },
         "model": {
@@ -865,7 +829,7 @@ dqn_bayes_reward_002 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 5
+        "kappa": 1
     },
     "use_dock": True
 }
@@ -879,8 +843,6 @@ max_dqn_bayes_reward_000= {
             "reward_config": {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
-                "delta": True,
-                "dense_rewards": True
             },
         },
         "model": {
@@ -895,9 +857,10 @@ max_dqn_bayes_reward_000= {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 5
+        "kappa": 0.1
     },
 }
+
 
 max_dqn_bayes_reward_001 = {
     "rllib_config":{
@@ -908,37 +871,6 @@ max_dqn_bayes_reward_001 = {
             "reward_config": {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
-                "delta": True,
-                "dense_rewards": True
-            },
-        },
-        "model": {
-            "custom_model": "GraphMolDQN_thv1",
-            "custom_options":{"dqn_rew_type": "MaxDQN"} # does a **kw to __init__,
-        },
-        "lr": 5e-5,
-        # "entropy_coeff": 1e-4,
-        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
-        "framework": "torch",
-    },
-    "reward_learner_config": {
-        "num_mol_retrain": 1000,
-        "kappa": 5
-    },
-    "use_dock": True
-}
-
-max_dqn_bayes_reward_002 = {
-    "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockBayesianReward_v1,
-            "reward_config": {
-                "synth_config": synth_config,
-                "binding_model": binding_model,
-                "delta": True,
-                "dense_rewards": True
             },
         },
         "model": {
@@ -953,7 +885,7 @@ max_dqn_bayes_reward_002 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 5
+        "kappa": 1
     },
     "use_dock": True
 }
