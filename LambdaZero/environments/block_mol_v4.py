@@ -129,7 +129,7 @@ synth_config = {
         "num_workers": 8,  # Number of workers for the parallel data loading (0 means sequential)
         "batch_size": 50,  # Batch size
         "disable_progress_bar": True,
-        "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_1/model.pt")
+        "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_2/model.pt")
     },
 }
 

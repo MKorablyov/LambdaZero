@@ -71,7 +71,7 @@ DEFAULT_CONFIG = {
 
 synth_config = deepcopy(DEFAULT_CONFIG)
 synth_config["predict_config"]["checkpoint_path"] = os.path.join(datasets_dir,
-                                            "Synthesizability/MPNN_model/Regression/model_1/model.pt")
+                                            "Synthesizability/MPNN_model/Regression/model_2/model.pt")
 synth_config["synth_cutoff"] = [0, 4]
 
 binding_config = deepcopy(DEFAULT_CONFIG)
