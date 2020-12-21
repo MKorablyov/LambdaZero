@@ -778,7 +778,7 @@ ppo_bayes_reward_020 = {
     "use_dock": True
 }
 
-########### DQN CONFIGS
+##################################### DQN #########################################
 dqn_bayes_reward_000 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
@@ -844,11 +844,13 @@ dqn_bayes_reward_002 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
+            "random_steps": 5,
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
             "custom_options":{"dqn_rew_type": "DQN",
-                              "eps_anneal_timelength": int(5e4)} # does a **kw to __init__,
+                              "eps_anneal_timelength": int(5e4),
+                              "eps_lowerlim": 0.25} # does a **kw to __init__,
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -857,7 +859,7 @@ dqn_bayes_reward_002 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 2
+        "kappa": 0.1
     },
     "use_dock": True
 }
@@ -872,11 +874,13 @@ dqn_bayes_reward_003 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
+            "random_steps": 5,
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
             "custom_options":{"dqn_rew_type": "DQN",
-                              "eps_anneal_timelength": int(5e4)} # does a **kw to __init__,
+                              "eps_anneal_timelength": int(5e4),
+                              "eps_lowerlim": 0.25} # does a **kw to __init__,
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -885,11 +889,13 @@ dqn_bayes_reward_003 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 5
+        "kappa": 1.0
     },
     "use_dock": True
 }
 
+
+################################# Max_DQN #########################################
 
 max_dqn_bayes_reward_000= {
     "rllib_config":{
@@ -957,11 +963,13 @@ max_dqn_bayes_reward_002 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
+            "random_steps": 5,
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
             "custom_options":{"dqn_rew_type": "MaxDQN",
-                              "eps_anneal_timelength": int(5e4)} # does a **kw to __init__,
+                              "eps_anneal_timelength": int(5e4),
+                              "eps_lowerlim": 0.25} # does a **kw to __init__,
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -970,7 +978,7 @@ max_dqn_bayes_reward_002 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 2
+        "kappa": 0.1
     },
     "use_dock": True
 }
@@ -984,11 +992,13 @@ max_dqn_bayes_reward_003 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
+            "random_steps": 5,
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
             "custom_options":{"dqn_rew_type": "MaxDQN",
-                              "eps_anneal_timelength": int(5e4)} # does a **kw to __init__,
+                              "eps_anneal_timelength": int(5e4),
+                              "eps_lowerlim": 0.25} # does a **kw to __init__,
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -997,7 +1007,7 @@ max_dqn_bayes_reward_003 = {
     },
     "reward_learner_config": {
         "num_mol_retrain": 1000,
-        "kappa": 5
+        "kappa": 1.0
     },
     "use_dock": True
 }
