@@ -40,7 +40,7 @@ from LambdaZero.utils import get_external_dirs
 from LambdaZero.examples.goal_based_imitation import model_atom, model_block, model_fingerprint
 
 import importlib
-importlib.reload(model_fingerprint)
+importlib.reload(model_block)
 importlib.reload(chem_op)
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
@@ -54,6 +54,7 @@ parser.add_argument("--nemb", default=32, help="#hidden", type=int)
 parser.add_argument("--num_iterations", default=100000, type=int)
 parser.add_argument("--array", default='')
 parser.add_argument("--repr_type", default='block_graph')
+parser.add_argument("--model_version", default='v1')
 parser.add_argument("--run", default=0, help="run", type=int)
 parser.add_argument("--save_path", default='/miniscratch/bengioe/LambdaZero/imitation_learning/')
 parser.add_argument("--print_array_length", default=False, action='store_true')
@@ -148,6 +149,7 @@ class MolMDPNC(MolMDP):
         self.stem_type_offset = np.int32([0] + list(np.cumsum([max(i)+1 for i in self.block_rs])))
         self.num_stem_types = self.stem_type_offset[-1]
         #print(self.max_num_atm, self.num_stem_types)
+        self.molcache = {}
 
     def mols2batch(self, mols):
         if self.repr_type == 'block_graph':
@@ -160,12 +162,17 @@ class MolMDPNC(MolMDP):
     def mol2repr(self, mol=None):
         if mol is None:
             mol = self.molecule
+        molhash = str(mol.blockidxs)+':'+str(mol.stems)+':'+str(mol.jbonds)
+        if molhash in self.molcache:
+            return self.molcache[molhash]
         if self.repr_type == 'block_graph':
-            return model_block.mol2graph(mol, self)
+            r = model_block.mol2graph(mol, self)
         elif self.repr_type == 'atom_graph':
-            return model_atom.mol2graph(mol, self)
+            r = model_atom.mol2graph(mol, self)
         elif self.repr_type == 'morgan_fingerprint':
-            return model_fingerprint.mol2fp(mol, self)
+            r = model_fingerprint.mol2fp(mol, self)
+        self.molcache[molhash] = r
+        return r
 
 
 
@@ -308,14 +315,17 @@ class ReplayBuffer:
 
 class RolloutActor(threading.Thread):
     def __init__(self, bpath, device, repr_type, model, stop_event, replay, synth_net, sample_type,
-                 stop_after=0):
+                 stop_after=0, greedy=False):
         super().__init__()
         self.device = torch.device(device)
         self.mdp = MolMDPNC(bpath)
         self.mdp.post_init(self.device, repr_type)
         self.max_blocks = 5, 13
+        # energy, synth, qed
         self.goal_bounds = np.float32([[0, 8], [0.1, 1], [0.1, 1]]).T
         self.greedy_goal_bounds = np.float32([[6, 8], [0.5, 1], [0.7, 1]]).T
+        if greedy:
+            self.goal_bounds = self.greedy_goal_bounds
         self.model = model
         self.stop_event = stop_event
         self.docker = SimDockLet('tmp')
@@ -353,12 +363,15 @@ class RolloutActor(threading.Thread):
                 break
             batch = self.mdp.mols2batch([self.mdp.mol2repr()])
             stem_o, stop_o = self.model(batch, goal)
-            logits = torch.cat([stop_o.reshape(-1), stem_o.reshape(-1)])
-            if torch.isnan(logits).any():
+            policy = torch.cat([i.reshape(-1)
+                                for i in self.model.out_to_policy(batch, stem_o, stop_o)])
+            #logits = torch.cat([stop_o.reshape(-1), stem_o.reshape(-1)])
+            if torch.isnan(policy).any():
                 self.failed = True
                 self.tb = traceback.extract_stack()
                 raise ValueError("nan found")
-            action = F.softmax(logits).multinomial(1).item()
+            #action = F.softmax(logits).multinomial(1).item()
+            action = policy.multinomial(1).item()
             if action == 0:
                 done = True
                 action = (-1, 0)
@@ -461,7 +474,7 @@ def dump_episodes(args):
 
 
 def main(args):
-    debug_no_threads = True
+    debug_no_threads = False
 
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
 
@@ -490,7 +503,8 @@ def main(args):
     stop_event = threading.Event()
 
     if args.repr_type == 'block_graph':
-        model = model_block.GraphAgent(args.nemb, 3, mdp.num_blocks, 1, 6, mdp)
+        model = model_block.GraphAgent(args.nemb, 3, mdp.num_blocks, 1, 6, mdp,
+                                       args.model_version)
         model.to(device)
     elif args.repr_type == 'atom_graph':
         model = model_atom.MolAC_GCN(args.nemb, 3, mdp.num_blocks, 1)
@@ -504,10 +518,10 @@ def main(args):
     rollout_threads = (
         [RolloutActor(bpath, device, args.repr_type, model,
                       stop_event, replay, synth_net, 'categorical')
-         for i in range(6)] +
+         for i in range(0)] +
         [RolloutActor(bpath, device, args.repr_type, model,
                       stop_event, replay, synth_net, 'beam')
-         for i in range(2)])
+         for i in range(0)])
     if not debug_no_threads:
         [i.start() for i in rollout_threads]
     if 0:
@@ -546,6 +560,7 @@ def main(args):
     train_losses = []
     test_losses = []
     time_start = time.time()
+    time_last_check = time.time()
 
     for i in range(args.num_iterations+1):
         if not debug_no_threads:
@@ -556,44 +571,53 @@ def main(args):
         negloglike = model.action_negloglikelihood(s, a, g, stem_o, mol_o).mean()
         logit_reg = (mol_o.pow(2).sum() + stem_o.pow(2).sum()) / (np.prod(mol_o.shape) + np.prod(stem_o.shape))
 
-        (negloglike + logit_reg * 1e-1).backward()
+        #(negloglike + logit_reg * 1e-1).backward()
+        negloglike.backward()
         last_losses.append(negloglike.item())
         train_losses.append(negloglike.item())
         opt.step()
         opt.zero_grad()
         model.training_steps = i + 1
         #if any([torch.isnan(i).any() for i in model.parameters()]):
-        #    stop_event.set()
-        #    pdb.set_trace()
+        if torch.isnan(negloglike):
+            stop_event.set()
+            stop_everything()
+            raise ValueError()
+            #pdb.set_trace()
         for thread in rollout_threads:
             if thread.failed:
                 stop_event.set()
                 pdb.set_trace()
 
         if not i % 500:
-            recent_best = np.argmax([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
-            recent_best_m = np.max([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
+            #recent_best = np.argmax([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
+            #recent_best_m = np.max([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
             last_losses = np.mean(last_losses)
-            print(i, last_losses, np.mean([i.gdist for i in replay.episodes[-100:]]),
-                  recent_best_m, replay.episodes[-100+recent_best].rewards)
+            print(i, last_losses)#, np.mean([i.gdist for i in replay.episodes[-100:]]),
+            #recent_best_m, replay.episodes[-100+recent_best].rewards)
             print(logit_reg)
             print(stem_o.mean(), stem_o.max(), stem_o.min())
+            print('time:', time.time() - time_last_check)
+            time_last_check = time.time()
             last_losses = []
-            qed_cutoff = [0.2, 0.7]
-            synth_cutoff = [0, 0.4]
-            all_rs = []
-            for ep in replay.episodes[replay.num_loaded_episodes:]:
-                nrg, synth, qed = ep.rewards
-                qed_discount = (qed - qed_cutoff[0]) / (qed_cutoff[1] - qed_cutoff[0])
-                qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
-                synth_discount = (synth - synth_cutoff[0]) / (synth_cutoff[1] - synth_cutoff[0])
-                synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
-                all_rs.append(nrg * synth_discount * qed_discount)
-            print(np.mean(all_rs), sorted(all_rs)[-10:])
+
+            if 0:
+                qed_cutoff = [0.2, 0.7]
+                synth_cutoff = [0, 0.4]
+                all_rs = []
+                for ep in replay.episodes[replay.num_loaded_episodes:]:
+                    nrg, synth, qed = ep.rewards
+                    qed_discount = (qed - qed_cutoff[0]) / (qed_cutoff[1] - qed_cutoff[0])
+                    qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
+                    synth_discount = (synth - synth_cutoff[0]) / (synth_cutoff[1] - synth_cutoff[0])
+                    synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
+                    all_rs.append(nrg * synth_discount * qed_discount)
+                print(np.mean(all_rs), sorted(all_rs)[-10:])
 
             if i % 5000:
                 continue
 
+            t0 = time.time()
             total_test_loss = 0
             total_test_n = 0
             for s, a, g in replay.iterate_test(mbsize):
@@ -603,17 +627,27 @@ def main(args):
                 total_test_n += g.shape[0]
             test_nll = total_test_loss / total_test_n
             print('test NLL:', test_nll)
+            print('test took:', time.time() - t0)
             test_losses.append(test_nll)
             save_stuff()
 
 
     stop_everything()
 
-    print("Running final beam search")
+
+    print("Running final search")
+    stop_event = threading.Event()
     rollout_threads = (
         [RolloutActor(bpath, device, args.repr_type, model,
-                      stop_event, replay, synth_net, 'beam',
-                      stop_after=1)
+                      stop_event, replay, synth_net, 'categorical',
+                      greedy=True,
+                      stop_after=5)
+         for i in range(8)]
+        +
+        [RolloutActor(bpath, device, args.repr_type, model,
+                      stop_event, replay, synth_net, 'categorical',
+                      greedy=False,
+                      stop_after=5)
          for i in range(8)])
     if not debug_no_threads:
         [i.start() for i in rollout_threads]
@@ -645,6 +679,35 @@ def array_nov_25(args):
     for lr in [1e-4, 1e-3]
     for nemb in [16, 32, 64]
     for repr_type in ['block_graph', 'atom_graph']
+  ])
+  return all_hps
+
+def array_dec_02(args):
+  all_hps = ([
+    {'mbsize': 32,
+     'learning_rate': lr,
+     'num_iterations': 200_000,
+     'nemb': nemb,
+     'repr_type': repr_type,
+     }
+    for lr in [1e-4, 1e-3]
+    for nemb in [16, 32, 64]
+    for repr_type in ['morgan_fingerprint']
+  ])
+  return all_hps
+
+def array_dec_08(args):
+  all_hps = ([
+    {'mbsize': 32,
+     'learning_rate': lr,
+     'num_iterations': 200_000,
+     'nemb': nemb,
+     'repr_type': repr_type,
+     'model_version': 'v2',
+     }
+    for lr in [1e-4, 1e-3]
+    for nemb in [16, 32, 64]
+    for repr_type in ['block_graph']
   ])
   return all_hps
 

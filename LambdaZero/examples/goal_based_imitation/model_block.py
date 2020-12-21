@@ -11,17 +11,20 @@ import torch_geometric.nn as gnn
 
 class GraphAgent(nn.Module):
 
-    def __init__(self, nemb, nvec, out_per_stem, out_per_mol, num_conv_steps, mdp_cfg):
+    def __init__(self, nemb, nvec, out_per_stem, out_per_mol, num_conv_steps, mdp_cfg, version='v1'):
         super().__init__()
+        self.version = version
         self.embeddings = nn.ModuleList([
             nn.Embedding(mdp_cfg.num_blocks + 1, nemb),
             nn.Embedding(mdp_cfg.num_stem_types + 1, nemb),
             nn.Embedding(mdp_cfg.num_stem_types, nemb)])
         self.conv = gnn.NNConv(nemb, nemb, nn.Sequential(), aggr='mean')
-        self.block2emb = nn.Sequential(nn.Linear(nemb + nvec, nemb), nn.LeakyReLU(),
+        nvec_1 = nvec * (version == 'v1')
+        nvec_2 = nvec * (version == 'v2')
+        self.block2emb = nn.Sequential(nn.Linear(nemb + nvec_1, nemb), nn.LeakyReLU(),
                                        nn.Linear(nemb, nemb))
         self.gru = nn.GRU(nemb, nemb)
-        self.stem2pred = nn.Sequential(nn.Linear(nemb * 2, nemb), nn.LeakyReLU(),
+        self.stem2pred = nn.Sequential(nn.Linear(nemb * 2 + nvec_2, nemb), nn.LeakyReLU(),
                                        nn.Linear(nemb, nemb), nn.LeakyReLU(),
                                        nn.Linear(nemb, out_per_stem))
         self.global2pred = nn.Sequential(nn.Linear(nemb, nemb), nn.LeakyReLU(),
@@ -30,6 +33,8 @@ class GraphAgent(nn.Module):
         self.num_conv_steps = num_conv_steps
         self.nemb = nemb
         self.training_steps = 0
+        self.categorical_style = 'escort'
+        self.escort_p = 4
 
 
     def forward(self, graph_data, vec_data):
@@ -40,9 +45,13 @@ class GraphAgent(nn.Module):
         graph_data.edge_attr = (
             graph_data.edge_attr[:, 0][:, :, None] * graph_data.edge_attr[:, 1][:, None, :]
         ).reshape((graph_data.edge_index.shape[1], self.nemb**2))
-        batch_vec = vec_data[graph_data.batch]
         out = graph_data.x
-        out = self.block2emb(torch.cat([out, batch_vec], 1))
+        if self.version == 'v1':
+            batch_vec = vec_data[graph_data.batch]
+            out = self.block2emb(torch.cat([out, batch_vec], 1))
+        elif self.version == 'v2':
+            out = self.block2emb(out)
+
         h = out.unsqueeze(0)
 
         for i in range(self.num_conv_steps):
@@ -56,17 +65,34 @@ class GraphAgent(nn.Module):
         stem_block_batch_idx = (
             torch.tensor(graph_data.__slices__['x'], device=out.device)[graph_data.stems_batch]
             + graph_data.stems[:, 0])
-        stem_out_cat = torch.cat([out[stem_block_batch_idx], graph_data.stemtypes], 1)
+        if self.version == 'v1':
+            stem_out_cat = torch.cat([out[stem_block_batch_idx], graph_data.stemtypes], 1)
+        elif self.version == 'v2':
+            stem_out_cat = torch.cat([out[stem_block_batch_idx],
+                                      graph_data.stemtypes,
+                                      vec_data[graph_data.stems_batch]], 1)
+
         stem_preds = self.stem2pred(stem_out_cat)
         mol_preds = self.global2pred(gnn.global_mean_pool(out, graph_data.batch))
         return stem_preds, mol_preds
 
+    def out_to_policy(self, s, stem_o, mol_o):
+        if self.categorical_style == 'softmax':
+            stem_e = torch.exp(stem_o - 2)
+            mol_e = torch.exp(mol_o[:, 0] - 2)
+        elif self.categorical_style == 'escort':
+            stem_e = abs(stem_o)**self.escort_p
+            mol_e = abs(mol_o[:, 0])**self.escort_p
+        Z = gnn.global_add_pool(stem_e, s.stems_batch).sum(1) + mol_e + 1e-3
+        return mol_e / Z, stem_e / Z[s.stems_batch, None]
+
     def action_negloglikelihood(self, s, a, g, stem_o, mol_o):
-        stem_e = torch.exp(stem_o - 2)
-        mol_e = torch.exp(mol_o[:, 0] - 2)
-        Z = gnn.global_add_pool(stem_e, s.stems_batch).sum(1) + mol_e
-        mol_lsm = torch.log(mol_e / Z)
-        stem_lsm = torch.log(stem_e / Z[s.stems_batch, None])
+        mol_p, stem_p = self.out_to_policy(s, stem_o, mol_o)
+        #print(Z.shape, Z.min().item(), Z.mean().item(), Z.max().item())
+        mol_lsm = torch.log(mol_p + 1e-5)
+        stem_lsm = torch.log(stem_p + 1e-5)
+        #print(mol_lsm.shape, mol_lsm.min().item(), mol_lsm.mean().item(), mol_lsm.max().item())
+        #print(stem_lsm.shape, stem_lsm.min().item(), stem_lsm.mean().item(), stem_lsm.max().item(), '--')
         stem_slices = torch.tensor(s.__slices__['stems'][:-1], dtype=torch.long, device=stem_lsm.device)
         return -(
             stem_lsm[stem_slices + a[:, 1]][
@@ -101,6 +127,7 @@ def mol2graph(mol, mdp):
                 edge_attr=f(edge_attrs) if len(edges) else f([]).reshape((0,2)),
                 stems=f(mol.stems) if len(mol.stems) else f([(0,0)]),
                 stemtypes=f(stemtypes) if len(mol.stems) else f([mdp.num_stem_types]))
+    data.to(mdp.device)
     #print(data)
     return data
 
