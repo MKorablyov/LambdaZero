@@ -16,8 +16,10 @@ DEFAULT_CONFIG = {
     #"split_name": "randsplit_dock_blocks105_walk40_clust",
 
     "dataset_root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-    "file_names": ["Zinc15_2k"],#["Zinc15_260k_0",  "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
-    "split_name": "randsplit_Zinc15_2k",
+    "file_names": #["Zinc15_2k"], #
+                     ["Zinc15_260k_0",  "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+    "split_name": "randsplit_Zinc15_260k",
+    #    "randsplit_Zinc15_2k",
     "probs": [0.8, 0.1, 0.1],
 }
 config = DEFAULT_CONFIG

@@ -1,5 +1,5 @@
 from abc import ABC
-import os, time
+import os
 
 import numpy as np
 from ray.rllib.models.model import restore_original_dimensions
@@ -8,13 +8,20 @@ from ray.rllib.utils.annotations import override
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
 
-#from torch_geometric.nn import GINEConv
+# from torch_geometric.nn import GINEConv
 from torch_geometric.nn import NNConv
 from torch_geometric.nn import Set2Set
 
 
 # import torch and torch.nn using ray utils
-torch, nn = try_import_torch()
+#torch, nn = try_import_torch()
+import torch
+from torch import nn
+import torch.nn.functional as F
+from .global_attention_layer import LowRankAttention
+
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 from LambdaZero.utils import RunningMeanStd
 
@@ -187,51 +194,119 @@ class MPNNet(nn.Module):
         out = self.lin2(out)
         return out.view(-1)
 
+
 class MPNNetDrop(nn.Module):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
     """
-    def __init__(self, num_feat=14, dim=64):
+    def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=64):
         super(MPNNetDrop, self).__init__()
+        self.drop_last = drop_last
+        self.drop_data = drop_data
+        self.drop_weights = drop_weights
+        self.drop_prob = drop_prob
         self.lin0 = nn.Linear(num_feat, dim)
 
         h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
         self.conv = NNConv(dim, dim, h, aggr='mean')
-
         self.gru = nn.GRU(dim, dim)
-
         self.set2set = Set2Set(dim, processing_steps=3)
         self.lin1 = nn.Linear(2 * dim, dim)
         self.lin2 = nn.Linear(dim, 1)
 
-    def forward(self, data, do_dropout, drop_p):
-        out = nn.functional.relu(self.lin0(data.x))
+    def get_embed(self, data, do_dropout):
+        if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin0(data.x))
         h = out.unsqueeze(0)
+        if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
 
         for i in range(3):
-            m = nn.functional.relu(self.conv(out, data.edge_index, data.edge_attr))
+            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+            if self.drop_weights: m = F.dropout(m, training=do_dropout, p=self.drop_prob)
             out, h = self.gru(m.unsqueeze(0), h)
+            if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
             out = out.squeeze(0)
 
         out = self.set2set(out, data.batch)
-        out = nn.functional.relu(self.lin1(out))
-        out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
-        out = self.lin2(out)
+        if self.drop_weights: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin1(out))
+        if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        return out
+
+    def forward(self, data, do_dropout):
+        embed = self.get_embed(data, do_dropout)
+        out = self.lin2(embed)
         return out.view(-1)
 
-    def get_embed(self, data, do_dropout, drop_p):
-        out = nn.functional.relu(self.lin0(data.x))
+    # todo: integrate masking
+    # # if do_dropout and use_mask: out = out * self.set_mask
+    # def set_mask(self):
+    #     self.input_mask = torch.bernoulli(torch.zeros(self.num_feat).fill_(1 - self.drop_prob)).to(device)
+    #     self.lin0_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+    #     self.h_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+    #     self.conv_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+    #     self.gru_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+    #     self.set_mask = torch.bernoulli(torch.zeros(self.dim + self.dim).fill_(1 - self.drop_prob)).to(device)
+    #     self.lin1_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+    #     self.lin2_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
+        
+        
+class MPNNetDropLRGA(nn.Module):
+    """
+    A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
+    """
+    def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=64):
+        super(MPNNetDropLRGA, self).__init__()
+        self.drop_last = drop_last
+        self.drop_data = drop_data
+        self.drop_weights = drop_weights
+        self.drop_prob = drop_prob
+        self.lin0 = nn.Linear(num_feat, dim)
+
+        h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
+        self.conv = NNConv(dim, dim, h, aggr='mean')
+        self.lrga = nn.ModuleList([LowRankAttention(30, 14, drop_prob),
+                     LowRankAttention(30, 14, drop_prob),
+                     LowRankAttention(30, 14, drop_prob)])
+        self.lrga_lin = nn.ModuleList([nn.Linear(60 + dim, dim),
+                                       nn.Linear(60 + dim, dim),
+                                       nn.Linear(60 + dim, dim)])
+
+        self.gru = nn.GRU(dim+60, dim)
+        self.set2set = Set2Set(dim, processing_steps=3)
+        self.lin1 = nn.Linear(2 * dim, dim)
+        self.lin2 = nn.Linear(dim, 1)
+
+    def get_embed(self, data, do_dropout):
+        if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin0(data.x))
         h = out.unsqueeze(0)
+        if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
 
         for i in range(3):
-            m = nn.functional.relu(self.conv(out, data.edge_index, data.edge_attr))
+            local_feat = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+            if self.drop_weights: local_feat = F.dropout(local_feat, training=do_dropout, p=self.drop_prob)
+            #with torch.no_grad():
+            global_feat = 0* self.lrga[i](data.x)
+            m = torch.cat([local_feat, global_feat], axis=1)
+            #m = F.relu(self.lrga_lin[i](feat))
+            #print("mean var", local_feat.mean(), local_feat.var(), global_feat.mean(), global_feat.var(),)
+
             out, h = self.gru(m.unsqueeze(0), h)
+            if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
             out = out.squeeze(0)
 
         out = self.set2set(out, data.batch)
-        out = nn.functional.relu(self.lin1(out))
-        out = nn.functional.dropout(out, training=do_dropout, p=drop_p)
+        if self.drop_weights: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin1(out))
+        if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
         return out
+
+    def forward(self, data, do_dropout):
+        embed = self.get_embed(data, do_dropout)
+        out = self.lin2(embed)
+        return out.view(-1)
+
 
 class GraphIsomorphismNet(nn.Module):
     def __init__(self,
@@ -312,8 +387,6 @@ class GraphIsomorphismNet(nn.Module):
 
         # pooling with set2set
         node_out = self.set2set2(node_out, data.batch)
-
         # fully-connected layer for output
         out = self.fully_connected(node_out)
-
         return out.view(-1)
