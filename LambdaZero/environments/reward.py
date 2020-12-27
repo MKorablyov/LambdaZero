@@ -10,6 +10,7 @@ import threading
 from rdkit import Chem
 from rdkit.Chem import QED, AllChem
 from rdkit import DataStructs
+import torch
 from torch.utils.data import Subset, ConcatDataset
 import torch_geometric.transforms as T
 import LambdaZero.utils
@@ -22,7 +23,7 @@ import gzip
 import pandas as pd
 from LambdaZero.examples.bayesian_models.bayes_tune.deep_ensemble import DeepEnsemble
 from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
-
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import fit_gp_embed_mpnn, fit_acqf_mcdrop, _optimize_acqf
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 class PredDockReward:
@@ -490,6 +491,8 @@ class BayesianRewardActor():
         print('BR: Prepared Dataset')
         
         self.regressor = config["regressor"](self.regressor_config)
+
+        self.best_mol_found = {'mol': None, 'rew': 0}
         
         if pretrained_model is not None:
             self.regressor.model.load_state_dict(th.load(pretrained_model))
@@ -604,16 +607,30 @@ class BayesianRewardActor():
 
     def acquire_batch(self):
         mols = np.array(self.train_unseen_mols)[:, 0]
-        loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
-        mean, var = self.regressor.get_mean_variance(loader, self.train_len)
-        scores = mean + (self.config["kappa"] * var)
+        # loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
+
+        # mean, var = self.regressor.get_mean_variance(loader, self.train_len)
+        # import pdb; pdb.set_trace();
+        acqf = fit_acqf_mcdrop(self.regressor)
+
+        ac_loader = DataLoader(mols, batch_size=mols.shape[0], num_workers=2, pin_memory=True)
+        idxs, scores = _optimize_acqf(acqf, ac_loader, self.config["aq_size"])
+
+        # scores = mean + (self.config["kappa"] * var)
+        # scores = np.maximum(mean - self.best_mol_found['rew'], 0)
+        # scores = mean + (np.sqrt(self.config["kappa"] * var))
+
+        # import pdb; pdb.set_trace();
+
         for i in range(len(self.train_unseen_mols)):
             scores[i] = self.train_unseen_mols[i][3] * scores[i]
             self.train_unseen_mols[i][2] = self.train_unseen_mols[i][3] * scores[i]
 
         # noise is not a part of original UCT but is added here
-        if self.config["minimize_objective"]: scores = -scores
-        idxs = np.argsort(-scores)[:self.config["aq_size"]]
+        # if self.config["minimize_objective"]: scores = -scores
+        # idxs = np.argsort(-scores)[:self.config["aq_size"]]
+        # import pdb; pdb.set_trace();
+
         return idxs
 
     def compute_targets(self, mol_set):
@@ -640,12 +657,18 @@ class BayesianRewardActor():
     def update_with_seen(self, idxs):
         aq_mask = np.zeros(len(self.train_unseen_mols), dtype=np.bool)
         aq_mask[idxs] = True
-        # import pdb; pdb.set_trace();
         aq_idxs = np.asarray(self.train_unseen_mols)[aq_mask].tolist()
         self.train_unseen_mols = np.asarray(self.train_unseen_mols)[~aq_mask].tolist()
-
+        
         aq_idx, rews = self.compute_targets(aq_idxs)
         rews = np.array(rews)
+
+        # import pdb; pdb.set_trace();
+
+        if np.max(rews) > self.best_mol_found['rew']:
+            self.best_mol_found['mol'] = aq_idx[np.argmax(rews)]
+            self.best_mol_found['rew'] = np.max(rews)
+        print('Best acquired mol: {}'.format(self.best_mol_found))
 
         if len(self.unselected_indices) == 0:
             self.unselected_indices = self.aq_indices
@@ -668,10 +691,13 @@ class BayesianRewardActor():
             # getattr(graph, self.config["data"]["target"]) * self.get_discount(Chem.MolFromSmiles(getattr(graph, "smi")))]
             # for graph in aq_set])
         # fine_tune_dataset = np.concatenate((np.array(aq_idx)[:, :1], aq_set_arr), axis=0)
-        # import pdb; pdb.set_trace()
         self.train_molecules.extend(np.array(aq_idx)[:, :1].reshape(-1).tolist())
         train_loader = DataLoader(self.train_molecules, shuffle=True, batch_size=self.config["data"]["b_size"])
+        
         # import pdb; pdb.set_trace();
+        # Where to get train_Y? rews?
+        # gp_model, acqf = fitGP_embed_mpnn(train_loader, self.regressor.model, self.device, self.config)
+        
         self.unseen_molecules.extend(self.train_unseen_mols)
 
         # fit model to the data

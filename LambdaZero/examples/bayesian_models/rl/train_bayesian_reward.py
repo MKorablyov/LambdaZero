@@ -54,7 +54,7 @@ DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
         "local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
-        "num_workers": 8,
+        "num_workers": 0,
         "num_gpus_per_worker": 0.25,
         "num_gpus": 1,
         "model": {
@@ -70,16 +70,16 @@ DEFAULT_CONFIG = {
     "checkpoint_freq": 250,
     "stop":{"training_iteration": 2000000},
     "reward_learner_config": {
-        "aq_size0": 3000,
+        "aq_size0": 200, # 3000
         "data": dict(data_config, **{"dataset_creator":None}),
         "aq_size": 32,
         "mol_dump_loc": "",
-        "kappa": 0.1,
+        "kappa": 1,
         "sync_freq": 50,
         "epsilon": 0.0,
         "minimize_objective": False,
         "b_size": 32,
-        'num_mol_retrain': 1000,
+        'num_mol_retrain': 100, # 1000
         "device": "cuda",
         "qed_cutoff": [0.2, 0.7],
         "synth_config": synth_config,
@@ -120,11 +120,11 @@ if machine == "Ikarus":
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
-    mol_dump_loc = '/scratch/mjain/lambdabo_mol_dump/'
+    mol_dump_loc = '/home/nekoeiha/scratch/Summaries/lambdabo_mol_dump/'
     curr_trial =  config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
     
     if not osp.exists(osp.join(mol_dump_loc, curr_trial)):
-        os.mkdir(osp.join(mol_dump_loc, curr_trial))
+        os.makedirs(osp.join(mol_dump_loc, curr_trial))
     config['reward_learner_config']['mol_dump_loc'] = osp.join(mol_dump_loc, curr_trial)
 
     reward_learner = BayesianRewardActor.remote(config['reward_learner_config'], 

@@ -17,14 +17,18 @@ from LambdaZero.examples.bayesian_models.bayes_tune import config
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch, eval_epoch, \
     train_mcdrop, mcdrop_mean_variance, eval_mcdrop, mpnn_brr_mean_variance
 
+from botorch.models.model import Model
+from botorch.posteriors.gpytorch import GPyTorchPosterior
+from gpytorch.distributions import MultivariateNormal
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 transform = T.Compose([LambdaZero.utils.Complete()])
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-class MCDrop(tune.Trainable):
-    def _setup(self, config):
+class MCDrop(Model):
+    def __init__(self, config):
+        super().__init__()
         self.config = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.train_loader = None
@@ -37,25 +41,28 @@ class MCDrop(tune.Trainable):
         self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"])
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
-        self.train_len = 0
+        self.output_dim = 1
+
+    @property
+    def num_outputs(self):
+        return self.output_dim
 
     def _train(self):
         scores = self.config["train"](
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
         return scores
 
-    def fine_tune(self, new_samples_loader, val_loader, validate):
+    def fine_tune(self, new_samples_loader, train_loader, val_loader, validate):
         self.train_loader, self.val_loader = new_samples_loader, val_loader
-        self.train_len += len(self.train_loader.dataset)
         all_scores = []
         for i in range(self.config["finetune_iterations"]):
             self._iteration = i
             scores = self._train()
             all_scores.append(scores)
-        # self.train_loader = train_loader
+        self.train_loader = train_loader
         if validate:
             val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
             return all_scores[-1], {**val_score, **val_ll}
         else:
             return all_scores[-1], {}
@@ -72,7 +79,6 @@ class MCDrop(tune.Trainable):
     def fit(self, train_loader, val_loader, validate=False):
         # update internal dataset
         self.train_loader, self.val_loader = train_loader, val_loader
-        self.train_len = len(train_loader.dataset)
         # make a new model
         self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"]) # todo: reset?
         self.optim = self.config["optimizer"](self.model.parameters(), **self.config["optimizer_config"])
@@ -86,7 +92,7 @@ class MCDrop(tune.Trainable):
             all_scores.append(scores)
         if validate:
             val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
             return all_scores[-1], {**val_score, **val_ll}
         else:
             return all_scores[-1], {}
@@ -94,6 +100,21 @@ class MCDrop(tune.Trainable):
     def get_mean_variance(self, loader, train_len):
         mean,var = self.config["get_mean_variance"](train_len, loader, self.model, self.device, self.config)
         return mean, var
+
+    def posterior(self, loader):
+        # this works with 1d output only
+        # x should be a n x d tensor
+        mvn = self.forward(loader)
+        return GPyTorchPosterior(mvn)
+
+    def forward(self, loader):
+        # if x.ndim == 3:
+        #     assert x.size(1) == 1
+        #     return self.forward(x.squeeze(1))
+        means, std = self.get_mean_variance(loader, len(loader.dataset))
+        variances = torch.tensor(std).unsqueeze(-1) ** 2
+        mvn = MultivariateNormal(torch.tensor(means).unsqueeze(-1), variances.unsqueeze(-1))
+        return mvn
 
 
 data_config = {

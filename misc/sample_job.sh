@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:4                      # Number of GPUs needed
 #SBATCH --mem=64G                         # Amount of RAM needed
 #SBATCH --time=48:00:00                   # The time for which the job runs
-#SBATCH -o /scratch/<username>/slurm-%j.out  # Write the log in $SCRATCH
+#SBATCH -o /scratch/nekoeiha/Summaries/slurm-%j.out  # Write the log in $SCRATCH
 
 
 module load python/3.6 cuda/10.1 cudnn/7.6.5
@@ -20,7 +20,7 @@ export LIBRARY_PATH=$LIBRARY_PATH:$CUDA_PATH/lib64
 # pip install -e .
 source /lustre03/project/6004852/mkkr/anaconda3/etc/profile.d/conda.sh
 conda activate lz
-export PYTHONPATH="${PYTHONPATH}:<path to your working directory>/LambdaZero" 
+export PYTHONPATH="${PYTHONPATH}:/home/nekoeiha/LambdaZero" 
 
 # cd to the experiment you would like to run and call the script. For eg.
 cd ~/LambdaZero/LambdaZero/examples/bayesian_models/rl

@@ -753,3 +753,17 @@ ppo_bayes_reward_019 = {
     },
     "use_dock": True
 }
+
+random_bayes_reward_000 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            }
+        },
+    },
+}
