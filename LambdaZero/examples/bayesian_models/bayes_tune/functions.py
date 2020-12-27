@@ -8,7 +8,7 @@ from torch_geometric.data import DataLoader
 from botorch.models import SingleTaskGP
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.fit import fit_gpytorch_model
-from botorch.acquisition import ExpectedImprovement, qMaxValueEntropy
+# from botorch.acquisition import ExpectedImprovement, qMaxValueEntropy
 from LambdaZero.examples.bayesian_models.bayes_tune.botorch_acqf_analytic import UpperConfidenceBound
 from botorch.optim import optimize_acqf
 from LambdaZero.examples.bayesian_models.bayes_tune.botorch_sampling import MaxPosteriorSampling, BoltzmannSampling

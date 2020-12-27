@@ -214,12 +214,6 @@ class MPNNetDrop(nn.Module):
         self.lin1 = nn.Linear(2 * dim, dim)
         self.lin2 = nn.Linear(dim, 1)
 
-        self.output_dim = 1
-        self.config = None
-        
-    @property
-    def num_outputs(self):
-        return self.output_dim
 
     def get_embed(self, data, do_dropout):
         if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
@@ -245,27 +239,6 @@ class MPNNetDrop(nn.Module):
         embed = self.get_embed(data, do_dropout)
         out = self.lin2(embed)
         return out.view(-1)
-
-    # def get_mean_variance(self, loader):
-    #     import pdb; pdb.set_trace();
-    #     mean,var = mcdrop_mean_variance(1000, loader, self, self.device, self.config)
-    #     print(mean)
-    #     return mean, var
-    #
-    # def posterior(self, loader):
-    #     # this works with 1d output only
-    #     # x should be a n x d tensor
-    #     import pdb; pdb.set_trace();
-    #     # means, sts = [], []
-    #     # for bidx, data in enumerate(loader):
-    #     means, stds = self.get_mean_variance(loader)
-    #         # means.append(mean)
-    #         # stds.append(std)
-    #     print('mean : {} and var: {}'.format(means, stds))
-    #     variances = np.array(stds) ** 2
-    #     mvn = MultivariateNormal(means, variances.unsqueeze(-1))
-    #     return GPyTorchPosterior(mvn), means, variances
-
 
     # todo: integrate masking
     # # if do_dropout and use_mask: out = out * self.set_mask
