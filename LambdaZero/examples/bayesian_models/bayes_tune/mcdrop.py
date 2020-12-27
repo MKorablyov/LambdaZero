@@ -42,6 +42,7 @@ class MCDrop(Model):
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
         self.output_dim = 1
+        self.train_len = 0
 
     @property
     def num_outputs(self):

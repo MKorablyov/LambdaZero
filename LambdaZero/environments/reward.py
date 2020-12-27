@@ -608,19 +608,13 @@ class BayesianRewardActor():
     def acquire_batch(self):
         mols = np.array(self.train_unseen_mols)[:, 0]
         # loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
-
         # mean, var = self.regressor.get_mean_variance(loader, self.train_len)
+        # scores = mean + (self.config["kappa"] * var)
+
         # import pdb; pdb.set_trace();
         acqf = fit_acqf_mcdrop(self.regressor)
-
         ac_loader = DataLoader(mols, batch_size=mols.shape[0], num_workers=2, pin_memory=True)
         idxs, scores = _optimize_acqf(acqf, ac_loader, self.config["aq_size"])
-
-        # scores = mean + (self.config["kappa"] * var)
-        # scores = np.maximum(mean - self.best_mol_found['rew'], 0)
-        # scores = mean + (np.sqrt(self.config["kappa"] * var))
-
-        # import pdb; pdb.set_trace();
 
         for i in range(len(self.train_unseen_mols)):
             scores[i] = self.train_unseen_mols[i][3] * scores[i]
@@ -641,7 +635,6 @@ class BayesianRewardActor():
             mol_set = np.array([mol for mol in result[:,0]]).tolist()
             rs = np.array([mol for mol in result[:,1]])
             t1 = time.time()
-            # import pdb; pdb.set_trace();
             print('Docking sim done in {}'.format(t1-t0))
             print('Mean R in batch: ', np.mean(rs))
         else:
@@ -696,8 +689,6 @@ class BayesianRewardActor():
         
         # import pdb; pdb.set_trace();
         # Where to get train_Y? rews?
-        # gp_model, acqf = fitGP_embed_mpnn(train_loader, self.regressor.model, self.device, self.config)
-        
         self.unseen_molecules.extend(self.train_unseen_mols)
 
         # fit model to the data
