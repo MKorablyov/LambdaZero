@@ -212,13 +212,11 @@ class BoltzmannSampling(SamplingStrategy):
         # so that X_eval has shape `N x batch_shape x 1 x d`
         # X_eval = X.permute(-2, *range(X.ndim - 2), -1).unsqueeze(-2)
         acqval = self.acq_func.forward(X)  # N x batch_shape
-        # print('Ac values:', acqval)
         # now move the `N` dimension back (this is the number of categories)
         # acqval = acqval.permute(*range(1, X.ndim - 1), 0)  # batch_shape x N
         weights = torch.exp(self.eta * standardize(acqval))  # batch_shape x N
         idcs = batched_multinomial(
             weights=weights, num_samples=num_samples, replacement=self.replacement
         )
-        # print('ac values:', idcs)
         # now do some gathering acrobatics to select the right elements from X
         return idcs, acqval # torch.gather(X, -2, idcs.unsqueeze(-1).expand(*idcs.shape, X.size(-1)))

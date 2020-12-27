@@ -26,7 +26,81 @@ transform = T.Compose([LambdaZero.utils.Complete()])
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-class MCDrop(Model):
+
+class MCDrop(tune.Trainable):
+    def _setup(self, config):
+        self.config = config
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.train_loader = None
+        self.val_loader = None
+        if config["data"]["dataset_creator"] is not None:
+            self.train_loader, self.val_loader = config["data"]["dataset_creator"](config["data"])
+
+        # self.feature_dim = 64
+        # make model
+        self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"])
+        self.model.to(self.device)
+        self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
+        self.train_len = 0
+
+    def _train(self):
+        scores = self.config["train"](
+            self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
+        return scores
+
+    def fine_tune(self, new_samples_loader, val_loader, validate):
+        self.train_loader, self.val_loader = new_samples_loader, val_loader
+        self.train_len += len(self.train_loader.dataset)
+        all_scores = []
+        for i in range(self.config["finetune_iterations"]):
+            self._iteration = i
+            scores = self._train()
+            all_scores.append(scores)
+        # self.train_loader = train_loader
+        if validate:
+            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
+            return all_scores[-1], {**val_score, **val_ll}
+        else:
+            return all_scores[-1], {}
+
+    def save(self, path):
+        torch.save(self.model.state_dict(), os.path.join(path, f'model.pt'))
+
+    def get_weights(self):
+        return self.model.state_dict()
+
+    def set_weights(self, weights):
+        self.model.load_state_dict(weights)
+
+    def fit(self, train_loader, val_loader, validate=False):
+        # update internal dataset
+        self.train_loader, self.val_loader = train_loader, val_loader
+        self.train_len = len(train_loader.dataset)
+        # make a new model
+        self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"]) # todo: reset?
+        self.optim = self.config["optimizer"](self.model.parameters(), **self.config["optimizer_config"])
+        self.model.to(self.device)
+
+        # todo allow ray native stopping
+        all_scores = []
+        for i in range(self.config["train_iterations"]):
+            self._iteration = i
+            scores = self._train()
+            all_scores.append(scores)
+        if validate:
+            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
+            return all_scores[-1], {**val_score, **val_ll}
+        else:
+            return all_scores[-1], {}
+
+    def get_mean_variance(self, loader, train_len):
+        mean,var = self.config["get_mean_variance"](train_len, loader, self.model, self.device, self.config)
+        return mean, var
+
+
+class MCDropGenAcqf(Model):
     def __init__(self, config):
         super().__init__()
         self.config = config

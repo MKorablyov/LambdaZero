@@ -294,7 +294,6 @@ class UpperConfidenceBound(AnalyticAcquisitionFunction):
             A `(b)`-dim Tensor of Upper Confidence Bound values at the given
             design points `X`.
         """
-        # import pdb; pdb.set_trace();
         # self.beta = self.beta.to(X)
         posterior = self._get_posterior(X=X)
 
