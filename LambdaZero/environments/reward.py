@@ -623,7 +623,6 @@ class BayesianRewardActor():
         # noise is not a part of original UCT but is added here
         # if self.config["minimize_objective"]: scores = -scores
         # idxs = np.argsort(-scores)[:self.config["aq_size"]]
-        # import pdb; pdb.set_trace();
 
         return idxs
 
