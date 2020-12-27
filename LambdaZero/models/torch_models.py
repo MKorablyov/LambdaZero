@@ -14,7 +14,6 @@ from torch_geometric.nn import Set2Set
 import torch.nn.functional as F
 
 from LambdaZero.utils import RunningMeanStd
-from LambdaZero.examples.bayesian_models.bayes_tune.functions import mcdrop_mean_variance
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -235,7 +234,6 @@ class MPNNetDrop(nn.Module):
         return out
 
     def forward(self, data, do_dropout):
-        # print('data in torch.model forward', data)
         embed = self.get_embed(data, do_dropout)
         out = self.lin2(embed)
         return out.view(-1)

@@ -49,20 +49,21 @@ class MCDrop(Model):
 
     def _train(self):
         scores = self.config["train"](
-            self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
+            self.train_loader, self.val_loader, self.model, self.device, self.config, self.optim, self._iteration)
         return scores
 
-    def fine_tune(self, new_samples_loader, train_loader, val_loader, validate):
+    def fine_tune(self, new_samples_loader, val_loader, validate):
         self.train_loader, self.val_loader = new_samples_loader, val_loader
+        self.train_len += len(self.train_loader.dataset)
         all_scores = []
         for i in range(self.config["finetune_iterations"]):
             self._iteration = i
             scores = self._train()
             all_scores.append(scores)
-        self.train_loader = train_loader
+        # self.train_loader = train_loader
         if validate:
             val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
             return all_scores[-1], {**val_score, **val_ll}
         else:
             return all_scores[-1], {}
@@ -79,8 +80,9 @@ class MCDrop(Model):
     def fit(self, train_loader, val_loader, validate=False):
         # update internal dataset
         self.train_loader, self.val_loader = train_loader, val_loader
+        self.train_len = len(train_loader.dataset)
         # make a new model
-        self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"]) # todo: reset?
+        self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"])  # todo: reset?
         self.optim = self.config["optimizer"](self.model.parameters(), **self.config["optimizer_config"])
         self.model.to(self.device)
 
@@ -92,13 +94,13 @@ class MCDrop(Model):
             all_scores.append(scores)
         if validate:
             val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
             return all_scores[-1], {**val_score, **val_ll}
         else:
             return all_scores[-1], {}
 
     def get_mean_variance(self, loader, train_len):
-        mean,var = self.config["get_mean_variance"](train_len, loader, self.model, self.device, self.config)
+        mean, var = self.config["get_mean_variance"](train_len, loader, self.model, self.device, self.config)
         return mean, var
 
     def posterior(self, loader):
