@@ -248,34 +248,14 @@ def brr_mean_variance(train_loader, loader, model, device, config):
     pass
 
 
-def fit_gp_embed_mpnn(loader, model, device, config):
-    # import pdb; pdb.set_trace();
-
-    train_X = sample_embeds(loader, model, device, config)
-    # train_Y =
-
-    gp_model = SingleTaskGP(torch.tensor(train_X), torch.tensor(train_Y))
-    mll = ExactMarginalLogLikelihood(gp_model.likelihood, gp_model)
-
-    fit_gpytorch_model(mll)
-
-    acqf = UpperConfidenceBound(gp_model, beta=0.2)
-
-    return gp_model, acqf
-
-
 def fit_acqf_mcdrop(mc_drop_model):
     acqf = UpperConfidenceBound(mc_drop_model, beta=0.2)
-
     return acqf
 
 
 def _optimize_acqf(acqf, unseen_mol, num_samples):
     # import pdb; pdb.set_trace();
-    # embeds = model.get_embed(unseen_mol, do_dropout=False)
     BMacqf = BoltzmannSampling(acqf)
     candidate, acq_value = BMacqf.forward(unseen_mol, num_samples=num_samples)
-
-    # print('candidate: ', candidate)
 
     return candidate, acq_value
