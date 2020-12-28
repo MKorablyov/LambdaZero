@@ -894,6 +894,65 @@ dqn_bayes_reward_003 = {
     "use_dock": True
 }
 
+dqn_bayes_reward_004 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 7,
+        },
+        "model": {
+            "custom_model": "GraphMolDQN_thv1",
+            "custom_options":{"dqn_rew_type": "DQN",
+                              "eps_anneal_timelength": int(5e4),
+                              "eps_lowerlim": 0.25} # does a **kw to __init__,
+        },
+        "lr": 5e-5,
+        # "entropy_coeff": 1e-4,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 0.1
+    },
+    "use_dock": True
+}
+dqn_bayes_reward_005 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 7,
+        },
+        "model": {
+            "custom_model": "GraphMolDQN_thv1",
+            "custom_options":{"dqn_rew_type": "DQN",
+                              "eps_anneal_timelength": int(5e4),
+                              "eps_lowerlim": 0.25} # does a **kw to __init__,
+        },
+        "lr": 5e-5,
+        # "entropy_coeff": 1e-4,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1.0
+    },
+    "use_dock": True
+}
+
 
 ################################# Max_DQN #########################################
 
@@ -993,6 +1052,66 @@ max_dqn_bayes_reward_003 = {
                 "binding_model": binding_model,
             },
             "random_steps": 5,
+        },
+        "model": {
+            "custom_model": "GraphMolDQN_thv1",
+            "custom_options":{"dqn_rew_type": "MaxDQN",
+                              "eps_anneal_timelength": int(5e4),
+                              "eps_lowerlim": 0.25} # does a **kw to __init__,
+        },
+        "lr": 5e-5,
+        # "entropy_coeff": 1e-4,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1.0
+    },
+    "use_dock": True
+}
+
+max_dqn_bayes_reward_004 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 7,
+        },
+        "model": {
+            "custom_model": "GraphMolDQN_thv1",
+            "custom_options":{"dqn_rew_type": "MaxDQN",
+                              "eps_anneal_timelength": int(5e4),
+                              "eps_lowerlim": 0.25} # does a **kw to __init__,
+        },
+        "lr": 5e-5,
+        # "entropy_coeff": 1e-4,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 0.1
+    },
+    "use_dock": True
+}
+
+max_dqn_bayes_reward_005 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "random_steps": 7,
         },
         "model": {
             "custom_model": "GraphMolDQN_thv1",
