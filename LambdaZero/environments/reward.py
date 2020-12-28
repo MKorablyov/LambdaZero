@@ -23,7 +23,7 @@ import gzip
 import pandas as pd
 from LambdaZero.examples.bayesian_models.bayes_tune.deep_ensemble import DeepEnsemble
 from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
-from LambdaZero.examples.bayesian_models.bayes_tune.functions import fit_gp_embed_mpnn, fit_acqf_mcdrop, _optimize_acqf
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import fit_acqf_mcdrop, _optimize_acqf
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 class PredDockReward:
@@ -492,7 +492,7 @@ class BayesianRewardActor():
         
         self.regressor = config["regressor"](self.regressor_config)
 
-        self.best_mol_found = {'mol': None, 'rew': 0}
+        self.best_mol_found = {'mol': None, 'rew': -1}
         
         if pretrained_model is not None:
             self.regressor.model.load_state_dict(th.load(pretrained_model))
@@ -612,8 +612,8 @@ class BayesianRewardActor():
         # scores = mean + (self.config["kappa"] * var)
 
         # import pdb; pdb.set_trace();
-        acqf = fit_acqf_mcdrop(self.regressor)
-        ac_loader = DataLoader(mols, batch_size=mols.shape[0], num_workers=2, pin_memory=True)
+        acqf = fit_acqf_mcdrop(self.regressor, acqf_name=self.config["acqf_name"], best_f=self.best_mol_found['rew'])
+        ac_loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
         idxs, scores = _optimize_acqf(acqf, ac_loader, self.config["aq_size"])
 
         for i in range(len(self.train_unseen_mols)):

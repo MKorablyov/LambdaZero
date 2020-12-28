@@ -14,7 +14,7 @@ import torch
 import torch_geometric.transforms as T
 
 # from LambdaZero.environments import block_mol_v3
-from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
+from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop, MCDropGenAcqf
 from LambdaZero.examples.bayesian_models.rl import config
 from LambdaZero.environments.reward import BayesianRewardActor
 
@@ -47,7 +47,7 @@ data_config = {
 
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo_bayes_reward_000"
+else: config_name = "ppo_bayes_reward_general_acqf_UCB"
 config = getattr(config,config_name)
 
 DEFAULT_CONFIG = {
@@ -103,7 +103,7 @@ DEFAULT_CONFIG = {
             "get_mean_variance": mcdrop_mean_variance,
             "is_reward_model": True
         },
-        "regressor": MCDrop,
+        "regressor": MCDropGenAcqf,
     },
     "use_dock": False,
     "pretrained_model": None #  "/home/mjain/scratch/mcdrop_rl/model.pt"

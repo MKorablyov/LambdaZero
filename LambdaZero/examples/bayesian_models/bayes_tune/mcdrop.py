@@ -179,15 +179,11 @@ class MCDropGenAcqf(Model):
         return mean, var
 
     def posterior(self, loader):
-        # this works with 1d output only
-        # x should be a n x d tensor
         mvn = self.forward(loader)
         return GPyTorchPosterior(mvn)
 
     def forward(self, loader):
-        # if x.ndim == 3:
-        #     assert x.size(1) == 1
-        #     return self.forward(x.squeeze(1))
+
         means, std = self.get_mean_variance(loader, len(loader.dataset))
         variances = torch.tensor(std).unsqueeze(-1) ** 2
         mvn = MultivariateNormal(torch.tensor(means).unsqueeze(-1), variances.unsqueeze(-1))

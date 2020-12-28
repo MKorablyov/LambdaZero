@@ -9,7 +9,7 @@ from botorch.models import SingleTaskGP
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.fit import fit_gpytorch_model
 # from botorch.acquisition import ExpectedImprovement, qMaxValueEntropy
-from LambdaZero.examples.bayesian_models.bayes_tune.botorch_acqf_analytic import UpperConfidenceBound
+from LambdaZero.examples.bayesian_models.bayes_tune.botorch_acqf_analytic import UpperConfidenceBound, ExpectedImprovement
 from botorch.optim import optimize_acqf
 from LambdaZero.examples.bayesian_models.bayes_tune.botorch_sampling import MaxPosteriorSampling, BoltzmannSampling
 
@@ -248,14 +248,18 @@ def brr_mean_variance(train_loader, loader, model, device, config):
     pass
 
 
-def fit_acqf_mcdrop(mc_drop_model):
-    acqf = UpperConfidenceBound(mc_drop_model, beta=0.2)
+def fit_acqf_mcdrop(mc_drop_model, acqf_name, best_f=-100):
+    if acqf_name == ExpectedImprovement:
+        acqf = acqf_name(mc_drop_model, best_f=best_f)
+    elif acqf_name == UpperConfidenceBound:
+        acqf = acqf_name(mc_drop_model, beta=0.2)
     return acqf
 
 
 def _optimize_acqf(acqf, unseen_mol, num_samples):
-    # import pdb; pdb.set_trace();
-    BMacqf = BoltzmannSampling(acqf)
-    candidate, acq_value = BMacqf.forward(unseen_mol, num_samples=num_samples)
+    BMacqf = BoltzmannSampling(acqf, eta=1, replacement=False)
+    candidate, acq_value = BMacqf(unseen_mol, num_samples=num_samples)
+
+    print('candidates acq_values:', acq_value[candidate])
 
     return candidate, acq_value

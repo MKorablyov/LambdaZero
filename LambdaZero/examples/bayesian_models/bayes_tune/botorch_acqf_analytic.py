@@ -120,7 +120,7 @@ class ExpectedImprovement(AnalyticAcquisitionFunction):
             best_f = torch.tensor(best_f)
         self.register_buffer("best_f", best_f)
 
-    @t_batch_mode_transform(expected_q=1)
+    # @t_batch_mode_transform(expected_q=1)
     def forward(self, X: Tensor) -> Tensor:
         r"""Evaluate Expected Improvement on the candidate set X.
 
@@ -134,11 +134,13 @@ class ExpectedImprovement(AnalyticAcquisitionFunction):
             A `b1 x ... bk`-dim tensor of Expected Improvement values at the
             given design points `X`.
         """
-        self.best_f = self.best_f.to(X)
+        # self.best_f = self.best_f.to(X)
         posterior = self._get_posterior(X=X)
         mean = posterior.mean
         # deal with batch evaluation and broadcasting
-        view_shape = mean.shape[:-2] if mean.dim() >= X.dim() else X.shape[:-2]
+        # view_shape = mean.shape[:-2] if mean.dim() >= X.dim() else X.shape[:-2]
+        view_shape = len(X.dataset) # X.shape[:-2]
+
         mean = mean.view(view_shape)
         sigma = posterior.variance.clamp_min(1e-9).sqrt().view(view_shape)
         u = (mean - self.best_f.expand_as(mean)) / sigma

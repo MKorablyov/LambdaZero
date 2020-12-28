@@ -12,14 +12,14 @@ module load nixpkgs/16.09
 module load gcc/7.3.0 
 module load rdkit/2019.03.4
 module load openbabel/2.4.1
+
 export PATH=$CUDA_PATH/bin${PATH:+:${PATH}}
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUDA_PATH/lib64
 export LIBRARY_PATH=$LIBRARY_PATH:$CUDA_PATH/lib64
+export PATH=/lustre03/project/6004852/mkkr/Programs/mgltools_x86_64Linux2_1.5.6/bin${PATH:+:${PATH}}
 
-# cd ~/LambdaZero
-# pip install -e .
-source /lustre03/project/6004852/mkkr/anaconda3/etc/profile.d/conda.sh
-conda activate lz
+source /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
+# conda activate lz
 export PYTHONPATH="${PYTHONPATH}:/home/nekoeiha/LambdaZero" 
 
 # cd to the experiment you would like to run and call the script. For eg.
