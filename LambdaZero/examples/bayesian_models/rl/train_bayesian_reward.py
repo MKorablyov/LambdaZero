@@ -27,22 +27,29 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 data_config = {
-    "target": "gridscore",
-    # "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
+    "target": "dockscore",
+    #"dataset_creator": LambdaZero.inputs.dataset_creator_v1,
     "dataset_split_path": osp.join(datasets_dir,
                                 #    "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
-    "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+                                #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
+                                "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
+    # "dataset_config": {
+    #     "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
+    #     "props": ["gridscore", "smi"],
+    #     "transform": T.Compose([LambdaZero.utils.Complete()]),
+    #     "file_names":
+    #     # ["Zinc15_2k"],
+    #     ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+    # },
     "dataset_config": {
-        "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
-        "props": ["gridscore", "smi"],
+        "root": osp.join(datasets_dir, "brutal_dock/seh/raw"),
+        "props": ["dockscore", "smiles"],
         "transform": T.Compose([LambdaZero.utils.Complete()]),
-        "file_names": 
-        # ["Zinc15_2k"],
-        ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+        "file_names": "Zinc20_docked_neg_randperm_3k",
     },
     "b_size": 40,
-    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057])
+    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.10])
 }
 
 
@@ -120,7 +127,7 @@ if machine == "Ikarus":
 if __name__ == "__main__":
     ray.init(memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
-    mol_dump_loc = '/scratch/mjain/lambdabo_mol_dump/'
+    mol_dump_loc = summaries_dir #'/scratch/mjain/lambdabo_mol_dump/'
     curr_trial =  config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
     
     if not osp.exists(osp.join(mol_dump_loc, curr_trial)):

@@ -12,7 +12,8 @@ from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 # fixme
-binding_model = osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth")
+#binding_model = osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth")
+binding_model = osp.join(datasets_dir, "brutal_dock/seh/trained_weights/vanilla_mpnn/model.pth")
 # binding_config["predict_config"]["checkpoint_path"] = \
 #     os.path.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/chemprop/model_0/model.pt")
 
@@ -221,6 +222,7 @@ ppo_bayes_reward_008 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
+            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",

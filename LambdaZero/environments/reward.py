@@ -452,7 +452,7 @@ class BayesianRewardActor():
             self.net.to(config['device'])
             self.net.load_state_dict(th.load(binding_model, map_location=th.device(config['device'])))
             self.net.eval()
-        self.target_norm = [-8.6, 1.10]
+        self.target_norm = config["normalizer"] # [-8.6, 1.10]
 
         print('BR: Loaded Oracle Network')
         print('BR: Loading Dataset ...')
@@ -486,7 +486,7 @@ class BayesianRewardActor():
         # self.val_loader = DataLoader(val_set, batch_size=config["data"]["b_size"])
         # self.train_molecules = train_molecules
         # self.dataset = None
-        self.train_molecules, train_loader, self.val_loader = self.construct_dataset(os.path.join(datasets_dir, 'zinc20', 'zinc20_docked.csv'))
+        self.train_molecules, train_loader, self.val_loader = self.construct_dataset(os.path.join(config["data"]["dataset_config"]["root"], config["data"]["dataset_config"]["file_names"]))
         print('BR: Prepared Dataset')
         
         self.regressor = config["regressor"](self.regressor_config)
@@ -505,10 +505,11 @@ class BayesianRewardActor():
         self.batches = 0
     
     def construct_dataset(self, path):
-        df = pd.read_csv(path)
+        df = pd.read_feather(path)
         # train = df.sample(n=self.config['aq_size0'])
-        train = df.nsmallest(self.config['aq_size0'], 'dockscore')
-        val = df.sample(n=self.config['aq_size0'])
+        # train = df.nsmallest(self.config['aq_size0'], 'dockscore')
+        # val = df.sample(n=self.config['aq_size0'])
+        train, val = np.split(df.sample(n=2*self.config['aq_size0']), [self.config['aq_size0'], 2*self.config['aq_size0']]) # splits without replacement
         train_mols = []
         # import pdb; pdb.set_trace()
         for index, row in train.iterrows():
