@@ -9,7 +9,6 @@ from rdkit.Chem import AllChem
 from sklearn.decomposition import PCA
 import pickle as pk
 from rdkit import Chem
-import LambdaZero.utils
 import LambdaZero.chem
 
 

@@ -1,4 +1,5 @@
-from .tf_models import *
+#from .tf_models import *
 from .torch_models import *
-from .torch_tpnn_models import *
+# fixme - we need something like def_try_import_TPNN()
+# from .torch_tpnn_models import *
 from .wrappers import *
