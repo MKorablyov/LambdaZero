@@ -765,19 +765,23 @@ ppo_bayes_reward_general_acqf_EI = {
             "reward_config": {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
-            }
+            },
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
             "custom_options":{"num_hidden": 64} # does a **kw to __init__
         },
-        # "lr": 1e-4,
+        "lr": 5e-5,
+        # "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
         "framework": "torch",
     },
     "reward_learner_config": {
+        'num_mol_retrain': 1000,
         "acqf_name": ExpectedImprovement,
         "regressor": MCDropGenAcqf,
     },
+    "use_dock": True
 }
 
 ppo_bayes_reward_general_acqf_UCB = {
@@ -789,17 +793,22 @@ ppo_bayes_reward_general_acqf_UCB = {
             "reward_config": {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
-            }
+            },
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
             "custom_options":{"num_hidden": 64} # does a **kw to __init__
         },
-        # "lr": 1e-4,
+        "lr": 5e-5,
+        # "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
         "framework": "torch",
     },
     "reward_learner_config": {
+        'num_mol_retrain': 1000,
         "acqf_name": UpperConfidenceBound,
         "regressor": MCDropGenAcqf,
+        "kappa": 1,
     },
+    "use_dock": True
 }

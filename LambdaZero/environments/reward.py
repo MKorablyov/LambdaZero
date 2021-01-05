@@ -22,7 +22,7 @@ import pickle
 import gzip
 import pandas as pd
 from LambdaZero.examples.bayesian_models.bayes_tune.deep_ensemble import DeepEnsemble
-from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
+from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop, MCDropGenAcqf
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import fit_acqf_mcdrop, _optimize_acqf
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -607,22 +607,25 @@ class BayesianRewardActor():
 
     def acquire_batch(self):
         mols = np.array(self.train_unseen_mols)[:, 0]
-        # loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
-        # mean, var = self.regressor.get_mean_variance(loader, self.train_len)
-        # scores = mean + (self.config["kappa"] * var)
-
-        # import pdb; pdb.set_trace();
-        acqf = fit_acqf_mcdrop(self.regressor, acqf_name=self.config["acqf_name"], best_f=self.best_mol_found['rew'])
-        ac_loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
-        idxs, scores = _optimize_acqf(acqf, ac_loader, self.config["aq_size"])
+        scores = np.zeros(mols.shape[0])
+        if self.config["regressor"] == MCDrop:
+            print('Using MCDrop...')
+            loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
+            mean, var = self.regressor.get_mean_variance(loader, self.train_len)
+            scores = mean + (self.config["kappa"] * var)
+        elif self.config["regressor"] == MCDropGenAcqf:
+            print('Using MCDropGenAcqf...')
+            acqf = fit_acqf_mcdrop(self.regressor, config=self.config, best_f=self.best_mol_found['rew'])
+            ac_loader = DataLoader(mols, batch_size=self.config["data"]["b_size"], num_workers=2, pin_memory=True)
+            idxs, scores = _optimize_acqf(acqf, ac_loader, self.config["aq_size"])
 
         for i in range(len(self.train_unseen_mols)):
             scores[i] = self.train_unseen_mols[i][3] * scores[i]
             self.train_unseen_mols[i][2] = self.train_unseen_mols[i][3] * scores[i]
 
         # noise is not a part of original UCT but is added here
-        # if self.config["minimize_objective"]: scores = -scores
-        # idxs = np.argsort(-scores)[:self.config["aq_size"]]
+        if self.config["minimize_objective"]: scores = -scores
+        idxs = np.argsort(-scores)[:self.config["aq_size"]]
 
         return idxs
 

@@ -16,7 +16,7 @@ import torch
 import torch_geometric.transforms as T
 
 # from LambdaZero.environments import block_mol_v3
-from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
+from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop, MCDropGenAcqf
 from LambdaZero.examples.bayesian_models.rl import config_az as config
 from LambdaZero.examples.bayesian_models.rl.random_search import RandomSearchTrainer
 from LambdaZero.environments.reward import BayesianRewardActor
@@ -141,7 +141,7 @@ DEFAULT_CONFIG = {
             "get_mean_variance": mcdrop_mean_variance,
             "is_reward_model": True
         },
-        "regressor": MCDrop,
+        "regressor": MCDropGenAcqf,
     },
     "use_dock": False,
     "pretrained_model": None #  "/home/mjain/scratch/mcdrop_rl/model.pt"

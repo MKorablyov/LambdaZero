@@ -103,7 +103,7 @@ DEFAULT_CONFIG = {
             "get_mean_variance": mcdrop_mean_variance,
             "is_reward_model": True
         },
-        "regressor": MCDropGenAcqf,
+        "regressor": MCDrop,
     },
     "use_dock": False,
     "pretrained_model": None #  "/home/mjain/scratch/mcdrop_rl/model.pt"
