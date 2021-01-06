@@ -7,7 +7,6 @@ from LambdaZero.environments.persistent_search.persistent_buffer import BlockMol
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v2, PredDockReward_v3, PredDockBayesianReward_v1
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
-from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
