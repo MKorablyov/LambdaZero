@@ -7,8 +7,7 @@ from LambdaZero.environments.persistent_search.persistent_buffer import BlockMol
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments import PredDockReward_v2, PredDockReward_v3, PredDockBayesianReward_v1
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
-from LambdaZero.examples.bayesian_models.bayes_tune.botorch_acqf_analytic import UpperConfidenceBound, ExpectedImprovement
-from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop, MCDropGenAcqf
+from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -123,62 +122,6 @@ az_bayes_reward_002_1 = {
             "num_simulations": 25,
             "policy_optimization": True,
         },
-    },
-    "use_dock": False
-}
-
-az_bayes_reward_002_EI = {
-    "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockBayesianReward_v1,
-            "reward_config": {
-                "synth_config": synth_config,
-                "binding_model": binding_model,
-            }
-        },
-        "model": {
-            "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
-        },
-        "mcts_config": {
-            "num_simulations": 25,
-            "policy_optimization": True,
-        },
-    },
-    "reward_learner_config": {
-        'num_mol_retrain': 1000,
-        "acqf_name": ExpectedImprovement,
-        "regressor": MCDropGenAcqf,
-    },
-    "use_dock": False
-}
-
-az_bayes_reward_002_UCB = {
-    "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
-        "env_config": {
-            "allow_removal": True,
-            "reward": PredDockBayesianReward_v1,
-            "reward_config": {
-                "synth_config": synth_config,
-                "binding_model": binding_model,
-            }
-        },
-        "model": {
-            "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
-        },
-        "mcts_config": {
-            "num_simulations": 25,
-            "policy_optimization": True,
-        },
-    },
-    "reward_learner_config": {
-        'num_mol_retrain': 1000,
-        "acqf_name": UpperConfidenceBound,
-        "regressor": MCDropGenAcqf,
     },
     "use_dock": False
 }
