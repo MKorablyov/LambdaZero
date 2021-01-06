@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=8                # Number of CPUs needed
 #SBATCH --gres=gpu:4                      # Number of GPUs needed
 #SBATCH --mem=64G                         # Amount of RAM needed
-#SBATCH --time=72:00:00                   # The time for which the job runs
+#SBATCH --time=144:00:00                   # The time for which the job runs
 #SBATCH -o /scratch/nekoeiha/Summaries/slurm-%j.out  # Write the log in $SCRATCH
 
 
@@ -24,5 +24,5 @@ export PYTHONPATH="${PYTHONPATH}:/home/nekoeiha/LambdaZero"
 
 # cd to the experiment you would like to run and call the script. For eg.
 cd ~/LambdaZero/LambdaZero/examples/bayesian_models/rl
-python3 train_bayesian_reward.py ppo_bayes_reward_008
+python3 train_bayesian_reward.py ppo_bayes_reward_EI_LargerBlock
 

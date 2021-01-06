@@ -756,7 +756,7 @@ ppo_bayes_reward_019 = {
     "use_dock": True
 }
 
-ppo_bayes_reward_general_acqf_EI = {
+ppo_bayes_reward_EI_LargerBlock = {
     "rllib_config":{
         "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
@@ -766,6 +766,10 @@ ppo_bayes_reward_general_acqf_EI = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
+            "molMDP_config": {
+            "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"), # larger building block action space
+            },
+            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -784,7 +788,7 @@ ppo_bayes_reward_general_acqf_EI = {
     "use_dock": True
 }
 
-ppo_bayes_reward_general_acqf_UCB = {
+ppo_bayes_reward_UCB_LargerBlock = {
     "rllib_config":{
         "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
@@ -794,6 +798,10 @@ ppo_bayes_reward_general_acqf_UCB = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
+            "molMDP_config": {
+            "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"), # larger building block action space
+            },
+            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
