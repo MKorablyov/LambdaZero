@@ -73,8 +73,10 @@ class MCDrop(tune.Trainable):
             scores = self._train()
             all_scores.append(scores)
         if validate:
-            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, len(self.train_loader.dataset), "val")
+            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device,
+                                                  self.config, "val")
+            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config,
+                                 len(self.train_loader.dataset), "val")
             return all_scores[-1], {**val_score, **val_ll}
         else:
             return all_scores[-1], {}
@@ -156,6 +158,3 @@ if __name__ == "__main__":
     # mcdrop = MCDrop(config["regressor_config"]["config"])
     # print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
     # print(mcdrop.get_mean_variance(mcdrop.train_loader))
-
-
-

@@ -454,7 +454,7 @@ class DockVina_smi:
                  rec_file="4jnc.nohet.aligned.pdbqt",
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
-                 cleanup=True):
+                 cleanup=False):
 
         self.outpath = outpath
         self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
@@ -484,6 +484,7 @@ class DockVina_smi:
             # complete docking query
             dock_cmd = self.dock_cmd.format(input_file, docked_file)
             dock_cmd = dock_cmd + " " + self.dock_pars
+
             # dock
             cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
             cl.wait()

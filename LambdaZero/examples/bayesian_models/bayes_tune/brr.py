@@ -27,7 +27,8 @@ class BRR(tune.Trainable):
         train_feat, val_feat = self.get_feat(train_loader), self.get_feat(val_loader)
         train_targets_norm = sample_targets(train_loader, self.config)
         val_targets_norm = sample_targets(val_loader, self.config)
-        scores, self.clf = bayesian_ridge(train_feat, val_feat, train_targets_norm, val_targets_norm, self.config)
+        scores, self.clf = bayesian_ridge(train_feat, val_feat, train_targets_norm, val_targets_norm,
+                                          self.config)
 
         # self.alpha = self.clf.lambda_
         # self.beta = self.clf.alpha_
@@ -86,7 +87,6 @@ if __name__ == "__main__":
     #
     # dataset_cell = Subset(dataset,idxs)
     # train_idx, val_idx, test_ixs = random_split(len(dataset_cell), [0.8, 0.1, 0.1])
-    #
     #
     # train_set = Subset(dataset_cell, train_idx)
     # val_set = Subset(dataset_cell, val_idx)
