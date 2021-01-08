@@ -15,7 +15,7 @@ import LambdaZero.utils
 from LambdaZero.examples.PPO import config
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo000"
+else: config_name = "ppo_graph_001"
 config = getattr(config,config_name)
 
 _, _, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -29,8 +29,7 @@ DEFAULT_CONFIG = {
         "num_gpus": 0.5,
         "model": {
             "custom_model": "MolActorCritic_thv1",
-            #"custom_model": "GraphMolActorCritic_thv1",
-            #'custom_model_config': {"num_blocks:":125}
+
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
         "framework": "torch",
@@ -47,7 +46,7 @@ config = merge_dicts(DEFAULT_CONFIG, config)
 # convenience option to debug on maksym's personal laptop
 machine = socket.gethostname()
 if machine == "Ikarus":
-    config["rllib_config"]["num_workers"] = 5
+    config["rllib_config"]["num_workers"] = 1
     config["rllib_config"]["memory"] = 25 * 10**9
 
 

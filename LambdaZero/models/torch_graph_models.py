@@ -83,7 +83,15 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         # more memory copying (~12ms), then we create a Batch from the
         # "data list" of graphs which involves stacking and
         # incrementing arrays (~4ms) and send it back to gpu (<.5ms).
+
+        #print(obs)
+        #print(obs.keys())
+        #print(obs["mol_graph"].shape)
+        #time.sleep(100)
+
         enc_graphs = obs["mol_graph"].data.cpu().numpy().astype(np.uint8)
+        #print(enc_graphs)
+        #time.sleep(100)
         graphs = [self.space.unpack(i) for i in enc_graphs]
         num_steps = obs["num_steps"]
         action_mask = obs["action_mask"]

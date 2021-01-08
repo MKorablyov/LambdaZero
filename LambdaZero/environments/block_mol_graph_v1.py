@@ -59,6 +59,7 @@ class MolGraphSpace(Space):
         return buf
 
     def unpack(self, buf):
+
         l, = struct.unpack('H', buf[:2])
         msg = zlib.decompress(buf[2:2+l])
         d = {}

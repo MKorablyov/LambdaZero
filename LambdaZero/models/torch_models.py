@@ -67,10 +67,8 @@ class ActorCriticModel(TorchModelV2, nn.Module, ABC):
             value = self.value_function()
             logits, value = torch.squeeze(logits), torch.squeeze(value)
             priors = nn.Softmax(dim=-1)(logits)
-
             priors = priors.cpu().numpy()
             value = value.cpu().numpy()
-
             return priors, value
 
 
