@@ -815,7 +815,8 @@ ppo_bayes_reward_22 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 4,
+            "max_steps": 7,
+            "random_steps": 2,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -843,7 +844,8 @@ ppo_bayes_reward_23 = {
                 "synth_config": synth_config,
                 "binding_model": binding_model,
             },
-            "random_steps": 7,
+            "max_steps": 7,
+            "random_steps": 4,
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
@@ -861,6 +863,120 @@ ppo_bayes_reward_23 = {
     "use_dock": True
 }
 
+ppo_bayes_reward_24 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "max_steps": 7,
+            "random_steps": 6,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1
+    },
+    "use_dock": True
+}
+
+ppo_bayes_reward_25 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "max_steps": 10,
+            "random_steps": 2,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1
+    },
+    "use_dock": True
+}
+ppo_bayes_reward_26 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "max_steps": 10,
+            "random_steps": 4,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1
+    },
+    "use_dock": True
+}
+
+ppo_bayes_reward_27 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "max_steps": 10,
+            "random_steps": 6,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1
+    },
+    "use_dock": True
+}
 
 ##################################### DQN #########################################
 dqn_bayes_reward_000 = {
