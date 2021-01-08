@@ -1,3 +1,7 @@
+# After running your job, use this command from the login node to sync the logs:
+# wandb sync wandb/<log_dir>
+
+
 import os
 
 from ray import tune
