@@ -28,8 +28,9 @@ DEFAULT_CONFIG = {
         "num_gpus_per_worker": 0.075,
         "num_gpus": 0.5,
         "model": {
-            "custom_model": "GraphMolActorCritic_thv1",
-            'custom_model_config': {"num_blocks:":125}
+            "custom_model": "MolActorCritic_thv1",
+            #"custom_model": "GraphMolActorCritic_thv1",
+            #'custom_model_config': {"num_blocks:":125}
         },
         "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics}, # fixme (report all)
         "framework": "torch",

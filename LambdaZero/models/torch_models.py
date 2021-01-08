@@ -1,6 +1,6 @@
+import time
 from abc import ABC
 import os
-
 import numpy as np
 from ray.rllib.models.modelv2 import restore_original_dimensions
 from ray.rllib.models.preprocessors import get_preprocessor
@@ -104,11 +104,11 @@ class MolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     def forward(self, input_dict, state, seq_lens):
         # shared molecule embedding
         # weak todo (maksym) use mask before compute
-        mol_fp = input_dict["mol_fp"]
-        stem_fps = input_dict["stem_fps"]
-        jbond_fps = input_dict["jbond_fps"]
-        num_steps = input_dict["num_steps"]
-        action_mask = input_dict["action_mask"]
+        mol_fp = input_dict["obs"]["mol_fp"]
+        stem_fps = input_dict["obs"]["stem_fps"]
+        jbond_fps = input_dict["obs"]["jbond_fps"]
+        num_steps = input_dict["obs"]["num_steps"]
+        action_mask = input_dict["obs"]["action_mask"]
 
         # shared layers
         mol_embed = self.shared_layers(torch.cat([mol_fp, num_steps], 1))

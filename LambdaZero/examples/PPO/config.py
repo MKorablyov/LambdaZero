@@ -23,7 +23,7 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 ppo000 = {
     # 3.2-3.3
     "rllib_config":{
-        "env": BlockMolEnvGraph_v1,
+        "env": BlockMolEnv_v3,
         "env_config": {
             "allow_removal": True,
         }
