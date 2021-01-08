@@ -30,10 +30,10 @@ DEFAULT_CONFIG = {
         "batch_size": 16,  # 25
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
-            "root": os.path.join(datasets_dir, "brutal_dock_dev/mpro_6lze"),
+            "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
             "props": ["gridscore"],
             "transform": transform,
-            "file_names": ["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+            "file_names": ["Zinc15_260k_0"],#, "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
         },
         "model": LambdaZero.models.MPNNet,
         "model_config": {},
@@ -66,7 +66,7 @@ config = merge_dicts(DEFAULT_CONFIG, config)
 
 
 if __name__ == "__main__":
-    ray.init(memory=config["memory"])
+    ray.init(_memory=config["memory"])
     analysis = tune.run(config["trainer"],
                         config=config["trainer_config"],
                         stop=config["stop"],
