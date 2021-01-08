@@ -33,12 +33,11 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         self.max_steps = obs_space.original_space["num_steps"].n
 
         #print("action space dict", action_space.__dict__)
-        #print(model_config)
-        #time.sleep(100)
-
         #self.max_blocks = action_space.max_blocks
         #self.max_branches = action_space.max_branches
-        self.num_blocks = model_config['custom_model_config'].get("num_blocks", 125)
+        self.num_blocks = model_config['custom_model_config'].get("num_blocks", 135)
+
+
 
         self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
         self.rnd = (self.rnd_weight != 0)
@@ -86,11 +85,11 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         #print(obs)
         #print(obs.keys())
-        #print(obs["mol_graph"].shape)
-        #time.sleep(100)
 
+        print("mol graph type", obs["mol_graph"].dtype)
+        print("mol graph shape", obs["mol_graph"].shape)
         enc_graphs = obs["mol_graph"].data.cpu().numpy().astype(np.uint8)
-        #print(enc_graphs)
+        print("length of encoded graphs", [len(g) for g in enc_graphs])
         #time.sleep(100)
         graphs = [self.space.unpack(i) for i in enc_graphs]
         num_steps = obs["num_steps"]
@@ -111,6 +110,10 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         actor_logits = torch.cat([stop_logit,
                                   add_logits,
                                   break_logits], 1)
+
+
+        #print(stop_logit.shape, add_logits.shape, break_logits.shape)
+        #time.sleep(100)
 
         # mask not available actions
         masked_actions = (1. - action_mask).to(torch.bool)
