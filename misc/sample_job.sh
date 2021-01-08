@@ -19,6 +19,7 @@ export LIBRARY_PATH=$LIBRARY_PATH:$CUDA_PATH/lib64
 # cd ~/LambdaZero
 # pip install -e .
 source /lustre03/project/6004852/mkkr/anaconda3/etc/profile.d/conda.sh
+export PATH=/lustre03/project/6004852/mkkr/Programs/mgltools_x86_64Linux2_1.5.6/bin:$PATH
 conda activate lz
 export PYTHONPATH="${PYTHONPATH}:<path to your working directory>/LambdaZero" 
 

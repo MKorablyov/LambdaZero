@@ -1,8 +1,9 @@
+import time
 from abc import ABC
 import os
 
 import numpy as np
-from ray.rllib.models.model import restore_original_dimensions
+from ray.rllib.models.modelv2 import restore_original_dimensions
 from ray.rllib.models.preprocessors import get_preprocessor
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
@@ -30,15 +31,21 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         nn.Module.__init__(self)
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         self.max_steps = obs_space.original_space["num_steps"].n
-        self.max_blocks = action_space.max_blocks
-        self.max_branches = action_space.max_branches
-        self.num_blocks = action_space.num_blocks
+
+        #print("action space dict", action_space.__dict__)
+        #print(model_config)
+        #time.sleep(100)
+
+        #self.max_blocks = action_space.max_blocks
+        #self.max_branches = action_space.max_branches
+        self.num_blocks = model_config['custom_model_config'].get("num_blocks", 125)
 
         self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
         self.rnd = (self.rnd_weight != 0)
         rnd_output_dim = model_config['custom_model_config'].get("rnd_output_dim", 1)
         self.rnd_adv_weight = model_config['custom_model_config'].get("rnd_adv_weight", 1.0)
         self.rnd_vf_loss_weight = model_config['custom_model_config'].get("rnd_vf_loss_weight", 1.0)
+
 
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
