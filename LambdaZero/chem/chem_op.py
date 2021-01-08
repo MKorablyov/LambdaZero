@@ -476,68 +476,44 @@ class DockVina_smi:
 
     def dock(self, smi, mol_name=None, molgen_conf=20):
         mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
-        dockscore = float('nan')
-        coord = None
-        try:
-            docked_file = os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
-            input_file = self.gen_molfile(smi, mol_name, molgen_conf)
-            # complete docking query
-            dock_cmd = self.dock_cmd.format(input_file, docked_file)
-            dock_cmd = dock_cmd + " " + self.dock_pars
+        docked_file = os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
+        input_file = self.gen_molfile(smi, mol_name, molgen_conf)
+        # complete docking query
+        dock_cmd = self.dock_cmd.format(input_file, docked_file)
+        dock_cmd = dock_cmd + " " + self.dock_pars
 
-            # dock
-            cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
-            cl.wait()
-            # parse energy
-            with open(docked_file) as f:
-                docked_pdb = f.readlines()
-            if docked_pdb[1].startswith("REMARK VINA RESULT"):
-                dockscore = float(docked_pdb[1].split()[3])
-            else:
-                raise Exception("Can't parse docking energy")
-            # parse coordinates
-            # TODO: fix order
-            coord = []
-            endmodel_idx = 0
-            for idx, line in enumerate(docked_pdb):
-                if line.startswith("ENDMDL"):
-                    endmodel_idx = idx
-                    break
+        # dock
+        cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
+        cl.wait()
+        # parse energy
+        with open(docked_file) as f:
+            docked_pdb = f.readlines()
+        if docked_pdb[1].startswith("REMARK VINA RESULT"):
+            dockscore = float(docked_pdb[1].split()[3])
+        else:
+            raise Exception("Can't parse docking energy")
+        # parse coordinates
+        # TODO: fix order
+        coord = []
+        endmodel_idx = 0
+        for idx, line in enumerate(docked_pdb):
+            if line.startswith("ENDMDL"):
+                endmodel_idx = idx
+                break
 
-            docked_pdb_model_1 = docked_pdb[:endmodel_idx]  # take only the model corresponding to the best energy
-            docked_pdb_model_1_atoms = [line for line in docked_pdb_model_1 if line.startswith("ATOM") and line.split()[2][0] != 'H']  # ignore hydrogen
-            coord.append([line.split()[-7:-4] for line in docked_pdb_model_1_atoms])
-            coord = np.array(coord, dtype=np.float32)
+        docked_pdb_model_1 = docked_pdb[:endmodel_idx]  # take only the model corresponding to the best energy
+        docked_pdb_model_1_atoms = [line for line in docked_pdb_model_1 if line.startswith("ATOM")
+                                    and line.split()[2][0] != 'H']  # ignore hydrogen
+        coord.append([line.split()[-7:-4] for line in docked_pdb_model_1_atoms])
+        coord = np.array(coord, dtype=np.float32)
 
-        finally:
-            if self.cleanup:
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(self.outpath, "sdf", f"{mol_name}.sdf"))
-
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
-
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
-
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
-
-        return mol_name, dockscore, coord
-
-    def __del__(self):
         if self.cleanup:
             with contextlib.suppress(FileNotFoundError):
-                os.rmdir(os.path.join(self.outpath, "sdf"))
-
-            with contextlib.suppress(FileNotFoundError):
-                os.rmdir(os.path.join(self.outpath, "mol2"))
-
-            with contextlib.suppress(FileNotFoundError):
-                os.rmdir(os.path.join(self.outpath, "pdbqt"))
-
-            with contextlib.suppress(FileNotFoundError):
-                os.rmdir(os.path.join(self.outpath, "docked"))
+                os.remove(os.path.join(self.outpath, "sdf", f"{mol_name}.sdf"))
+                os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
+                os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
+                os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
+        return mol_name, dockscore, coord
 
 
 class ScaffoldSplit:
