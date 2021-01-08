@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from torch_geometric.nn import Set2Set, global_mean_pool
-from e3nn.point.message_passing import TensorPassingContext, TensorPassingLayer
+#from e3nn.point.message_passing import TensorPassingContext, TensorPassingLayer
 
 from functools import partial
 
@@ -50,22 +50,22 @@ class TPNN_v0(torch.nn.Module):
         return output
 
 
-class TPNN_ResNet(TensorPassingContext):
-    def __init__(self, representations, radial_model, gate):
-        super().__init__(representations)
-        self.model = torch.nn.ModuleList([
-            TensorPassingLayer(Rs_in, Rs_out, self.named_buffers_pointer, radial_model, gate)
-            for (Rs_in, Rs_out) in zip(self.input_representations[:-1], self.output_representations[:-1])
-        ])
-        # no gate on last layer
-        self.model.append(TensorPassingLayer(self.input_representations[-1], self.output_representations[-1], self.named_buffers_pointer, radial_model))
-
-    def forward(self, edge_index, features, abs_distances, rel_vec, norm):
-        features = self.model[0](edge_index, features, abs_distances, rel_vec, norm)
-        for layer in self.model[1:-1]:
-            features = (features + layer(edge_index, features, abs_distances, rel_vec, norm)).mul(0.7071)  # o[n] = (o[n-1] + f[n]) / sqrt(2)
-        features = self.model[-1](edge_index, features, abs_distances, rel_vec, norm)
-        return features
+# class TPNN_ResNet(TensorPassingContext):
+#     def __init__(self, representations, radial_model, gate):
+#         super().__init__(representations)
+#         self.model = torch.nn.ModuleList([
+#             TensorPassingLayer(Rs_in, Rs_out, self.named_buffers_pointer, radial_model, gate)
+#             for (Rs_in, Rs_out) in zip(self.input_representations[:-1], self.output_representations[:-1])
+#         ])
+#         # no gate on last layer
+#         self.model.append(TensorPassingLayer(self.input_representations[-1], self.output_representations[-1], self.named_buffers_pointer, radial_model))
+#
+#     def forward(self, edge_index, features, abs_distances, rel_vec, norm):
+#         features = self.model[0](edge_index, features, abs_distances, rel_vec, norm)
+#         for layer in self.model[1:-1]:
+#             features = (features + layer(edge_index, features, abs_distances, rel_vec, norm)).mul(0.7071)  # o[n] = (o[n-1] + f[n]) / sqrt(2)
+#         features = self.model[-1](edge_index, features, abs_distances, rel_vec, norm)
+#         return features
 
 
 class TPNN_Unet(TensorPassingContext):
