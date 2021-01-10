@@ -693,8 +693,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
     # convert atmfeat to pandas
     if panda_fmt:
         atmfeat_pd = pd.DataFrame(index=range(natm), columns=[
-            "type_idx", "atomic_number", "acceptor", "donor", "aromatic",
-            "sp", "sp2", "sp3", "num_hs"])
+            "type_idx", "atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3", "num_hs"])
         atmfeat_pd['type_idx'] = atmfeat[:, :ntypes+1]
         atmfeat_pd['atomic_number'] = atmfeat[:, ntypes+1]
         atmfeat_pd['acceptor'] = atmfeat[:, ntypes+2]

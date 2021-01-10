@@ -74,54 +74,52 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         obs = input_dict['obs']
         device = obs["mol_graph"].device
 
-        # Due to the way RLLib forces encodeing observations into
-        # fixed length vectors, this part is quite expensive (~timings
-        # on big batch), first there's a useless
-        # uint8->float->cpu->gpu->cpu->uint8 (~3ms), then we unpack
-        # each graph individually which involves a decompress call and
-        # more memory copying (~12ms), then we create a Batch from the
-        # "data list" of graphs which involves stacking and
-        # incrementing arrays (~4ms) and send it back to gpu (<.5ms).
-
-        #print(obs)
-        #print(obs.keys())
-
-        print("mol graph type", obs["mol_graph"].dtype)
-        print("mol graph shape", obs["mol_graph"].shape)
-        enc_graphs = obs["mol_graph"].data.cpu().numpy().astype(np.uint8)
-        print("length of encoded graphs", [len(g) for g in enc_graphs])
-        #time.sleep(100)
-        graphs = [self.space.unpack(i) for i in enc_graphs]
         num_steps = obs["num_steps"]
         action_mask = obs["action_mask"]
+        mol_graph = obs["mol_graph"]
 
-        data = fast_from_data_list(graphs)
-        data = data.to(device)
-        # </end of expensive unpacking> The rest of this is the
-        # forward pass (~5ms) and then a backward pass + update (which
-        # I can't measure directly but seems to take at most ~20ms)
+        # todo: the if loop below is not very elegant but is to solve a problem of rllib sending dummy batches
+        # if dummy batch initialize all with 0s
+        if torch.equal(mol_graph, torch.zeros_like(mol_graph)):
+            actor_logits = torch.zeros_like(action_mask)
+            self._value_out = torch.zeros_like(action_mask[:,0])
+            if self.rnd:
+                self._value_int = torch.zeros_like(action_mask[:,0])
+        else:
+            # Due to the way RLLib forces encodeing observations into
+            # fixed length vectors, this part is quite expensive (~timings
+            # on big batch), first there's a useless
+            # uint8->float->cpu->gpu->cpu->uint8 (~3ms), then we unpack
+            # each graph individually which involves a decompress call and
+            # more memory copying (~12ms), then we create a Batch from the
+            # "data list" of graphs which involves stacking and
+            # incrementing arrays (~4ms) and send it back to gpu (<.5ms).
+            enc_graphs = obs["mol_graph"].data.cpu().numpy().astype(np.uint8)
+            graphs = [self.space.unpack(i) for i in enc_graphs]
+            data = fast_from_data_list(graphs)
+            data = data.to(device)
+            # </end of expensive unpacking> The rest of this is the
+            # forward pass (~5ms) and then a backward pass + update (which
+            # I can't measure directly but seems to take at most ~20ms)
 
-        scalar_outs, data = self.model(data)
+            scalar_outs, data = self.model(data)
+            stop_logit = scalar_outs[:, 1:2]
+            add_logits = data.stem_preds.reshape((data.num_graphs, -1))
+            break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
 
-        stop_logit = scalar_outs[:, 1:2]
-        add_logits = data.stem_preds.reshape((data.num_graphs, -1))
-        break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
-
-        actor_logits = torch.cat([stop_logit,
-                                  add_logits,
-                                  break_logits], 1)
+            actor_logits = torch.cat([stop_logit,
+                                      add_logits,
+                                      break_logits], 1)
 
 
-        #print(stop_logit.shape, add_logits.shape, break_logits.shape)
-        #time.sleep(100)
 
-        # mask not available actions
-        masked_actions = (1. - action_mask).to(torch.bool)
-        actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
+            # mask not available actions
+            masked_actions = (1. - action_mask).to(torch.bool)
+            actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
 
-        self._value_out = scalar_outs[:, 0]
-        if self.rnd:
-            self._value_int = scalar_outs[:, 2]
+            self._value_out = scalar_outs[:, 0]
+            if self.rnd:
+                self._value_int = scalar_outs[:, 2]
         return actor_logits, state
 
     def value_function(self):

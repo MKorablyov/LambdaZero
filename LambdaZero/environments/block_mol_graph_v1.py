@@ -44,9 +44,6 @@ class MolGraphSpace(Space):
         return True
 
     def pack(self, g):
-        print("g at packing", g)
-        print([(i, getattr(g, i).numpy().data.shape) for i in self.attributes])
-
         msg = b''
         shapes = np.int16(np.hstack([getattr(g, i).shape for i in self.attributes])).tostring()
         if self._ndims is None:
@@ -63,7 +60,6 @@ class MolGraphSpace(Space):
 
     def unpack(self, buf):
         l, = struct.unpack('H', buf[:2])
-        print("length at unpack", l)
         msg = zlib.decompress(buf[2:2+l])
         d = {}
         shapes = struct.unpack((self._shapeslen // 2) * 'h', msg[:self._shapeslen])
