@@ -53,7 +53,7 @@ if machine == "Ikarus":
 if __name__ == "__main__":
     ray.init(_memory=config["memory"])
 
-    #time.sleep(150) todo - this used to be here to prevent ray locking in ray_0.8.7
+    time.sleep(150) # todo - this used to be here to prevent ray locking in ray_0.8.7
     ModelCatalog.register_custom_model("MolActorCritic_thv1", MolActorCritic_thv1)
     # ModelCatalog.register_custom_model("MolActorCritic_tfv1", MolActorCritic_tfv1)
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
