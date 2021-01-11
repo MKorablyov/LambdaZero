@@ -60,7 +60,7 @@ synth_config = {
         "num_workers": 8,  # Number of workers for the parallel data loading (0 means sequential)
         "batch_size": 50,  # Batch size
         "disable_progress_bar": True,
-        "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_1/model.pt")
+        "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_2/model.pt")
     },
 
 }
@@ -100,7 +100,7 @@ DEFAULT_CONFIG = {
     # },
 
     "reward": PredDockReward_v2,
-    "num_blocks": 105,
+    "num_blocks": None, # 105, 464
     "max_steps": 7,
     "max_blocks": 7,
     "max_atoms": 50,
@@ -117,6 +117,10 @@ class BlockMolEnv_v3:
         config = merge_dicts(DEFAULT_CONFIG, config)
 
         self.num_blocks = config["num_blocks"]
+        self.molMDP = MolMDP(**config["molMDP_config"])
+        if self.num_blocks is None:
+            self.num_blocks = len(self.molMDP.block_smi)
+
         self.max_steps = config["max_steps"]
         self.max_branches = config["max_branches"]
         self.max_blocks = config["max_blocks"]
@@ -136,7 +140,6 @@ class BlockMolEnv_v3:
             "action_mask": Box(low=0, high=1, shape=(num_actions,)),
         })
 
-        self.molMDP = MolMDP(**config["molMDP_config"])
         self.reward = config["reward"](**config["reward_config"])
         self.get_fps = LambdaZero.chem.FPEmbedding_v2(**config["obs_config"])
         self._prev_obs = None

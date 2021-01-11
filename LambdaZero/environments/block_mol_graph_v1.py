@@ -176,6 +176,10 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         config = merge_dicts(DEFAULT_CONFIG, config)
 
         self.num_blocks = config["num_blocks"]
+        self.molMDP = MolMDP(**config["molMDP_config"])
+        if self.num_blocks is None:
+            self.num_blocks = len(self.molMDP.block_smi)
+
         self.max_steps = config["max_steps"]
         self.max_branches = config["max_branches"]
         self.max_blocks = config["max_blocks"]
@@ -196,7 +200,6 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
             "action_mask": Box(low=0, high=1, shape=(num_actions,)),
         })
 
-        self.molMDP = MolMDP(**config["molMDP_config"])
         self.reward = config["reward"](**config["reward_config"])
         self._prev_obs = None
 

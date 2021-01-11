@@ -129,7 +129,7 @@ synth_config = {
         "num_workers": 8,  # Number of workers for the parallel data loading (0 means sequential)
         "batch_size": 50,  # Batch size
         "disable_progress_bar": True,
-        "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_1/model.pt")
+        "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_2/model.pt")
     },
 }
 
@@ -168,7 +168,7 @@ DEFAULT_CONFIG = {
     #    "device": "cuda",
     #},
     "reward": PredDockReward_v2,
-    "num_blocks": 105, # number of types of building blocks (can only change this to smaller number)
+    "num_blocks": None, # 105, 464 # number of types of building blocks (can only change this to smaller number)
     "max_steps": 7,    # number of steps an agent can take before forced to exit the environment
     "max_blocks": 7,   # maximum number of building blocks in the molecule
     # (if num_bloks(molecule) > max_bloks, block additon is not alowed)
@@ -188,12 +188,15 @@ class BlockMolEnv_v4:
         config = merge_dicts(DEFAULT_CONFIG, config)
 
         self.num_blocks = config["num_blocks"]
+        self.molMDP = MolMDP(**config["molMDP_config"])
+        if self.num_blocks is None:
+            self.num_blocks = len(self.molMDP.block_smi)
+
         self.max_blocks = config["max_blocks"]
         self.max_steps = config["max_steps"]
         self.max_simulations = config["max_simulations"]
         self.random_blocks = config["random_blocks"]
         #
-        self.molMDP = MolMDP(**config["molMDP_config"])
         self.observ = FPObs_v1(config, self.molMDP)
         self.reward = config["reward"](**config["reward_config"])
 
