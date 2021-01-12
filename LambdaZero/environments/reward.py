@@ -452,7 +452,7 @@ class BayesianRewardActor():
             self.net.to(config['device'])
             self.net.load_state_dict(th.load(binding_model, map_location=th.device(config['device'])))
             self.net.eval()
-        self.target_norm = config["data"]["normalizer"] # [-8.6, 1.10]
+        self.target_norm = config["data"]["target_norm"] # [-8.6, 1.10]
 
         print('BR: Loaded Oracle Network')
         print('BR: Loading Dataset ...')
@@ -509,7 +509,7 @@ class BayesianRewardActor():
         # train = df.sample(n=self.config['aq_size0'])
         # train = df.nsmallest(self.config['aq_size0'], 'dockscore')
         # val = df.sample(n=self.config['aq_size0'])
-        train, val = np.split(df.sample(n=2*self.config['aq_size0']), [self.config['aq_size0'], 2*self.config['aq_size0']]) # splits without replacement
+        train, val, _ = np.split(df.sample(n=2*self.config['aq_size0']), [self.config['aq_size0'], 2*self.config['aq_size0']]) # splits without replacement
         train_mols = []
         # import pdb; pdb.set_trace()
         for index, row in train.iterrows():
