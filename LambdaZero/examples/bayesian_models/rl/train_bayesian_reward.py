@@ -46,10 +46,10 @@ data_config = {
         "root": osp.join(datasets_dir, "brutal_dock/seh/raw"),
         "props": ["dockscore", "smiles"],
         "transform": T.Compose([LambdaZero.utils.Complete()]),
-        "file_names": "Zinc20_docked_neg_randperm_3k",
+        "file_names": "Zinc20_docked_neg_randperm_3k.feather",
     },
     "b_size": 40,
-    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.10])
+    "normalizer": [-8.6, 1.10] # LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.10])
 }
 
 

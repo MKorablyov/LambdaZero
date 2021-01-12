@@ -452,7 +452,7 @@ class BayesianRewardActor():
             self.net.to(config['device'])
             self.net.load_state_dict(th.load(binding_model, map_location=th.device(config['device'])))
             self.net.eval()
-        self.target_norm = config["normalizer"] # [-8.6, 1.10]
+        self.target_norm = config["data"]["normalizer"] # [-8.6, 1.10]
 
         print('BR: Loaded Oracle Network')
         print('BR: Loading Dataset ...')
