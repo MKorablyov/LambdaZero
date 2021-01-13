@@ -339,7 +339,8 @@ class PredDockBayesianReward_v1:
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"dockscore_reward": dockscore_reward, "chemprop_reward": dockscore, "qed": qed, "synth": synth, **log_vals}
+        return disc_reward, {"dockscore_reward": dockscore_reward, "chemprop_reward": dockscore,
+                             "qed": qed, "synth": synth, **log_vals}
 
     def _simulation(self, mol):
         atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
@@ -409,7 +410,7 @@ class _SimDockLet:
         except Exception as e: # Sometimes the prediction fails
             print('exception for', s, e)
             r = 0
-        setattr(mol[0], 'gridscore', th.FloatTensor([max(0, -(r - self.target_norm[0]) / self.target_norm[1])]))
+        setattr(mol[0], 'dockscore', th.FloatTensor([max(0, -(r - self.target_norm[0]) / self.target_norm[1])]))
         reward = -(r-self.target_norm[0])/self.target_norm[1]
         print("done", s, r)
         return mol, max(0, reward)
@@ -425,6 +426,7 @@ class BayesianRewardActor():
         self.config = config
         self.regressor_config = config["regressor_config"]
         self.mol_dump_loc = config["mol_dump_loc"]
+        self.docking_loc = config["docking_loc"]
         self.unseen_molecules = []
         self.aq_molecules = []
         self.mols = 0
@@ -443,7 +445,7 @@ class BayesianRewardActor():
         self.synth_net = LambdaZero.models.ChempropWrapper_v1(config['synth_config'])
                 
         if use_dock_sim:
-            self.actors = [_SimDockLet.remote(os.environ['SLURM_TMPDIR'], programs_dir, datasets_dir, self.config["data"]["target"])
+            self.actors = [_SimDockLet.remote(self.docking_loc, programs_dir, datasets_dir, self.config["data"]["target"])
                        for i in range(self.num_threads)]
             self.pool = ray.util.ActorPool(self.actors)
             
@@ -486,7 +488,9 @@ class BayesianRewardActor():
         # self.val_loader = DataLoader(val_set, batch_size=config["data"]["b_size"])
         # self.train_molecules = train_molecules
         # self.dataset = None
-        self.train_molecules, train_loader, self.val_loader = self.construct_dataset(os.path.join(config["data"]["dataset_config"]["root"], config["data"]["dataset_config"]["file_names"]))
+        self.train_molecules, train_loader, self.val_loader = \
+            self.construct_dataset(os.path.join(config["data"]["dataset_config"]["root"],
+                                                config["data"]["dataset_config"]["file_names"]))
         print('BR: Prepared Dataset')
         
         self.regressor = config["regressor"](self.regressor_config)
@@ -509,7 +513,8 @@ class BayesianRewardActor():
         # train = df.sample(n=self.config['aq_size0'])
         # train = df.nsmallest(self.config['aq_size0'], 'dockscore')
         # val = df.sample(n=self.config['aq_size0'])
-        train, val, _ = np.split(df.sample(n=2*self.config['aq_size0']), [self.config['aq_size0'], 2*self.config['aq_size0']]) # splits without replacement
+        train, val, _ = np.split(df.sample(n=2*self.config['aq_size0']),
+                                 [self.config['aq_size0'], 2*self.config['aq_size0']]) # splits without replacement
         train_mols = []
         # import pdb; pdb.set_trace()
         for index, row in train.iterrows():
@@ -517,9 +522,10 @@ class BayesianRewardActor():
             atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
             graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
             graph = self.transform(graph)
-            setattr(graph, self.config["data"]["target"], th.FloatTensor([-(row['dockscore'] - self.target_norm[0]) / self.target_norm[1]]))
+            setattr(graph, self.config["data"]["target"],
+                    th.FloatTensor([-(row['dockscore'] - self.target_norm[0]) / self.target_norm[1]]))
             train_mols.append(graph)
-        train_loader =  DataLoader(train_mols, shuffle=True, batch_size=self.config["data"]["b_size"])
+        train_loader = DataLoader(train_mols, shuffle=True, batch_size=self.config["data"]["b_size"])
 
         val_mols = []
         for i, row in val.iterrows():
@@ -529,7 +535,7 @@ class BayesianRewardActor():
             graph = self.transform(graph)
             setattr(graph, self.config["data"]["target"], -(row['dockscore'] - self.target_norm[0]) / self.target_norm[1])
             val_mols.append(graph)
-        val_loader =  DataLoader(val_mols, shuffle=True, batch_size=self.config["data"]["b_size"])
+        val_loader = DataLoader(val_mols, shuffle=True, batch_size=self.config["data"]["b_size"])
         return train_mols, train_loader, val_loader
 
     def get_discount(self, mol):
@@ -595,6 +601,7 @@ class BayesianRewardActor():
         atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
         graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
         graph = self.transform(graph)
+
         self.unseen_molecules.append([graph, molecule, disc_rew, discount])
         self.mols += 1
         if self.mols % self.config['num_mol_retrain'] == 0:
@@ -671,6 +678,8 @@ class BayesianRewardActor():
         # fine_tune_dataset = np.concatenate((np.array(aq_idx)[:, :1], aq_set_arr), axis=0)
         # import pdb; pdb.set_trace()
         self.train_molecules.extend(np.array(aq_idx)[:, :1].reshape(-1).tolist())
+
+        print("self train_molecules", self.train_molecules)
         train_loader = DataLoader(self.train_molecules, shuffle=True, batch_size=self.config["data"]["b_size"])
         # import pdb; pdb.set_trace();
         self.unseen_molecules.extend(self.train_unseen_mols)
@@ -694,14 +703,16 @@ class BayesianRewardActor():
         self.regressor.save(self.mol_dump_loc)
         self.aq_molecules.extend(np.array(aq_idx)[:, :3].tolist())
 
-        self.logs = {**scores, **val, 'mse_before': mse_before, 'mse_after': mse_after, 'mse_diff': mse_before - mse_after, 
-                        'oracle_max': np.max(rews), 'oracle_mean': np.mean(rews)}
+        self.logs = {**scores, **val, 'mse_before': mse_before, 'mse_after': mse_after,
+                     'mse_diff': mse_before - mse_after,
+                     'oracle_max': np.max(rews), 'oracle_mean': np.mean(rews)}
         print(self.logs)
         return scores
 
     def train(self):
         print('BR: Acquring Batch ...')
         idx = self.acquire_batch()
+        print("acquired idx:", idx)
         print('BR: Acquired Batch')
         print('BR: Retraining with Acquired Batch ...')
         self.update_with_seen(idx)

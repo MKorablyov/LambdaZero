@@ -68,39 +68,39 @@ class TPNN_v0(torch.nn.Module):
 #         return features
 
 
-class TPNN_Unet(TensorPassingContext):
-    def __init__(self, representations, radial_model, gate):
-        super().__init__(representations)
-        self.model = torch.nn.ModuleList([
-            TensorPassingLayer(Rs_in, Rs_out, self.named_buffers_pointer, radial_model, gate) for (Rs_in, Rs_out) in zip(self.input_representations[:-1], self.output_representations[:-1])
-        ])
-        # no gate on last layer
-        self.model.append(TensorPassingLayer(self.input_representations[-1], self.output_representations[-1], self.named_buffers_pointer, radial_model))
-
-        self.n_equivariant_layers = len(self.model)
-        self.n_arm_layers = (self.n_equivariant_layers - 1) // 2
-        self.has_mid_layer = ((self.n_equivariant_layers - 1) % 2) == 1
-
-    def forward(self, edge_index, features, abs_distances, rel_vec, norm):
-        model_iter = iter(self.model)
-        features_list = []
-
-        # left U arm
-        for _ in range(self.n_arm_layers):
-            layer = next(model_iter)
-            features = layer(edge_index, features, abs_distances, rel_vec, norm)
-            features_list.append(features)
-
-        # mid layer
-        if self.has_mid_layer:
-            layer = next(model_iter)
-            features = layer(edge_index, features, abs_distances, rel_vec, norm)
-
-        # right U arm
-        for _ in range(self.n_arm_layers):
-            layer = next(model_iter)
-            features = (layer(edge_index, features, abs_distances, rel_vec, norm) + features_list.pop()).mul(0.7071)
-
-        layer = next(model_iter)
-        features = layer(edge_index, features, abs_distances, rel_vec, norm)
-        return features
+# class TPNN_Unet(TensorPassingContext):
+#     def __init__(self, representations, radial_model, gate):
+#         super().__init__(representations)
+#         self.model = torch.nn.ModuleList([
+#             TensorPassingLayer(Rs_in, Rs_out, self.named_buffers_pointer, radial_model, gate) for (Rs_in, Rs_out) in zip(self.input_representations[:-1], self.output_representations[:-1])
+#         ])
+#         # no gate on last layer
+#         self.model.append(TensorPassingLayer(self.input_representations[-1], self.output_representations[-1], self.named_buffers_pointer, radial_model))
+#
+#         self.n_equivariant_layers = len(self.model)
+#         self.n_arm_layers = (self.n_equivariant_layers - 1) // 2
+#         self.has_mid_layer = ((self.n_equivariant_layers - 1) % 2) == 1
+#
+#     def forward(self, edge_index, features, abs_distances, rel_vec, norm):
+#         model_iter = iter(self.model)
+#         features_list = []
+#
+#         # left U arm
+#         for _ in range(self.n_arm_layers):
+#             layer = next(model_iter)
+#             features = layer(edge_index, features, abs_distances, rel_vec, norm)
+#             features_list.append(features)
+#
+#         # mid layer
+#         if self.has_mid_layer:
+#             layer = next(model_iter)
+#             features = layer(edge_index, features, abs_distances, rel_vec, norm)
+#
+#         # right U arm
+#         for _ in range(self.n_arm_layers):
+#             layer = next(model_iter)
+#             features = (layer(edge_index, features, abs_distances, rel_vec, norm) + features_list.pop()).mul(0.7071)
+#
+#         layer = next(model_iter)
+#         features = layer(edge_index, features, abs_distances, rel_vec, norm)
+#         return features

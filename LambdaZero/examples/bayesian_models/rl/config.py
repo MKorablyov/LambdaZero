@@ -22,7 +22,7 @@ binding_model = osp.join(datasets_dir, "brutal_dock/seh/trained_weights/vanilla_
 #     os.path.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_0/model.pt")
 
 ppo_bayes_reward_000 = {
-    "rllib_config":{
+    "rllib_config": {
         "env": BlockMolGraphEnv_PersistentBuffer,
         "env_config": {
             "allow_removal": True,
@@ -34,7 +34,7 @@ ppo_bayes_reward_000 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config": {"num_hidden": 64} # does a **kw to __init__
         },
         # "lr": 1e-4,
         "framework": "torch",
@@ -226,7 +226,7 @@ ppo_bayes_reward_008 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,

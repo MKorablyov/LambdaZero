@@ -24,6 +24,11 @@ from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, tr
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+if len(sys.argv) >= 2: config_name = sys.argv[1]
+else: config_name = "ppo_bayes_reward_008"
+config = getattr(config,config_name)
+curr_trial = config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
+
 
 
 data_config = {
@@ -53,11 +58,6 @@ data_config = {
     "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.10])
 }
 
-
-if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo_bayes_reward_000"
-config = getattr(config,config_name)
-
 DEFAULT_CONFIG = {
     "rllib_config":{
         "tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
@@ -81,7 +81,8 @@ DEFAULT_CONFIG = {
         "aq_size0": 3000,
         "data": dict(data_config, **{"dataset_creator":None}),
         "aq_size": 32,
-        "mol_dump_loc": "",
+        "mol_dump_loc": osp.join(summaries_dir, curr_trial),
+        "docking_loc": osp.join(summaries_dir, curr_trial, "docking"),
         "kappa": 0.1,
         "sync_freq": 50,
         "epsilon": 0.0,
@@ -119,26 +120,34 @@ DEFAULT_CONFIG = {
 
 config = merge_dicts(DEFAULT_CONFIG, config)
 
-# convenience option to debug on maksym's personal laptop
+# convenience option to debug on someone's laptop (add yours)
 machine = socket.gethostname()
 if machine == "Ikarus":
-    config["rllib_config"]["num_workers"] = 5
+    config["rllib_config"]["num_workers"] = 1
+    config["rllib_config"]["num_gpus"] = 0.3
     config["rllib_config"]["memory"] = 25 * 10**9
+    config["rllib_config"]["sgd_minibatch_size"] = 4
+    config["reward_learner_config"]["regressor_config"]["train_iterations"] = 2
+    config["reward_learner_config"]["regressor_config"]["finetune_iterations"] = 2
+    config["reward_learner_config"]["regressor_config"]["T"] = 2
+    config["reward_learner_config"]["aq_size0"] = 10
+    config["reward_learner_config"]["aq_size"] = 2
+    config["reward_learner_config"]["b_size"] = 2
+    config["reward_learner_config"]["data"]["b_size"] = 2
+
 
 if __name__ == "__main__":
-    ray.init(memory=config["memory"])
+    ray.init(_memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
-    mol_dump_loc = summaries_dir #'/scratch/mjain/lambdabo_mol_dump/'
-    curr_trial =  config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
-    
-    if not osp.exists(osp.join(mol_dump_loc, curr_trial)):
-        os.mkdir(osp.join(mol_dump_loc, curr_trial))
-    config['reward_learner_config']['mol_dump_loc'] = osp.join(mol_dump_loc, curr_trial)
+    #
+    if not osp.exists(config['reward_learner_config']['mol_dump_loc']):
+        os.mkdir(config['reward_learner_config']['mol_dump_loc'])
+    if not osp.exists(config['reward_learner_config']['docking_loc']):
+        os.mkdir(config['reward_learner_config']['docking_loc'])
 
-    reward_learner = BayesianRewardActor.remote(config['reward_learner_config'], 
-                                                config["use_dock"], 
-                                                config["rllib_config"]['env_config']['reward_config']['binding_model'],
-                                                config["pretrained_model"])
+    reward_learner = BayesianRewardActor.options(num_cpus=1, num_gpus=0.3).\
+        remote(config['reward_learner_config'], config["use_dock"],
+               config["rllib_config"]['env_config']['reward_config']['binding_model'], config["pretrained_model"])
 
     config['rllib_config']['env_config']['reward_config']['reward_learner'] = reward_learner
     config['rllib_config']['env_config']['reward_config']['regressor'] = config['reward_learner_config']['regressor']
