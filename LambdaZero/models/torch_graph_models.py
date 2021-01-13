@@ -111,8 +111,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
                                       add_logits,
                                       break_logits], 1)
 
-
-
             # mask not available actions
             masked_actions = (1. - action_mask).to(torch.bool)
             actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf

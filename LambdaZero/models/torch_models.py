@@ -11,14 +11,13 @@ from ray.rllib.utils import try_import_torch
 # from torch_geometric.nn import GINEConv
 from torch_geometric.nn import NNConv
 from torch_geometric.nn import Set2Set
+import torch.nn.functional as F
 
-
-# import torch and torch.nn using ray utils
-#torch, nn = try_import_torch()
+from LambdaZero.utils import RunningMeanStd
 import torch
 from torch import nn
 import torch.nn.functional as F
-from .global_attention_layer import LowRankAttention
+#from .global_attention_layer import LowRankAttention
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

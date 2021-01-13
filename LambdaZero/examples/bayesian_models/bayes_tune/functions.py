@@ -22,9 +22,11 @@ def _epoch_metrics(epoch_targets_norm, epoch_logits, normalizer, scope):
     if scope is not None: metrics = dict([(scope + "_" + k, v) for k, v in metrics.items()])
     return metrics
 
+
 def get_tau(config, N):
     tau = (1 - config["model_config"]["drop_prob"]) * (config["lengthscale"]**2) / (2 * N * config["lambda"])
     return tau
+
 
 def _log_lik(y, Yt_hat, config, N):
     "computes log likelihood"
@@ -113,7 +115,7 @@ def train_mcdrop(train_loader, val_loader, model, device, config, optim, iterati
     return scores
 
 def train_mcdrop_rl(train_loader, val_loader, model, device, config, optim, iteration):
-    N = len(train_loader.dataset)
+    # N = len(train_loader.dataset)
     train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
     
     return train_scores
@@ -147,6 +149,7 @@ def bayesian_ridge(train_x, val_x, train_targets_norm, val_targets_norm, config)
     val_scores["val_ll"] = ll
     return {**train_scores, **val_scores}, clf
 
+
 def sample_embeds(loader, model, device, config):
     epoch_embeds = []
     for bidx, data in enumerate(loader):
@@ -168,6 +171,7 @@ def eval_mpnn_brr(train_loader, val_loader, model, device, config, N):
     val_embeds = sample_embeds(val_loader, model, device, config)
     scores,_ = bayesian_ridge(train_embeds, val_embeds, train_targets_norm, val_targets_norm, config)
     return scores
+
 
 def train_mpnn_brr(train_loader, val_loader, model, device, config, optim, iteration):
     N = len(train_loader.dataset)
@@ -199,11 +203,12 @@ def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
     epoch_logits = []
 
     for bidx, data in enumerate(loader):
+
         data = data.to(device)
         targets = getattr(data, config["data"]["target"])
 
         optimizer.zero_grad()
-        logits = model(data, do_dropout=True)
+        logits = model(data, do_dropout=False)
         # targets_norm = config["data"]["normalizer"].tfm(targets)
         reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
         loss = F.mse_loss(logits, targets) + reg_loss

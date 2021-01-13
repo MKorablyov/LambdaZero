@@ -12,10 +12,12 @@ module load nixpkgs/16.09
 module load gcc/7.3.0
 module load rdkit/2019.03.4
 module load openbabel/2.4.1
+
 export PATH=$CUDA_PATH/bin${PATH:+:${PATH}}
 export PATH=/lustre03/project/6004852/mkkr/Programs/mgltools_x86_64Linux2_1.5.6/bin:$PATH
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUDA_PATH/lib64
 export LIBRARY_PATH=$LIBRARY_PATH:$CUDA_PATH/lib64
+export PATH=/lustre03/project/6004852/mkkr/Programs/mgltools_x86_64Linux2_1.5.6/bin${PATH:+:${PATH}}
 
 source /lustre03/project/6004852/mkkr/anaconda3/etc/profile.d/conda.sh
 conda activate lz

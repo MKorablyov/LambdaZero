@@ -2,7 +2,7 @@ import ray
 import torch
 import numpy as np
 
-from ray.rllib.models.model import restore_original_dimensions
+from ray.rllib.models.modelv2 import restore_original_dimensions
 from ray.rllib.policy.policy import Policy
 from ray.rllib.agents.trainer_template import build_trainer
 
