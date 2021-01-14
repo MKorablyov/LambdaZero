@@ -49,7 +49,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
-                                       kw.get('num_hidden', 64), # For some reason I need 128... for DQN -- but not for this :/ 
+                                       kw.get('num_hidden', 64), 
                                        self.num_blocks,
                                        self.rnd)
         self._value_out = None

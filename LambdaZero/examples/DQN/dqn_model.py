@@ -1,13 +1,3 @@
-'''
- Issue 1: num_outputs for this one is preset to 256... This is an embedding size that should be updatable 
-   - Maybe larger embedding size and network is better -- we have 2107 possible actions...
- Issue 2: epsilon greedy (some kind of this)
- Issue 3: Ensure that only from action_mask are sampled.
- Issue 4: FIX THE PCA.PKL (re-install?)
-'''
-
-
-
 from ray.rllib.models.torch.misc import SlimFC
 from ray.rllib.models.torch.modules.noisy_layer import NoisyLayer
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
@@ -32,7 +22,6 @@ from LambdaZero.utils import RunningMeanStd
 # import torch and torch.nn using ray utils
 torch, nn = try_import_torch()
 
-# Running pdb - set # of workers to 0
 class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
     def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kw):
         DQNTorchModel.__init__(self, obs_space, action_space, num_outputs, model_config, name) # How is num_outputs determined? -- Why is this supposed to be 256?
@@ -49,12 +38,11 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         self.num_blocks = action_space.num_blocks # default: 105
 
         self.space = obs_space.original_space['mol_graph']
-        self.dim_hidden = 128 # hack to get this working -- for some reason the output needs to be 256 -- to check
+        self.dim_hidden = 128
         self.state_embedder = MPNNet_Parametric(self.space.num_node_feat,
                                        kw.get('num_hidden', self.dim_hidden),
                                        self.num_blocks)
         
-        # self.dim_action = self.max_branches * self.num_blocks + 6 + 1 # Calculated based on debugging... PPO - product of branches and blocks, break_logit, and stop_logit
         self.dim_action = self.max_blocks + self.max_branches * self.num_blocks # This is the calculation used in the block mol environment - future just copy from action_space
 
         
@@ -93,18 +81,16 @@ class GraphMolDQN_thv1(DQNTorchModel, nn.Module): # Not sure what _thv1 meant
         enc_graphs = obs["mol_graph"].data.cpu().numpy().astype(np.uint8)
         graphs = [self.space.unpack(i) for i in enc_graphs]
         num_steps = obs["num_steps"]
-        action_mask = obs["action_mask"] # Hack to allow get_q_value_dist access to this
+        action_mask = obs["action_mask"]
 
-        data = fast_from_data_list(graphs) # Leo: Check -- Can I run it w/ debugging -- pdb. Num_workers = 1?
+        data = fast_from_data_list(graphs)
         data = data.to(device)
         # </end of expensive unpacking> The rest of this is the
         # forward pass (~5ms) and then a backward pass + update (which
         # I can't measure directly but seems to take at most ~20ms)
 
         state_embeddings, data = self.state_embedder(data)
-        self.action_mask_dict[state_embeddings] = action_mask # Hack to get this working
-
-        # Leo: Need to think about "stopping"/"testing" -- this should be an "action" in itself
+        self.action_mask_dict[state_embeddings] = action_mask 
         # Set of Actions: (Picking a stem and adding a part, Stopping and evaluating, Breaking logit -- prolly means delete)
 
         return state_embeddings, state 
