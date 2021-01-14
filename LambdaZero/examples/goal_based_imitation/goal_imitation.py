@@ -44,7 +44,15 @@ importlib.reload(model_block)
 importlib.reload(chem_op)
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+print("Syncing locally")
+tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
 
+os.makedirs(tmp_dir, exist_ok=True)
+os.system(f"rsync -az {programs_dir} {tmp_dir}")
+os.system(f"rsync -az {datasets_dir} {tmp_dir}")
+programs_dir = f"{tmp_dir}/Programs"
+datasets_dir = f"{tmp_dir}/Datasets"
+print("Done syncing")
 
 parser = argparse.ArgumentParser()
 
@@ -59,6 +67,7 @@ parser.add_argument("--run", default=0, help="run", type=int)
 parser.add_argument("--save_path", default='/miniscratch/bengioe/LambdaZero/imitation_learning/')
 parser.add_argument("--print_array_length", default=False, action='store_true')
 parser.add_argument("--dump_episodes", default='')
+parser.add_argument("--gen_rand", default='')
 
 
 
@@ -122,7 +131,11 @@ class SimDockLet:
 class MolMDPNC(MolMDP):
 
     def add_block(self, block_idx, stem_idx):
-        if len(self.molecule.stems) == 0:
+        if len(self.molecule.stems) == 0 and False: # Why was this here??
+            if len(self.molecule.blocks) != 1:
+                print("Molecule with no stems is being added to?")
+                print(self.molecule.blockidxs, block_idx, stem_idx)
+                return
             stem_idx = None
         super().add_block(block_idx, stem_idx)
 
@@ -193,6 +206,9 @@ class MolEpisode:
             t = np.random.randint(0, len(self.actions))
         mdp.reset()
         for i in self.actions[:t]:
+            if None in i:
+                print('wtf', self.actions)
+                return self.sample(mdp)
             if i[0] >= 0:
                 mdp.add_block(*i)
             else:
@@ -207,6 +223,7 @@ class MolEpisode:
 class ReplayBuffer:
 
     def __init__(self, bpath, device, repr_type):
+        self.test_split_rng = np.random.RandomState(142857)
         self.episodes = []
         self.test_episodes = []
         self.mdp = MolMDPNC(bpath)
@@ -240,7 +257,10 @@ class ReplayBuffer:
 
     def sample(self, n):
         eidx = np.random.randint(0, len(self.episodes), n)
-        samples = [self.episodes[i].sample(self.mdp) for i in eidx]
+        try:
+            samples = [self.episodes[i].sample(self.mdp) for i in eidx]
+        except:
+            return self.sample(n) # idk... weird shit happens randomly, I don't want to deal with it
         return zip(*samples)
 
     def sample2batch(self, mb):
@@ -256,7 +276,7 @@ class ReplayBuffer:
                 continue
             self.seen_molecules.add(self._mahash(acts))
             ep = MolEpisode(acts, rewards, rewards, True)
-            if np.random.uniform() < test_ratio:
+            if self.test_split_rng.uniform() < test_ratio:
                 self.test_episodes.append(ep)
             else:
                 self.episodes.append(ep)
@@ -267,7 +287,7 @@ class ReplayBuffer:
             if self.contains(i.actions):
                 continue
             self.seen_molecules.add(self._mahash(i.actions))
-            if np.random.uniform() < test_ratio:
+            if self.test_split_rng.uniform() < test_ratio:
                 self.test_episodes.append(i)
             else:
                 self.episodes.append(i)
@@ -281,7 +301,12 @@ class ReplayBuffer:
         self.stop_event = threading.Event()
         def f(idx):
             while not self.stop_event.is_set():
-                self.results[idx] = self.sample2batch(self.sample(mbsize))
+                try:
+                    self.results[idx] = self.sample2batch(self.sample(mbsize))
+                except Exception as e:
+                    print("Exception while sampling:")
+                    print(e)
+                    continue
                 self.ready_events[idx].set()
                 self.resume_events[idx].clear()
                 self.resume_events[idx].wait()
@@ -328,7 +353,7 @@ class RolloutActor(threading.Thread):
             self.goal_bounds = self.greedy_goal_bounds
         self.model = model
         self.stop_event = stop_event
-        self.docker = SimDockLet('tmp')
+        self.docker = SimDockLet(tmp_dir)
         self.synth_net = synth_net
         self.replay = replay
         self.failed = False
@@ -344,10 +369,48 @@ class RolloutActor(threading.Thread):
                 self._sample_episode()
             elif self.sample_type == 'beam':
                 self._beam_episode()
+            elif self.sample_type == 'random':
+                self._random_episode()
             self.episodes_done += 1
             if self.stop_after > 0 and self.episodes_done >= self.stop_after:
                 break
 
+
+    def _random_episode(self):
+        self.mdp.reset()
+        actions = []
+        done = False
+        goal = (torch.tensor(np.random.uniform(*self.goal_bounds))
+                .reshape((1,3)).float().to(self.device))
+        max_len = np.random.randint(*self.max_blocks)
+        while not done:
+            if (len(self.mdp.molecule.blocks) >= max_len or
+                len(self.mdp.molecule.blocks) > 0 and len(self.mdp.molecule.stems) == 0):
+                actions.append((-1, 0))
+                break
+            action = np.random.randint(
+                0, 1 + self.mdp.num_blocks * max(len(self.mdp.molecule.stems), 1))
+            if action == 0:
+                done = True
+                action = (-1, 0)
+            else:
+                action -= 1
+                action = (action % self.mdp.num_blocks, action // self.mdp.num_blocks)
+                self.mdp.add_block(*action)
+            actions.append(action)
+        rdmol = self.mdp.molecule.mol
+        if self.replay.contains(actions): return
+        if rdmol is None: return
+        energy = self.docker.eval(self.mdp.molecule)
+        synth = self.synth_net(mol=rdmol) / 10
+        qed = QED.qed(rdmol)
+        goal = goal.cpu().numpy()[0]
+        reached_state = np.float32((energy, synth, qed))
+        #print(reached_state, goal)
+        goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
+        self.replay.add_episode(actions, reached_state, goal, goal_reached,
+                                self.model.training_steps if self.model is not None else 0,
+                                'random')
 
     def _sample_episode(self):
         self.mdp.reset()
@@ -461,17 +524,40 @@ def dump_episodes(args):
 
     device = torch.device('cpu')
     mdp = MolMDPNC(bpath)
-    mdp.post_init(device)
-    replay = ReplayBuffer(bpath, device)
-    past_ep = pickle.load(gzip.open(args.dump_episodes, 'rb'))
+    mdp.post_init(device, None)
+    replay = ReplayBuffer(bpath, device, None)
+    past_ep = pickle.load(gzip.open('replays/random_15000.pkl.gz', 'rb'))
     replay.load_initial_episodes(past_ep, test_ratio=0)
-    past_ep = pickle.load(gzip.open('raw_dump_pts.pkl.gz', 'rb'))
+    print(replay.num_loaded_episodes)
+    past_ep = pickle.load(gzip.open('raw_dump.pkl.gz', 'rb'))
     replay.load_raw_episodes(past_ep, test_ratio=0)
     print(replay.num_loaded_episodes)
     raw = replay.dump_to_raw()
-    with gzip.open('raw_dump.pkl.gz','wb') as f:
+    with gzip.open('raw_dump_2021_01_07.pkl.gz','wb') as f:
         pickle.dump(raw, f)
 
+
+def generate_random_episodes(args):
+    device = torch.device('cuda')
+    bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
+    synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
+
+    replay = ReplayBuffer(bpath, device, args.repr_type)
+    stop_event = threading.Event()
+    rollout_threads = (
+        [RolloutActor(bpath, device, None, None,
+                      stop_event, replay, synth_net, 'random')
+         for i in range(8)])
+    [i.start() for i in rollout_threads]
+
+    while len(replay.episodes) < 50000:
+        time.sleep(30)
+        print('>>', len(replay.episodes))
+        pickle.dump(replay.episodes, gzip.open('replays/random_50000.pkl.gz', 'wb'))
+    stop_event.set()
+    [i.join() for i in rollout_threads]
+    pickle.dump(replay.episodes, gzip.open('replays/random_50000.pkl.gz', 'wb'))
+    return
 
 def main(args):
     debug_no_threads = False
@@ -493,8 +579,10 @@ def main(args):
 
     #past_ep = pickle.load(gzip.open('replays/random_1000.pkl.gz', 'rb'))
     # This includes the tree search mols, to be seen...
-    past_ep = pickle.load(gzip.open('raw_dump.pkl.gz', 'rb'))
-    replay.load_raw_episodes(past_ep)
+    #past_ep = pickle.load(gzip.open('raw_dump_2021_01_07.pkl.gz', 'rb'))
+    #replay.load_raw_episodes(past_ep)
+    past_ep = pickle.load(gzip.open('replays/random_15000.pkl.gz', 'rb'))
+    replay.load_initial_episodes(past_ep, test_ratio=0.05)
     #past_ep = pickle.load(gzip.open('replays/latest_oct_22_5.pkl.gz', 'rb'))
     #replay.load_initial_episodes(past_ep)
     print(len(replay.episodes), 'episodes')
@@ -503,7 +591,7 @@ def main(args):
     stop_event = threading.Event()
 
     if args.repr_type == 'block_graph':
-        model = model_block.GraphAgent(args.nemb, 3, mdp.num_blocks, 1, 6, mdp,
+        model = model_block.GraphAgent(args.nemb, 3, mdp.num_blocks, 1, args.num_conv_steps, mdp,
                                        args.model_version)
         model.to(device)
     elif args.repr_type == 'atom_graph':
@@ -524,12 +612,6 @@ def main(args):
          for i in range(0)])
     if not debug_no_threads:
         [i.start() for i in rollout_threads]
-    if 0:
-        while len(replay.episodes) < 1000:
-            time.sleep(10)
-            print('>>', len(replay.episodes))
-        pickle.dump(replay.episodes, gzip.open('replays/random_1000.pkl.gz', 'wb'))
-        return
 
     tf = lambda x: torch.tensor(x, device=device).float()
     tint = lambda x: torch.tensor(x, device=device).long()
@@ -641,13 +723,13 @@ def main(args):
         [RolloutActor(bpath, device, args.repr_type, model,
                       stop_event, replay, synth_net, 'categorical',
                       greedy=True,
-                      stop_after=5)
+                      stop_after=2)
          for i in range(8)]
         +
         [RolloutActor(bpath, device, args.repr_type, model,
                       stop_event, replay, synth_net, 'categorical',
                       greedy=False,
-                      stop_after=5)
+                      stop_after=2)
          for i in range(8)])
     if not debug_no_threads:
         [i.start() for i in rollout_threads]
@@ -711,6 +793,26 @@ def array_dec_08(args):
   ])
   return all_hps
 
+def array_jan_07(args):
+  all_hps = ([
+    {'mbsize': 512,
+     'learning_rate': lr,
+     'num_iterations': 300_000,
+     'nemb': nemb,
+     'repr_type': repr_type,
+     'model_version': 'v2',
+     }
+    for lr in [1e-3]
+    for nemb in [128, 256]
+    for repr_type in ['block_graph', 'morgan_fingerprint']
+  ])
+  all_hps += [
+      {**all_hps[0], 'nemb': 256, 'repr_type': 'morgan_fingerprint', 'learning_rate': 1e-4},
+      {**all_hps[0], 'nemb': 128, 'repr_type': 'morgan_fingerprint', 'learning_rate': 1e-4},
+      {**all_hps[0], 'nemb': 128, 'repr_type': 'morgan_fingerprint', 'learning_rate': 1e-4}, ## 15k r
+  ]
+  return all_hps
+
 if __name__ == '__main__':
   args = parser.parse_args()
   if args.array:
@@ -727,5 +829,7 @@ if __name__ == '__main__':
       main(args)
   elif args.dump_episodes:
       dump_episodes(args)
+  elif args.gen_rand:
+      generate_random_episodes(args)
   else:
     main(args)

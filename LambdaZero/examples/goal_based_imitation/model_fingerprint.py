@@ -31,6 +31,8 @@ class MFP_MLP(nn.Module):
                                     nn.Linear(nhid, nhid))
         self.molh2o = nn.Sequential(nn.Linear(nhid, nhid), act,
                                     nn.Linear(nhid, out_per_mol))
+        self.categorical_style = 'escort'
+        self.escort_p = 4
 
     def forward(self, x, v):
         molx, stemx, stem_batch, bondx, bond_batch, _ = x
@@ -49,21 +51,40 @@ class MFP_MLP(nn.Module):
         return per_stem_pred, per_mol_pred
 
 
-    def action_negloglikelihood(self, s, a, g, stem_o, mol_o):
-        stem_e = torch.exp(stem_o - 2)
-        mol_e = torch.exp(mol_o[:, 0] - 2)
+    def out_to_policy(self, s, stem_o, mol_o):
+
+        if self.categorical_style == 'softmax':
+            stem_e = torch.exp(stem_o - 2)
+            mol_e = torch.exp(mol_o[:, 0] - 2)
+        elif self.categorical_style == 'escort':
+            stem_e = abs(stem_o)**self.escort_p
+            mol_e = abs(mol_o[:, 0])**self.escort_p
         #Z = gnn.global_add_pool(stem_e, s.stems_batch).sum(1) + mol_e
-        Z = torch.zeros_like(mol_e).index_add_(0, s[2], stem_e.sum(1)) + mol_e
-        mol_lsm = torch.log(mol_e / Z)
-        stem_lsm = torch.log(stem_e / Z[s[2], None])
+        Z = torch.zeros_like(mol_e).index_add_(0, s[2], stem_e.sum(1)) + mol_e + 1e-6
+        mol_lsm = mol_e / Z
+        stem_lsm = stem_e / Z[s[2], None]
+        return mol_lsm, stem_lsm
+
+
+    def action_negloglikelihood(self, s, a, g, stem_o, mol_o):
+        if self.categorical_style == 'softmax':
+            stem_e = torch.exp(stem_o - 2)
+            mol_e = torch.exp(mol_o[:, 0] - 2)
+        elif self.categorical_style == 'escort':
+            stem_e = abs(stem_o)**self.escort_p
+            mol_e = abs(mol_o[:, 0])**self.escort_p
+        #Z = gnn.global_add_pool(stem_e, s.stems_batch).sum(1) + mol_e
+        Z = torch.zeros_like(mol_e).index_add_(0, s[2], stem_e.sum(1)) + mol_e + 1e-6
+        mol_lsm = torch.log(mol_e / Z + 1e-6)
+        stem_lsm = torch.log(stem_e / Z[s[2], None] + 1e-6)
         #stem_slices=torch.tensor(s.__slices__['stems'][:-1], dtype=torch.long, device=stem_lsm.device)
         stem_slices = s[5]
-        try:
-            x = (stem_lsm.cpu()[stem_slices.cpu() + a.cpu()[:, 1]][
-                torch.arange(a.shape[0]), a.cpu()[:, 0]] * (a.cpu()[:, 0] >= 0)
-                 + mol_lsm.cpu() * (a.cpu()[:, 0] == -1))
-        except:
-            raise ValueError()
+        #try:
+        #    x = (stem_lsm.cpu()[stem_slices.cpu() + a.cpu()[:, 1]][
+        #        torch.arange(a.shape[0]), a.cpu()[:, 0]] * (a.cpu()[:, 0] >= 0)
+        #         + mol_lsm.cpu() * (a.cpu()[:, 0] == -1))
+        #except:
+        #    raise ValueError()
 
         return -(
             stem_lsm[stem_slices + a[:, 1]][

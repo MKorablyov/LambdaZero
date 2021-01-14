@@ -19,8 +19,8 @@ class GraphAgent(nn.Module):
             nn.Embedding(mdp_cfg.num_stem_types + 1, nemb),
             nn.Embedding(mdp_cfg.num_stem_types, nemb)])
         self.conv = gnn.NNConv(nemb, nemb, nn.Sequential(), aggr='mean')
-        nvec_1 = nvec * (version == 'v1')
-        nvec_2 = nvec * (version == 'v2')
+        nvec_1 = nvec * (version == 'v1' or version == 'v3')
+        nvec_2 = nvec * (version == 'v2' or version == 'v3')
         self.block2emb = nn.Sequential(nn.Linear(nemb + nvec_1, nemb), nn.LeakyReLU(),
                                        nn.Linear(nemb, nemb))
         self.gru = nn.GRU(nemb, nemb)
@@ -34,7 +34,7 @@ class GraphAgent(nn.Module):
         self.nemb = nemb
         self.training_steps = 0
         self.categorical_style = 'escort'
-        self.escort_p = 4
+        self.escort_p = 6
 
 
     def forward(self, graph_data, vec_data):
@@ -46,7 +46,7 @@ class GraphAgent(nn.Module):
             graph_data.edge_attr[:, 0][:, :, None] * graph_data.edge_attr[:, 1][:, None, :]
         ).reshape((graph_data.edge_index.shape[1], self.nemb**2))
         out = graph_data.x
-        if self.version == 'v1':
+        if self.version == 'v1' or self.version == 'v3':
             batch_vec = vec_data[graph_data.batch]
             out = self.block2emb(torch.cat([out, batch_vec], 1))
         elif self.version == 'v2':
@@ -67,7 +67,7 @@ class GraphAgent(nn.Module):
             + graph_data.stems[:, 0])
         if self.version == 'v1':
             stem_out_cat = torch.cat([out[stem_block_batch_idx], graph_data.stemtypes], 1)
-        elif self.version == 'v2':
+        elif self.version == 'v2' or self.version == 'v3':
             stem_out_cat = torch.cat([out[stem_block_batch_idx],
                                       graph_data.stemtypes,
                                       vec_data[graph_data.stems_batch]], 1)
