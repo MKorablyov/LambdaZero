@@ -6,11 +6,12 @@ from torch_geometric import transforms as T
 from torch.utils.data import Subset
 from torch_geometric.data import DataLoader
 import LambdaZero.utils
+import LambdaZero.chem
 import LambdaZero.inputs
 
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
-transform = T.Compose([LambdaZero.utils.Complete(),LambdaZero.utils.MakeFP()])
+transform = T.Compose([LambdaZero.utils.Complete(), LambdaZero.chem.MakeFP()])
 
 config = {"dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {

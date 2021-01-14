@@ -1,8 +1,9 @@
+import time
 from abc import ABC
 import os
 
 import numpy as np
-from ray.rllib.models.model import restore_original_dimensions
+from ray.rllib.models.modelv2 import restore_original_dimensions
 from ray.rllib.models.preprocessors import get_preprocessor
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
@@ -31,15 +32,20 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         nn.Module.__init__(self)
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         self.max_steps = obs_space.original_space["num_steps"].n
-        self.max_blocks = action_space.max_blocks
-        self.max_branches = action_space.max_branches
-        self.num_blocks = action_space.num_blocks
+
+        #print("action space dict", action_space.__dict__)
+        #self.max_blocks = action_space.max_blocks
+        #self.max_branches = action_space.max_branches
+        self.num_blocks = model_config['custom_model_config'].get("num_blocks", 135)
+
+
 
         self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
         self.rnd = (self.rnd_weight != 0)
         rnd_output_dim = model_config['custom_model_config'].get("rnd_output_dim", 1)
         self.rnd_adv_weight = model_config['custom_model_config'].get("rnd_adv_weight", 1.0)
         self.rnd_vf_loss_weight = model_config['custom_model_config'].get("rnd_vf_loss_weight", 1.0)
+
 
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
@@ -69,43 +75,50 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         obs = input_dict['obs']
         device = obs["mol_graph"].device
 
-        # Due to the way RLLib forces encodeing observations into
-        # fixed length vectors, this part is quite expensive (~timings
-        # on big batch), first there's a useless
-        # uint8->float->cpu->gpu->cpu->uint8 (~3ms), then we unpack
-        # each graph individually which involves a decompress call and
-        # more memory copying (~12ms), then we create a Batch from the
-        # "data list" of graphs which involves stacking and
-        # incrementing arrays (~4ms) and send it back to gpu (<.5ms).
-        enc_graphs = obs["mol_graph"].data.cpu().numpy().astype(np.uint8)
-        graphs = [self.space.unpack(i) for i in enc_graphs]
         num_steps = obs["num_steps"]
         action_mask = obs["action_mask"]
+        mol_graph = obs["mol_graph"]
 
-        data = fast_from_data_list(graphs) # Leo: Check -- Can I run it w/ debugging -- pdb. Num_workers = 1?
-        data = data.to(device)
-        # </end of expensive unpacking> The rest of this is the
-        # forward pass (~5ms) and then a backward pass + update (which
-        # I can't measure directly but seems to take at most ~20ms)
+        # todo: the if loop below is not very elegant but is to solve a problem of rllib sending dummy batches
+        # if dummy batch initialize all with 0s
+        if torch.equal(mol_graph, torch.zeros_like(mol_graph)):
+            actor_logits = torch.zeros_like(action_mask)
+            self._value_out = torch.zeros_like(action_mask[:,0])
+            if self.rnd:
+                self._value_int = torch.zeros_like(action_mask[:,0])
+        else:
+            # Due to the way RLLib forces encodeing observations into
+            # fixed length vectors, this part is quite expensive (~timings
+            # on big batch), first there's a useless
+            # uint8->float->cpu->gpu->cpu->uint8 (~3ms), then we unpack
+            # each graph individually which involves a decompress call and
+            # more memory copying (~12ms), then we create a Batch from the
+            # "data list" of graphs which involves stacking and
+            # incrementing arrays (~4ms) and send it back to gpu (<.5ms).
+            enc_graphs = obs["mol_graph"].data.cpu().numpy().astype(np.uint8)
+            graphs = [self.space.unpack(i) for i in enc_graphs]
+            data = fast_from_data_list(graphs)
+            data = data.to(device)
+            # </end of expensive unpacking> The rest of this is the
+            # forward pass (~5ms) and then a backward pass + update (which
+            # I can't measure directly but seems to take at most ~20ms)
 
-        scalar_outs, data = self.model(data)
+            scalar_outs, data = self.model(data)
+            stop_logit = scalar_outs[:, 1:2]
+            add_logits = data.stem_preds.reshape((data.num_graphs, -1))
+            break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
 
-        stop_logit = scalar_outs[:, 1].unsqueeze(1) # Leo: what's this stop_logit and isn't this just [:, 1]. Maybe just calling docking?
-        # Ends rollout -- and give agent rew.
-        add_logits = data.stem_preds.reshape((data.num_graphs, -1))
-        break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
+            actor_logits = torch.cat([stop_logit,
+                                      add_logits,
+                                      break_logits], 1)
 
-        actor_logits = torch.cat([stop_logit,
-                                  add_logits,
-                                  break_logits], 1)
+            # mask not available actions
+            masked_actions = (1. - action_mask).to(torch.bool)
+            actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
 
-        # mask not available actions
-        masked_actions = (1. - action_mask).to(torch.bool)
-        actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
-
-        self._value_out = scalar_outs[:, 0]
-        if self.rnd:
-            self._value_int = scalar_outs[:, 2]
+            self._value_out = scalar_outs[:, 0]
+            if self.rnd:
+                self._value_int = scalar_outs[:, 2]
         return actor_logits, state
 
     def value_function(self):

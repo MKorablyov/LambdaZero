@@ -58,6 +58,29 @@ az_bayes_reward_001 = {
     },
 }
 
+az_bayes_reward_001_1 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "mcts_config": {
+            "num_simulations": 50,
+            "policy_optimization": True,
+        },
+    },
+    "use_dock": True
+}
+
 az_bayes_reward_002 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
@@ -78,4 +101,27 @@ az_bayes_reward_002 = {
             "policy_optimization": True,
         },
     },
+}
+
+az_bayes_reward_002_1 = {
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            }
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "mcts_config": {
+            "num_simulations": 25,
+            "policy_optimization": True,
+        },
+    },
+    "use_dock": False
 }

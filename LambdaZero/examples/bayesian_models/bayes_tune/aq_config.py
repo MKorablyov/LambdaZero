@@ -5,6 +5,7 @@ import torch
 from ray.tune import grid_search
 from torch_geometric import transforms as T
 import LambdaZero.utils
+import LambdaZero.chem
 import LambdaZero.inputs
 import LambdaZero.models
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_mcdrop, train_mpnn_brr, \
@@ -361,15 +362,16 @@ def fp_feat(loader):
 uct008 = {
     "acquirer_config": {
         "config": {
-            "data": {"dataset_config":{
-                "transform":T.Compose([LambdaZero.utils.Complete(),LambdaZero.utils.MakeFP()])
+            "data": {"dataset_config": {
+                "transform": T.Compose([LambdaZero.utils.Complete(), LambdaZero.chem.MakeFP()])
                 }},
             "regressor": BRR,
             "regressor_config": {"config": {
-                "regressor_config":{"get_feat":fp_feat},
-                "data":{"dataset_config":{
-                    "transform":T.Compose([LambdaZero.utils.Complete(),LambdaZero.utils.MakeFP()])
+                "regressor_config": {"get_feat": fp_feat},
+                "data":{"dataset_config": {
+                    "transform": T.Compose([LambdaZero.utils.Complete(), LambdaZero.chem.MakeFP()])
                 }}}}}}}
+
 
 def concat_fp_feat(loader):
     feat = [np.concatenate([d.row_fp, d.col_fp]) for d in loader.dataset]

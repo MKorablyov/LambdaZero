@@ -7,6 +7,10 @@ import torch_scatter
 from aggr import MLP, GRUAggr
 from ray import tune
 
+#cat([np.arange(np.random(10)) for i in range(100)])
+
+
+
 def slice_cat(tensor,slices, dim):
     chunks = [tensor.narrow(dim, slice[0], slice[1]) for slice in slices]
     return torch.cat(chunks,dim=dim)
@@ -44,11 +48,16 @@ class DiffGCN(torch.nn.Module):
         return None
 
     def diffuse(self, v, adj, adj_slic):
+        # todo: v -> node_attr
+        # todo: adj -> edge_index
+        # todo: adj_slices -> edge_index_slices (?compute from edge_index)
+
         num_nodes = v.shape[0]
         # initialize
         walks = torch.arange(num_nodes,device=v.device)[:,None] # [w, 1] --> [w,t]
-        walk_embeds = v[:, None, :]
+        walk_embeds = v[:, None, :] # [w, t, feat]
         walks_logp = []
+
         # diffuse
         for t in range(self.t):
             # find slices of the adjacency matrix
