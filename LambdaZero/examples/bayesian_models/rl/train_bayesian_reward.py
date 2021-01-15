@@ -74,11 +74,14 @@ DEFAULT_CONFIG = {
         "lr": 5e-5,
     },
     "summaries_dir": summaries_dir,
-    "memory": 60 * 10 ** 9,
+    "memory": 30*10**9,
+    "object_store_memory": 30*10**9,
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
     "stop":{"training_iteration": 2000000},
     "reward_learner_config": {
+        "reward_actor_cpus":4,
+        "reward_actor_gpus":1.0,
         "aq_size0": 3000,
         "data": dict(data_config, **{"dataset_creator":None}),
         "aq_size": 32,
@@ -128,6 +131,8 @@ if machine == "Ikarus":
     config["rllib_config"]["num_gpus"] = 0.3
     config["rllib_config"]["memory"] = 25 * 10**9
     config["rllib_config"]["sgd_minibatch_size"] = 4
+    config['reward_learner_config']['reward_actor_cpus'] = 1
+    config['reward_learner_config']['reward_actor_cpus'] = 0.3
     config["reward_learner_config"]["regressor_config"]["train_iterations"] = 2
     config["reward_learner_config"]["regressor_config"]["finetune_iterations"] = 2
     config["reward_learner_config"]["regressor_config"]["T"] = 2
@@ -138,7 +143,7 @@ if machine == "Ikarus":
 
 
 if __name__ == "__main__":
-    ray.init(_memory=config["memory"])
+    ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     #
     if not osp.exists(config['reward_learner_config']['mol_dump_loc']):
@@ -146,7 +151,9 @@ if __name__ == "__main__":
     if not osp.exists(config['reward_learner_config']['docking_loc']):
         os.mkdir(config['reward_learner_config']['docking_loc'])
 
-    reward_learner = BayesianRewardActor.options(num_cpus=1, num_gpus=0.3).\
+    reward_learner = BayesianRewardActor.options(
+        num_cpus=config['reward_learner_config']['reward_actor_cpus'],
+        num_gpus=config['reward_learner_config']['reward_actor_gpus']).\
         remote(config['reward_learner_config'], config["use_dock"],
                config["rllib_config"]['env_config']['reward_config']['binding_model'], config["pretrained_model"])
 

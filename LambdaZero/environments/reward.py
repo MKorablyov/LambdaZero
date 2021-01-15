@@ -173,7 +173,7 @@ class PredDockReward_v2:
             if reward is not None:
                 discounted_reward, log_vals = self._discount(molecule.mol, reward)
             else:
-                discounted_reward, log_vals = -0.5, {"dock_reward": -0.5, "natm": 0.0, "qed" : -0.5, "synth" : -0.5}
+                discounted_reward, log_vals = -0.5, {"dock_reward":-0.5, "natm": 0.0, "qed": -0.5, "synth": -0.5}
         else:
             discounted_reward, log_vals = 0.0, {}
         return discounted_reward, log_vals
@@ -283,6 +283,8 @@ class PredDockBayesianReward_v1:
     def reset(self, previous_reward=0.0):
         self.previous_reward = previous_reward
         self.episodes += 1
+
+
         if self.episodes % self.weight_sync_freq == 0:
             updates, aq_batches = ray.get(self.reward_learner.sync_weights.remote(self.aq_batches))
             if updates:
@@ -295,6 +297,7 @@ class PredDockBayesianReward_v1:
                 print('synced weights')
 
     def _get_dockscore(self, molecule):
+        # fixme !!!!!!!!!! -- this is not a dockscore but a UCB reward --------------
         mol = molecule.mol
         atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
         graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
@@ -303,6 +306,15 @@ class PredDockBayesianReward_v1:
         mean, var = self.regressor.get_mean_variance(loader, self.train_len)
         # import pdb; pdb.set_trace();
         return (mean + (self.kappa * var)).item(), {'proxy_reward_mean': mean, 'proxy_reward_var': var}
+
+    # def _simulation(self, mol):
+    #     atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
+    #     graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
+    #     graph = self.transform(graph)
+    #     batch = Batch.from_data_list([graph]).to(self.device)
+    #     pred = self.net(batch)
+    #     reward = -float(pred.detach().cpu().numpy())
+    #     return reward
 
     def _discount(self, molecule):
         mol = molecule.mol
@@ -318,37 +330,33 @@ class PredDockBayesianReward_v1:
 
         # Binding energy prediction
         # dockscore, log_vals = self._get_dockscore(molecule)
+
         dockscore_reward, log_vals = self._get_dockscore(molecule)
 
-        
-        dockscore = self._simulation(mol=mol)
+
+#        dockscore = self._simulation(mol=mol)
         # dockscore = (self.dockscore_std[0] - dockscore) / (self.dockscore_std[1])  # normalize against std dev
         if self.reward_learner_logs is not None:
             print(self.reward_learner_logs)
-            log_vals = { **log_vals, **self.reward_learner_logs}
+            log_vals = {**log_vals, **self.reward_learner_logs}
             self.reward_learner_logs = None
         # combine rewards
         disc_reward = dockscore_reward * qed_discount * synth_discount
 
+        # fixme - it's unclear how to use exp/delta
         self.reward_learner.add_molecule.remote(molecule, disc_reward, synth_discount * qed_discount)
 
+        # fixme - it would be more intuitive to compute this with handling exceptions
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward
         delta_reward = (disc_reward - self.previous_reward - self.simulation_cost)
         self.previous_reward = disc_reward
         if self.delta: disc_reward = delta_reward
-        return disc_reward, {"dockscore_reward": dockscore_reward, "chemprop_reward": dockscore,
+        return disc_reward, {"dockscore_reward": dockscore_reward, #"chemprop_reward": dockscore,
                              "qed": qed, "synth": synth, **log_vals}
 
-    def _simulation(self, mol):
-        atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
-        graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
-        graph = self.transform(graph)
-        batch = Batch.from_data_list([graph]).to(self.device)
-        pred = self.net(batch)
-        reward = -float(pred.detach().cpu().numpy())
-        return reward
+
 
     def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.dense_rewards:
@@ -536,17 +544,17 @@ class BayesianRewardActor():
         val_loader = DataLoader(val_mols, shuffle=True, batch_size=self.config["data"]["b_size"])
         return train_mols, train_loader, val_loader
 
-    def get_discount(self, mol):
-        qed = QED.qed(mol)
-        qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
-        qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
-
-        # Synthesizability constraint
-        synth = self.synth_net(mol=mol)
-        synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
-        synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
-
-        return synth_discount * qed_discount
+    # def get_discount(self, mol):
+    #     qed = QED.qed(mol)
+    #     qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
+    #     qed_discount = min(max(0.0, qed_discount), 1.0) # relu to maxout at 1
+    #
+    #     # Synthesizability constraint
+    #     synth = self.synth_net(mol=mol)
+    #     synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
+    #     synth_discount = min(max(0.0, synth_discount), 1.0) # relu to maxout at 1
+    #
+    #     return synth_discount * qed_discount
 
     def prune(self):
         new_mols_idx = np.argsort([i[2] for i in self.unseen_molecules])[int(self.prune_factor * self.max_size):]

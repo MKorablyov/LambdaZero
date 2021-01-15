@@ -19,8 +19,8 @@ from rdkit.Chem.rdchem import BondType as BT
 from rdkit.Chem.rdchem import HybridizationType
 
 from LambdaZero.chem.chimera_op import _add_hydrogens_and_compute_gasteiger_charges_with_chimera
-# from LambdaZero.utils import get_external_dirs
-# datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+from LambdaZero.utils import get_external_dirs
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 rdBase.DisableLog('rdApp.error')
 
@@ -448,9 +448,9 @@ class GenMolFile:
 class DockVina_smi:
     def __init__(self,
                  outpath,
-                 mgltools_dir,#=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
-                 vina_dir,#=os.path.join(programs_dir, "vina"),
-                 docksetup_dir,#,=os.path.join(datasets_dir, "seh/4jnc"),
+                 mgltools_dir=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
+                 vina_dir=os.path.join(programs_dir, "vina"),
+                 docksetup_dir=os.path.join(datasets_dir, "seh/4jnc"),
                  rec_file="4jnc.nohet.aligned.pdbqt",
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
