@@ -4,7 +4,7 @@ import numpy as np
 from ray.tune import grid_search
 import LambdaZero.utils
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_mcdrop, train_mpnn_brr, \
-    mpnn_brr_mean_variance
+    mpnn_brr_mean_variance, train_evidential, evidential_mean_variance
     
 datasets_dir, _, _ = LambdaZero.utils.get_external_dirs()
 
@@ -18,6 +18,11 @@ mcdrop001 = {"regressor_config":
                        "get_mean_variance": mpnn_brr_mean_variance,
                        }}}
 
+evidential_001 = {"regressor_config":
+                 {"config":
+                      {"train":train_evidential,
+                       "get_mean_variance": evidential_mean_variance,
+                       }}}
 
 
 mcdrop002 = {"regressor_config":

@@ -244,3 +244,91 @@ def train_brr(train_loader, val_loader, model, device, config, optim, iteration)
 
 def brr_mean_variance(train_loader, loader, model, device, config):
     pass
+
+## Evidential Regresion
+
+def evidential_mean_variance(loader, model, device, config):
+    gamma, v, alpha, beta = evidential_get_outputs(loader, model, device, config)
+    mean = gamma
+    var = beta / (v * (alpha - 1))
+    return mean, var
+
+def train_evidential(train_loader, val_loader, model, device, config, optim, iteration):
+    N = len(train_loader.dataset)
+    train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
+    val_scores = config["eval_epoch"](val_loader, model, device, config, "val", N = N)
+    scores = {**train_scores, **val_scores}
+
+    if iteration % config["uncertainty_eval_freq"] == config["uncertainty_eval_freq"] - 1:
+        _scores = evidential_eval_epoch(val_loader, model, device, config, "val", N = N)
+        scores = {**scores, **_scores}
+    return scores
+
+def evidential_train_epoch(loader, model, optimizer, device, config, scope):
+    model.train()
+    epoch_targets_norm = []
+    epoch_logits = []
+
+    for bidx,data in enumerate(loader):
+        data = data.to(device)
+        targets = getattr(data, config["data"]["target"])
+
+        optimizer.zero_grad()
+        gamma, v, alpha, beta = model(data, False)
+        targets_norm = config["data"]["normalizer"].tfm(targets)
+        # reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
+        loss = (evidential_loss(gamma, v, alpha, beta, targets_norm) + \
+                config["reg_coefficient"] * evidential_regularization(gamma, v, alpha, beta, targets_norm)).mean()
+        loss.backward()
+        optimizer.step()
+
+        epoch_targets_norm.append(targets_norm.detach().cpu().numpy())
+        epoch_logits.append(gamma.detach().cpu().numpy())
+
+    epoch_targets_norm = np.concatenate(epoch_targets_norm,0)
+    epoch_logits = np.concatenate(epoch_logits, 0)
+    scores = _epoch_metrics(epoch_targets_norm, epoch_logits, config["data"]["normalizer"], scope)
+    return scores
+
+def evidential_loss(gamma, v, alpha, beta, targets):
+    twoBlambda = 2 * beta * (1 + v)
+    error = torch.abs(targets - gamma)
+
+    nll = 0.5 * torch.log(np.pi / v) \
+        - alpha * torch.log(twoBlambda) \
+        + (alpha + 0.5) * torch.log(v * (targets - gamma) ** 2 + twoBlambda) \
+        + torch.lgamma(alpha) \
+        - torch.lgamma(alpha + 0.5)
+    return nll
+
+def evidential_regularization(gamma, v, alpha, beta, targets):
+    error = torch.abs(targets - gamma)
+    return error * (2 * v + alpha)
+
+def evidential_get_outputs(loader, model, device, config):
+    gamma, v, alpha, beta = [], [], [], []
+    for bidx, data in enumerate(loader):
+        data = data.to(device)
+        ops = model(data, False)
+        gamma.append(ops[0])
+        v.append(ops[1])
+        alpha.append(ops[2])
+        beta.append(ops[3])
+    gamma = torch.cat(gamma, 0)
+    v = torch.cat(v, 0)
+    alpha = torch.cat(alpha, 0)
+    beta = torch.cat(beta, 0)
+    return gamma, v, alpha, beta
+
+def sample_targets(loader, config):
+    epoch_targets = [getattr(d, config["data"]["target"]).cpu().numpy() for d in loader.dataset]
+    norm_targets = config["data"]["normalizer"].tfm(np.concatenate(epoch_targets,0))
+    return norm_targets
+
+def evidential_eval_epoch(loader, model, device, config, scope, N):
+    logits = evidential_get_outputs(loader, model, device, config)[0].detach().cpu().numpy()
+    norm_targets = sample_targets(loader, config)
+    scores = _epoch_metrics(norm_targets, logits, config["data"]["normalizer"], scope)
+    # ll_dict = eval_mcdrop(loader, model, device, config, N, scope)
+    # scores.update(ll_dict)
+    return scores
