@@ -870,7 +870,7 @@ ppo_bayes_reward_021 = {
     "use_dock": True
 }
 
-ppo_bayes_reward_22 = {
+ppo_bayes_reward_022 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {
@@ -885,7 +885,7 @@ ppo_bayes_reward_22 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -899,7 +899,7 @@ ppo_bayes_reward_22 = {
     "use_dock": True
 }
 
-ppo_bayes_reward_23 = {
+ppo_bayes_reward_023 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {
@@ -914,7 +914,7 @@ ppo_bayes_reward_23 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -928,7 +928,7 @@ ppo_bayes_reward_23 = {
     "use_dock": True
 }
 
-ppo_bayes_reward_24 = {
+ppo_bayes_reward_024 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {
@@ -943,7 +943,7 @@ ppo_bayes_reward_24 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -957,7 +957,7 @@ ppo_bayes_reward_24 = {
     "use_dock": True
 }
 
-ppo_bayes_reward_25 = {
+ppo_bayes_reward_025 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {
@@ -972,7 +972,7 @@ ppo_bayes_reward_25 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -985,7 +985,7 @@ ppo_bayes_reward_25 = {
     },
     "use_dock": True
 }
-ppo_bayes_reward_26 = {
+ppo_bayes_reward_026 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {
@@ -1000,7 +1000,7 @@ ppo_bayes_reward_26 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -1014,7 +1014,7 @@ ppo_bayes_reward_26 = {
     "use_dock": True
 }
 
-ppo_bayes_reward_27 = {
+ppo_bayes_reward_027 = {
     "rllib_config":{
         "env": BlockMolEnvGraph_v1,
         "env_config": {
@@ -1029,7 +1029,7 @@ ppo_bayes_reward_27 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
