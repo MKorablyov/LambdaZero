@@ -1042,3 +1042,100 @@ ppo_bayes_reward_027 = {
     },
     "use_dock": True
 }
+
+
+ppo_bayes_reward_028 = { # drop weights and last layer
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "max_steps": 10,
+            "random_steps": 6,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1,
+        'regressor_config' : {
+            "model_config": {"drop_data":False, "drop_weights":True, "drop_last":True, "drop_prob":0.1},
+        }
+    },
+    "use_dock": True
+}
+
+ppo_bayes_reward_029 = { # incr dropout rate
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "max_steps": 10,
+            "random_steps": 6,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1,
+        'regressor_config' : {
+            "model_config": {"drop_data":False, "drop_weights":True, "drop_last":True, "drop_prob":0.2},
+        }
+    },
+    "use_dock": True
+}
+
+ppo_bayes_reward_030 = { # drop only weights (not last layer)
+    "rllib_config":{
+        "env": BlockMolEnvGraph_v1,
+        "env_config": {
+            "allow_removal": True,
+            "reward": PredDockBayesianReward_v1,
+            "reward_config": {
+                "synth_config": synth_config,
+                "binding_model": binding_model,
+            },
+            "max_steps": 10,
+            "random_steps": 6,
+        },
+        "model": {
+            "custom_model": "GraphMolActorCritic_thv1",
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
+        },
+        "lr": 5e-5,
+        "entropy_coeff": 1e-3,
+        # "entropy_coeff_schedule": [(0, 1e-4), (10000, 5e-5), (100000, 1e-5), (1000000, 1e-6)],
+        "framework": "torch",
+    },
+    "reward_learner_config": {
+        "num_mol_retrain": 1000,
+        "kappa": 1,
+        'regressor_config' : {
+            "model_config": {"drop_data":False, "drop_weights":True, "drop_last":False, "drop_prob":0.1},
+        }
+    },
+    "use_dock": True
+}
