@@ -45,7 +45,7 @@ class MCDrop(tune.Trainable):
         self.model.to(self.device)
         # todo allow ray native stopping
         all_scores = []
-        for i in range(self.config["train_iterations"]):
+        for i in range(self.config["train_epochs"]):
             scores = self._train()
             all_scores.append(scores)
         return all_scores
@@ -103,7 +103,7 @@ DEFAULT_CONFIG = {
             "T": 20,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations":150,
+            "train_epochs":150,
             "model": LambdaZero.models.MPNNetDrop,
             "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
             # "model_config": {},

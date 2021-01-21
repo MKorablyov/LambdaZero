@@ -341,7 +341,7 @@ class PredDockBayesianReward_v1:
             log_vals = {**log_vals, **self.reward_learner_logs}
             self.reward_learner_logs = None
         # combine rewards
-        disc_reward = dockscore_reward * qed_discount * synth_discount
+        disc_reward = dockscore_reward * qed_discount * synth_discount # This is what the RL agent is actually trained on
 
         # fixme - it's unclear how to use exp/delta
         self.reward_learner.add_molecule.remote(molecule, disc_reward, synth_discount * qed_discount)
@@ -683,7 +683,7 @@ class BayesianRewardActor():
             # for graph in aq_set])
         # fine_tune_dataset = np.concatenate((np.array(aq_idx)[:, :1], aq_set_arr), axis=0)
         # import pdb; pdb.set_trace()
-        self.train_molecules.extend(np.array(aq_idx)[:, :1].reshape(-1).tolist())
+        self.train_molecules.extend(np.array(aq_idx)[:, :1].reshape(-1).tolist()) # Leo: increase the number of molecules to train the proxy on...
 
         print("self train_molecules", self.train_molecules)
         train_loader = DataLoader(self.train_molecules, shuffle=True, batch_size=self.config["data"]["b_size"])

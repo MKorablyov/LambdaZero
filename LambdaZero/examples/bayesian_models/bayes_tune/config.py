@@ -76,3 +76,37 @@ mcdrop_rl = {
           }
      }
 }
+
+
+
+
+
+
+
+import torch
+from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch_with_targets, eval_epoch, \
+    train_mcdrop_rl, mcdrop_mean_variance
+
+mcdrop_debug = {
+    'regressor_config': {
+        "config": {
+          "lambda": 6.16e-9,
+          "T": 20,
+          "lengthscale": 1e-2,
+          "uncertainty_eval_freq":15,
+          "train_epochs": 72,
+          "finetune_epochs": 16,
+          "model": LambdaZero.models.MPNNetDrop,
+          "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
+          "optimizer": torch.optim.Adam,
+          "optimizer_config": {
+              "lr": 0.001
+          },
+          "train_epoch": train_epoch_with_targets,
+          "eval_epoch": eval_epoch,
+          "train": train_mcdrop_rl,
+          "get_mean_variance": mcdrop_mean_variance,
+          "is_reward_model": True
+        }
+    },
+}

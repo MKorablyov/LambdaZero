@@ -102,15 +102,15 @@ DEFAULT_CONFIG = {
             "T": 20,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations": 72,
-            "finetune_iterations": 16,
+            "train_epochs": 72,
+            "finetune_epochs": 16,
             "model": LambdaZero.models.MPNNetDrop,
             "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
             "optimizer": torch.optim.Adam,
             "optimizer_config": {
                 "lr": 0.001
             },
-            "train_epoch": train_epoch_with_targets,
+            "train_epoch": train_epoch_with_targets, # vs. train_epoch by itself... we're trying to predict without the normalisation? 
             "eval_epoch": eval_epoch,
             "train": train_mcdrop_rl,
             "get_mean_variance": mcdrop_mean_variance,
@@ -133,8 +133,8 @@ if machine == "Ikarus":
     config["rllib_config"]["sgd_minibatch_size"] = 4
     config['reward_learner_config']['reward_actor_cpus'] = 1
     config['reward_learner_config']['reward_actor_cpus'] = 0.3
-    config["reward_learner_config"]["regressor_config"]["train_iterations"] = 2
-    config["reward_learner_config"]["regressor_config"]["finetune_iterations"] = 2
+    config["reward_learner_config"]["regressor_config"]["train_epochs"] = 2
+    config["reward_learner_config"]["regressor_config"]["finetune_epochs"] = 2
     config["reward_learner_config"]["regressor_config"]["T"] = 2
     config["reward_learner_config"]["aq_size0"] = 10
     config["reward_learner_config"]["aq_size"] = 2

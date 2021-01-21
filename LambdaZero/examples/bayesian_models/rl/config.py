@@ -430,7 +430,7 @@ ppo_bayes_reward_009 = {
     },
     "use_dock": True
     # "reward_learner_config": {
-    #     "train_iterations": 100
+    #     "train_epochs": 100
     # },
 }
 
@@ -457,7 +457,7 @@ ppo_bayes_reward_009_1 = {
     },
     "use_dock": True
     # "reward_learner_config": {
-    #     "train_iterations": 100
+    #     "train_epochs": 100
     # },
 }
 

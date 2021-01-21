@@ -43,7 +43,7 @@ regressor_config = {
         "T": 20,
         "lengthscale": 1e-2,
         "uncertainty_eval_freq": 60,
-        "train_iterations": 59,
+        "train_epochs": 59,
         "model": LambdaZero.models.MPNNetDrop,
         "model_config": {"drop_data":False, "drop_weights": False, "drop_last":True, "drop_prob":0.1},
         "optimizer": torch.optim.Adam,

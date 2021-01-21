@@ -34,6 +34,7 @@ class MCDrop(tune.Trainable):
 
         # self.feature_dim = 64
         # make model
+
         self.model = LambdaZero.models.MPNNetDrop(**self.config["model_config"])
         self.model.to(self.device)
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
@@ -48,7 +49,7 @@ class MCDrop(tune.Trainable):
         self.train_loader, self.val_loader = new_samples_loader, val_loader
         self.train_len += len(self.train_loader.dataset)
         all_scores = []
-        for i in range(self.config["finetune_iterations"]):
+        for i in range(self.config["finetune_epochs"]):
             self._iteration = i
             scores = self._train()
             all_scores.append(scores)
@@ -69,7 +70,7 @@ class MCDrop(tune.Trainable):
     def set_weights(self, weights):
         self.model.load_state_dict(weights)
 
-    def fit(self, train_loader, val_loader, validate=False):
+    def fit(self, train_loader, val_loader, validate=False): # Leo: Maybe it's worthwhile setting this validate flag to true...
         # update internal dataset
         self.train_loader, self.val_loader = train_loader, val_loader
         self.train_len = len(train_loader.dataset)
@@ -80,7 +81,7 @@ class MCDrop(tune.Trainable):
 
         # todo allow ray native stopping
         all_scores = []
-        for i in range(self.config["train_iterations"]):
+        for i in range(self.config["train_epochs"]):
             self._iteration = i
             scores = self._train()
             all_scores.append(scores)
@@ -100,18 +101,26 @@ data_config = {
     "target": "gridscore",
     "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
     "dataset_split_path": osp.join(datasets_dir,
-                                   "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+                                   # "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                    #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k_after_fixing_1_broken_mol.npy"),
+                                "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
+    # "dataset_config": {
+    #     "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
+    #     "props": ["gridscore", "smi"],
+    #     "transform": transform,
+    #     "file_names": ["Zinc15_260k_0"], # "Zinc15_2k"
+    #     #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"], # Subsets between zinc
+    # },
     "dataset_config": {
-        "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
-        "props": ["gridscore", "smi"],
-        "transform": transform,
-        "file_names": ["Zinc15_2k"],
-        #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+        "root": osp.join(datasets_dir, "brutal_dock/seh/raw"),
+        "props": ["dockscore", "smiles"],
+        "transform": T.Compose([LambdaZero.utils.Complete()]),
+        "file_names": "Zinc20_docked_neg_randperm_30k.feather",
     },
     "b_size": 40,
-    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057])
+    "target_norm": [-8.6, 1.10],
+    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.10])
 }
 
 
@@ -124,9 +133,9 @@ DEFAULT_CONFIG = {
             "T": 20,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations":150,
+            "train_epochs":150,
             "model": LambdaZero.models.MPNNetDrop,
-            "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
+            "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1}, # Leo: Accident -- dropout with the last layer. 
             # "model_config": {},
 
             "optimizer": torch.optim.Adam,
@@ -153,6 +162,15 @@ DEFAULT_CONFIG = {
 
 
 
+# setup datapath - /Users/leofeng/Downloads/molecules/ppo_bayes_reward_general_acqf_UCB2020-12-30_03-09-04
+# train using data from this datapath and the next couple steps (a for loop for the training)
+# for ... tune.run() -- save these results -- what is the 
+
+# path = "/Users/leofeng/Downloads/molecules/ppo_bayes_reward_general_acqf_UCB2020-12-30_03-09-04"
+path = "/home/leofeng/Molecule-Discovery/Temp/ppo_bayes_reward_general_acqf_UCB2020-12-30_03-09-04"
+
+print("STARTING")
+
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
     else: config_name = "mcdrop001"
@@ -160,11 +178,40 @@ if __name__ == "__main__":
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
 
-    ray.init(memory=config["memory"])
-    # this will run train the model with tune scheduler
-    #tune.run(**config["regressor_config"])
-    tune.run(**config["regressor_config"])
-#     # this will fit the model outside of tune
-    # mcdrop = MCDrop(config["regressor_config"]["config"])
-    # print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
-    # print(mcdrop.get_mean_variance(mcdrop.train_loader))
+    
+    ray.init(_memory=config["memory"])
+    
+    print("Config loaded")
+    mcdrop = MCDrop(config["regressor_config"]["config"])
+    print("Model created")
+    weights = torch.load(os.path.join(path, f'model.pt')) # This is a cuda weight, so I need to do this on the server. 
+
+    print("WEIGHTS LOADED")
+    mcdrop.set_weights(weights)
+
+    print("WEIGHTS SET")
+
+
+    print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
+    print(mcdrop.get_mean_variance(mcdrop.train_loader))        
+
+    print("FINISHED")
+
+
+# rsync /Users/leofeng/Documents/Projects/Molecule-Discovery/LambdaZero/LambdaZero/examples/bayesian_models/bayes_tune/mcdrop.py leofeng@beluga.computecanada.ca:/home/leofeng/Molecule-Discovery/LambdaZero/LambdaZero/examples/bayesian_models/bayes_tune
+
+# if __name__ == "__main__":
+#     if len(sys.argv) >= 2: config_name = sys.argv[1]
+#     else: config_name = "mcdrop001"
+#     config = getattr(config, config_name)
+#     config = merge_dicts(DEFAULT_CONFIG, config)
+#     config["regressor_config"]["name"] = config_name
+
+#     ray.init(memory=config["memory"])
+#     # this will run train the model with tune scheduler
+#     #tune.run(**config["regressor_config"])
+#     tune.run(**config["regressor_config"])
+# #     # this will fit the model outside of tune
+#     # mcdrop = MCDrop(config["regressor_config"]["config"])
+#     # print(mcdrop.fit(mcdrop.train_loader, mcdrop.val_loader))
+#     # print(mcdrop.get_mean_variance(mcdrop.train_loader))
