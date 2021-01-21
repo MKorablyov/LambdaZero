@@ -54,7 +54,7 @@ ppo_bayes_reward_000_1 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -76,7 +76,7 @@ ppo_bayes_reward_001 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 1e-5,
         # "entropy_coeff": 1e-4,
@@ -99,7 +99,7 @@ ppo_bayes_reward_002 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -125,7 +125,7 @@ ppo_bayes_reward_003 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -151,7 +151,7 @@ ppo_bayes_reward_004 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -180,7 +180,7 @@ ppo_bayes_reward_005 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -203,7 +203,7 @@ ppo_bayes_reward_006 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-4,
@@ -252,7 +252,7 @@ ppo_bayes_reward_008_1 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,
@@ -279,7 +279,7 @@ ppo_bayes_reward_008_2 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,
@@ -306,7 +306,7 @@ ppo_bayes_reward_008_3 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,
@@ -337,7 +337,7 @@ ppo_bayes_reward_008_4 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,
@@ -364,7 +364,7 @@ ppo_bayes_reward_007 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,
@@ -394,7 +394,7 @@ ppo_bayes_reward_007_2 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,
@@ -421,7 +421,7 @@ ppo_bayes_reward_009 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,
@@ -448,7 +448,7 @@ ppo_bayes_reward_009_1 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         # "entropy_coeff": 1e-3,
@@ -474,7 +474,7 @@ ppo_bayes_reward_010 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -502,7 +502,7 @@ ppo_bayes_reward_010_1 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -528,7 +528,7 @@ ppo_bayes_reward_011 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -556,7 +556,7 @@ ppo_bayes_reward_011_1 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -582,7 +582,7 @@ ppo_bayes_reward_012 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -610,7 +610,7 @@ ppo_bayes_reward_012_1 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -636,7 +636,7 @@ ppo_bayes_reward_013 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -663,7 +663,7 @@ ppo_bayes_reward_014 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -690,7 +690,7 @@ ppo_bayes_reward_015 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -717,7 +717,7 @@ ppo_bayes_reward_016 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -744,7 +744,7 @@ ppo_bayes_reward_017 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -772,7 +772,7 @@ ppo_bayes_reward_018 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -802,7 +802,7 @@ ppo_bayes_reward_019 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -829,7 +829,7 @@ ppo_bayes_reward_020 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
@@ -856,7 +856,7 @@ ppo_bayes_reward_021 = {
         },
         "model": {
             "custom_model": "GraphMolActorCritic_thv1",
-            "custom_options":{"num_hidden": 64} # does a **kw to __init__
+            "custom_model_config":{"num_hidden": 64} # does a **kw to __init__
         },
         "lr": 5e-5,
         "entropy_coeff": 1e-3,
