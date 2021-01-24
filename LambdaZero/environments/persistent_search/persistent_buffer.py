@@ -204,7 +204,7 @@ class BlockMolGraphEnv_PersistentBuffer(BlockMolEnvGraph_v1):
         self.first_reset = True
         self._reset = super().reset
         self.random_start_prob = config.get('random_start_prob', 0.75)
-        print(self.random_start_prob)
+        #print(self.random_start_prob)
         self.episodes = 0
 
     def reset(self):

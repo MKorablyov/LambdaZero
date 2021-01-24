@@ -113,7 +113,7 @@ DEFAULT_CONFIG = {
 class BlockMolEnv_v3:
     mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems"]
     def __init__(self, config=None):
-        warnings.warn("BlockMolEnv_v3 is deprecated for BlockMolEnv_v4")
+        #warnings.warn("BlockMolEnv_v3 is deprecated for BlockMolEnv_v4")
 
         config = merge_dicts(DEFAULT_CONFIG, config)
 
@@ -172,7 +172,6 @@ class BlockMolEnv_v3:
                "num_steps": self.num_steps}
 
         self._prev_obs = obs
-
         return obs
 
     def _if_terminate(self):
@@ -228,7 +227,6 @@ class BlockMolEnv_v3:
         else:
             smiles = None
         info = {"molecule": smiles, "log_vals": log_vals}
-        #info = {"molecule": self.molMDP.molecule, "log_vals": log_vals}
         done = any((agent_stop, env_stop))
         return obs, reward, done, info
 
@@ -245,9 +243,6 @@ class BlockMolEnv_v3:
         return self._make_obs()
 
     def render(self, outpath):
+        # todo: also visualize building blocks used ?
         mol = self.molMDP.molecule.mol
         if mol is not None: Chem.Draw.MolToFile(mol, outpath)
-
-
-
-

@@ -200,7 +200,6 @@ class BlockMolEnv_v4:
         self.observ = FPObs_v1(config, self.molMDP)
         self.reward = config["reward"](**config["reward_config"])
 
-
         self.action_space = self.observ.action_space
         self.observation_space = self.observ.observation_space
 

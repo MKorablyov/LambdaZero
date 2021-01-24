@@ -462,13 +462,13 @@ class BayesianRewardActor():
             self.net.eval()
         self.target_norm = config["data"]["target_norm"] # [-8.6, 1.10]
 
-        print('BR: Loaded Oracle Network')
-        print('BR: Loading Dataset ...')
+        #print('BR: Loaded Oracle Network')
+        #print('BR: Loading Dataset ...')
 
 
         # self.dataset = config["data"]["dataset"](**config["data"]["dataset_config"])
         # ul_idxs, val_idxs, test_idxs = np.load(self.config["data"]["dataset_split_path"], allow_pickle=True)
-        print('BR: Loaded Dataset ...')
+        #print('BR: Loaded Dataset ...')
 
         print('BR: Preparing Dataset ...')
         # np.random.shuffle(ul_idxs) # randomly acquire batch zero
@@ -497,7 +497,7 @@ class BayesianRewardActor():
         self.train_molecules, train_loader, self.val_loader = \
             self.construct_dataset(os.path.join(config["data"]["dataset_config"]["root"],
                                                 config["data"]["dataset_config"]["file_names"]))
-        print('BR: Prepared Dataset')
+        print('BR: Prepared Dataset', "train:", len(train_loader), "val:", len(self.val_loader))
         
         self.regressor = config["regressor"](self.regressor_config)
         

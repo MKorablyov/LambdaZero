@@ -169,7 +169,6 @@ class GraphMolObs:
 
 
 class BlockMolEnvGraph_v1(BlockMolEnv_v3):
-    mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems"]
 
     def __init__(self, config=None):
 
@@ -199,12 +198,9 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
             "num_steps": Discrete(n=self.max_steps + 1),
             "action_mask": Box(low=0, high=1, shape=(num_actions,)),
         })
-        #print(config["reward"])
-        #print(config["reward_config"].keys())
-        #time.sleep(100)
+
         self.reward = config["reward"](**config["reward_config"])
         self._prev_obs = None
-
 
     def step(self, action):
         try:
