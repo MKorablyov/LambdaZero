@@ -123,12 +123,15 @@ if __name__ == "__main__":
     binding.reset_index(inplace=True)
     smis = binding["Smiles"].to_numpy()
 
-    dock_smi = DockVina_smi(config)
-    dockscore = pd.DataFrame({"dockscore": [dock_smi.dock(smi) for smi in smis]})
-    binding = pd.concat([binding, dockscore], axis=1)
-    binding.to_feather(os.path.join(config["outpath"], "seh.ftr"))
-    binding = pd.read_feather(os.path.join(config["outpath"], "seh.ftr"))
-    # binding = pd.read_feather(os.path.join(datasets_dir, "seh/4jnc/docked/seh_v1.ftr"))
+    # dock_smi = DockVina_smi(config)
+    # dockscore = pd.DataFrame({"dockscore": [dock_smi.dock(smi) for smi in smis]})
+    # binding = pd.concat([binding, dockscore], axis=1)
+    #
+    # binding.to_feather(os.path.join(config["outpath"], "seh.ftr"))
+    # binding = pd.read_feather(os.path.join(config["outpath"], "seh.ftr"))
+
+
+    binding = pd.read_feather(os.path.join(datasets_dir, "seh/4jnc/docked/seh.ftr"))
     binding = binding.dropna()
 
     fpr, tpr, _ = roc_curve(binding["Standard Value"] < 1, -binding["dockscore"])
@@ -136,6 +139,14 @@ if __name__ == "__main__":
     # plt.plot(fpr,tpr)
     # plt.show()
     print(roc_auc)
+    top50 = np.argsort(binding["dockscore"].to_numpy())[:33]
+    enrichment_50 = np.mean(binding["Standard Value"].to_numpy()[top50] < 1)
+    print(enrichment_50)
+
+    #print(len(dock_order))
+    #binding["Standard Value"] < 1,
+    #print(enrichment)
+
     # print(roc_auc_score(binding["Standard Value"] < 1, -binding["dockscore"]))
     # plt.scatter(np.log(binding["Standard Value"]), binding["dockscore"])
     # plt.show()

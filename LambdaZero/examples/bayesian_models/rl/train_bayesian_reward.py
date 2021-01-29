@@ -16,7 +16,7 @@ import torch_geometric.transforms as T
 
 from LambdaZero.examples.bayesian_models.bayes_tune.mcdrop import MCDrop
 from LambdaZero.examples.bayesian_models.rl import config
-from LambdaZero.environments.reward import BayesianRewardActor
+from LambdaZero.environments.bayesian_reward import BayesianRewardActor
 from LambdaZero.environments.persistent_search.persistent_buffer import \
     BlockMolGraphEnv_PersistentBuffer, BlockMolEnvGraph_v1
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch_with_targets, eval_epoch, \

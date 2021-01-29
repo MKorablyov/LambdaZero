@@ -117,7 +117,7 @@ def train_mcdrop(train_loader, val_loader, model, device, config, optim, iterati
 def train_mcdrop_rl(train_loader, val_loader, model, device, config, optim, iteration):
     # N = len(train_loader.dataset)
     train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
-    
+
     return train_scores
 
 def mcdrop_mean_variance(train_len, loader, model, device, config):
@@ -156,7 +156,7 @@ def sample_embeds(loader, model, device, config):
         data = data.to(device)
         embeds = model.get_embed(data, do_dropout=False)
         epoch_embeds.append(embeds.detach().cpu().numpy())
-    epoch_embeds = np.concatenate(epoch_embeds,axis=0)
+    epoch_embeds = np.concatenate(epoch_embeds, axis=0)
     return epoch_embeds
 
 
@@ -222,25 +222,3 @@ def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
     epoch_logits = np.concatenate(epoch_logits, 0)
     scores = _epoch_metrics(epoch_targets_norm, epoch_logits, config["data"]["normalizer"], scope)
     return scores
-
-
-def train_brr(train_loader, val_loader, model, device, config, optim, iteration):
-    N = len(train_loader.dataset)
-
-    print(train_loader.dataset)
-    print(train_loader.dataset[0])
-    print(train_loader.dataset[0].__dict__)
-    time.sleep(10000)
-
-    #train_scores = config["train_epoch"](train_loader, model, optim, device, config, "train")
-    #val_scores = config["eval_epoch"](val_loader, model, device, config, "val")
-    #scores = {**train_scores, **val_scores}
-
-    #if iteration % config["uncertainty_eval_freq"] == 1:
-    #    _scores = eval_mpnn_brr(train_loader, val_loader, model, device, config, N)
-    #    scores = {**scores, **_scores}
-    #return scores
-
-
-def brr_mean_variance(train_loader, loader, model, device, config):
-    pass

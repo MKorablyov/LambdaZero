@@ -44,7 +44,10 @@ def aq_regret(train_loader, ul_loader, config):
             "aq_frac_top25_percent":frac_top25percent}
 
 
-class UCT(tune.Trainable):
+
+
+
+class UCB(tune.Trainable):
     def _setup(self, config):
         self.config = config
         # load dataset
@@ -102,7 +105,7 @@ class UCT(tune.Trainable):
 
 DEFAULT_CONFIG = {
     "acquirer_config": {
-        "run_or_experiment": UCT,
+        "run_or_experiment": UCB,
         "config":{
             "data": aq_config.data_config,
             "regressor": MCDrop,
