@@ -145,6 +145,7 @@ def bayesian_ridge(train_x, val_x, train_targets_norm, val_targets_norm, config)
     val_logits, val_std = clf.predict(val_x, return_std=True)
     train_scores = _epoch_metrics(train_targets_norm, train_logits, config["data"]["normalizer"], "train_ridge")
     val_scores = _epoch_metrics(val_targets_norm, val_logits, config["data"]["normalizer"], "val_ridge")
+    #print(train_scores, ((train_targets_norm - train_targets_norm.mean())**2).mean() )
     ll = -0.5 * np.mean(np.log(2 * np.pi * val_std ** 2) + ((val_targets_norm - val_logits) ** 2 / val_std ** 2))
     val_scores["val_ll"] = ll
     return {**train_scores, **val_scores}, clf

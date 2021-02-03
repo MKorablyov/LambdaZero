@@ -13,7 +13,7 @@ from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_mcdro
 from LambdaZero.examples.bayesian_models.bayes_tune.brr import BRR
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
     mcdrop_mean_variance
-# from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
+from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 
 datasets_dir, _, _ = LambdaZero.utils.get_external_dirs()
 
@@ -377,24 +377,45 @@ def concat_fp_feat(loader):
     feat = [np.concatenate([d.row_fp, d.col_fp]) for d in loader.dataset]
     return np.asarray(feat)
 
-# comb_data = {"dataset": DrugCombEdge,
-#                   "dataset_split_path": osp.join(datasets_dir, "NewDrugComb/raw/1700_split.npy"),
-#                   "target": "negative_css",
-#                   "dataset_config": {},
-#                   "b_size": 40,
-#                   "normalizer": LambdaZero.utils.MeanVarianceNormalizer([0, 1.]),
-#                   }
-# uctComb001 = {
-#     "acquirer_config": {
-#         #"stop": {"training_iteration": 115},
-#         "config": {
-#             "data": comb_data,
-#             "regressor": BRR,
-#             "regressor_config": {"config": {
-#                 "data":comb_data,
-#                 "regressor_config": {"get_feat": concat_fp_feat},
-#             }},
-#         "aq_size": 100,
-#         }}}
-# uctComb002 = uctComb001
-# uctComb002["acquirer_config"]["config"]["epsilon"] = 10000
+comb_data = {"dataset": DrugCombEdge,
+                  "dataset_split_path": osp.join(datasets_dir, "NewDrugComb/raw/1700_split.npy"),
+                  "target": "negative_css",
+                  "dataset_config": {},
+                  "b_size": 40,
+                  "normalizer": LambdaZero.utils.MeanVarianceNormalizer([0, 1.]),
+                  }
+uctComb001 = {
+    "acquirer_config": {
+        #"stop": {"training_iteration": 115},
+        "config": {
+            "data": comb_data,
+            "epsilon": 0.0,#111110.0,
+            #"minimize_objective": True,
+            "kappa": 0.00,
+            "aq_size": 100,
+            # grid_search(list(10**np.linspace(start=-2,stop=2,num=32))),
+            "regressor": BRR,
+            "regressor_config": {"config": {
+                "data":comb_data,
+                "regressor_config": {"get_feat": concat_fp_feat},
+            }},
+
+        },
+        "resources_per_trial": {"cpu": 4, "gpu": 0.0}
+    }}
+
+uctComb002 = {
+    "acquirer_config": {
+        "config": {
+            "data": comb_data,
+            "kappa": grid_search(list(10**np.linspace(start=-2,stop=2,num=32))),
+            "aq_size": 100,
+            "regressor": BRR,
+            "regressor_config": {"config": {
+                "data":comb_data,
+                "regressor_config": {"get_feat": concat_fp_feat},
+            }},
+
+        },
+        "resources_per_trial": {"cpu": 1, "gpu": 0.0}
+    }}

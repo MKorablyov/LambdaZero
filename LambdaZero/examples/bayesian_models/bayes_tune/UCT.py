@@ -94,12 +94,16 @@ class UCB(tune.Trainable):
 
     def acquire_batch(self):
         mean, var = self.regressor.get_mean_variance(self.ul_loader)
-        scores = mean + (self.config["kappa"] * var)
+        if self.config["minimize_objective"]:
+            scores = -mean + (self.config["kappa"] * var)
+        else:
+            scores = mean + (self.config["kappa"] * var)
         # noise is not a part of original UCT but is added here
         noise = self.config["epsilon"] * np.random.uniform(size=mean.shape[0])
         scores = scores + noise
-        if self.config["minimize_objective"]: scores = -scores
         idxs = np.argsort(-scores)[:self.config["aq_size"]]
+        #print(mean, self.config["kappa"],self.config["epsilon"], noise)
+        #print(np.mean(scores), np.mean(scores[idxs]))
         return idxs
 
 
@@ -128,11 +132,11 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "uct001"
+    else: config_name = "uctComb002"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["acquirer_config"]["name"] = config_name
-    ray.init(memory=config["memory"])
+    ray.init(_memory=config["memory"])
 
     print(config)
     tune.run(**config["acquirer_config"])
