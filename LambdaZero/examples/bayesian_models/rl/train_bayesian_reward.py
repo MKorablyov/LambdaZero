@@ -23,6 +23,7 @@ from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, tr
     train_mcdrop_rl, mcdrop_mean_variance
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config
 from LambdaZero.environments import PredDockBayesianReward_v1
+from LambdaZero.environments import ProxyReward
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
