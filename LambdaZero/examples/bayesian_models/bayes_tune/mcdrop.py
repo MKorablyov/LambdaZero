@@ -39,26 +39,26 @@ class MCDrop(tune.Trainable):
         self.optim = config["optimizer"](self.model.parameters(), **config["optimizer_config"])
         self.train_len = 0
 
-    def _train(self):
-        scores = self.config["train"](
+    def _train(self): # this is train iteration actually
+        stats = self.config["train"](
             self.train_loader, self.val_loader, self.model,self.device, self.config, self.optim, self._iteration)
-        return scores
+        return stats
 
-    def fine_tune(self, new_samples_loader, val_loader, validate):
-        self.train_loader, self.val_loader = new_samples_loader, val_loader
-        self.train_len += len(self.train_loader.dataset)
-        all_scores = []
-        for i in range(self.config["finetune_iterations"]):
-            self._iteration = i
-            scores = self._train()
-            all_scores.append(scores)
-        # self.train_loader = train_loader
-        if validate:
-            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
-            return all_scores[-1], {**val_score, **val_ll}
-        else:
-            return all_scores[-1], {}
+    # def fine_tune(self, new_samples_loader, val_loader, validate):
+    #     self.train_loader, self.val_loader = new_samples_loader, val_loader
+    #     self.train_len += len(self.train_loader.dataset)
+    #     all_scores = []
+    #     for i in range(self.config["finetune_iterations"]):
+    #         self._iteration = i
+    #         scores = self._train()
+    #         all_scores.append(scores)
+    #     # self.train_loader = train_loader
+    #     if validate:
+    #         val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
+    #         val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
+    #         return all_scores[-1], {**val_score, **val_ll}
+    #     else:
+    #         return all_scores[-1], {}
 
     def fit(self, train_loader, val_loader, validate=False):
         # update internal dataset
@@ -75,15 +75,17 @@ class MCDrop(tune.Trainable):
             self._iteration = i
             scores = self._train()
             all_scores.append(scores)
-        if validate:
-            val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
-            val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
-            return all_scores[-1], {**val_score, **val_ll}
-        else:
-            return all_scores[-1], {}
 
-    def get_mean_variance(self, loader, train_len):
-        mean,var = self.config["get_mean_variance"](train_len, loader, self.model, self.device, self.config)
+        return all_scores[-1], {}
+        # if validate:
+        #     val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")
+        #     val_ll = eval_mcdrop(self.val_loader, self.model, self.device, self.config, self.train_len, "val")
+        #     return all_scores[-1], {**val_score, **val_ll}
+        # else:
+        #     return all_scores[-1], {}
+
+    def get_mean_variance(self, loader, train_loader):
+        mean,var = self.config["get_mean_variance"](train_loader, loader, self.model, self.device, self.config)
         return mean, var
 
     def save(self, path):
@@ -124,9 +126,9 @@ DEFAULT_CONFIG = {
             "T": 20,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations":150,
+            "train_iterations": 61,
             "model": LambdaZero.models.MPNNetDrop,
-            "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
+            "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1,},
             # "model_config": {},
 
             "optimizer": torch.optim.Adam,
@@ -160,7 +162,7 @@ if __name__ == "__main__":
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["regressor_config"]["name"] = config_name
 
-    ray.init(memory=config["memory"])
+    ray.init(_memory=config["memory"])
     # this will run train the model with tune scheduler
     #tune.run(**config["regressor_config"])
     tune.run(**config["regressor_config"])

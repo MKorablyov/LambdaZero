@@ -196,7 +196,7 @@ class MPNNetDrop(nn.Module):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
     """
-    def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=64):
+    def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=64, out_dim=1):
         super(MPNNetDrop, self).__init__()
         self.drop_last = drop_last
         self.drop_data = drop_data
@@ -209,7 +209,7 @@ class MPNNetDrop(nn.Module):
         self.gru = nn.GRU(dim, dim)
         self.set2set = Set2Set(dim, processing_steps=3)
         self.lin1 = nn.Linear(2 * dim, dim)
-        self.lin2 = nn.Linear(dim, 1)
+        self.lin2 = nn.Linear(dim, out_dim)
 
     def get_embed(self, data, do_dropout):
         if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
@@ -233,7 +233,8 @@ class MPNNetDrop(nn.Module):
     def forward(self, data, do_dropout):
         embed = self.get_embed(data, do_dropout)
         out = self.lin2(embed)
-        return out.view(-1)
+        return out
+        #return out.view(-1)
 
     # todo: integrate masking
     # # if do_dropout and use_mask: out = out * self.set_mask

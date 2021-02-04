@@ -44,9 +44,6 @@ def aq_regret(train_loader, ul_loader, config):
             "aq_frac_top25_percent":frac_top25percent}
 
 
-
-
-
 class UCB(tune.Trainable):
     def _setup(self, config):
         self.config = config
@@ -93,7 +90,8 @@ class UCB(tune.Trainable):
         return scores
 
     def acquire_batch(self):
-        mean, var = self.regressor.get_mean_variance(self.ul_loader)
+        # fixme ! - not sure how to deal with passing around train loade here ?!
+        mean, var = self.regressor.get_mean_variance(self.ul_loader, self.train_loader)
         if self.config["minimize_objective"]:
             scores = -mean + (self.config["kappa"] * var)
         else:
@@ -132,7 +130,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "uctComb002"
+    else: config_name = "ucb008_deup"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["acquirer_config"]["name"] = config_name

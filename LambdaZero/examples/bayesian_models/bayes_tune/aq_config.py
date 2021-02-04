@@ -12,27 +12,27 @@ from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_mcdro
     mpnn_brr_mean_variance
 from LambdaZero.examples.bayesian_models.bayes_tune.brr import BRR
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
-    mcdrop_mean_variance
+    mcdrop_mean_variance, train_mpnn_deup, deup_mean_variance
 from LambdaZero.examples.drug_comb.new_drugcomb_data_v2 import DrugCombEdge
 
 datasets_dir, _, _ = LambdaZero.utils.get_external_dirs()
 
 
 data_config = {
-    "target": "gridscore",
+    "target": "dockscore",
     "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
     "dataset_split_path": osp.join(datasets_dir,
-                                 "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
+                                 "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
-        "root": osp.join(datasets_dir, "brutal_dock/mpro_6lze"),
-        "props": ["gridscore", "smi"],
+        "root": osp.join(datasets_dir, "brutal_dock/seh"),
+        "props": ["dockscore", "smiles"],
         "transform": T.Compose([LambdaZero.utils.Complete()]),
-        "file_names": ["Zinc15_2k"],
+        "file_names": ["Zinc20_docked_neg_randperm_3k"],
                      #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
     },
     "b_size": 40,
-    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-43.042, 7.057])
+    "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.1])
 }
 
 
@@ -291,6 +291,24 @@ uct007_mcdrop = {
                     }
                 }
             }}}
+
+
+
+ucb008_deup = {
+    "acquirer_config":{
+            "config":{
+                "train":train_mpnn_brr,
+                "get_mean_variance": deup_mean_variance,
+                "kappa": 0.07,
+                "regressor_config":{
+                    "config":{
+                        "model_config": {"drop_data": False, "drop_weights": False, "drop_last": True,
+                                         "drop_prob": 0.1, "out_dim": 2},
+
+                        "train": train_mpnn_deup,
+                        "get_mean_variance":deup_mean_variance
+                    }}}}}
+
 
 
 ################# Thompson Sampling experiment ################# 
