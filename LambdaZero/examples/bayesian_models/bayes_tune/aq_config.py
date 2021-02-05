@@ -9,7 +9,7 @@ import LambdaZero.chem
 import LambdaZero.inputs
 import LambdaZero.models
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_mcdrop, train_mpnn_brr, \
-    mpnn_brr_mean_variance
+    mpnn_brr_mean_variance, train_deup_debug
 from LambdaZero.examples.bayesian_models.bayes_tune.brr import BRR
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import train_epoch,eval_epoch, train_mcdrop, \
     mcdrop_mean_variance, train_mpnn_deup, deup_mean_variance
@@ -22,13 +22,13 @@ data_config = {
     "target": "dockscore",
     "dataset_creator": LambdaZero.inputs.dataset_creator_v1,
     "dataset_split_path": osp.join(datasets_dir,
-                                 "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+                                 "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh"),
         "props": ["dockscore", "smiles"],
         "transform": T.Compose([LambdaZero.utils.Complete()]),
-        "file_names": ["Zinc20_docked_neg_randperm_3k"],
+        "file_names": ["Zinc20_docked_neg_randperm_30k"],
                      #["Zinc15_260k_0", "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
     },
     "b_size": 40,
@@ -299,6 +299,39 @@ ucb008_deup = {
             "config":{
                 "train":train_mpnn_brr,
                 "get_mean_variance": deup_mean_variance,
+                "kappa": grid_search(list(10**np.linspace(start=-1.5,stop=1,num=5))),
+                "regressor_config":{
+                    "config":{
+                        "model_config": {"drop_data": False, "drop_weights": False, "drop_last": True,
+                                         "drop_prob": 0.1, "out_dim": 2},
+
+                        "train": train_mpnn_deup,
+                        "get_mean_variance":deup_mean_variance
+                    }}}}}
+
+
+
+ucb009_deup = {
+    "acquirer_config":{
+            "config":{
+                "train":train_mpnn_brr,
+                "get_mean_variance": deup_mean_variance,
+                "kappa": grid_search(list(10**np.linspace(start=-1.5,stop=1,num=5))),
+                "regressor_config":{
+                    "config":{
+                        "model_config": {"drop_data": False, "drop_weights": False, "drop_last": True,
+                                         "drop_prob": 0.1, "out_dim": 2},
+
+                        "train": train_mpnn_deup,
+                        "get_mean_variance":deup_mean_variance
+                    }}}}}
+
+
+ucb010_deup = {
+    "acquirer_config":{
+            "config":{
+                "train":train_mpnn_brr,
+                "get_mean_variance": deup_mean_variance,
                 "kappa": 0.07,
                 "regressor_config":{
                     "config":{
@@ -309,6 +342,107 @@ ucb008_deup = {
                         "get_mean_variance":deup_mean_variance
                     }}}}}
 
+
+ucb011_deup = {
+    "acquirer_config":{
+            "config":{
+                "train":train_mpnn_brr,
+                "get_mean_variance": deup_mean_variance,
+                "kappa": 0.5,
+                "regressor_config":{
+                    "config":{
+                        "model_config": {"drop_data": False, "drop_weights": False, "drop_last": True,
+                                         "drop_prob": 0.1, "out_dim": 2},
+
+                        "train": train_mpnn_deup,
+                        "get_mean_variance":deup_mean_variance
+                    }}}}}
+
+ucb012_deup = {
+    "acquirer_config":{
+            "config":{
+                "train":train_mpnn_brr,
+                "get_mean_variance": deup_mean_variance,
+                "kappa": 0.5,
+                "regressor_config":{
+                    "config":{
+                        "model":LambdaZero.models.MPNNetDropSmall,
+                        "model_config": {"drop_data": False, "drop_weights": False, "drop_last": False,
+                                         "drop_prob": 0.0, "out_dim": 2},
+
+                        #"train_iterations": 1451,
+                        "train": train_mpnn_deup,
+                        "get_mean_variance":deup_mean_variance
+                    }}}}}
+
+ucb013_deup = {
+    "acquirer_config":{
+            "config":{
+                "train":train_mpnn_brr,
+                "get_mean_variance": deup_mean_variance,
+                "kappa": 0.0,
+                "regressor_config":{
+                    "config":{
+                        "model":LambdaZero.models.MPNNetDrop,
+                        "model_config": {"drop_data": False, "drop_weights": False, "drop_last": False,
+                                         "drop_prob": 0.0, "out_dim": 2},
+
+                        "train_iterations": 61,
+                        "train": train_deup_debug,
+                        "get_mean_variance":deup_mean_variance
+                    }}}}}
+
+
+ucb014_deup = {
+    "acquirer_config":{
+            "config":{
+                "train":train_mpnn_brr,
+                "get_mean_variance": deup_mean_variance,
+                "kappa": grid_search(list(10**np.linspace(start=-1.5,stop=1,num=8))),
+                "regressor_config":{
+                    "config":{
+                        "model":LambdaZero.models.MPNNetDrop,
+                        "model_config": {"drop_data": False, "drop_weights": False, "drop_last": False,
+                                         "drop_prob": 0.0, "out_dim": 2},
+
+                        "train_iterations": 61,
+                        "train": train_mpnn_deup,
+                        "get_mean_variance":deup_mean_variance
+                    }}},
+        "stop": {"training_iteration": 1}
+    }}
+# +-----------------+------------+-------+------------+--------+------------------+-------------------+-------------------+------------+
+# | Trial name      | status     | loc   |      kappa |   iter |   total time (s) |   aq_top15_regret |   aq_top50_regret |   aq_top15 |
+# |-----------------+------------+-------+------------+--------+------------------+-------------------+-------------------+------------|
+# | UCB_3bb76_00000 | TERMINATED |       |  0.0316228 |      1 |          282.681 |          0.7      |          0.599999 |      -13   |
+# | UCB_3bb76_00001 | TERMINATED |       |  0.0719686 |      1 |          274.256 |          0.8      |          0.7      |      -12.9 |
+# | UCB_3bb76_00002 | TERMINATED |       |  0.163789  |      1 |          268.965 |          0.8      |          0.799999 |      -12.9 |
+# | UCB_3bb76_00003 | TERMINATED |       |  0.372759  |      1 |          254.992 |          0.5      |          0.7      |      -13.2 |
+# | UCB_3bb76_00004 | TERMINATED |       |  0.848343  |      1 |          281.678 |          0.8      |          0.7      |      -12.9 |
+# | UCB_3bb76_00005 | TERMINATED |       |  1.9307    |      1 |          279.885 |          0.599999 |          0.7      |      -13.1 |
+# | UCB_3bb76_00006 | TERMINATED |       |  4.39397   |      1 |          309.035 |          0.4      |          0.599999 |      -13.3 |
+# | UCB_3bb76_00007 | TERMINATED |       | 10         |      1 |          295.208 |          0.7      |          0.7      |      -13   |
+# +-----------------+------------+-------+------------+--------+------------------+-------------------+-------------------+------------+
+
+
+ucb015_deup = {
+    "acquirer_config":{
+            "config":{
+                "train":train_mpnn_brr,
+                "get_mean_variance": deup_mean_variance,
+                "kappa": grid_search(list(10**np.linspace(start=-1.5,stop=1,num=8))),
+                "regressor_config":{
+                    "config":{
+                        "model":LambdaZero.models.MPNNetDrop,
+                        "model_config": {"drop_data": False, "drop_weights": False, "drop_last": False,
+                                         "drop_prob": 0.0, "out_dim": 2},
+
+                        "train_iterations": 61,
+                        "train": train_mpnn_deup,
+                        "get_mean_variance":deup_mean_variance
+                    }}},
+        "stop": {"training_iteration": 10}
+    }}
 
 
 ################# Thompson Sampling experiment ################# 

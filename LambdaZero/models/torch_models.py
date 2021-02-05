@@ -234,20 +234,52 @@ class MPNNetDrop(nn.Module):
         embed = self.get_embed(data, do_dropout)
         out = self.lin2(embed)
         return out
-        #return out.view(-1)
 
-    # todo: integrate masking
-    # # if do_dropout and use_mask: out = out * self.set_mask
-    # def set_mask(self):
-    #     self.input_mask = torch.bernoulli(torch.zeros(self.num_feat).fill_(1 - self.drop_prob)).to(device)
-    #     self.lin0_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
-    #     self.h_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
-    #     self.conv_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
-    #     self.gru_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
-    #     self.set_mask = torch.bernoulli(torch.zeros(self.dim + self.dim).fill_(1 - self.drop_prob)).to(device)
-    #     self.lin1_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
-    #     self.lin2_mask = torch.bernoulli(torch.zeros(self.dim).fill_(1 - self.drop_prob)).to(device)
-        
+
+
+class MPNNetDropSmall(nn.Module):
+    """
+    A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
+    """
+    def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=32, out_dim=1):
+        super(MPNNetDropSmall, self).__init__()
+        self.drop_last = drop_last
+        self.drop_data = drop_data
+        self.drop_weights = drop_weights
+        self.drop_prob = drop_prob
+        self.lin0 = nn.Linear(num_feat, dim)
+
+        h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
+        self.conv = NNConv(dim, dim, h, aggr='mean')
+        self.gru = nn.GRU(dim, dim)
+        self.set2set = Set2Set(dim, processing_steps=2)
+        self.lin1 = nn.Linear(2 * dim, dim)
+        self.lin2 = nn.Linear(dim, out_dim)
+
+    def get_embed(self, data, do_dropout):
+        if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin0(data.x))
+        h = out.unsqueeze(0)
+        if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+
+        for i in range(2):
+            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+            if self.drop_weights: m = F.dropout(m, training=do_dropout, p=self.drop_prob)
+            out, h = self.gru(m.unsqueeze(0), h)
+            if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+            out = out.squeeze(0)
+
+        out = self.set2set(out, data.batch)
+        if self.drop_weights: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        out = F.relu(self.lin1(out))
+        if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+        return out
+
+    def forward(self, data, do_dropout):
+        embed = self.get_embed(data, do_dropout)
+        out = self.lin2(embed)
+        return out
+
         
 class MPNNetDropLRGA(nn.Module):
     """

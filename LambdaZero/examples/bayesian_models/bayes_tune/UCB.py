@@ -112,14 +112,14 @@ DEFAULT_CONFIG = {
             "data": aq_config.data_config,
             "regressor": MCDrop,
             "regressor_config": aq_config.regressor_config,
-            "aq_size0": 200,
-            "aq_size": 50,
+            "aq_size0": 1000,
+            "aq_size": 100,
             "kappa": 0.2,
             "epsilon": 0.0,
             "minimize_objective":True,
         },
         "local_dir": summaries_dir,
-        "stop": {"training_iteration": 20},
+        "stop": {"training_iteration": 10},
         "resources_per_trial": {"cpu": 4, "gpu": 1.0}
     },
     "memory": 10 * 10 ** 9
@@ -130,7 +130,7 @@ DEFAULT_CONFIG = {
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2: config_name = sys.argv[1]
-    else: config_name = "ucb008_deup"
+    else: config_name = "ucb015_deup"
     config = getattr(aq_config, config_name)
     config = merge_dicts(DEFAULT_CONFIG, config)
     config["acquirer_config"]["name"] = config_name

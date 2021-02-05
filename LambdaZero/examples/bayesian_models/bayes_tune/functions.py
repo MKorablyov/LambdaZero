@@ -230,7 +230,7 @@ def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
 
 def _ll_loss(y, y_hat, std_hat):
     # positive log likelihood
-    loss = 0.5 *torch.mean(torch.log(2 * float(np.pi) * std_hat ** 2) + ((y - y_hat) ** 2 / std_hat ** 2))
+    loss = 0.5 * torch.mean(torch.log(2 * float(np.pi) * std_hat ** 2) + ((y - y_hat) ** 2 / std_hat ** 2))
     return loss
 
 
@@ -242,46 +242,155 @@ def train_mpnn_deup(train_loader, val_loader, model, device, config, optim, iter
 
     tvar_targets_norm = []
     tvar_logits = []
+    tvar_losses = []
     tmean_targets_norm = []
     tmean_logits = []
-
+    tmean_losses = []
+    model.train()
     for i in range(len(tvar_data)):
         # tmean step
         batch = next(iter(tmean_data)).to(device)
         targets = getattr(batch, config["data"]["target"])
         optim.zero_grad()
         out = model(batch, do_dropout=True)
-        y_hat, std = (out[:,0])[:,None], (out[:,1])[:,None]
+        y_hat, std = (out[:,0]), (out[:,1])
         targets_norm = config["data"]["normalizer"].tfm(targets)
         loss = _ll_loss(torch.tensor(targets_norm).to(device),y_hat, std.detach())
+
         loss.backward()
         optim.step()
         tmean_targets_norm.append(targets_norm.detach().cpu().numpy())
         tmean_logits.append(y_hat.detach().cpu().numpy())
+        tmean_losses.append(loss.detach().cpu().numpy())
 
         # tvar step
         batch = next(iter(tvar_data)).to(device)
         targets = getattr(batch, config["data"]["target"])
         optim.zero_grad()
         out = model(batch, do_dropout=True)
-        y_hat, std = out[:,0][:,None], out[:,1][:,None]
+        y_hat, std = out[:,0], out[:,1]
         targets_norm = config["data"]["normalizer"].tfm(targets)
         loss = _ll_loss(torch.tensor(targets_norm).to(device),y_hat.detach(), std)
         loss.backward()
         optim.step()
         tvar_targets_norm.append(targets_norm.detach().cpu().numpy())
         tvar_logits.append(y_hat.detach().cpu().numpy())
+        tvar_losses.append(loss.detach().cpu().numpy())
 
     tmean_scores = _epoch_metrics(np.concatenate(tmean_targets_norm, 0),
-                                  np.concatenate(tmean_logits,0), config["data"]["normalizer"], "train_tmean_")
+                                  np.concatenate(tmean_logits,0), config["data"]["normalizer"], "train_tmean")
     tvar_scores = _epoch_metrics(np.concatenate(tvar_targets_norm, 0),
-                                  np.concatenate(tvar_logits,0), config["data"]["normalizer"], "train_tvar_")
-    return {**tmean_scores, **tvar_scores}
+                                  np.concatenate(tvar_logits,0), config["data"]["normalizer"], "train_tvar")
+
+
+    val_losses = []
+    model.eval()
+    for i in range(10):
+        # tmean step
+        batch = next(iter(tmean_data)).to(device)
+        targets = getattr(batch, config["data"]["target"])
+        out = model(batch, do_dropout=True)
+        y_hat, std = (out[:,0]), (out[:,1])
+        targets_norm = config["data"]["normalizer"].tfm(targets)
+        loss = _ll_loss(torch.tensor(targets_norm).to(device),y_hat, std.detach())
+        val_losses.append(loss.detach().cpu().numpy())
+
+    tmean_loss = np.stack(tmean_losses,0).mean()
+    tvar_loss = np.stack(tvar_losses, 0).mean()
+    val_loss = np.stack(val_losses, 0).mean()
+
+    print(iteration, "tmean scores:", tmean_loss, tmean_scores )
+    print(iteration,"tvar scores",tvar_loss, tvar_scores)
+    print(iteration,"val loss:", val_loss)
+
+    return {**tmean_scores, **tvar_scores, "tmean_loss":tmean_loss, "tvar_loss":tvar_loss}
+
+
+def train_deup_debug(train_loader, val_loader, model, device, config, optim, iteration):
+    train_data = train_loader.dataset
+    n = int(len(train_data) * 0.5)
+    tmean_data = DataLoader(train_data[:n], shuffle=True, batch_size=config["data"]["b_size"])
+    tvar_data = DataLoader(train_data[n:], shuffle=True, batch_size=config["data"]["b_size"])
+
+    tvar_targets_norm = []
+    tvar_logits = []
+    tvar_losses = []
+    tmean_targets_norm = []
+    tmean_logits = []
+    tmean_losses = []
+    model.train()
+    for i in range(len(tvar_data)):
+        # tmean step
+        batch = next(iter(tmean_data)).to(device)
+        targets = getattr(batch, config["data"]["target"])
+        optim.zero_grad()
+        out = model(batch, do_dropout=True)
+        y_hat, std = (out[:,0]), (out[:,1])
+        targets_norm = config["data"]["normalizer"].tfm(targets)
+
+        loss = F.mse_loss(y_hat, targets_norm)
+        #loss = _ll_loss(torch.tensor(targets_norm).to(device),y_hat, std.detach())
+
+        loss.backward()
+        optim.step()
+        tmean_targets_norm.append(targets_norm.detach().cpu().numpy())
+        tmean_logits.append(y_hat.detach().cpu().numpy())
+        tmean_losses.append(loss.detach().cpu().numpy())
+
+        # tvar step
+        batch = next(iter(tvar_data)).to(device)
+        targets = getattr(batch, config["data"]["target"])
+        optim.zero_grad()
+        out = model(batch, do_dropout=True)
+        y_hat, std = out[:,0], out[:,1]
+        targets_norm = config["data"]["normalizer"].tfm(targets)
+        loss = F.mse_loss(y_hat, targets_norm)
+        #loss = _ll_loss(torch.tensor(targets_norm).to(device),y_hat.detach(), std)
+        loss.backward()
+        optim.step()
+        tvar_targets_norm.append(targets_norm.detach().cpu().numpy())
+        tvar_logits.append(y_hat.detach().cpu().numpy())
+        tvar_losses.append(loss.detach().cpu().numpy())
+
+    tmean_scores = _epoch_metrics(np.concatenate(tmean_targets_norm, 0),
+                                  np.concatenate(tmean_logits,0), config["data"]["normalizer"], "train_tmean")
+    tvar_scores = _epoch_metrics(np.concatenate(tvar_targets_norm, 0),
+                                  np.concatenate(tvar_logits,0), config["data"]["normalizer"], "train_tvar")
+
+    val_losses = []
+    model.eval()
+    for i in range(10):
+        # tmean step
+        batch = next(iter(tmean_data)).to(device)
+        targets = getattr(batch, config["data"]["target"])
+        out = model(batch, do_dropout=True)
+        y_hat, std = (out[:,0]), (out[:,1])
+        targets_norm = config["data"]["normalizer"].tfm(targets)
+        loss = _ll_loss(torch.tensor(targets_norm).to(device),y_hat, std.detach())
+        val_losses.append(loss.detach().cpu().numpy())
+
+    tmean_loss = np.stack(tmean_losses,0).mean()
+    tvar_loss = np.stack(tvar_losses, 0).mean()
+    val_loss = np.stack(val_losses, 0).mean()
+
+    print("baseline mse", ((np.concatenate(tmean_targets_norm, 0) - np.concatenate(tvar_targets_norm,0).mean())**2).mean() )
+    print(iteration, "tmean scores:", tmean_loss, tmean_scores )
+    print(iteration,"tvar scores",tvar_loss, tvar_scores)
+    print(iteration,"val loss:", val_loss)
+
+    return {**tmean_scores, **tvar_scores, "tmean_loss":tmean_loss, "tvar_loss":tvar_loss}
+
 
 
 def deup_mean_variance(train_loader, loader, model, device, config):
-    means, vars = [], []
-    for data in (loader):
-        means.append(1.0)
-        vars.append(1.0)
-    return np.asarray(means), np.asarray(vars)
+    print("getting variance for", len(loader))
+    meanstds = []
+    for batch in loader:
+        batch = batch.to(device)
+        meanvar = model(batch,do_dropout=False)
+        meanstds.append(meanvar.detach().cpu().numpy())
+
+    meanstds = np.concatenate(meanstds, 0)
+    means, vars = meanstds[:,0], (meanstds[:,1]**2)
+    means = config["data"]["normalizer"].itfm(means)
+    return means, vars

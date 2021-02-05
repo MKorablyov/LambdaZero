@@ -125,8 +125,8 @@ DEFAULT_CONFIG = {
             "lambda": 1e-11,
             "T": 20,
             "lengthscale": 1e-2,
-            "uncertainty_eval_freq":15,
-            "train_iterations": 61,
+            "uncertainty_eval_freq":1500,
+            "train_iterations": 151,
             "model": LambdaZero.models.MPNNetDrop,
             "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1,},
             # "model_config": {},
@@ -140,7 +140,7 @@ DEFAULT_CONFIG = {
             "eval_epoch": eval_epoch,
         },
         "local_dir": summaries_dir,
-        "stop": {"training_iteration": 61},
+        "stop": {"training_iteration": 151},
         "resources_per_trial": {
             "cpu": 4,
             "gpu": 1.0
