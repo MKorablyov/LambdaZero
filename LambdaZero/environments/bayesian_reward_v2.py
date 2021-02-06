@@ -28,8 +28,33 @@ class ProxyReward:
         return reward, scores
 
 
+class UCB:
+    # todo: acquisition function - maybe create classes
+    #  AcqusitionFunction; ModelWithUncertainty
+    def __init__(self):
+        # make model
+        # seen_x, seen_y, val_x, val_y = None
+        pass
+
+    def update_with_seen(self, x, y):
+        # self.seen_x +=x
+        # self.model_with_uncertainty.fit(x,y, self.val_x, self.val_y)
+        pass
+
+    def acqusition_values(self, x):
+        # mean, var = self.model.get_mean_and_variance(molecules)
+        # return mean + kappa * var
+        pass
+
+    def acquire_batch(self, x, discounts, aq_values=None):
+        # if aq_values = self.compute_acquisition_values(x)
+        # aq_values_ = aq_values[top_k]
+        # return idx
+        pass
+
+
 @ray.remote(num_gpus=0.25, num_cpus=2)
-class ScoreProxy:
+class ScoreProxy(UCB):
     "combine scores from many models with uncertainty"
     def __init__(self, update_freq):
         self.update_freq = update_freq
@@ -58,46 +83,71 @@ class ScoreProxy:
         pass
 
 
-class UCB:
-    def __init__(self):
-        # make model
-        pass
 
-    def acquire_batch(self, molecules, discounts):
-        pass
-
-    def update_with_seen(self):
-        pass
-
+# class UCBTrainer(UCB, tune.trainable):
+    # _init():
+    #   seen_x, seen_y, val_x, val_y, unseen_x, unseen_y = .....
+    # def train()
+    #   idx  = self.acquire_batch(unseen_x)
+    #   x_, y_ = unseen[idx], unseen[idx]
+    #   self.update_with_seen(x_, y_)
 
 class DockScoreUCB(UCB):
-    name = "dock_score"
-    # todo: log acquisitions
-
-    def __call__(self, molecule):
-        # call UCB with a single example
-        pass
+    #def __call__(self, molecule):
+    #    # graph = G(molecule)
+    #    # return self.acquisition_values(molecule)[0]
 
     def acquire(self, molecules):
         # do docking here
+        # return molecules, dockscores
         pass
 
-    def acquire_and_update(self, molecules, scores):
-        # take_highest_k(molecules, scores)
-        # dockscores = self.acquire(highest_scoring_molecules)
-        print("dock score UCB to acquire molecules", len(molecules))
+    def acquire_and_update(self, molecules, aq_scores, discounts):
+        # idx = self.acquire_batch(molecules, aq_scores, discounts)
+        # molecules[idx], discounts[idx]
+        # dockscores = self.acquire(molecules)
         # self.update_with_seen(molecules, dockscores)
+        print("dock score UCB to acquire molecules", len(molecules))
         return None
+
+    def get_weights(self):
+        pass
+
+
+# todo: I want to be able to update every weight set independently with calls
+# todo: maybe original score could become ray.remote() object
+
+# DockScoreUCBActor(get_weights_func)
+# get_weights()
+# __call__(molecule)
+#   if self.get_weights()
+#   return self.weights * molecule
+
+
+
+# class DockScoreUCBActor():
+#     def __init__(self):
+#         pass
+#
+#     def __call__(self, molecule):
+#         if self.num_calls % self.weight_update_freq:
+#             self.weights = self.get_weights_func()
+#         return self.weights * molecule
+
+
+
+
 
 
 class ProxyActor:
-    def __init__(self):
-        self.sync_weights()
+    def __init__(self, sync_freq, get_weights):
+        self.sync_freq = sync_freq
+        self.weights = get_weights.remote()
 
-    def compute_reward(self):
+    def __call__(self, molecule):
         pass
 
-    def sync_weights(self):
+    def _sync_weights(self):
         pass
 
 
