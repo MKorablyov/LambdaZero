@@ -1,27 +1,14 @@
 import ray
 from LambdaZero.examples.hobby.acquisition_function import UCB,acquisition_values_UCB
-from .proxy import Actor
-
+from .proxy import Proxy, Actor
 
 
 @ray.remote(num_gpus=0.25, num_cpus=2)
-class ProxyUCB(UCB): # todo: inherit Proxy()
-    "combine scores from many models with uncertainty"
-    def __init__(self, update_freq, proc_func, acquirer_config):
-        self.update_freq = update_freq
+class ProxyUCB(UCB, Proxy): # todo: inherit Proxy()
+    def __init__(self, update_freq, proc_func, acquirer_config,proposed_x=[],proposed_y=[]):
         self.proc_func = proc_func
-        self.proposed_molecules = []
-        self.proposed_scores = []
         UCB.__init__(self,acquirer_config)
-
-    def propose_molecule(self, molecule, scores):
-        self.proposed_molecules.append(molecule)
-        self.proposed_scores.append(scores)
-
-        if len(self.proposed_molecules) == self.update_freq:
-            self.acquire_and_update()
-        print(len(self.proposed_molecules))
-        return None
+        Proxy.__init__(self, update_freq, proposed_x, proposed_y)
 
     def acquire_and_update(self):
         print("updating proxy", len(self.proposed_molecules))
@@ -31,7 +18,6 @@ class ProxyUCB(UCB): # todo: inherit Proxy()
         # dockscores = self.acquire(molecules)
         # self.update_with_seen(molecules, dockscores)
         #self.dockScore.acquire_and_update(self.proposed_molecules, self.proposed_scores)
-        self.proposed_molecules, proposed_scores = [], []
 
     def acquire(self, molecules):
         # do docking here
