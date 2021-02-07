@@ -1,1 +1,1 @@
-from .proxyUCB import ProxyUCB
+from .proxyUCB import ProxyUCB, Actor

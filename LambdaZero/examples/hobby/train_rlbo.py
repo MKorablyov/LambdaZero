@@ -24,7 +24,6 @@ curr_trial = config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
 
 
 
-
 DEFAULT_CONFIG = {
     "rllib_config":rllib_config,
     "summaries_dir": summaries_dir,

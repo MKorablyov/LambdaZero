@@ -25,6 +25,7 @@ rllib_config = {
         "reward_config": {
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
+            "actor_update_freq": 100,
 
         },
 
