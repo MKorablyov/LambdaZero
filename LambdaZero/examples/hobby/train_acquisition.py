@@ -3,8 +3,6 @@ from ray import tune
 
 # class EnsembleMLP:
     # make ensemble of weights in torch
-    #
-
     # def fit(x, y, x_val, y_val)
         # this would fit to the dataset
 
@@ -55,5 +53,15 @@ def load_dataset():
     return x,y
 
 load_dataset()
+
+# class UCBTrainer(UCB, tune.trainable):
+    # _init():
+    #   seen_x, seen_y, val_x, val_y, unseen_x, unseen_y = .....
+    # def train()
+    #   idx  = self.acquire_batch(unseen_x)
+    #   x_, y_ = unseen[idx], unseen[idx]
+    #   self.update_with_seen(x_, y_)
+
 # tune run reference here:
 # https://github.com/MKorablyov/LambdaZero/blob/master/LambdaZero/examples/bayesian_models/bayes_tune/UCB.py
+

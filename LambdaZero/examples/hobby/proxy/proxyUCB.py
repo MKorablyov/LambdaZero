@@ -7,12 +7,12 @@ from .proxy import Actor
 @ray.remote(num_gpus=0.25, num_cpus=2)
 class ProxyUCB(UCB): # todo: inherit Proxy()
     "combine scores from many models with uncertainty"
-    def __init__(self, update_freq, proc_func):
+    def __init__(self, update_freq, proc_func, acquirer_config):
         self.update_freq = update_freq
         self.proc_func = proc_func
         self.proposed_molecules = []
         self.proposed_scores = []
-        super(UCB, self).__init__()
+        UCB.__init__(self,acquirer_config)
 
     def propose_molecule(self, molecule, scores):
         self.proposed_molecules.append(molecule)

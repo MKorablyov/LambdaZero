@@ -11,8 +11,7 @@ import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.examples.bayesian_models.rl import config
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
-
-from LambdaZero.examples.hobby.reward.bayesian_reward_v2 import ProxyReward
+from LambdaZero.examples.hobby.reward.proxy_reward import ProxyReward
 
 from LambdaZero.examples.hobby.config_rlbo import rllib_config
 
@@ -22,6 +21,7 @@ if len(sys.argv) >= 2: config_name = sys.argv[1]
 else: config_name = "ppo_bayes_reward_008"
 config = getattr(config,config_name)
 curr_trial = config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
+
 
 
 
@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     "stop":{"training_iteration": 2000000},
     #"reward_learner_config":reward_learner_config,
     #"use_dock": True,
-    #"pretrained_model": None # "/home/mjain/scratch/mcdrop_rl/model.pt"
+    #"pretrained_model": None
 }
 
 config = merge_dicts(DEFAULT_CONFIG, config)
@@ -45,7 +45,7 @@ machine = socket.gethostname()
 if machine == "Ikarus":
     config["rllib_config"]["num_workers"] = 1
     config["rllib_config"]["num_gpus"] = 0.3
-    config["rllib_config"]["memory"] = 25 * 10**9
+    config["rllib_config"]["memory"] = 15 * 10**9
     config["rllib_config"]["sgd_minibatch_size"] = 4
 
 

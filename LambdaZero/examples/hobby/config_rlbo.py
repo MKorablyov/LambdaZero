@@ -1,10 +1,17 @@
 from LambdaZero.environments.persistent_search.persistent_buffer import \
     BlockMolEnvGraph_v1
 from LambdaZero.examples.hobby.proxy import ProxyUCB
-from LambdaZero.examples.hobby.reward.bayesian_reward_v2 import ProxyReward
+from LambdaZero.examples.hobby.reward.proxy_reward import ProxyReward
 from LambdaZero.examples.hobby.inputs import mol_to_graph_v1
+from LambdaZero.examples.hobby.model_with_uncertainty import ModelWithUncertainty
+
+acquirer_config = {
+    "model":ModelWithUncertainty,
+    "model_config":{},
+}
 
 proxy_config = {
+    "acquirer_config":acquirer_config,
     "update_freq":20,
     "proc_func":mol_to_graph_v1,
 }
