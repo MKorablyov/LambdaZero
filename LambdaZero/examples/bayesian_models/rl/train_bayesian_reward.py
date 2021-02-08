@@ -185,8 +185,6 @@ if __name__ == "__main__":
     config['rllib_config']['env_config']['reward_config']['sync_freq'] = config['reward_learner_config']['sync_freq']
 
 
-
-
     tune.run(config["trainer"],
         stop=config["stop"],
         max_failures=0,

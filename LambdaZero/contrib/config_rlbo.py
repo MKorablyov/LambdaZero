@@ -2,6 +2,7 @@ from LambdaZero.environments.persistent_search.persistent_buffer import BlockMol
 from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyReward
 from LambdaZero.contrib.model_with_uncertainty import MolFP
+from LambdaZero.contrib.oracle import DockingOracle
 
 model_config = {}
 
@@ -12,14 +13,17 @@ acquirer_config = {
     "kappa":0.2
 }
 
+oracle_config = {"num_threads":2}
+
 proxy_config = {
     "acquirer_config":acquirer_config,
     "update_freq":100,
-
+    "oracle": DockingOracle,
+    "oracle_config":oracle_config
 }
 
 rllib_config = {
-    "env": BlockMolEnvGraph_v1, # fixme maybe ray.remote the buffer as well
+    "env": BlockMolEnvGraph_v1, # todo: make ray remote environment
     "env_config": {
         "random_steps": 4,
         "allow_removal": True,
@@ -41,7 +45,7 @@ rllib_config = {
             "num_hidden": 64
         },
     },
-    #"callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},  # fixme (report all)
+    # "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},  # fixme (report all)
     "framework": "torch",
     "lr": 5e-5,
 }

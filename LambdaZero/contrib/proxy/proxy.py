@@ -33,9 +33,9 @@ class Proxy:
 
 
 class Actor():
-    def __init__(self, scoreProxy, sync_freq):
+    def __init__(self, scoreProxy, actor_sync_freq):
         self.scoreProxy = scoreProxy
-        self.sync_freq = sync_freq
+        self.sync_freq = actor_sync_freq
         # initialize
         self.num_calls = 0
         self.acqusition_func = ray.get(scoreProxy.get_acquisition_func.remote())

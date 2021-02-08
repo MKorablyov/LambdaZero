@@ -93,7 +93,7 @@ synth_config = {
         "features_generator": None,  # Method(s) of generating additional features
         "features_path": None,  # Path(s) to features to use in FNN (instead of features_generator)
         "no_features_scaling": False,  # Turn off scaling of features
-        "num_workers": 8,  # Number of workers for the parallel data loading (0 means sequential)
+        "num_workers": 8,  # Number of workers for the acquire data loading (0 means sequential)
         "batch_size": 50,  # Batch size
         "separate_val_path": None,  # Path to separate val set, optional
         "separate_test_path": None,  # Path to separate test set, optional
@@ -126,7 +126,7 @@ synth_config = {
         "features_generator": None,
         "features_path": None,  # Path(s) to features to use in FNN (instead of features_generator)
         "no_features_scaling": False,  # Turn off scaling of features
-        "num_workers": 8,  # Number of workers for the parallel data loading (0 means sequential)
+        "num_workers": 8,  # Number of workers for the acquire data loading (0 means sequential)
         "batch_size": 50,  # Batch size
         "disable_progress_bar": True,
         "checkpoint_path": osp.join(datasets_dir, "Synthesizability/MPNN_model/Regression/model_2/model.pt")

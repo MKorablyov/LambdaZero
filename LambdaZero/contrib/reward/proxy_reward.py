@@ -13,7 +13,6 @@ class ProxyReward:
         qed = 0.9
 
         dock_score = self.actor([molecule], [qed * synth_score])[0]
-        print("received dock_score from actor", dock_score)
         scores = {"dock_score":dock_score, "synth_score": synth_score, "qed":0.9}
 
         return synth_score * dock_score * qed, scores

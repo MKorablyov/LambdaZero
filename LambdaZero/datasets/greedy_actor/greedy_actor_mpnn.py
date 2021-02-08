@@ -21,7 +21,7 @@ class cfg:
     # MPNN parameters
     dockscore_model = osp.join(datasets_dir, "brutal_dock/d4/dock_blocks105_walk40_12_clust_model002")
 
-    # data parallel
+    # data acquire
     num_workers = 4
 
 

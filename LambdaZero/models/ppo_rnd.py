@@ -155,7 +155,7 @@ def lfilter(input_tensor, a_coeffs, b_coeffs):
     a_coeffs_flipped = a_coeffs.flip(0)
     b_coeffs_flipped = b_coeffs.flip(0)
 
-    # calculate windowed_input_signal in parallel
+    # calculate windowed_input_signal in acquire
     # create indices of original with shape (n_channel, n_order, n_sample)
     window_idxs = torch.arange(n_sample, device=device).unsqueeze(0) + torch.arange(n_order, device=device).unsqueeze(1)
     window_idxs = window_idxs.repeat(n_channel, 1, 1)
