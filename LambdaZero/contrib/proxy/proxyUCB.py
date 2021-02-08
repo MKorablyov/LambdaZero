@@ -1,6 +1,6 @@
 import ray
-from LambdaZero.examples.hobby.acquisition_function import UCB
-from .proxy import Proxy, Actor
+from LambdaZero.contrib.acquisition_function import UCB
+from .proxy import Proxy
 
 
 @ray.remote(num_gpus=0.25, num_cpus=2)

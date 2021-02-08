@@ -1,20 +1,5 @@
-import pickle, gzip,time,  os.path as osp
-import torch
-import pandas as pd
-import numpy as np
-import ray
+from LambdaZero.contrib.proxy import Actor
 
-from torch_geometric.data import Batch, DataLoader
-import torch_geometric.transforms as T
-from rdkit import Chem
-from rdkit.Chem import QED
-
-import LambdaZero.utils
-import LambdaZero.models
-import LambdaZero.chem
-
-from LambdaZero.examples.hobby.proxy import Actor
-from LambdaZero.examples.hobby.acquisition_function import UCB
 
 class ProxyReward:
     def __init__(self, scoreProxy, actor_sync_freq, **kwargs):

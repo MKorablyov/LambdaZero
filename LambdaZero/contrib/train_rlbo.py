@@ -10,10 +10,8 @@ from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.examples.bayesian_models.rl import config
-from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
-from LambdaZero.examples.hobby.reward.proxy_reward import ProxyReward
 
-from LambdaZero.examples.hobby.config_rlbo import rllib_config
+from LambdaZero.contrib.config_rlbo import rllib_config
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 

@@ -1,9 +1,7 @@
-from LambdaZero.environments.persistent_search.persistent_buffer import \
-    BlockMolEnvGraph_v1
-from LambdaZero.examples.hobby.proxy import ProxyUCB
-from LambdaZero.examples.hobby.reward.proxy_reward import ProxyReward
-from LambdaZero.examples.hobby.inputs import mol_to_graph_v1
-from LambdaZero.examples.hobby.model_with_uncertainty import MolFP
+from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
+from LambdaZero.contrib.proxy import ProxyUCB
+from LambdaZero.contrib.reward import ProxyReward
+from LambdaZero.contrib.model_with_uncertainty import MolFP
 
 model_config = {}
 
