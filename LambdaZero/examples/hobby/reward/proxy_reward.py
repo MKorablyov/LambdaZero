@@ -17,8 +17,8 @@ from LambdaZero.examples.hobby.proxy import Actor
 from LambdaZero.examples.hobby.acquisition_function import UCB
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_update_freq, **kwargs):
-        self.actor = Actor(scoreProxy, actor_update_freq)
+    def __init__(self, scoreProxy, actor_sync_freq, **kwargs):
+        self.actor = Actor(scoreProxy, actor_sync_freq)
 
     def reset(self):
         return None
@@ -27,7 +27,7 @@ class ProxyReward:
         synth_score = 0.5
         qed = 0.9
 
-        dock_score = self.actor(molecule, qed * synth_score)
+        dock_score = self.actor([molecule], [qed * synth_score])[0]
         print("received dock_score from actor", dock_score)
         scores = {"dock_score":dock_score, "synth_score": synth_score, "qed":0.9}
 

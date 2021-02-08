@@ -9,5 +9,5 @@ class ModelWithUncertainty:
     def get_mean_and_variance(self,x):
         raise NotImplementedError
 
-    def fit(self, x_train, y_train):
+    def fit(self, x, y):
         raise NotImplementedError

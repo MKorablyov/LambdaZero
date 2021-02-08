@@ -2,20 +2,20 @@ import time
 import ray
 
 class Proxy:
-    def __init__(self, update_freq, proposed_x,  proposed_acq, proposed_d):
+    def __init__(self, update_freq, proposed_x, proposed_d, proposed_acq):
         self.update_freq = update_freq
-        self.proposed_x, self.proposed_acq, self.proposed_d = proposed_x, proposed_acq, proposed_d
+        self.proposed_x, self.proposed_d, self.proposed_acq = proposed_x, proposed_d, proposed_acq
 
-    def propose_x(self,x, acq, d):
+    def propose_x(self,x, d, acq):
         """
-        :param x: point to evaluate
-        :param aq: current estimate of the acquisition value at x
-        :param d: discount factor defaults to 1. This would be used for the acquisition
+        :param x: points to evaluate
+        :param aq: current estimates of the acquisition value at x
+        :param d: discount factors defaults to 1. This would be used for the acquisition
         :return:
         """
-        self.proposed_x.append(x)
-        self.proposed_acq.append(acq)
-        self.proposed_d.append(d)
+        self.proposed_x.extend(x)
+        self.proposed_d.extend(d)
+        self.proposed_acq.extend(acq)
         if len(self.proposed_x) == self.update_freq:
             self.acquire_and_update() #
             self.proposed_x, self.proposed_acq, self.proposed_d = [], [], []
@@ -40,12 +40,6 @@ class Actor():
         self.num_calls = 0
         self.acqusition_func = ray.get(scoreProxy.get_acquisition_func.remote())
 
-        #self.proc_func = proc_func
-        #self.aq_values_func = aq_values_func
-        #self.get_weights = get_weights_func
-        #self.propose_x_func = propose_x_func
-        #self.weights = get_weights_func()
-
     def __call__(self, x, d):
         # compute acquisition value
         self.num_calls += 1
@@ -58,9 +52,4 @@ class Actor():
         if self.num_calls % self.sync_freq==0:
             # todo - need to figure out to do non-blocking calls here
             self.acqusition_func = ray.get(self.scoreProxy.get_acquisition_func.remote())
-
-        # graph = self.proc_func(x) # this will build graph
-        # aq_val = self.aq_values_func(graph)
-        # self.sharex_func(x)
-        # if self.sync_weigths
         return acq

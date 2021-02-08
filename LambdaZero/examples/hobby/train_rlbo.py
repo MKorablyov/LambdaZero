@@ -23,7 +23,6 @@ config = getattr(config,config_name)
 curr_trial = config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
 
 
-
 DEFAULT_CONFIG = {
     "rllib_config":rllib_config,
     "summaries_dir": summaries_dir,
@@ -42,8 +41,8 @@ config = merge_dicts(DEFAULT_CONFIG, config)
 # convenience option to debug on someone's laptop (add yours)
 machine = socket.gethostname()
 if machine == "Ikarus":
-    config["rllib_config"]["num_workers"] = 1
-    config["rllib_config"]["num_gpus"] = 0.3
+    config["rllib_config"]["num_workers"] = 2
+    config["rllib_config"]["num_gpus"] = 0.1
     config["rllib_config"]["memory"] = 15 * 10**9
     config["rllib_config"]["sgd_minibatch_size"] = 4
 

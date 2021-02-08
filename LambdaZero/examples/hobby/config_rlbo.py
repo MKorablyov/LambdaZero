@@ -3,19 +3,21 @@ from LambdaZero.environments.persistent_search.persistent_buffer import \
 from LambdaZero.examples.hobby.proxy import ProxyUCB
 from LambdaZero.examples.hobby.reward.proxy_reward import ProxyReward
 from LambdaZero.examples.hobby.inputs import mol_to_graph_v1
-from LambdaZero.examples.hobby.model_with_uncertainty import ModelWithUncertainty
+from LambdaZero.examples.hobby.model_with_uncertainty import MolFP
 
 model_config = {}
 
 acquirer_config = {
-    "model":ModelWithUncertainty,
+    "model": MolFP,
     "model_config":model_config,
+    "acq_size": 32,
+    "kappa":0.2
 }
 
 proxy_config = {
     "acquirer_config":acquirer_config,
-    "sync_freq":20, #
-    "proc_func":mol_to_graph_v1,
+    "update_freq":100,
+
 }
 
 rllib_config = {
@@ -27,8 +29,7 @@ rllib_config = {
         "reward_config": {
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "actor_update_freq": 100,
-
+            "actor_sync_freq":20,
         },
 
     },
