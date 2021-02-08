@@ -5,14 +5,16 @@ from LambdaZero.examples.hobby.reward.proxy_reward import ProxyReward
 from LambdaZero.examples.hobby.inputs import mol_to_graph_v1
 from LambdaZero.examples.hobby.model_with_uncertainty import ModelWithUncertainty
 
+model_config = {}
+
 acquirer_config = {
     "model":ModelWithUncertainty,
-    "model_config":{},
+    "model_config":model_config,
 }
 
 proxy_config = {
     "acquirer_config":acquirer_config,
-    "update_freq":20,
+    "sync_freq":20, #
     "proc_func":mol_to_graph_v1,
 }
 

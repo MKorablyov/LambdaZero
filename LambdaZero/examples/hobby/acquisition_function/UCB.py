@@ -2,8 +2,6 @@ import time
 from .acquisition_function import AcquisitionFunction
 
 
-
-
 class UCB(AcquisitionFunction):
     def __init__(self, config):
         AcquisitionFunction.__init__(self, config["model"], config["model_config"])
@@ -18,8 +16,8 @@ class UCB(AcquisitionFunction):
         # return mean + kappa * var
         return 1.0
 
-    def acquire_batch(self, x, discounts, aq_values=None):
-        # if aq_values = acquisition_values(x, self.model)
+    def acquire_batch(self, x, discounts, acq=None):
+        # if aq_values = self.acquisition_value(x, self.model)
         # aq_values_ = aq_values[top_k]
         # return idx
         pass

@@ -6,8 +6,8 @@ class ModelWithUncertainty:
     def get_samples(self,x):
         raise NotImplementedError
 
-    def get_mean_and_variacne(self,x):
+    def get_mean_and_variance(self,x):
         raise NotImplementedError
 
-    def fit(self,x_train,y_train, x_val, y_val):
+    def fit(self, x_train, y_train):
         raise NotImplementedError
