@@ -6,7 +6,8 @@ class MolFP(ModelWithUncertainty):
         ModelWithUncertainty.__init__(self)
 
     def fit(self,x,y):
-        raise NotImplementedError
+        print("fit not implemented")
+        #raise NotImplementedError
 
     def get_mean_and_variance(self,x):
         # todo:

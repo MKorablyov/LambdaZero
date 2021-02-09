@@ -6,8 +6,7 @@ class DockingOracle:
 
     def __call__(self, molecules):
 
-
         dockscores = [len(molecules[i].blocks) for i in range(len(molecules))]
 
-        print("oracle is called on", len(molecules))
+        print("oracle is called on", len(molecules), dockscores)
         return dockscores

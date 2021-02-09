@@ -1,1 +1,1 @@
-from .inputs import mol_to_graph_v1
+from .inputs import load_data_v1

@@ -1,8 +1,30 @@
+import os.path as osp
+import torch_geometric.transforms as T
+import LambdaZero.utils
+import LambdaZero.inputs
+
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
 from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyReward
 from LambdaZero.contrib.model_with_uncertainty import MolFP
 from LambdaZero.contrib.oracle import DockingOracle
+from LambdaZero.contrib.inputs import load_data_v1
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+
+
+
+load_seen_config = {
+    "target": "dockscore",
+    "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+    "dataset": LambdaZero.inputs.BrutalDock,
+    "dataset_config": {
+        "root": osp.join(datasets_dir, "brutal_dock/seh"),
+        "props": ["dockscore", "smiles"],
+        "transform": T.Compose([LambdaZero.utils.Complete(), LambdaZero.utils.Normalize("dockscore", -8.6, 1.1)]),
+        "file_names": ["Zinc20_docked_neg_randperm_3k"],
+    },
+}
+
 
 model_config = {}
 
@@ -16,10 +38,12 @@ acquirer_config = {
 oracle_config = {"num_threads":2}
 
 proxy_config = {
-    "acquirer_config":acquirer_config,
     "update_freq":100,
+    "acquirer_config":acquirer_config,
     "oracle": DockingOracle,
-    "oracle_config":oracle_config
+    "oracle_config":oracle_config,
+    "load_seen": load_data_v1,
+    "load_seen_config": load_seen_config,
 }
 
 rllib_config = {

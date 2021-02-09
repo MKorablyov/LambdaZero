@@ -23,7 +23,7 @@ from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, tr
     train_mcdrop_rl, mcdrop_mean_variance
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config
 from LambdaZero.environments import PredDockBayesianReward_v1
-from LambdaZero.environments import ProxyReward
+
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -40,14 +40,16 @@ data_config = {
     "dataset_split_path": osp.join(datasets_dir,
                                 #    "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                 #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-                                "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
+                                "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh/raw"),
         "props": ["dockscore", "smiles"],
         "transform": T.Compose([LambdaZero.utils.Complete()]),
-        "file_names": "Zinc20_docked_neg_randperm_30k.feather",
+        "file_names": "Zinc20_docked_neg_randperm_3k.feather",
     },
+
+
     "b_size": 40,
     "target_norm": [-8.6, 1.10], # fixme use normalizer everywhere
     "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.10])

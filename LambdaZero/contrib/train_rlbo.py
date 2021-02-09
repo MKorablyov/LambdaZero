@@ -1,6 +1,5 @@
 import sys, time, socket
 import ray
-
 from ray import tune
 from ray.rllib.models.catalog import ModelCatalog
 from ray.rllib.agents.ppo import PPOTrainer
@@ -29,9 +28,6 @@ DEFAULT_CONFIG = {
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
     "stop":{"training_iteration": 2000000},
-    #"reward_learner_config":reward_learner_config,
-    #"use_dock": True,
-    #"pretrained_model": None
 }
 
 config = merge_dicts(DEFAULT_CONFIG, config)
@@ -41,7 +37,8 @@ machine = socket.gethostname()
 if machine == "Ikarus":
     config["rllib_config"]["num_workers"] = 2
     config["rllib_config"]["num_gpus"] = 0.1
-    config["rllib_config"]["memory"] = 15 * 10**9
+    config["memory"] = 7 * 10**9
+    config["object_store_memory"] = 7 * 10**9
     config["rllib_config"]["sgd_minibatch_size"] = 4
 
 

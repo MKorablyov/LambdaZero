@@ -4,14 +4,19 @@ from .acquisition_function import AcquisitionFunction
 
 
 class UCB(AcquisitionFunction):
-    def __init__(self, config):
-        AcquisitionFunction.__init__(self, config["model"], config["model_config"], config["acq_size"])
-        self.kappa = config["kappa"]
+    def __init__(self, model, model_config, acq_size, kappa, seen_x, seen_y, val_x, val_y):
+
+        self.kappa = kappa
+        self.seen_x, self.seen_y, self.val_x, self.val_y = seen_x, seen_y, val_x, val_y
+        #print("loaded training examples", len(self.seen_x), len(self.seen_y), len(self.val_x), len(self.val_y))
+        AcquisitionFunction.__init__(self, model, model_config, acq_size)
 
     def update_with_seen(self, x, y):
-        # self.seen_x +=x
-        # self.model_with_uncertainty.fit(x,y, self.val_x, self.val_y)
-        pass
+        self.seen_x.extend(x)
+        self.seen_y.extend(y)
+        self.model.fit(x,y)
+        # todo: evaluate on a separate train/val set
+        return None
 
     def acquisition_value(self, x):
         mean, var = self.model.get_mean_and_variance(x)

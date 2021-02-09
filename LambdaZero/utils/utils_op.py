@@ -95,6 +95,14 @@ class Complete(object):
         data.edge_index = edge_index
         return data
 
+class Normalize:
+    def __init__(self, property, mean, std):
+        self.property, self.mean, self.std = property, mean, std
+    def __call__(self, data):
+        data.property = (getattr(data,self.property) - self.mean) / self.std
+        return data
+
+
 
 def uniform_sample(data, nsamples, nbins=20, nmargin=1, bin_low=None, bin_high=None):
     data = np.asarray(data, dtype=np.float32)
