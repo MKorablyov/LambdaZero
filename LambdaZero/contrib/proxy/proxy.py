@@ -33,17 +33,21 @@ class Proxy:
 
 
 class Actor():
-    def __init__(self, scoreProxy, actor_sync_freq):
+    def __init__(self, scoreProxy, Proc, proc_config, actor_sync_freq):
         self.scoreProxy = scoreProxy
+        self.proc = Proc(**proc_config)
         self.sync_freq = actor_sync_freq
         # initialize
         self.num_calls = 0
-        self.acqusition_func = ray.get(scoreProxy.get_acquisition_func.remote())
+        self.acquisition_func = ray.get(scoreProxy.get_acquisition_func.remote())
 
     def __call__(self, x, d):
         # compute acquisition value
         self.num_calls += 1
-        acq = self.acqusition_func.acquisition_value(x)
+        acq = self.acquisition_func.acquisition_value(x)
+
+        # perform data processing action if needed
+        x = self.proc(x)
 
         # send molecule to the remote proxy
         self.scoreProxy.propose_x.remote(x, acq, d)
@@ -51,5 +55,5 @@ class Actor():
         # sync weights with proxy if needed
         if self.num_calls % self.sync_freq==0:
             # todo - need to figure out to do non-blocking calls here
-            self.acqusition_func = ray.get(self.scoreProxy.get_acquisition_func.remote())
+            self.acquisition_func = ray.get(self.scoreProxy.get_acquisition_func.remote())
         return acq

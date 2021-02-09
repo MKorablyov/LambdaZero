@@ -8,10 +8,11 @@ from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyReward
 from LambdaZero.contrib.model_with_uncertainty import MolFP
 from LambdaZero.contrib.oracle import DockingOracle
-from LambdaZero.contrib.inputs import load_data_v1
+from LambdaZero.contrib.inputs import load_data_v1,Mol2GraphProc
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-
+props = ["dockscore", "smiles"]
+transform = T.Compose([LambdaZero.utils.Complete(), LambdaZero.utils.Normalize("dockscore", -8.6, 1.1)])
 
 load_seen_config = {
     "target": "dockscore",
@@ -19,8 +20,8 @@ load_seen_config = {
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh"),
-        "props": ["dockscore", "smiles"],
-        "transform": T.Compose([LambdaZero.utils.Complete(), LambdaZero.utils.Normalize("dockscore", -8.6, 1.1)]),
+        "props": props,
+        "transform": transform,
         "file_names": ["Zinc20_docked_neg_randperm_3k"],
     },
 }
@@ -55,6 +56,8 @@ rllib_config = {
         "reward_config": {
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
+            "Proc":Mol2GraphProc,
+            "proc_config":{"props":props,"transform":transform},
             "actor_sync_freq":20,
         },
 

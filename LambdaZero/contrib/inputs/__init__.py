@@ -1,1 +1,1 @@
-from .inputs import load_data_v1
+from .inputs import load_data_v1, Mol2GraphProc

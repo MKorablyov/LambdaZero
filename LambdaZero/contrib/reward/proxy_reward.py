@@ -2,8 +2,8 @@ from LambdaZero.contrib.proxy import Actor
 
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_sync_freq, **kwargs):
-        self.actor = Actor(scoreProxy, actor_sync_freq)
+    def __init__(self, scoreProxy, Proc, proc_config, actor_sync_freq, **kwargs):
+        self.actor = Actor(scoreProxy, Proc, proc_config, actor_sync_freq)
 
     def reset(self):
         return None

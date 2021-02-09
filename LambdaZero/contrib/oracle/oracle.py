@@ -4,9 +4,9 @@ class DockingOracle:
         self.num_threads = num_threads
         # create actor pool
 
-    def __call__(self, molecules):
+    def __call__(self, data):
 
-        dockscores = [len(molecules[i].blocks) for i in range(len(molecules))]
+        dockscores = [data["graph"] for i in range(len(data))]
 
-        print("oracle is called on", len(molecules), dockscores)
+        print("oracle is called on", len(data), dockscores)
         return dockscores
