@@ -9,9 +9,9 @@ def load_data_v1(target, dataset_split_path, dataset, dataset_config):
     dataset = dataset(**dataset_config)
     train_idxs, val_idxs, test_idxs = np.load(dataset_split_path, allow_pickle=True)
     # take corresponding indices from data loaders
-    train_x = [{"graph":dataset[int(i)]} for i in train_idxs]
+    train_x = [{"mol_graph":dataset[int(i)]} for i in train_idxs]
     train_y = [getattr(dataset[int(i)],target) for i in train_idxs]
-    val_x = [{"graph":dataset[int(i)]} for i in val_idxs]
+    val_x = [{"mol_graph":dataset[int(i)]} for i in val_idxs]
     val_y = [getattr(dataset[int(i)],target) for i in val_idxs]
     return train_x, train_y, val_x, val_y
 

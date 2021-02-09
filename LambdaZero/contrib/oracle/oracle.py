@@ -6,7 +6,7 @@ class DockingOracle:
 
     def __call__(self, data):
 
-        dockscores = [data["graph"] for i in range(len(data))]
+        dockscores = [1.0 for i in range(len(data))]
 
         print("oracle is called on", len(data), dockscores)
         return dockscores

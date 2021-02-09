@@ -47,7 +47,7 @@ class Actor():
         acq = self.acquisition_func.acquisition_value(x)
 
         # perform data processing action if needed
-        x = self.proc(x)
+        #x = self.proc(x)
 
         # send molecule to the remote proxy
         self.scoreProxy.propose_x.remote(x, acq, d)
