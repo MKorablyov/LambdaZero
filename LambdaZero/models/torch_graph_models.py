@@ -182,7 +182,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
 
 class MPNNet_Parametric(nn.Module):
-
     def __init__(self, num_feat=14, dim=64, num_out_per_stem=105, rnd=False):
         super().__init__()
         self.lin0 = nn.Linear(num_feat, dim)

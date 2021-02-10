@@ -1,4 +1,6 @@
 import sys, time
+from LambdaZero.models.torch_graph_models import MPNNet_Parametric, fast_from_data_list
+from LambdaZero.models import MPNNetDrop
 from .model_with_uncertainty import ModelWithUncertainty
 
 
@@ -6,18 +8,25 @@ from .model_with_uncertainty import ModelWithUncertainty
 class MolFP(ModelWithUncertainty):
     def __init__(self):
         ModelWithUncertainty.__init__(self)
-    num_fit = 0
-    start = time.time()
+        self.model = MPNNetDrop(True, False, True, 0.1, 72) # fixme 72 features is insane!!
+        # drop_last, drop_data, drop_weights, drop_prob, num_feat=14
 
     def fit(self,x,y):
-        print("fit not implemented")
-        print("mol graph", x)
+
+        graphs = [m["mol_graph"] for m in x]
+
+
+        for graph in graphs:
+            g = fast_from_data_list([graph])
+
+            print(graph.x.shape)
+            print("MPNN fit", self.model.forward(g, do_dropout=True))
+
+        #print("fit these mol graph", x)
 
         # 0.48 for no fit
-        self.num_fit +=1
-        print("exps:", "%.3f" % (self.num_fit / (time.time() - self.start)))
+        #print("exps:", "%.3f" % (self.num_fit / (time.time() - self.start)))
 
-        #raise NotImplementedError
 
     def get_mean_and_variance(self,x):
         # todo:
