@@ -3,8 +3,6 @@ from .model_with_uncertainty import ModelWithUncertainty
 
 
 
-
-
 class MolFP(ModelWithUncertainty):
     def __init__(self):
         ModelWithUncertainty.__init__(self)
@@ -13,7 +11,7 @@ class MolFP(ModelWithUncertainty):
 
     def fit(self,x,y):
         print("fit not implemented")
-        print("mol graph", x[0])
+        print("mol graph", x)
 
         # 0.48 for no fit
         self.num_fit +=1
@@ -24,7 +22,6 @@ class MolFP(ModelWithUncertainty):
     def get_mean_and_variance(self,x):
         # todo:
         #print("mean variance not implemented", x)
-
         mean = [0.1 for i in x]
         var = [0.2 for i in x]
         return mean, var

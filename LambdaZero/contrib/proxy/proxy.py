@@ -17,9 +17,8 @@ class Proxy:
         self.proposed_d.extend(d)
         self.proposed_acq.extend(acq)
         if len(self.proposed_x) == self.update_freq:
-            self.acquire_and_update() #
+            self.acquire_and_update()
             self.proposed_x, self.proposed_acq, self.proposed_d = [], [], []
-            # todo: report statistics
         return None
 
     def acquire_and_update(self):

@@ -24,9 +24,7 @@ class UCB(AcquisitionFunction):
         return acq
 
     def acquire_batch(self, x, d, acq=None):
-        if acq is not None:
-            acq = self.acquisition_value(x)
-
+        if acq is not None: acq = self.acquisition_value(x)
         # compute indices with highest acquisition values
         idx = np.argsort(acq)[-self.acq_size:]
         # take selected indices

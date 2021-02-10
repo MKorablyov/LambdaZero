@@ -75,7 +75,6 @@ class MCDrop(tune.Trainable):
             self._iteration = i
             scores = self._train()
             all_scores.append(scores)
-
         return all_scores[-1], {}
         # if validate:
         #     val_score = self.config["eval_epoch"](self.val_loader, self.model, self.device, self.config, "val")

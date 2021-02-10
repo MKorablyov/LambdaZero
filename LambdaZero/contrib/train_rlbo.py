@@ -36,11 +36,11 @@ config = merge_dicts(DEFAULT_CONFIG, config)
 machine = socket.gethostname()
 if machine == "Ikarus":
     config["rllib_config"]["num_workers"] = 2
-    config["rllib_config"]["num_gpus"] = 0.3
+    config["rllib_config"]["num_gpus"] = 0.4
     config["rllib_config"]["num_gpus_per_worker"] = 0.1
     config["memory"] = 10 * 10**9
     config["object_store_memory"] = 10 * 10**9
-    config["rllib_config"]["train_batch_size"] = 10
+    config["rllib_config"]["train_batch_size"] = 16
     config["rllib_config"]["sgd_minibatch_size"] = 4
 
 
