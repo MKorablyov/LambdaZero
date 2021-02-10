@@ -67,7 +67,9 @@ class MolGraphSpace(Space):
         for attr, ndim, dtype, dsize in zip(self.attributes, self._ndims, self._dtypes, self._dsizes):
             shape = shapes[:ndim]
             l = shape[0] * (1 if ndim == 1 else shape[1]) * dsize
-            d[attr] = torch.from_numpy(np.frombuffer(msg[idx:idx+l], dtype).reshape(shape))
+
+            arr = np.copy(np.frombuffer(msg[idx:idx+l], dtype).reshape(shape)) # copy to make array writeable
+            d[attr] = torch.from_numpy(arr)
             idx += l
             shapes = shapes[ndim:]
         return ParametricMolData(**d)
@@ -83,7 +85,6 @@ class MolGraphSpace(Space):
                 for data in zip(*[batch[i] for i in self.attributes])]
 
 class ParametricMolData(Data):
-
     def __inc__(self, key, value):
         if key == 'stem_atmidx' or key == 'jbond_atmidx':
             return self.num_nodes
@@ -91,7 +92,7 @@ class ParametricMolData(Data):
 
 class GraphMolObs:
 
-    def __init__(self, config={}, max_stems=20, max_jbonds=10):
+    def __init__(self, config={}, max_stems=25, max_jbonds=10):
         self.one_hot_atom = config.get('one_hot_atom', True)
         self.stem_indices = config.get('stem_indices', True)
         self.jbond_indices = config.get('jbond_indices', True)
@@ -164,7 +165,7 @@ class GraphMolObs:
             g.edge_attr = torch.zeros((1, g.edge_attr.shape[1])).float()
             g.stem_atmidx = torch.zeros((self.max_stems,)).long()
 
-        return self.space.pack(g)
+        return g, self.space.pack(g)
 
 
 
@@ -206,26 +207,28 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         try:
             return super().step(action)
         except Exception as e:
+            print("error in env", e)
+
             with open(osp.join(summaries_dir, 'block_mol_graph_v1.error.txt'), 'a') as f:
                 print(e, file=f)
                 print(self.get_state(), file=f)
                 print(action, file=f)
+                print(traceback.format_exc(), file=f)
                 print(traceback.format_exc(), file=f)
                 f.flush()
             print(e)
             print(self.get_state())
             print(action)
             print(traceback.format_exc())
-            return super().step(0)
+            super().reset() # reset the environment
+            return super().step(0) # terminate
 
     def _make_obs(self):
         mol = self.molMDP.molecule
-        graph = self.graph_mol_obs(mol)
-
+        graph, flat_graph = self.graph_mol_obs(mol)
         # make action mask
         jbond_mask = np.zeros(self.max_blocks-1, dtype=np.float32)
-        if self.allow_removal:
-            jbond_mask[:len(mol.jbonds)] = 1
+        if self.allow_removal: jbond_mask[:len(mol.jbonds)] = 1
         stem_mask = np.zeros(self.max_branches, dtype=np.float32)
         if self.molMDP.molecule.numblocks == 0: stem_mask[:] = 1 # allow to add any block
         else: stem_mask[:len(mol.stems)] = 1
@@ -233,10 +236,10 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         stem_mask = np.tile(stem_mask[:, None], [1, self.num_blocks]).reshape(-1)
         action_mask = np.concatenate([np.ones([1], dtype=np.float32), jbond_mask, stem_mask])
 
-        obs = {"mol_graph": graph,
+        obs = {"mol_graph": flat_graph,
                "action_mask": action_mask,
                "num_steps": self.num_steps}
 
         self._prev_obs = obs
 
-        return obs
+        return obs, graph

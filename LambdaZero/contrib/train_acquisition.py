@@ -116,6 +116,31 @@ class BayesianRegressor(nn.Module):
         return x
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 regressor = BayesianRegressor(1024, 1)
 
 # class UCBTrainer(UCB, tune.trainable):

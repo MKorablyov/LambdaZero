@@ -172,7 +172,7 @@ class BlockMolEnv_v3:
                "num_steps": self.num_steps}
 
         self._prev_obs = obs
-        return obs
+        return obs, None
 
     def _if_terminate(self):
         terminate = False
@@ -191,15 +191,16 @@ class BlockMolEnv_v3:
         self.num_steps = 0
         self.molMDP.reset()
         self.reward.reset()
-        obs = self._make_obs()
+        obs, graph = self._make_obs()
+
         for i in range(self.random_steps):
             actions = np.where(obs["action_mask"])[0]
             action = np.random.choice(actions)
             self.step(action)
-            obs = self._make_obs()
+            obs, graph = self._make_obs()
             if self._if_terminate():
-                self.num_steps = 0
                 self.molMDP.reset()
+        if self.molMDP.molecule is None: self.reset() # reset if molecule is/was empty
         self.num_steps = 0
         return obs
 
@@ -219,10 +220,12 @@ class BlockMolEnv_v3:
             self.molMDP.add_block(block_idx=block_idx, stem_idx=stem_idx)
 
         self.num_steps += 1
-        obs = self._make_obs()
+        obs, graph = self._make_obs()
         env_stop = self._if_terminate()
-        # todo -- this will break other rewards
-        reward, log_vals = self.reward(self.molMDP.molecule, obs, agent_stop, env_stop, self.num_steps)
+
+        molecule = self.molMDP.molecule
+        molecule.graph = graph
+        reward, log_vals = self.reward(molecule, agent_stop, env_stop, self.num_steps)
         if (self.molMDP.molecule.mol is not None):
             smiles = Chem.MolToSmiles(self.molMDP.molecule.mol)
         else:
@@ -241,7 +244,8 @@ class BlockMolEnv_v3:
         [setattr(self.molMDP.molecule, key, deepcopy(value)) for key, value in mol_attr.items()]
         self.molMDP.molecule.blocks = [self.molMDP.block_mols[idx] for idx in state[0]["blockidxs"]]
         self.molMDP.molecule._mol = None
-        return self._make_obs()
+        obs, graph = self._make_obs()
+        return obs
 
     def render(self, outpath):
         # todo: also visualize building blocks used ?

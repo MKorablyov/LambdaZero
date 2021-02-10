@@ -37,8 +37,8 @@ machine = socket.gethostname()
 if machine == "Ikarus":
     config["rllib_config"]["num_workers"] = 2
     config["rllib_config"]["num_gpus"] = 0.1
-    config["memory"] = 7 * 10**9
-    config["object_store_memory"] = 7 * 10**9
+    config["memory"] = 10 * 10**9
+    config["object_store_memory"] = 10 * 10**9
     config["rllib_config"]["sgd_minibatch_size"] = 4
 
 

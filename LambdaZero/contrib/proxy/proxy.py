@@ -33,9 +33,8 @@ class Proxy:
 
 
 class Actor():
-    def __init__(self, scoreProxy, Proc, proc_config, actor_sync_freq):
+    def __init__(self, scoreProxy, actor_sync_freq):
         self.scoreProxy = scoreProxy
-        self.proc = Proc(**proc_config)
         self.sync_freq = actor_sync_freq
         # initialize
         self.num_calls = 0
@@ -45,9 +44,6 @@ class Actor():
         # compute acquisition value
         self.num_calls += 1
         acq = self.acquisition_func.acquisition_value(x)
-
-        # perform data processing action if needed
-        #x = self.proc(x)
 
         # send molecule to the remote proxy
         self.scoreProxy.propose_x.remote(x, acq, d)

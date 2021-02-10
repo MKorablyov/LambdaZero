@@ -165,10 +165,12 @@ class MolMDP:
                                 block=self.block_mols[block_idx],
                                 block_r=self.block_rs[block_idx],
                                 stem_idx=stem_idx, atmidx=atmidx)
+        #assert self.molecule.mol is not None, "returning not a molecule"
         return None
 
     def remove_jbond(self, jbond_idx=None, atmidx=None):
         atmidx = self.molecule.remove_jbond(jbond_idx, atmidx)
+        #assert self.molecule.mol is not None, "returning not a molecule"
         return atmidx
 
     def random_walk(self, length):
@@ -190,3 +192,4 @@ class MolMDP:
                 if self.molecule.numblocks >= length: done = True
             else:
                 self.reset()
+        #assert self.molecule.mol is not None, "returning not a molecule"

@@ -56,8 +56,6 @@ rllib_config = {
         "reward_config": {
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "Proc":Mol2GraphProc,
-            "proc_config":{"props":props,"transform":transform},
             "actor_sync_freq":20,
         },
 

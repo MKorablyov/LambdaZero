@@ -69,7 +69,7 @@ class PredDockReward:
             reward = None
         return reward
 
-    def __call__(self, molecule, obs, simulate, env_stop, num_steps):
+    def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:
             simulate = simulate or env_stop
         else:
@@ -152,7 +152,7 @@ class PredDockReward_v2:
             reward = None
         return reward
 
-    def __call__(self, molecule, obs, simulate, env_stop, num_steps):
+    def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:
             simulate = simulate or env_stop
         else:
@@ -215,7 +215,7 @@ class PredDockReward_v3:
         return disc_reward, {"dockscore": dockscore_normalized, "qed": qed, "synth": synth,
                              "discount": discount}
 
-    def __call__(self, molecule, obs, simulate, env_stop, num_steps):
+    def __call__(self, molecule, simulate, env_stop, num_steps):
         if self.soft_stop:
             simulate = simulate or env_stop
         else:
