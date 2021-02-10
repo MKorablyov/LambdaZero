@@ -8,8 +8,6 @@ class ProxyUCB(Proxy):
     def __init__(self,update_freq, acquirer_config, oracle, oracle_config, load_seen, load_seen_config):
         # load data for (1) acquisition function (2) proxy
         seen_x, seen_y, val_x, val_y = load_seen(**load_seen_config)
-        #print(len(seen_x), len(seen_y), len(val_x), len(val_y))
-        #seen_x, seen_y, val_x, val_y = [], [],[],[]
         proposed_x, proposed_d, proposed_acq = [], [], []  # todo: load if needed
 
         self.UCB = UCB(**acquirer_config, seen_x=seen_x, seen_y=seen_y, val_x=val_x, val_y=val_y)

@@ -207,8 +207,6 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         try:
             return super().step(action)
         except Exception as e:
-            print("error in env", e)
-
             with open(osp.join(summaries_dir, 'block_mol_graph_v1.error.txt'), 'a') as f:
                 print(e, file=f)
                 print(self.get_state(), file=f)

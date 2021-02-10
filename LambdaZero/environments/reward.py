@@ -235,9 +235,13 @@ class PredDockReward_v3:
 
 
 class QEDReward:
-    def __init__(self):
+    def __init__(self, **kwargs):
         pass
-    def __call__(self, molecule, done, num_steps):
+
+    def reset(self, previous_reward=0.0):
+        pass
+
+    def __call__(self, molecule, simulate , done, num_steps):
         mol = molecule.mol
         if mol is None:
             return 0.0, {"discounted_reward": 0.0, "QED": 0.0}

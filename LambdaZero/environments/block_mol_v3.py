@@ -86,7 +86,7 @@ DEFAULT_CONFIG = {
         "delta": False,
         "simulation_cost": 0.0,
         "device": "cuda",
-        "dense_rewards": False
+        #"dense_rewards": False
     },
 
     # "reward_config": {

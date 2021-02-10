@@ -4,8 +4,9 @@ import LambdaZero.utils
 import LambdaZero.inputs
 
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
+from LambdaZero.environments.reward import PredDockReward_v2
 from LambdaZero.contrib.proxy import ProxyUCB
-from LambdaZero.contrib.reward import ProxyReward
+from LambdaZero.contrib.reward import ProxyReward,DummyReward
 from LambdaZero.contrib.model_with_uncertainty import MolFP
 from LambdaZero.contrib.oracle import DockingOracle
 from LambdaZero.contrib.inputs import load_data_v1,Mol2GraphProc
