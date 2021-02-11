@@ -1,6 +1,9 @@
 import sys, time
+
+from torch.utils.data import DataLoader
 from LambdaZero.models.torch_graph_models import MPNNet_Parametric, fast_from_data_list
 from LambdaZero.models import MPNNetDrop
+from LambdaZero.contrib.inputs import ListGraphDataset
 from .model_with_uncertainty import ModelWithUncertainty
 
 
@@ -12,19 +15,13 @@ class MolFP(ModelWithUncertainty):
         # drop_last, drop_data, drop_weights, drop_prob, num_feat=14
 
     def fit(self,x,y):
-
         graphs = [m["mol_graph"] for m in x]
+        dataset = ListGraphDataset(graphs)
+        dataloader = DataLoader(dataset, batch_size=2,collate_fn=fast_from_data_list)
 
+        for batch in dataloader:
+            print("batch", batch, self.model.forward(batch, do_dropout=True))
 
-        for graph in graphs:
-            g = fast_from_data_list([graph])
-
-            print(graph.x.shape)
-            print("MPNN fit", self.model.forward(g, do_dropout=True))
-
-        #print("fit these mol graph", x)
-
-        # 0.48 for no fit
         #print("exps:", "%.3f" % (self.num_fit / (time.time() - self.start)))
 
 
