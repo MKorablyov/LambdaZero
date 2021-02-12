@@ -7,9 +7,9 @@ from LambdaZero.environments.persistent_search.persistent_buffer import BlockMol
 from LambdaZero.environments.reward import PredDockReward_v2
 from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyReward,DummyReward
-from LambdaZero.contrib.model_with_uncertainty import MolFP
+from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.contrib.oracle import DockingOracle
-from LambdaZero.contrib.inputs import load_data_v1,Mol2GraphProc
+from LambdaZero.contrib.inputs import load_data_v1
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 props = ["dockscore", "smiles"]
@@ -31,7 +31,7 @@ load_seen_config = {
 model_config = {}
 
 acquirer_config = {
-    "model": MolFP,
+    "model": MolMCDropGNN,
     "model_config":model_config,
     "acq_size": 32,
     "kappa":0.2

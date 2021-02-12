@@ -632,7 +632,7 @@ def onehot(arr, num_classes, dtype=np.int):
 _mpnn_feat_cache = [None]
 
 
-def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_features=True):
+def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_features=False):
     atomtypes = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
     bondtypes = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
 

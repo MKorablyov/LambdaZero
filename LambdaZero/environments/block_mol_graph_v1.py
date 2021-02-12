@@ -22,7 +22,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 DEFAULT_CONFIG = dict(block_mol_v3_config)
 DEFAULT_CONFIG.update({
-    "obs_config": {'one_hot_atom': True},
+    "obs_config": {'one_hot_atom': False},
     "threshold": 0.7
 })
 
@@ -93,7 +93,8 @@ class ParametricMolData(Data):
 class GraphMolObs:
 
     def __init__(self, config={}, max_stems=25, max_jbonds=10):
-        self.one_hot_atom = config.get('one_hot_atom', True)
+        self.one_hot_atom = config.get('one_hot_atom', False)
+
         self.stem_indices = config.get('stem_indices', True)
         self.jbond_indices = config.get('jbond_indices', True)
         self.max_stems = max_stems
@@ -134,8 +135,7 @@ class GraphMolObs:
             atmfeat, bond, bondfeat = (np.zeros((1, self.num_base_feat)), np.zeros((1, 2)),
                                        np.zeros((1, self.space.num_edge_feat)))
         else:
-            atmfeat, _, bond, bondfeat = chem.mpnn_feat(mol.mol, ifcoord=False,
-                                                        one_hot_atom=True, donor_features=False)
+            atmfeat, _, bond, bondfeat = chem.mpnn_feat(mol.mol, ifcoord=False)
         g = chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat, data_cls=ParametricMolData)
         g.stem_preds = torch.zeros((self.max_stems, 0))
         g.jbond_preds = torch.zeros((self.max_jbonds, 0))
@@ -156,9 +156,8 @@ class GraphMolObs:
                 g.jbond_atmidx = torch.zeros((self.max_jbonds, 2)).long()
             else:
                 g.jbond_atmidx = torch.tensor(
-                    np.concatenate([jbond_idx,
-                                    np.zeros((self.max_jbonds - len(jbond_idx), 2))], 0)).long()
-            g.x = torch.cat([g.x, stem_mask], 1)
+                    np.concatenate([jbond_idx,np.zeros((self.max_jbonds - len(jbond_idx), 2))], 0)).long()
+            g.x = torch.cat([g.x, jbond_mask], 1)
 
         if g.edge_index.shape[0] == 0: # Edge case
             g.edge_index = torch.zeros((2, 1)).long()

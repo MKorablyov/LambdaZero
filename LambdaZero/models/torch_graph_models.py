@@ -36,9 +36,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         #self.max_blocks = action_space.max_blocks
         #self.max_branches = action_space.max_branches
         self.num_blocks = model_config['custom_model_config'].get("num_blocks", 135)
-
-
-
         self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
         self.rnd = (self.rnd_weight != 0)
         rnd_output_dim = model_config['custom_model_config'].get("rnd_output_dim", 1)
@@ -47,6 +44,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
 
         self.space = obs_space.original_space['mol_graph']
+
         self.model = MPNNet_Parametric(self.space.num_node_feat,
                                        kw.get('num_hidden', 64),
                                        self.num_blocks,
@@ -182,7 +180,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
 
 class MPNNet_Parametric(nn.Module):
-    def __init__(self, num_feat=14, dim=64, num_out_per_stem=105, rnd=False):
+    def __init__(self, num_feat=16, dim=64, num_out_per_stem=105, rnd=False):
         super().__init__()
         self.lin0 = nn.Linear(num_feat, dim)
         self.num_ops = num_out_per_stem
@@ -205,6 +203,9 @@ class MPNNet_Parametric(nn.Module):
             self.lin_out = nn.Linear(dim * 2, 2)
 
     def forward(self, data):
+        print(data.x.shape, self.lin0)
+        time.sleep(1)
+
         out = F.leaky_relu(self.lin0(data.x))
         h = out.unsqueeze(0)
 

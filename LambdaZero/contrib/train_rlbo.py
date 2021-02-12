@@ -9,7 +9,6 @@ from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.examples.bayesian_models.rl import config
-
 from LambdaZero.contrib.config_rlbo import rllib_config
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -38,8 +37,8 @@ if machine == "Ikarus":
     config["rllib_config"]["num_workers"] = 2
     config["rllib_config"]["num_gpus"] = 0.4
     config["rllib_config"]["num_gpus_per_worker"] = 0.1
-    config["memory"] = 10 * 10**9
-    config["object_store_memory"] = 10 * 10**9
+    config["memory"] = 7 * 10**9
+    config["object_store_memory"] = 7 * 10**9
     config["rllib_config"]["train_batch_size"] = 16
     config["rllib_config"]["sgd_minibatch_size"] = 4
 
