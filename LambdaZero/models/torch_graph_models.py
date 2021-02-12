@@ -203,9 +203,6 @@ class MPNNet_Parametric(nn.Module):
             self.lin_out = nn.Linear(dim * 2, 2)
 
     def forward(self, data):
-        print(data.x.shape, self.lin0)
-        time.sleep(1)
-
         out = F.leaky_relu(self.lin0(data.x))
         h = out.unsqueeze(0)
 

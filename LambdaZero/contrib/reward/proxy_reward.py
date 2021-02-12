@@ -15,8 +15,9 @@ class ProxyReward:
         qed = 0.9
         # todo: to come up with some molecule encoding
         smiles = Chem.MolToSmiles(molecule.mol)
-        dock_score = self.actor([{"smiles":smiles, "mol_graph":molecule.graph.to("cuda")}], [qed * synth_score])[0]
+        dock_score = self.actor([{"smiles":smiles, "mol_graph":molecule.graph}], [qed * synth_score])[0]
         #dock_score = 1.0
+        print("reward graph", molecule.graph)
         print("rewarded", dock_score)
         scores = {"dock_score": dock_score, "synth_score": synth_score, "qed":0.9}
         return synth_score * dock_score * qed, scores
