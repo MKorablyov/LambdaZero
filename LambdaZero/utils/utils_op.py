@@ -99,7 +99,8 @@ class Normalize:
     def __init__(self, property, mean, std):
         self.property, self.mean, self.std = property, mean, std
     def __call__(self, data):
-        data.property = (getattr(data,self.property) - self.mean) / self.std
+        norm_value = (getattr(data,self.property) - self.mean) / self.std
+        setattr(data,self.property,norm_value)
         return data
 
 

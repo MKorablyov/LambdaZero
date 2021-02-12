@@ -239,8 +239,8 @@ class BrutalDock(InMemoryDataset):
         graphs = []
         for processed_path in self.processed_paths:
             self.data, self.slices = torch.load(processed_path)
-
             graphs += [self.get(i) for i in range(len(self))]
+
         if len(graphs) > 0:
             self.data, self.slices = self.collate(graphs)
 
@@ -261,11 +261,9 @@ class BrutalDock(InMemoryDataset):
             docked_index = pd.read_feather(raw_path)
             smis = docked_index["smiles"].tolist()
             props = {pr: docked_index[pr].tolist() for pr in self._props}
+
             tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
                                            self.pre_filter, self.pre_transform) for j in range(len(smis))]
-
-            print("num tasks", len(tasks))
-
             graphs = ray.get(tasks)
             graphs = [g for g in graphs if g is not None]
             # save to the disk
