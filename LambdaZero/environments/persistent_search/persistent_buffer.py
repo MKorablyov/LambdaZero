@@ -139,7 +139,7 @@ class BlockMolEnv_PersistentBuffer(BlockMolEnv_v3):
                                            for idx in self.molMDP.molecule.blockidxs]
             self.molMDP.molecule._mol = None
         self.reward.reset(last_reward)
-        obs = self._make_obs()
+        obs, graph = self._make_obs()
         # self.ep_mol_fp = obs['mol_fp']
         return obs
 
@@ -179,7 +179,7 @@ class BlockMolEnv_PersistentBuffer(BlockMolEnv_v3):
             self.set_state(state)
 
         self.num_steps += 1
-        obs = self._make_obs()
+        obs, graph = self._make_obs()
         done = self._if_terminate()
         reward, log_vals = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
         self.last_reward_info = copy(log_vals)
@@ -230,7 +230,7 @@ class BlockMolGraphEnv_PersistentBuffer(BlockMolEnvGraph_v1):
                                             for idx in self.molMDP.molecule.blockidxs]
                 self.molMDP.molecule._mol = None
         self.reward.reset(0)
-        obs = self._make_obs()
+        obs, graph = self._make_obs()
         return obs
 
 class BlockMolGraphEnv_PersistentBuffer_(BlockMolEnvGraph_v1):
@@ -274,7 +274,7 @@ class BlockMolGraphEnv_PersistentBuffer_(BlockMolEnvGraph_v1):
                                            for idx in self.molMDP.molecule.blockidxs]
             self.molMDP.molecule._mol = None
         self.reward.reset(last_reward)
-        obs = self._make_obs()
+        obs, graph = self._make_obs()
         # self.ep_mol_fp = obs['mol_fp']
         return obs
 
@@ -307,7 +307,7 @@ class BlockMolGraphEnv_PersistentBuffer_(BlockMolEnvGraph_v1):
             self.set_state(state)
 
         self.num_steps += 1
-        obs = self._make_obs()
+        obs, graph = self._make_obs()
         done = self._if_terminate()
         reward, log_vals = self.reward(self.molMDP.molecule, simulate, done, self.num_steps)
         log_vals['reward'] = reward

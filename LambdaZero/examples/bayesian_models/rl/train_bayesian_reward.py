@@ -110,6 +110,7 @@ rllib_config = {
         "reward_config": {
             "synth_config": synth_config,
             "binding_model": osp.join(datasets_dir, "brutal_dock/seh/trained_weights/vanilla_mpnn/model.pth"),
+            "dense_rewards":False,
         },
 
     },

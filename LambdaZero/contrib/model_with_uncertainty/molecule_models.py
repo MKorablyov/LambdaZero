@@ -58,24 +58,25 @@ class MolMCDropGNN(ModelWithUncertainty):
         for i in range(self.train_epochs):
             metrics = train_epoch(dataloader, self.model, self.optimizer, self.device)
             # todo: add weight decay etc.
-            print("train GNNMCDrop", metrics)
+            print("train GNNDrop", metrics)
 
-        # fixme - a few things that might cause copying errors
-        #self.model.to("cpu")
-        #self.optimizer = None
 
     def get_mean_and_variance(self,x):
+        y_hat_mc = self.get_samples(x, num_samples=self.num_mc_samples)
+        return y_hat_mc.mean(1), y_hat_mc.var(1)
+
+    def get_samples(self, x, num_samples):
         graphs = [m["mol_graph"] for m in x]
         dataset = ListGraphDataset(graphs)
         dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list)
 
         y_hat_mc = []
-        for i in range(self.num_mc_samples):
+        for i in range(num_samples):
             y_hat_epoch = []
             for batch in dataloader:
+                batch.to(self.device)
                 y_hat_batch = self.model(batch, do_dropout=True)[:,0]
                 y_hat_epoch.append(y_hat_batch.detach().cpu().numpy())
             y_hat_mc.append(np.concatenate(y_hat_epoch,0))
         y_hat_mc = np.stack(y_hat_mc,1)
-
-        return y_hat_mc.mean(1), y_hat_mc.var(1)
+        return y_hat_mc

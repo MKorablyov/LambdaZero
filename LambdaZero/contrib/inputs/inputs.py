@@ -9,19 +9,28 @@ import torch
 def load_data_v1(target, dataset_split_path, dataset, dataset_config):
     # make dataset
     dataset = dataset(**dataset_config)
-    train_idxs, val_idxs, test_idxs = np.load(dataset_split_path, allow_pickle=True)
 
+    train_idxs, val_idxs, test_idxs = np.load(dataset_split_path, allow_pickle=True)
     # add dimension to the graph # todo: maybe do in inputs
     data_list = []
+    y_list = []
     for graph in dataset:
+        y_list.append(getattr(graph,target))
+        delattr(graph,target)
+        # append stem and jbond features
+        delattr(graph, "pos")
+        delattr(graph, "smiles")
         graph.x = torch.cat([graph.x, torch.zeros([graph.x.shape[0],2])],dim=1)
+        graph.jbond_atmidx=torch.zeros([0, 2])
+        graph.jbond_preds=torch.zeros([0, 0])
+        graph.stem_atmidx=torch.zeros([0])
+        graph.stem_preds=torch.zeros([0, 0])
         data_list.append(graph)
 
     train_x = [{"mol_graph":data_list[int(i)]} for i in train_idxs]
-    train_y = [getattr(data_list[int(i)],target) for i in train_idxs]
+    train_y = [y_list[i] for i in train_idxs]
     val_x = [{"mol_graph":data_list[int(i)]} for i in val_idxs]
-    val_y = [getattr(data_list[int(i)],target) for i in val_idxs]
-
+    val_y = [y_list[i] for i in val_idxs]
     return train_x, train_y, val_x, val_y
 
 
