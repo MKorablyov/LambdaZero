@@ -6,5 +6,8 @@ class AcquisitionFunction:
     def update_with_seen(self,x,y):
         raise NotImplementedError
 
-    def acquire_batch(self,x, discounts, acq=None):
+    def acquisition_value(self,x):
+        raise NotImplementedError
+
+    def acquire_batch(self, x, d, acq=None):
         raise NotImplementedError
