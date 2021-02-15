@@ -22,6 +22,11 @@ from LambdaZero.environments.reward import BayesianRewardActor
 from LambdaZero.examples.bayesian_models.bayes_tune.functions import get_tau, train_epoch_with_targets, eval_epoch, \
     train_mcdrop_rl, mcdrop_mean_variance
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config
+from ray.tune.integration.wandb import WandbLoggerCallback
+
+import wandb
+
+os.environ['WANDB_MODE'] = 'dryrun'
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 if len(sys.argv) >= 2: config_name = sys.argv[1]
@@ -102,10 +107,10 @@ DEFAULT_CONFIG = {
             "T": 20,
             "lengthscale": 1e-2,
             "uncertainty_eval_freq":15,
-            "train_iterations": 72,
+            "train_iterations": 32,
             "finetune_iterations": 16,
             "model": LambdaZero.models.MPNNetDrop,
-            "model_config": {"drop_data":False, "drop_weights":False, "drop_last":True, "drop_prob":0.1},
+            "model_config": {"drop_data":True, "drop_weights":True, "drop_last":True, "drop_prob":0.1},
             "optimizer": torch.optim.Adam,
             "optimizer_config": {
                 "lr": 0.001
@@ -169,4 +174,9 @@ if __name__ == "__main__":
         config=config["rllib_config"],
              local_dir=summaries_dir,
              name=config_name,
-             checkpoint_freq=config["checkpoint_freq"])
+             checkpoint_freq=config["checkpoint_freq"],
+             callbacks=[WandbLoggerCallback(
+            project="lambdazero",
+            api_key_file="~/.wandb_api+key",
+            log_config=True)
+        ])
