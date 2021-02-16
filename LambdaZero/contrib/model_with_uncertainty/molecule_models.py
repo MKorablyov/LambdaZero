@@ -36,9 +36,9 @@ def train_epoch(loader, model, optimizer, device):
 class MolMCDropGNN(ModelWithUncertainty):
     def __init__(self):
         ModelWithUncertainty.__init__(self)
-        self.train_epochs = 2
-        self.batch_size = 10
-        self.num_mc_samples = 7
+        self.train_epochs = 1000
+        self.batch_size = 32
+        self.num_mc_samples = 100
         self.device = "cuda"
 
     def fit(self,x,y):
