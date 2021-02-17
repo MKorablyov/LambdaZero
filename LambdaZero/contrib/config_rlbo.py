@@ -9,26 +9,25 @@ from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyReward,DummyReward
 from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.contrib.oracle import DockingOracle
-from LambdaZero.contrib.inputs import load_data_v1
+from LambdaZero.contrib.inputs import temp_load_data_v1
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 load_seen_config = {
-    "target": "dockscore",
+    "mean":-8.6, "std": 1.1,
     "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh"),
         "props": ["dockscore", "smiles"],
-        "transform": T.Compose([LambdaZero.utils.Complete(),
-                       LambdaZero.utils.Normalize("dockscore", -8.6, 1.1)]),
+        "transform": T.Compose([LambdaZero.utils.Complete()]),
         "file_names": ["Zinc20_docked_neg_randperm_3k"],
     },
 }
 
 
 model_config = {
-    "train_epochs":10,
+    "train_epochs":50,
     "batch_size":10,
     "num_mc_samples":3,
     "device":"cuda"
@@ -37,18 +36,21 @@ model_config = {
 acquirer_config = {
     "model": MolMCDropGNN,
     "model_config":model_config,
-    "acq_size": 4,
+    "acq_size": 16,
     "kappa":0.2
 }
 
-oracle_config = {"num_threads":2}
+oracle_config = {"num_threads":2,
+                 "dockVina_config": {"outpath":osp.join(summaries_dir, "docking")},
+                 "mean":-8.6, "std": 1.1,
+                 }
 
 proxy_config = {
-    "update_freq":100,
+    "update_freq":10000,
     "acquirer_config":acquirer_config,
     "oracle": DockingOracle,
     "oracle_config":oracle_config,
-    "load_seen": load_data_v1,
+    "load_seen": temp_load_data_v1,
     "load_seen_config": load_seen_config,
 }
 
@@ -61,7 +63,7 @@ rllib_config = {
         "reward_config": {
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "actor_sync_freq":20,
+            "actor_sync_freq": 500,
         },
 
     },

@@ -6,7 +6,8 @@ from LambdaZero.inputs import mol_to_graph
 from rdkit import Chem
 import torch
 
-def load_data_v1(target, dataset_split_path, dataset, dataset_config):
+def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
+    " "
     # make dataset
     dataset = dataset(**dataset_config)
 
@@ -15,8 +16,8 @@ def load_data_v1(target, dataset_split_path, dataset, dataset_config):
     data_list = []
     y_list = []
     for graph in dataset:
-        y_list.append(getattr(graph,target))
-        delattr(graph,target)
+        y_list.append(getattr(graph,"dockscore"))
+        delattr(graph,"dockscore")
         # append stem and jbond features
         delattr(graph, "pos")
         delattr(graph, "smiles")
@@ -27,6 +28,7 @@ def load_data_v1(target, dataset_split_path, dataset, dataset_config):
         graph.stem_preds=torch.zeros([0, 0])
         data_list.append(graph)
 
+    y_list = [(mean - y) / std for y in y_list]
     train_x = [{"mol_graph":data_list[int(i)]} for i in train_idxs]
     train_y = [y_list[i] for i in train_idxs]
     val_x = [{"mol_graph":data_list[int(i)]} for i in val_idxs]

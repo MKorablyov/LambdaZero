@@ -25,10 +25,9 @@ def train_epoch(loader, model, optimizer, device):
         loss.backward()
         optimizer.step()
         epoch_y.append(data.y.detach().cpu().numpy())
-        epoch_y_hat.append(y_hat.detach().cpu().numpy())
+        epoch_y_hat.append(y_hat[:,0].detach().cpu().numpy())
     epoch_y = np.concatenate(epoch_y,0)
     epoch_y_hat = np.concatenate(epoch_y_hat, 0)
-
     # todo: make more detailed metrics including examples being acquired
     return {"train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
@@ -53,7 +52,7 @@ class MolMCDropGNN(ModelWithUncertainty):
 
         # do train epochs
         dataset = ListGraphDataset(graphs)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list, shuffle=True)
 
         for i in range(self.train_epochs):
             metrics = train_epoch(dataloader, self.model, self.optimizer, self.device)
