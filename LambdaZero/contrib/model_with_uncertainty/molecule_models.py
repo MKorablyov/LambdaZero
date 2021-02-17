@@ -25,7 +25,8 @@ def train_epoch(loader, model, optimizer, device):
         loss.backward()
         optimizer.step()
         epoch_y.append(data.y.detach().cpu().numpy())
-        epoch_y_hat.append(y_hat.detach().cpu().numpy())
+        epoch_y_hat.append(y_hat[:,0].detach().cpu().numpy())
+        #epoch_y_hat.append(y_hat.detach().cpu().numpy())
     epoch_y = np.concatenate(epoch_y,0)
     epoch_y_hat = np.concatenate(epoch_y_hat, 0)
 
@@ -36,10 +37,10 @@ def train_epoch(loader, model, optimizer, device):
 class MolMCDropGNN(ModelWithUncertainty):
     def __init__(self, train_epochs, batch_size, num_mc_samples, device):
         ModelWithUncertainty.__init__(self)
-        self.train_epochs = train_epochs
-        self.batch_size = batch_size
-        self.num_mc_samples = num_mc_samples
-        self.device = device
+        self.train_epochs = 1000
+        self.batch_size = 32
+        self.num_mc_samples = 100
+        self.device = "cuda"
 
     def fit(self,x,y):
         # initialize new model and optimizer
