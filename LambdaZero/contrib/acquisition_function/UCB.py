@@ -24,7 +24,7 @@ class UCB(AcquisitionFunction):
             acq = self.acquisition_value(x)
 
         # compute indices with highest acquisition values
-        idx = np.argsort(acq)[-self.acq_size:]
+        idx = np.argsort(np.asarray(acq) * np.asarray(d))[-self.acq_size:]
         # take selected indices
         x_ = [x[i] for i in idx]
         d_ = [d[i] for i in idx]
