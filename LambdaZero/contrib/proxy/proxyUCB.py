@@ -25,5 +25,5 @@ class ProxyUCB(Proxy):
         return None
 
     def get_acquisition_func(self):
-        # fixme -- I need to find a way to make a cheap copy of "acquire function"
+        # todo: I need to make sure this passes copy but not a reference
         return self.UCB

@@ -12,8 +12,6 @@ from LambdaZero.contrib.oracle import DockingOracle
 from LambdaZero.contrib.inputs import load_data_v1
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-props = ["dockscore", "smiles"]
-transform = T.Compose([LambdaZero.utils.Complete(), LambdaZero.utils.Normalize("dockscore", -8.6, 1.1)])
 
 load_seen_config = {
     "target": "dockscore",
@@ -21,19 +19,25 @@ load_seen_config = {
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh"),
-        "props": props,
-        "transform": transform,
+        "props": ["dockscore", "smiles"],
+        "transform": T.Compose([LambdaZero.utils.Complete(),
+                       LambdaZero.utils.Normalize("dockscore", -8.6, 1.1)]),
         "file_names": ["Zinc20_docked_neg_randperm_3k"],
     },
 }
 
 
-model_config = {}
+model_config = {
+    "train_epochs":10,
+    "batch_size":10,
+    "num_mc_samples":3,
+    "device":"cuda"
+}
 
 acquirer_config = {
     "model": MolMCDropGNN,
     "model_config":model_config,
-    "acq_size": 32,
+    "acq_size": 4,
     "kappa":0.2
 }
 

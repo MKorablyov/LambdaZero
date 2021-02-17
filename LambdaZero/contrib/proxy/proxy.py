@@ -51,5 +51,4 @@ class Actor():
         if self.num_calls % self.sync_freq==0:
             # todo - need to figure out to do non-blocking calls here
             self.acquisition_func = ray.get(self.scoreProxy.get_acquisition_func.remote())
-        print("actor called ", acq)
         return acq
