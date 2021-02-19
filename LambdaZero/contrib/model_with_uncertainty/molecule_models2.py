@@ -43,7 +43,7 @@ class MolMCDropGNN(ModelWithUncertainty):
 
     def fit(self,x,y):
         # initialize new model and optimizer
-        self.model = MPNNetDrop(True, False, True, 0.1, 16)
+        self.model = MPNNetDrop(True, False, True, 0.1, num_feat=16, dim=10)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
 
@@ -69,7 +69,6 @@ class MolMCDropGNN(ModelWithUncertainty):
         graphs = [m["mol_graph"] for m in x]
         dataset = ListGraphDataset(graphs)
         dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list)
-
         y_hat_mc = []
         for i in range(num_samples):
             y_hat_epoch = []
@@ -79,10 +78,30 @@ class MolMCDropGNN(ModelWithUncertainty):
                 y_hat_epoch.append(y_hat_batch.detach().cpu().numpy())
             y_hat_mc.append(np.concatenate(y_hat_epoch,0))
         y_hat_mc = np.stack(y_hat_mc,1)
-        return
+        return y_hat_mc
     
-    def posterior(self, x):
+    def posterior(self, x, observation_noise=False):
         mean_m, variance_m = self.get_mean_and_variance(x)
+        if observation_noise:
+            pass
+
         mvn = MultivariateNormal(mean_m.squeeze(), torch.diag(variance_m.squeeze() + 1e-6))
         return GPyTorchPosterior(mvn)
+
+    def get_embed(self, x):
+        graphs = [m["mol_graph"] for m in x]
+        dataset = ListGraphDataset(graphs)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list)
+        # y_hat_epoch = []
+        embed = None
+        for batch in dataloader:
+            batch.to(self.device)
+            y_hat_batch = self.model.get_embed(batch, do_dropout=True)
+            # y_hat_epoch.append(y_hat_batch.detach().cpu().numpy())
+            if embed is None:
+                embed = y_hat_batch.detach().cpu()
+            else:
+                embed = torch.cat((embed, y_hat_batch.detach().cpu()), dim=0)
+
+        return embed
 

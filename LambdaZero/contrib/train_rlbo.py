@@ -45,7 +45,7 @@ if machine == "Ikarus":
 
 
 if __name__ == "__main__":
-    ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
+    ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"], local_mode=True)
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
 
     # initialize scoreProxy which would be shared across many agents

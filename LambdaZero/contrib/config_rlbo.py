@@ -5,7 +5,7 @@ import LambdaZero.inputs
 
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
 from LambdaZero.environments.reward import PredDockReward_v2
-from LambdaZero.contrib.proxy import ProxyUCB
+from LambdaZero.contrib.proxy import ProxyUCB, ProxyEI, ProxyMES
 from LambdaZero.contrib.reward import ProxyReward,DummyReward
 from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.contrib.oracle import DockingOracle
@@ -17,24 +17,30 @@ transform = T.Compose([LambdaZero.utils.Complete(), LambdaZero.utils.Normalize("
 
 load_seen_config = {
     "target": "dockscore",
-    "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+    "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh"),
         "props": props,
         "transform": transform,
-        "file_names": ["Zinc20_docked_neg_randperm_3k"],
+        "file_names": ["Zinc20_docked_neg_randperm_30k"],
     },
 }
 
 
 model_config = {}
 
+# acquirer_config = {
+#     "model": MolMCDropGNN,
+#     "model_config":model_config,
+#     "acq_size": 32,
+#     "kappa":0.2
+# }
+
 acquirer_config = {
     "model": MolMCDropGNN,
     "model_config":model_config,
     "acq_size": 32,
-    "kappa":0.2
 }
 
 oracle_config = {"num_threads":2}
@@ -55,20 +61,20 @@ rllib_config = {
         "allow_removal": True,
         "reward": ProxyReward,
         "reward_config": {
-            "scoreProxy":ProxyUCB,
+            "scoreProxy": ProxyMES, #ProxyMES, #ProxyEI, #ProxyUCB,
             "scoreProxy_config":proxy_config,
             "actor_sync_freq":20,
         },
 
     },
-    "num_workers": 8,
-    "num_gpus_per_worker": 0.25,
+    "num_workers": 4,
+    "num_gpus_per_worker": 0.5,
     "num_gpus": 1,
     "model": {
         "custom_model": "GraphMolActorCritic_thv1",
         "custom_model_config": {
             "num_blocks": 105, # todo specify number of blocks only in env?
-            "num_hidden": 64
+            "num_hidden": 8 # 64
         },
     },
     # "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},  # fixme (report all)

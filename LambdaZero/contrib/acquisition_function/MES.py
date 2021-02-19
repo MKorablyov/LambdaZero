@@ -1,31 +1,63 @@
 import time
 import numpy as np
+import torch
 from .acquisition_function import AcquisitionFunction
 from torch.distributions import Normal
 
-class EI(AcquisitionFunction):
+from gpytorch.mlls import ExactMarginalLogLikelihood
+from gpytorch.utils.cholesky import psd_safe_cholesky
+from botorch.models import SingleTaskGP
+from botorch.fit import fit_gpytorch_model
+from botorch.sampling.samplers import SobolQMCNormalSampler
+from botorch.models.utils import check_no_nans
+
+CLAMP_LB = 1.0e-8
+
+class MES(AcquisitionFunction):
     def __init__(self, model, model_config, acq_size):
         self.model = model(**model_config)
+        num_y_samples = 20
+        self.sampler = SobolQMCNormalSampler(num_y_samples)
+        self.num_mv_samples = 10
+        self.num_fantasies = 1
+        self.gp_fitted = False
         AcquisitionFunction.__init__(self, model, model_config, acq_size)
 
     def update_with_seen(self, x, y):
         self.model.fit(x,y)
+        print('######## gp fitted: ', self.gp_fitted)
+        if self.gp_fitted is False:
+            self.candidate_set = self.model.get_embed(x)[-10:, :]
+            self.gp = SingleTaskGP(self.candidate_set, torch.tensor(y).unsqueeze(-1)[-10:, :])
+            self.gp_fitted = True
+        self.mll = ExactMarginalLogLikelihood(self.gp.likelihood, self.gp)
+        fit_gpytorch_model(self.mll)
         # todo: evaluate acquisition function on a separate train/val set
-        return None
+        return self.gp
 
     def acquisition_value(self, x):
-        posterior = self.model.posterior(X.unsqueeze(-3))
-        mean = self.weight * posterior.mean.squeeze(-1).squeeze(-1)
+        posterior = self.gp.posterior(self.model.get_embed(x).unsqueeze(1).unsqueeze(-3), observation_noise=False)
+        mean = posterior.mean.squeeze(-1).squeeze(-1)
         variance = posterior.variance.clamp_min(CLAMP_LB).view_as(mean)
         check_no_nans(mean)
         check_no_nans(variance)
 
+        if variance.dim() == 2:
+            covar_mM = variance.unsqueeze(-1)
+        else:
+            covar_mM = variance
+
+        self._sample_max_values()
+
         ig = self._compute_information_gain(
-            X=X, mean_M=mean, variance_M=variance, covar_mM=variance.unsqueeze(-1)
+            X=self.model.get_embed(x).unsqueeze(1), mean_M=mean, variance_M=variance, covar_mM=covar_mM
         )
-        return ig.mean(dim=0)
+
+        return ig.mean(dim=0).detach().numpy()
+
 
     def acquire_batch(self, x, d, acq=None):
+
         if acq is not None:
             acq = self.acquisition_value(x)
 
@@ -38,9 +70,10 @@ class EI(AcquisitionFunction):
         return x_, d_, acq_
 
     def _compute_information_gain(self, X, mean_M, variance_M, covar_mM):
+
         # Needs to add observation noise to the posterior
-        posterior_m = self.model.posterior(X.unsqueeze(-3), observation_noise=True)
-        mean_m = self.weight * posterior_m.mean.squeeze(-1)
+        posterior_m = self.gp.posterior(X.unsqueeze(-3), observation_noise=True)
+        mean_m = posterior_m.mean.squeeze(-1)
         variance_m = posterior_m.mvn.covariance_matrix
         check_no_nans(variance_m)
 
@@ -62,8 +95,7 @@ class EI(AcquisitionFunction):
         view_shape = (
             [self.num_mv_samples] + [1] * (len(X.shape) - 2) + [self.num_fantasies]
         )
-        if self.X_pending is None:
-            view_shape[-1] = 1
+
         max_vals = self.posterior_max_values.view(view_shape).unsqueeze(1)
         normalized_mvs_new = (max_vals - mean_new) / stdv_new
         cdf_mvs_new = normal.cdf(normalized_mvs_new).clamp_min(CLAMP_LB)
@@ -89,12 +121,19 @@ class EI(AcquisitionFunction):
         ig = ig.permute(-1, *range(ig.dim() - 1))
         return ig
 
-def _sample_max_value_Thompson(model, candidate_set, num_samples, maximize):
+    def _sample_max_values(self):
+
+        with torch.no_grad():
+            # sample max values
+            self.posterior_max_values = _sample_max_value_Thompson(
+                self.gp, self.candidate_set, self.num_mv_samples
+            )
+
+def _sample_max_value_Thompson(model, candidate_set, num_samples):
     """Samples the max values by discrete Thompson sampling.
     """
     posterior = model.posterior(candidate_set)
-    weight = 1.0 if maximize else -1.0
-    samples = weight * posterior.rsample(torch.Size([num_samples])).squeeze(-1)
+    samples = posterior.rsample(torch.Size([num_samples])).squeeze(-1)
     # samples is num_samples x (num_fantasies) x n
     max_values, _ = samples.max(dim=-1)
     if len(samples.shape) == 2:

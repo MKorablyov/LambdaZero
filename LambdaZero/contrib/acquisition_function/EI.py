@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import torch
 from .acquisition_function import AcquisitionFunction
 from torch.distributions import Normal
 
@@ -16,14 +17,17 @@ class EI(AcquisitionFunction):
 
     def acquisition_value(self, x):
         mean, var = self.model.get_mean_and_variance(x)
-        sigma = var.clip(1e-9, inf).sqrt()
-        u = (mean - self.best_f) / sigma
+        mean = torch.tensor(mean)
+        var = torch.tensor(var)
 
+        sigma = var.clamp_min(1e-9).sqrt()
+        u = (mean - self.best_f) / sigma
         normal = Normal(torch.zeros_like(u), torch.ones_like(u))
         ucdf = normal.cdf(u)
         updf = torch.exp(normal.log_prob(u))
         acq = sigma * (updf + u * ucdf)
-
+        import pdb;
+        pdb.set_trace()
         return np.array(acq)
 
     def acquire_batch(self, x, d, acq=None):
