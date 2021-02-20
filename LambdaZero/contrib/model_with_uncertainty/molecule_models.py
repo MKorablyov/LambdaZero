@@ -3,10 +3,11 @@ import sys, time
 import torch
 import torch.nn.functional as F
 import numpy as np
-
 from torch.utils.data import DataLoader
 #from LambdaZero.models.torch_graph_models import MPNNet_Parametric, fast_from_data_list
 from torch_geometric.data import Batch
+from ray.tune.integration.wandb import wandb_mixin
+import wandb
 from LambdaZero.models import MPNNetDrop
 from LambdaZero.contrib.inputs import ListGraphDataset
 from .model_with_uncertainty import ModelWithUncertainty
@@ -31,7 +32,7 @@ def train_epoch(loader, model, optimizer, device):
     # todo: make more detailed metrics including examples being acquired
     return {"train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
-
+@wandb_mixin
 class MolMCDropGNN(ModelWithUncertainty):
     def __init__(self, train_epochs, batch_size, num_mc_samples, device):
         ModelWithUncertainty.__init__(self)
@@ -58,7 +59,7 @@ class MolMCDropGNN(ModelWithUncertainty):
             metrics = train_epoch(dataloader, self.model, self.optimizer, self.device)
             # todo: add weight decay etc.
             print("train GNNDrop", metrics)
-
+            #wandb.log(metrics)
 
     def get_mean_and_variance(self,x):
         y_hat_mc = self.get_samples(x, num_samples=self.num_mc_samples)

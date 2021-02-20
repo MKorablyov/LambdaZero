@@ -4,12 +4,15 @@ from ray import tune
 from ray.rllib.models.catalog import ModelCatalog
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.utils import merge_dicts
+from ray.tune.logger import DEFAULT_LOGGERS
+from ray.tune.integration.wandb import WandbLogger
 
 from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.examples.bayesian_models.rl import config
 from LambdaZero.contrib.config_rlbo import rllib_config
+
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -26,7 +29,8 @@ DEFAULT_CONFIG = {
     "object_store_memory": 30*10**9,
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
-    "stop":{"training_iteration": 2000000},
+    "stop":{"training_iteration": 2},
+    "logger":DEFAULT_LOGGERS + (WandbLogger, )
 }
 
 config = merge_dicts(DEFAULT_CONFIG, config)
@@ -41,6 +45,8 @@ if machine == "Ikarus":
     config["object_store_memory"] = 7 * 10**9
     config["rllib_config"]["train_batch_size"] = 16
     config["rllib_config"]["sgd_minibatch_size"] = 4
+
+
 
 
 
@@ -59,4 +65,5 @@ if __name__ == "__main__":
         config=config["rllib_config"],
              local_dir=summaries_dir,
              name=config_name,
-             checkpoint_freq=config["checkpoint_freq"])
+             checkpoint_freq=config["checkpoint_freq"]
+             )

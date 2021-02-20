@@ -27,16 +27,16 @@ load_seen_config = {
 
 
 model_config = {
-    "train_epochs":50,
+    "train_epochs":2,
     "batch_size":10,
-    "num_mc_samples":3,
+    "num_mc_samples":2,
     "device":"cuda"
 }
 
 acquirer_config = {
     "model": MolMCDropGNN,
     "model_config":model_config,
-    "acq_size": 16,
+    "acq_size": 2,
     "kappa":0.2
 }
 
@@ -46,7 +46,7 @@ oracle_config = {"num_threads":2,
                  }
 
 proxy_config = {
-    "update_freq":10000,
+    "update_freq": 1000,
     "acquirer_config":acquirer_config,
     "oracle": DockingOracle,
     "oracle_config":oracle_config,
@@ -63,7 +63,7 @@ rllib_config = {
         "reward_config": {
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "actor_sync_freq": 500,
+            "actor_sync_freq": 250,
         },
 
     },
@@ -80,4 +80,8 @@ rllib_config = {
     # "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},  # fixme (report all)
     "framework": "torch",
     "lr": 5e-5,
-}
+    "logger_config" :{
+        "wandb": {
+            "project": "wandb_rlbo",
+            "api_key_file": osp.join(summaries_dir, "wandb_key")
+        }}}

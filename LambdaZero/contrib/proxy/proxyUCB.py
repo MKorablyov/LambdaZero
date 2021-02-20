@@ -2,7 +2,6 @@ import ray
 from LambdaZero.contrib.acquisition_function import UCB
 from .proxy import Proxy
 
-
 @ray.remote(num_gpus=0.3, num_cpus=2)
 class ProxyUCB(Proxy):
     def __init__(self,update_freq, acquirer_config, oracle, oracle_config, load_seen, load_seen_config):

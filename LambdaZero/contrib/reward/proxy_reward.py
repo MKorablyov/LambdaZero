@@ -5,6 +5,8 @@ from random import random
 
 class ProxyReward:
     def __init__(self, scoreProxy, actor_sync_freq, **kwargs):
+        #print("proxy reward args", **kwargs)
+        #time.sleep(100)
         self.actor = Actor(scoreProxy, actor_sync_freq)
 
     def reset(self, previous_reward=0.0):
