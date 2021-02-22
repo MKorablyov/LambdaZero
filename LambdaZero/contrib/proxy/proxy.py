@@ -38,6 +38,7 @@ class Actor():
         # initialize
         self.num_calls = 0
         self.acquisition_func = ray.get(scoreProxy.get_acquisition_func.remote())
+        self.names = []
 
     def __call__(self, x, d):
         # compute acquisition value

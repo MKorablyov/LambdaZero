@@ -34,8 +34,8 @@ def train_epoch(loader, model, optimizer, device):
 
 @wandb_mixin
 class MolMCDropGNN(ModelWithUncertainty):
-    def __init__(self, train_epochs, batch_size, num_mc_samples, device):
-        ModelWithUncertainty.__init__(self)
+    def __init__(self, train_epochs, batch_size, num_mc_samples, device, logger):
+        ModelWithUncertainty.__init__(self, logger)
         self.train_epochs = train_epochs
         self.batch_size = batch_size
         self.num_mc_samples = num_mc_samples
@@ -58,6 +58,9 @@ class MolMCDropGNN(ModelWithUncertainty):
         for i in range(self.train_epochs):
             metrics = train_epoch(dataloader, self.model, self.optimizer, self.device)
             # todo: add weight decay etc.
+            self.logger.log.remote(metrics)
+
+
             print("train GNNDrop", metrics)
             #wandb.log(metrics)
 

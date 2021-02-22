@@ -10,7 +10,7 @@ from LambdaZero.datasets.temp_brunos_work.parameter_inputs import get_user, get_
 class MLFlowLogger(ExperimentLogger):
     def __init__(self, run_parameters: Dict[str, str], tracking_uri: str, execution_filename: str):
         """
-        Class to manage the internals of mlflow, for easy experiment logging.
+        Class to manage the internals of mlflow, for easy experiment loggers.
         """
         super().__init__(run_parameters, tracking_uri, execution_filename)
 

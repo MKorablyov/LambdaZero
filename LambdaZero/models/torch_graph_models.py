@@ -84,7 +84,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
             if self.rnd:
                 self._value_int = torch.zeros_like(action_mask[:,0])
         else:
-            # Due to the way RLLib forces encodeing observations into
+            # Due to the way RLLib forces encoding observations into
             # fixed length vectors, this part is quite expensive (~timings
             # on big batch), first there's a useless
             # uint8->float->cpu->gpu->cpu->uint8 (~3ms), then we unpack

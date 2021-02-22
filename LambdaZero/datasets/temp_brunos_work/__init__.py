@@ -19,7 +19,7 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def set_logging_directory(logging_directory: Path):
-    logging_path = ROOT_DIR.joinpath("logging.yaml")
+    logging_path = ROOT_DIR.joinpath("loggers.yaml")
     with open(logging_path, "rt") as f:
         config = yaml.safe_load(f.read())
 

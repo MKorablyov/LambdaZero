@@ -10,7 +10,7 @@ class ExperimentLogger:
     def __init__(self, run_parameters: Dict[str, str], tracking_uri: str, execution_filename: str, **kwargs):
         """
 
-        Class to manage the internals of an experiment logger, for easy experiment logging.
+        Class to manage the internals of an experiment logger, for easy experiment loggers.
         Args:
             run_parameters (Dict): dictionary containing the name of the experiment and the run name
             tracking_uri (str): path where the logger will write.

@@ -1,12 +1,11 @@
-import time
+import time, numpy
 from LambdaZero.contrib.proxy import Actor
 from rdkit import Chem
 from random import random
 
 class ProxyReward:
     def __init__(self, scoreProxy, actor_sync_freq, **kwargs):
-        #print("proxy reward args", **kwargs)
-        #time.sleep(100)
+        self.env_name = numpy.random.uniform()
         self.actor = Actor(scoreProxy, actor_sync_freq)
 
     def reset(self, previous_reward=0.0):
@@ -17,7 +16,8 @@ class ProxyReward:
         qed = 1.0
         # todo: to come up with some molecule encoding
         smiles = Chem.MolToSmiles(molecule.mol)
-        dock_score = self.actor([{"smiles":smiles, "mol_graph":molecule.graph}], [qed * synth_score])[0]
+        dock_score = self.actor([{"smiles":smiles, "mol_graph":molecule.graph, "env_name":self.env_name}],
+                                [qed * synth_score])[0]
         scores = {"dock_score": dock_score, "synth_score": synth_score, "qed":0.9}
         return synth_score * dock_score * qed, scores
 

@@ -1,7 +1,7 @@
 class ModelWithUncertainty:
-    def __init__(self):
+    def __init__(self, logger):
         # todo: maybe it could be initialized with x_val, y_val
-        pass
+        self.logger = logger
 
     def get_samples(self,x, num_samples):
         raise NotImplementedError

@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 class cfg:
     num_feat = 1
     dim = 128
-    train_prob = 0.1
+    train_prob = 0.05
 
 class Model(nn.Module):
     def __init__(self, num_feat=cfg.num_feat, ksizes=[12, 8, 6], dim=cfg.dim, act=torch.nn.Tanh, drop_prob=0.1):
@@ -71,7 +71,7 @@ def _train_model():
 
 # do Thompson sampling
 samples_val = []
-for i in range(5):
+for i in range(10):
     model = _train_model()
     sample_val = model(x_val, do_dropout=True)[:, 0].detach().cpu().numpy()
     samples_val.append(sample_val)

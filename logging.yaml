@@ -7,13 +7,13 @@ formatters:
 
 handlers:
   console:
-    class: logging.StreamHandler
+    class: loggers.StreamHandler
     level: DEBUG
     formatter: simple
     stream: ext://sys.stdout
 
   info_file_handler:
-    class: logging.handlers.RotatingFileHandler
+    class: loggers.handlers.RotatingFileHandler
     level: INFO
     formatter: simple
     filename: info.log
@@ -22,7 +22,7 @@ handlers:
     encoding: utf8
 
   error_file_handler:
-    class: logging.handlers.RotatingFileHandler
+    class: loggers.handlers.RotatingFileHandler
     level: ERROR
     formatter: simple
     filename: errors.log

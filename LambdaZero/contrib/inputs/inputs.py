@@ -39,6 +39,8 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
 class ListGraphDataset(Dataset):
     def __init__(self, graphs):
         self.graps = graphs
+        # todo use torch geometric to aggregate graphs together
+        # use torch_geometric slices on each batch
 
     def __getitem__(self, idx):
         return self.graps[idx]

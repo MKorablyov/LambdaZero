@@ -171,7 +171,6 @@ class GraphMolObs:
 class BlockMolEnvGraph_v1(BlockMolEnv_v3):
 
     def __init__(self, config=None):
-
         config = merge_dicts(DEFAULT_CONFIG, config)
 
         self.num_blocks = config["num_blocks"]
