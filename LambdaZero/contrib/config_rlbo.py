@@ -5,7 +5,7 @@ import LambdaZero.inputs
 
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
 from LambdaZero.environments.reward import PredDockReward_v2
-from LambdaZero.contrib.proxy import ProxyUCB
+from LambdaZero.contrib.proxy import ProxyUCB, ProxyEI, ProxyMES
 from LambdaZero.contrib.reward import ProxyReward,DummyReward
 from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.contrib.oracle import DockingOracle
@@ -37,7 +37,7 @@ acquirer_config = {
     "model": MolMCDropGNN,
     "model_config":model_config,
     "acq_size": 2,
-    "kappa":0.2
+    #"kappa":0.2
 }
 
 oracle_config = {"num_threads":2,
@@ -61,7 +61,7 @@ rllib_config = {
         "allow_removal": True,
         "reward": ProxyReward,
         "reward_config": {
-            "scoreProxy":ProxyUCB,
+            "scoreProxy":ProxyMES, #ProxyEI, #ProxyUCB,
             "scoreProxy_config":proxy_config,
             "actor_sync_freq": 250,
         },

@@ -26,8 +26,8 @@ class EI(AcquisitionFunction):
         ucdf = normal.cdf(u)
         updf = torch.exp(normal.log_prob(u))
         acq = sigma * (updf + u * ucdf)
-        import pdb;
-        pdb.set_trace()
+        # import pdb;
+        # pdb.set_trace()
         return np.array(acq)
 
     def acquire_batch(self, x, d, acq=None):
