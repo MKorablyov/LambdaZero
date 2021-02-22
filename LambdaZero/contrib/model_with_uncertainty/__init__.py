@@ -1,2 +1,2 @@
 from .model_with_uncertainty import ModelWithUncertainty
-from . molecule_models2 import MolMCDropGNN
+from . molecule_models import MolMCDropGNN
