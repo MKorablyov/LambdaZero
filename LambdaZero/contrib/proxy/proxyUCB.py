@@ -2,7 +2,6 @@ import ray
 from LambdaZero.contrib.acquisition_function import UCB
 from .proxy import Proxy
 
-
 @ray.remote(num_gpus=0.3, num_cpus=2)
 class ProxyUCB(Proxy):
     def __init__(self,update_freq, acquirer_config, oracle, oracle_config, load_seen, load_seen_config):
@@ -25,5 +24,5 @@ class ProxyUCB(Proxy):
         return None
 
     def get_acquisition_func(self):
-        # fixme -- I need to find a way to make a cheap copy of "acquire function"
+        # todo: I need to make sure this passes copy but not a reference
         return self.UCB
