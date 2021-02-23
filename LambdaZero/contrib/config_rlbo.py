@@ -29,7 +29,7 @@ load_seen_config = {
 
 model_config = {
     "train_epochs":75,
-    "batch_size":40,
+    "batch_size":100,
     "num_mc_samples":5,
     "device":"cuda"
 }
@@ -47,7 +47,7 @@ oracle_config = {"num_threads":8,
                  }
 
 proxy_config = {
-    "update_freq": 1000,
+    "update_freq": 4000,
     "acquirer_config":acquirer_config,
     "oracle": DockingOracle,
     "oracle_config":oracle_config,

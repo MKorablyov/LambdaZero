@@ -40,14 +40,13 @@ machine = socket.gethostname()
 if machine == "Ikarus":
     config["rllib_config"]["num_workers"] = 2
     config["rllib_config"]["num_gpus"] = 0.3
-    config["rllib_config"]["num_gpus_per_worker"] = 0.01
+    config["rllib_config"]["num_gpus_per_worker"] = 0.05
     config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]["oracle_config"]["num_threads"] = 4
     config["memory"] = 7 * 10**9
     config["object_store_memory"] = 7 * 10**9
     config["rllib_config"]["train_batch_size"] = 16
     config["rllib_config"]["sgd_minibatch_size"] = 4
     #
-    config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]["update_freq"] = 10
     config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]["oracle_config"]["num_threads"] = 3
     config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]["acquirer_config"]["acq_size"] = 4
     config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]\
@@ -57,6 +56,8 @@ if machine == "Ikarus":
 
 
 if __name__ == "__main__":
+    # todo: I want some nice way to access/change nested config files
+
     ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
 
