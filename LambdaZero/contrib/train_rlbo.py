@@ -20,7 +20,6 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 if len(sys.argv) >= 2: config_name = sys.argv[1]
 else: config_name = "ppo_bayes_reward_008"
 config = getattr(config,config_name)
-curr_trial = config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
 
 
 DEFAULT_CONFIG = {
@@ -30,7 +29,7 @@ DEFAULT_CONFIG = {
     "object_store_memory": 30*10**9,
     "trainer": PPOTrainer,
     "checkpoint_freq": 250,
-    "stop":{"training_iteration": 2},
+    "stop":{"training_iteration": 2000},
     "logger":DEFAULT_LOGGERS + (WandbLogger, )
 }
 
@@ -42,11 +41,19 @@ if machine == "Ikarus":
     config["rllib_config"]["num_workers"] = 2
     config["rllib_config"]["num_gpus"] = 0.3
     config["rllib_config"]["num_gpus_per_worker"] = 0.01
+    config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]["oracle_config"]["num_threads"] = 4
     config["memory"] = 7 * 10**9
     config["object_store_memory"] = 7 * 10**9
     config["rllib_config"]["train_batch_size"] = 16
     config["rllib_config"]["sgd_minibatch_size"] = 4
-
+    #
+    config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]["update_freq"] = 10
+    config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]["oracle_config"]["num_threads"] = 3
+    config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]["acquirer_config"]["acq_size"] = 4
+    config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]\
+        ["acquirer_config"]["model_config"]["train_epochs"]=3
+    config["rllib_config"]["env_config"]["reward_config"]["scoreProxy_config"]\
+        ["acquirer_config"]["model_config"]["batch_size"]=10
 
 
 if __name__ == "__main__":
@@ -76,5 +83,4 @@ if __name__ == "__main__":
              local_dir=summaries_dir,
              name=config_name,
              checkpoint_freq=config["checkpoint_freq"],
-             loggers = DEFAULT_LOGGERS + (wandb_callback,),
-             )
+             loggers = DEFAULT_LOGGERS + (wandb_callback,),)

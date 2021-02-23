@@ -36,13 +36,13 @@ model_config = {
 
 acquirer_config = {
     "model": MolMCDropGNN,
-    "model_config":model_config,
+    "model_config": model_config,
     "acq_size": 32,
-    "kappa":0.2
+    "kappa": 0.2
 }
 
 oracle_config = {"num_threads":8,
-                 "dockVina_config": {"outpath":osp.join(summaries_dir, "docking")},
+                 "dockVina_config": {"outpath": osp.join(summaries_dir, "docking")},
                  "mean":-8.6, "std": 1.1,
                  }
 
