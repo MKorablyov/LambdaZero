@@ -62,6 +62,7 @@ if __name__ == "__main__":
 
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
+    os.environ["WANDB_MODE"] = "dryrun"
     remote_logger = RemoteLogger.remote()
     wandb_callback = WandbRemoteLoggerCalback(
         remote_logger=remote_logger,
@@ -83,4 +84,4 @@ if __name__ == "__main__":
              local_dir=summaries_dir,
              name=config_name,
              checkpoint_freq=config["checkpoint_freq"],
-             loggers = DEFAULT_LOGGERS + (wandb_callback,),)
+             loggers=DEFAULT_LOGGERS + (wandb_callback,),)
