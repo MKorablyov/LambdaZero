@@ -28,7 +28,7 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
         graph.stem_preds=torch.zeros([0, 0])
         data_list.append(graph)
 
-    y_list = [(mean - y) / std for y in y_list]
+    y_list = [(mean - y) / std for y in y_list] # this flips the dockscore to norm version
     train_x = [{"mol_graph":data_list[int(i)]} for i in train_idxs]
     train_y = [y_list[i] for i in train_idxs]
     val_x = [{"mol_graph":data_list[int(i)]} for i in val_idxs]

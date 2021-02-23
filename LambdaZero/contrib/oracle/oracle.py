@@ -4,6 +4,7 @@ import ray
 from rdkit import Chem
 from rdkit.Chem import QED
 from LambdaZero.chem import DockVina_smi
+from LambdaZero.models import ChempropWrapper_v1
 
 
 @ray.remote(num_gpus=0)
@@ -31,17 +32,16 @@ class DockingOracle:
     def __call__(self, data):
         smiles = [d["smiles"] for d in data]
         dockscores = list(self.pool.map(lambda actor, smi: actor.eval.remote(smi), smiles))
-        dockscores = [(self.mean -d) / self.std for d in dockscores]
+        dockscores = [min(0, d) for d in dockscores] # when docking score is positive, clip at 0
+        dockscores = [(self.mean -d) / self.std for d in dockscores] # this normalizes and flips dockscore
         print("dosckscores", dockscores)
         return dockscores
-
-
-
 
 
 @ray.remote
 class QEDEstimator:
     def __init__(self):
+
         pass
 
     def eval(self, smiles):
@@ -59,10 +59,25 @@ class QEDOracle:
         self.actors = [QEDEstimator.remote() for i in range(self.num_threads)]
         self.pool = ray.util.ActorPool(self.actors)
 
-    def __call__(self, data):
-        smiles = [d["smiles"] for d in data]
+    def __call__(self, molecules):
+        smiles = [m["smiles"] for m in molecules]
         qeds = list(self.pool.map(lambda actor, smi: actor.eval.remote(smi), smiles))
-        print("QEDs", qeds)
         return qeds
+
+
+class SynthOracle:
+    def __init__(self, synth_config):
+        self.synth_net = ChempropWrapper_v1(synth_config)
+
+    def __call__(self,molecules):
+        synths = []
+        for m in molecules:
+            try:
+                synth = self.synth_net(m["mol"])
+            except Exception as e:
+                print(e)
+                synth = 0.0
+            synths.append(synth)
+        return synths
 
 

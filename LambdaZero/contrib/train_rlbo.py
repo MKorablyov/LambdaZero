@@ -40,8 +40,8 @@ config = merge_dicts(DEFAULT_CONFIG, config)
 machine = socket.gethostname()
 if machine == "Ikarus":
     config["rllib_config"]["num_workers"] = 2
-    config["rllib_config"]["num_gpus"] = 0.4
-    config["rllib_config"]["num_gpus_per_worker"] = 0.1
+    config["rllib_config"]["num_gpus"] = 0.3
+    config["rllib_config"]["num_gpus_per_worker"] = 0.01
     config["memory"] = 7 * 10**9
     config["object_store_memory"] = 7 * 10**9
     config["rllib_config"]["train_batch_size"] = 16
@@ -50,7 +50,6 @@ if machine == "Ikarus":
 
 
 if __name__ == "__main__":
-
     ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
 

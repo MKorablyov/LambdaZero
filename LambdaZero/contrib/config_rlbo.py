@@ -6,7 +6,7 @@ import LambdaZero.inputs
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
 from LambdaZero.environments.reward import PredDockReward_v2
 from LambdaZero.contrib.proxy import ProxyUCB
-from LambdaZero.contrib.reward import ProxyReward,DummyReward
+from LambdaZero.contrib.reward import ProxyReward, ProxyRewardSparse
 from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.contrib.oracle import DockingOracle
 from LambdaZero.contrib.inputs import temp_load_data_v1
@@ -28,20 +28,20 @@ load_seen_config = {
 
 
 model_config = {
-    "train_epochs":2,
-    "batch_size":10,
-    "num_mc_samples":2,
+    "train_epochs":75,
+    "batch_size":40,
+    "num_mc_samples":5,
     "device":"cuda"
 }
 
 acquirer_config = {
     "model": MolMCDropGNN,
     "model_config":model_config,
-    "acq_size": 2,
+    "acq_size": 32,
     "kappa":0.2
 }
 
-oracle_config = {"num_threads":2,
+oracle_config = {"num_threads":8,
                  "dockVina_config": {"outpath":osp.join(summaries_dir, "docking")},
                  "mean":-8.6, "std": 1.1,
                  }
@@ -60,11 +60,11 @@ rllib_config = {
     "env_config": {
         "random_steps": 4,
         "allow_removal": True,
-        "reward": ProxyReward,
+        "reward": ProxyRewardSparse,
         "reward_config": {
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "actor_sync_freq": 250,
+            "actor_sync_freq": 100,
         },
 
     },
