@@ -11,6 +11,7 @@ from blitz.utils import variational_estimator
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+import LambdaZero.chem
 
 
 def evaluate_regression(regressor,
@@ -27,16 +28,6 @@ def evaluate_regression(regressor,
     ic_acc = (ci_lower <= y) * (ci_upper >= y)
     ic_acc = ic_acc.float().mean()
     return ic_acc, (ci_upper >= y).float().mean(), (ci_lower <= y).float().mean()
-
-
-# class EnsembleMLP:
-    # make ensemble of weights in torch
-    # def fit(x, y, x_val, y_val)
-        # this would fit to the dataset
-
-    # def get_mean_and_variance()
-        # samples = ensemble(w) @ X
-        # return  mean, variance(samples)
 
 class UCB:
     # todo: acquisition function - maybe create classes
@@ -73,50 +64,37 @@ class UCBTrainable(UCB, tune.Trainable):
     pass
 
 
+def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
+    """convert to PyTorch geometric module"""
+    natm = atmfeat.shape[0]
+    # transform to torch_geometric bond format; send edges both ways; sort bonds
+    atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
+    edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)], axis=1), dtype=torch.int64)
+    edge_attr = torch.tensor(np.concatenate([bondfeat, bondfeat], axis=0), dtype=torch.float32)
+    edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    # make torch data
+    if coord is not None:
+        coord = torch.tensor(coord, dtype=torch.float32)
+        data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+    else:
+        data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+    return data
 
-def load_dataset():
-    x = np.random.uniform(size=(10000,1024))
-    func = np.random.uniform(size=(1024,1)) / 1024.
-    y = np.matmul(x, func)
-    return x,y
+def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
+    """mol to graph convertor"""
+    mol, _, _ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
+    if feat == "mpnn":
+        atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
+    else:
+        raise NotImplementedError(feat)
+    graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
+    return graph
 
-
-def standardize_dataset(x, y):
-    x = StandardScaler().fit_transform(x)
-    # y = StandardScaler().fit_transform(np.expand_dims(y, -1))
-    y = StandardScaler().fit_transform(y)
-    return x, y
-
-
-def split_dataset(x, y):
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.25, random_state=42)
-    x_train, y_train = torch.tensor(x_train).float(), torch.tensor(y_train).float()
-    x_test, y_test = torch.tensor(x_test).float(), torch.tensor(y_test).float()
-    return x_train, y_train, x_test, y_test
-
-
-x, y = load_dataset()
-print("loaded dataset")
-x, y = standardize_dataset(x, y)
-print("standardized dataset")
-x_train, y_train, x_test, y_test = split_dataset(x, y)
-print("splitted dataset")
-
-
-@variational_estimator
-class BayesianRegressor(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super().__init__()
-        self.blinear1 = BayesianLinear(input_dim, 512)
-        self.blinear2 = BayesianLinear(512, output_dim)
-
-    def forward(self, x):
-        x = self.blinear1(x)
-        x = self.blinear2(x)
-        return x
-
-
-
+import csv
+with open('/home/sai/Downloads/1_step_docking_results_qed0.5.csv') as csvfile:
+    reader = csv.reader(csvfile, delimiter='')
+    for row in reader:
+        print(','.join(row))
 
 
 
