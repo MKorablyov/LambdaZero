@@ -1,1 +1,1 @@
-from .proxy_reward import ProxyReward, DummyReward
+from .proxy_reward import *

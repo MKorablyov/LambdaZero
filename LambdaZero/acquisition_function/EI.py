@@ -1,7 +1,7 @@
 import time
 import numpy as np
 import torch
-from .acquisition_function import AcquisitionFunction
+from LambdaZero.contrib.acquisition_function import AcquisitionFunction
 from torch.distributions import Normal
 
 class EI(AcquisitionFunction):

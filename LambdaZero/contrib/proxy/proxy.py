@@ -38,6 +38,7 @@ class Actor():
         # initialize
         self.num_calls = 0
         self.acquisition_func = ray.get(scoreProxy.get_acquisition_func.remote())
+        self.names = []
 
     def __call__(self, x, d):
         # compute acquisition value
@@ -51,5 +52,4 @@ class Actor():
         if self.num_calls % self.sync_freq==0:
             # todo - need to figure out to do non-blocking calls here
             self.acquisition_func = ray.get(self.scoreProxy.get_acquisition_func.remote())
-        print("actor called ", acq)
         return acq

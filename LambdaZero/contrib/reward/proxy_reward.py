@@ -1,26 +1,57 @@
-import time
+import time, numpy
 from LambdaZero.contrib.proxy import Actor
 from rdkit import Chem
 from random import random
+from LambdaZero.contrib.oracle import QEDOracle, SynthOracle
+from LambdaZero.environments.block_mol_v3 import synth_config
+
+import ray
+
+def _satlins(x, cutoff0, cutoff1):
+    "shifted saturated linearity activation function _/-"
+    x = (x - cutoff0) / (cutoff1 - cutoff0)
+    x = min(max(0.0, x), 1.0)  # relu to maxout at 1
+    return x
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_sync_freq, **kwargs):
-        #print("proxy reward args", **kwargs)
-        #time.sleep(100)
-        self.actor = Actor(scoreProxy, actor_sync_freq)
+    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, **kwargs):
+        self.env_name = numpy.random.uniform()
+        self.qed_cutoff = qed_cutoff
+        self.synth_cutoff = synth_cutoff
+        self.qed_oracle = QEDOracle(num_threads=1)
+        self.synth_oracle = SynthOracle(synth_config)
+        self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
 
     def reset(self, previous_reward=0.0):
         return None
 
-    def __call__(self, molecule, agent_stop, env_stop, num_steps):
-        synth_score = 1.0
-        qed = 1.0
-        # todo: to come up with some molecule encoding
+    def eval(self, molecule):
         smiles = Chem.MolToSmiles(molecule.mol)
-        dock_score = self.actor([{"smiles":smiles, "mol_graph":molecule.graph}], [qed * synth_score])[0]
-        scores = {"dock_score": dock_score, "synth_score": synth_score, "qed":0.9}
-        return synth_score * dock_score * qed, scores
+        qed = self.qed_oracle([{"smiles":smiles, "mol":molecule.mol}])[0]
+        synth_score = self.synth_oracle([{"smiles":smiles, "mol":molecule.mol}])[0]
+        # stop optimizing qed/synth beyond thresholds
+        clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
+        clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
+        dockreward = self.dockProxy_actor([{"smiles":smiles, "mol_graph":molecule.graph, "env_name": self.env_name}],
+                                          [clip_qed * clip_synth])[0]
+        clip_dock = min(dockreward, 0.0) # rewards are assumed to be non-negative
+        info = {"dockreward": dockreward, "synth_score": synth_score, "qed":qed}
+        #print("norm scores", clip_qed, clip_synth, dockreward)
+        return clip_qed * clip_synth * clip_dock, info
+
+    def __call__(self, molecule, agent_stop, env_stop, num_steps):
+        return self.eval(molecule)
+
+
+
+class ProxyRewardSparse(ProxyReward):
+    def __call__(self, molecule, agent_stop, env_stop, num_steps):
+        if agent_stop or env_stop:
+            reward, info = ProxyReward.eval(self, molecule)
+        else:
+            reward, info = 0.0, {}
+        return reward, info
 
 
 class DummyReward:
