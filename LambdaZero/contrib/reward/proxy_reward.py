@@ -35,7 +35,7 @@ class ProxyReward:
 
         dockreward = self.dockProxy_actor([{"smiles":smiles, "mol_graph":molecule.graph, "env_name": self.env_name}],
                                           [clip_qed * clip_synth])[0]
-        clip_dock = max(dockreward, 0.0) # rewards are clipped to be non-negative
+        clip_dock = max(dockreward, 0.0) # rewards are clipped to be non-negative (there is not anything to avoid)
         info = {"dockreward": dockreward, "synth_score": synth_score, "qed":qed}
         #print("norm scores", clip_qed, clip_synth, dockreward)
         return clip_qed * clip_synth * clip_dock, info

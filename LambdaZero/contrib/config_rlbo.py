@@ -1,5 +1,4 @@
 import os.path as osp
-import torch_geometric.transforms as T
 import LambdaZero.utils
 import LambdaZero.inputs
 
@@ -7,47 +6,21 @@ from LambdaZero.environments.persistent_search.persistent_buffer import BlockMol
 from LambdaZero.environments.reward import PredDockReward_v2
 from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyReward, ProxyRewardSparse
-from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.contrib.oracle import DockingOracle
 from LambdaZero.contrib.inputs import temp_load_data_v1
 
+from ray.tune.logger import DEFAULT_LOGGERS
+from ray.tune.integration.wandb import WandbLogger
+from ray.rllib.agents.ppo import PPOTrainer
+
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
+from config_model import load_seen_config
+from config_acquirer import oracle_config, acquirer_config
 
-load_seen_config = {
-    "mean":-8.6, "std": 1.1,
-    "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
-    "dataset": LambdaZero.inputs.BrutalDock,
-    "dataset_config": {
-        "root": osp.join(datasets_dir, "brutal_dock/seh"),
-        "props": ["dockscore", "smiles"],
-        "transform": T.Compose([LambdaZero.utils.Complete()]),
-        "file_names": ["Zinc20_docked_neg_randperm_3k"],
-    },
-}
-
-
-model_config = {
-    "train_epochs":75,
-    "batch_size":100,
-    "num_mc_samples":5,
-    "device":"cuda"
-}
-
-acquirer_config = {
-    "model": MolMCDropGNN,
-    "model_config": model_config,
-    "acq_size": 32,
-    "kappa": 0.2
-}
-
-oracle_config = {"num_threads":8,
-                 "dockVina_config": {"outpath": osp.join(summaries_dir, "docking")},
-                 "mean":-8.6, "std": 1.1,
-                 }
 
 proxy_config = {
-    "update_freq": 4000,
+    "update_freq": 10000,
     "acquirer_config":acquirer_config,
     "oracle": DockingOracle,
     "oracle_config":oracle_config,
@@ -64,7 +37,7 @@ rllib_config = {
         "reward_config": {
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "actor_sync_freq": 100,
+            "actor_sync_freq": 500,
         },
 
     },
@@ -81,8 +54,90 @@ rllib_config = {
     # "callbacks": {"on_episode_end": LambdaZero.utils.dock_metrics},  # fixme (report all)
     "framework": "torch",
     "lr": 5e-5,
-    "logger_config" :{
+    "logger_config":{
         "wandb": {
             "project": "wandb_rlbo",
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
+
+
+DEFAULT_CONFIG = {
+    "tune_config":{
+        "config":rllib_config,
+        "local_dir": summaries_dir,
+        "run_or_experiment": PPOTrainer,
+        "checkpoint_freq": 250,
+        "stop":{"training_iteration": 2000},
+        "loggers":DEFAULT_LOGGERS + (WandbLogger, )
+    },
+    "memory": 30 * 10 ** 9,
+    "object_store_memory": 30 * 10 ** 9
+}
+
+debug_config = {
+    "memory": 7 * 10 ** 9,
+    "object_store_memory": 7 * 10 ** 9,
+    "tune_config":{
+        "config":{
+            "num_workers": 2,
+            "num_gpus":0.3,
+            "num_gpus_per_worker": 0.05,
+            "train_batch_size":128,
+            "sgd_minibatch_size": 4,
+            "env_config":{
+                "reward_config":{
+                    "scoreProxy_config":{
+                        "oracle_config":{"num_threads": 4,},
+                        "acquirer_config":{
+                            "acq_size": 4,
+                            "model_config":{
+                                "train_epochs":3,
+                                "batch_size":10,
+                        }}}}}}}}
+
+
+
+rlbo_001 = {}
+rlbo_002 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "reward_config":{
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa":0.0
+                    }}}}}}}
+
+rlbo_003 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "reward_config":{
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa":0.0
+                    }}}}}}}
+
+rlbo_004 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "reward_config":{
+                    "scoreProxy_config":{
+                        "update_freq":1000,
+                    }}}}}}
+
+rlbo_005 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "random_steps":6,
+            }}}}
+
+rlbo_006 = { # this maybe needs to run only with EI
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "random_steps":6,
+                "reward": ProxyReward,
+            }}}}
