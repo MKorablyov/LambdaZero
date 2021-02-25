@@ -1,4 +1,5 @@
-import time, numpy
+import time
+import numpy as np
 from LambdaZero.contrib.proxy import Actor
 from rdkit import Chem
 from random import random
@@ -14,13 +15,16 @@ def _satlins(x, cutoff0, cutoff1):
     return x
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, **kwargs):
-        self.env_name = numpy.random.uniform()
+    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, clip_dockreward, **kwargs):
+        self.env_name = np.random.uniform()
         self.qed_cutoff = qed_cutoff
         self.synth_cutoff = synth_cutoff
         self.qed_oracle = QEDOracle(num_threads=1)
         self.synth_oracle = SynthOracle(synth_config)
         self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
+        self.clip_dockreward = clip_dockreward
+
+        self.rewards = []
 
     def reset(self, previous_reward=0.0):
         return None
@@ -35,9 +39,15 @@ class ProxyReward:
 
         dockreward = self.dockProxy_actor([{"smiles":smiles, "mol_graph":molecule.graph, "env_name": self.env_name}],
                                           [clip_qed * clip_synth])[0]
-        clip_dock = max(dockreward, 0.0) # rewards are clipped to be non-negative (there is not anything to avoid)
+        self.rewards.append(dockreward)
+        if self.clip_dockreward is not None: # rewards are clipped to be non-negative (there is not anything to avoid)
+            # I had to add an artificial reward for any molecule to help this to converge
+            clip_dock = max(self.clip_dockreward + dockreward, 0.0)
+        else:
+            clip_dock = dockreward
+
         info = {"dockreward": dockreward, "synth_score": synth_score, "qed":qed}
-        #print("norm scores", clip_qed, clip_synth, dockreward)
+
         return clip_qed * clip_synth * clip_dock, info
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):

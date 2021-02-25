@@ -1,7 +1,7 @@
 import ray
 from copy import deepcopy
 from ray.tune.integration.wandb import WandbLoggerCallback, _clean_log
-
+from ray.rllib.agents.callbacks import DefaultCallbacks
 
 @ray.remote
 class RemoteLogger:
@@ -22,7 +22,7 @@ class RemoteLogger:
         return logs
 
 
-class WandbRemoteLoggerCalback(WandbLoggerCallback):
+class WandbRemoteLoggerCallback(WandbLoggerCallback):
     def __init__(self, remote_logger, **kwargs):
         self.remote_logger = remote_logger
         WandbLoggerCallback.__init__(self, **kwargs)
@@ -36,3 +36,5 @@ class WandbRemoteLoggerCalback(WandbLoggerCallback):
         for log in logs:
             log = _clean_log(log)
             self._trial_queues[trial].put(log)
+
+
