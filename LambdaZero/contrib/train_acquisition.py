@@ -6,8 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from blitz.modules import BayesianLinear
-from blitz.utils import variational_estimator
+#from blitz.modules import BayesianLinear
+#from blitz.utils import variational_estimator
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -91,10 +91,11 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     return graph
 
 import csv
-with open('/home/sai/Downloads/1_step_docking_results_qed0.5.csv') as csvfile:
-    reader = csv.reader(csvfile, delimiter='')
+with open('/home/mkkr/1_step_docking_results_qed0.5.csv') as csvfile:
+    reader = csv.reader(csvfile, delimiter=' ')
     for row in reader:
-        print(','.join(row))
+        print(row[0].split(",")[1])
+        #print(','.join(row))
 
 
 
@@ -119,7 +120,7 @@ with open('/home/sai/Downloads/1_step_docking_results_qed0.5.csv') as csvfile:
 
 
 
-regressor = BayesianRegressor(1024, 1)
+#regressor = BayesianRegressor(1024, 1)
 
 # class UCBTrainer(UCB, tune.trainable):
     # _init():
