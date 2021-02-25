@@ -12,7 +12,9 @@ import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 import LambdaZero.chem
-
+from LambdaZero.chem import build_mol, mpnn_feat
+from torch_sparse import coalesce
+from torch_geometric.data import Data, InMemoryDataset
 
 def evaluate_regression(regressor,
                         X,
@@ -91,14 +93,36 @@ def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
     return graph
 
 import csv
+smiles_list = []
+scores_list = []
+graphs_list = []
+i = 0
 with open('/home/mkkr/1_step_docking_results_qed0.5.csv') as csvfile:
     reader = csv.reader(csvfile, delimiter=' ')
-    for row in reader:
-        print(row[0].split(",")[1])
+    for i in range(100):
+        row = reader[i]
+        splitter = row[0].split(",")
+        print(splitter[1])
+        print(splitter[2])
+        if splitter[1] != 'smiles':
+            smiles_list.append(splitter[1])
+            graphs_list.append(mol_to_graph(splitter[1]))
+            scores_list.append(splitter[2])
+        #print(row[0].split(",")[1])
         #print(','.join(row))
 
+import torch
+import numpy as np
+from torch.utils.data import TensorDataset, DataLoader
 
+#my_x = [np.array] # a list of numpy arrays
+#my_y = [np.array([4.]), np.array([2.])] # another list of numpy arrays (targets)
 
+tensor_x = torch.Tensor(graphs_list) # transform to torch tensor
+tensor_y = torch.Tensor(scores_list)
+
+my_dataset = TensorDataset(tensor_x,tensor_y) # create your datset
+my_dataloader = DataLoader(my_dataset) # create your dataloader
 
 
 
