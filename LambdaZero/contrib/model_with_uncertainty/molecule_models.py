@@ -59,8 +59,6 @@ class MolMCDropGNN(ModelWithUncertainty):
             metrics = train_epoch(dataloader, self.model, self.optimizer, self.device)
             # todo: add weight decay etc.
             self.logger.log.remote(metrics)
-
-
             print("train GNNDrop", metrics)
             #wandb.log(metrics)
 

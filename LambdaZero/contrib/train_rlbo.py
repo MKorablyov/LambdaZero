@@ -31,17 +31,16 @@ if machine == "Ikarus":
 if __name__ == "__main__":
     ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
-
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
     os.environ["WANDB_MODE"] = "dryrun"
     remote_logger = RemoteLogger.remote()
-#    time.sleep(10) # this might not be needed, but added due to unsolved wandb init errors
+    time.sleep(10) # this might not be needed, but added due to unsolved wandb init errors
     wandb_logger = WandbRemoteLoggerCallback(
         remote_logger=remote_logger,
         project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],
-        api_key_file=osp.join(summaries_dir, "wandb_key"),
-        log_config=False)
+        api_key_file=osp.join(summaries_dir, "wandb_key"))
+    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["logger"] = remote_logger
     config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["acquirer_config"]\
         ["model_config"]["logger"] = remote_logger
     config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)

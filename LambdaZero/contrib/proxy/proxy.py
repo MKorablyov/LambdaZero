@@ -2,9 +2,10 @@ import time
 import ray
 
 class Proxy:
-    def __init__(self, update_freq, proposed_x, proposed_d, proposed_acq):
+    def __init__(self, update_freq, proposed_x, proposed_d, proposed_acq, logger):
         self.update_freq = update_freq
         self.proposed_x, self.proposed_d, self.proposed_acq = proposed_x, proposed_d, proposed_acq
+        self.logger = logger
 
     def propose_x(self,x, d, acq):
         """
