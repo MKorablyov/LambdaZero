@@ -9,7 +9,7 @@ from ray.tune.logger import DEFAULT_LOGGERS
 from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 import LambdaZero.utils
 import LambdaZero.inputs
-from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger
+from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger, TrialNameCreator
 from LambdaZero.contrib.config_rlbo import DEFAULT_CONFIG
 import config_rlbo
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -19,7 +19,6 @@ if len(sys.argv) >= 2: config_name = sys.argv[1]
 else: config_name = "rlbo_001"
 config = getattr(config_rlbo,config_name)
 config = merge_dicts(DEFAULT_CONFIG, config)
-
 
 # convenience option to debug option to be able to run any config on someone's machine
 machine = socket.gethostname()
@@ -35,7 +34,7 @@ if __name__ == "__main__":
     os.environ['WANDB_DIR'] = summaries_dir
     os.environ["WANDB_MODE"] = "dryrun"
     remote_logger = RemoteLogger.remote()
-    time.sleep(10) # this might not be needed, but added due to unsolved wandb init errors
+    #time.sleep(10) # this might not be needed, but added due to unsolved wandb init errors
     wandb_logger = WandbRemoteLoggerCallback(
         remote_logger=remote_logger,
         project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],
@@ -46,8 +45,10 @@ if __name__ == "__main__":
     config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)
 
     # initialize scoreProxy which would be shared across many agents
-    scoreProxy = config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'].remote(
-        **config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
-    config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
+    scoreProxy = config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'].\
+        options(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_options']).\
+        remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
 
-    tune.run(**config["tune_config"], name=config_name)
+    config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
+    # run
+    tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))

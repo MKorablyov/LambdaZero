@@ -47,7 +47,6 @@ class ProxyReward:
             clip_dock = dockreward
 
         info = {"dockreward": dockreward, "synth_score": synth_score, "qed":qed}
-
         return clip_qed * clip_synth * clip_dock, info
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):

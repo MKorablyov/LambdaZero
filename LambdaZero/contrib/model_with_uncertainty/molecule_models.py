@@ -1,5 +1,5 @@
 import sys, time
-
+import ray
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -32,7 +32,7 @@ def train_epoch(loader, model, optimizer, device):
     # todo: make more detailed metrics including examples being acquired
     return {"train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
-@wandb_mixin
+
 class MolMCDropGNN(ModelWithUncertainty):
     def __init__(self, train_epochs, batch_size, num_mc_samples, device, logger):
         ModelWithUncertainty.__init__(self, logger)

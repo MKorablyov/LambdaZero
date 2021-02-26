@@ -32,9 +32,11 @@ rllib_config = {
         "allow_removal": True,
         "reward": ProxyRewardSparse,
         "reward_config": {
+            "qed_cutoff": [0.2, 0.5],
             "clip_dockreward":2.5,
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
+            "scoreProxy_options":{"num_cpus":2, "num_gpus":0.6},
             "actor_sync_freq": 500,
         },
 
@@ -54,7 +56,7 @@ rllib_config = {
     "lr": 5e-5,
     "logger_config":{
         "wandb": {
-            "project": "wandb_rlbo",
+            "project": "rlbo",
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
 
@@ -82,11 +84,12 @@ debug_config = {
             "sgd_minibatch_size": 4,
             "env_config":{
                 "reward_config":{
+                    "scoreProxy_options":{"num_cpus":2, "num_gpus":0.3},
                     "scoreProxy_config":{
                         "update_freq": 100,
                         "oracle_config":{"num_threads": 2,},
                         "acquirer_config":{
-                            "acq_size": 4,
+                            "acq_size": 2,
                             "model_config":{
                                 "train_epochs":3,
                                 "batch_size":10,
