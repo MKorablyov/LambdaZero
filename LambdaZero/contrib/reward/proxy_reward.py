@@ -15,12 +15,12 @@ def _satlins(x, cutoff0, cutoff1):
     return x
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, clip_dockreward, **kwargs):
+    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, clip_dockreward, synth_options, **kwargs):
         self.env_name = np.random.uniform()
         self.qed_cutoff = qed_cutoff
         self.synth_cutoff = synth_cutoff
         self.qed_oracle = QEDOracle(num_threads=1)
-        self.synth_oracle = SynthOracle(synth_config)
+        self.synth_oracle = SynthOracle(synth_options, synth_config)
         self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
         self.clip_dockreward = clip_dockreward
 

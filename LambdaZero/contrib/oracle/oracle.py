@@ -65,15 +65,21 @@ class QEDOracle:
         return qeds
 
 
+@ray.remote(num_gpus=0.05)
+class ChempropWrapper_v2(ChempropWrapper_v1):
+    def eval(self, m):
+        #print("M:", m)
+        return ChempropWrapper_v1.__call__(self, m)
+
 class SynthOracle:
-    def __init__(self, synth_config):
-        self.synth_net = ChempropWrapper_v1(synth_config)
+    def __init__(self, synth_options, synth_config):
+        self.synth_net = ChempropWrapper_v2.options(**synth_options).remote(synth_config)
 
     def __call__(self,molecules):
         synths = []
         for m in molecules:
             try:
-                synth = self.synth_net(m["mol"])
+                synth = ray.get(self.synth_net.eval.remote(m["mol"]))
             except Exception as e:
                 print(e)
                 synth = 0.0

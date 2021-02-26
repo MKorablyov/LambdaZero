@@ -32,17 +32,18 @@ rllib_config = {
         "allow_removal": True,
         "reward": ProxyRewardSparse,
         "reward_config": {
+            "synth_options":{"num_gpus":0.05},
             "qed_cutoff": [0.2, 0.5],
             "clip_dockreward":2.5,
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "scoreProxy_options":{"num_cpus":2, "num_gpus":0.6},
+            "scoreProxy_options":{"num_cpus":2, "num_gpus":0.55},
             "actor_sync_freq": 500,
         },
 
     },
     "num_workers": 8,
-    "num_gpus_per_worker": 0.05,
+    "num_gpus_per_worker": 0.1,
     "num_gpus": 0.5,
     "model": {
         "custom_model": "GraphMolActorCritic_thv1",
@@ -79,19 +80,19 @@ debug_config = {
         "config":{
             "num_workers": 2,
             "num_gpus":0.3,
-            "num_gpus_per_worker":0.05,
+            "num_gpus_per_worker":0.15,
             "train_batch_size": 128,
             "sgd_minibatch_size": 4,
             "env_config":{
                 "reward_config":{
-                    "scoreProxy_options":{"num_cpus":2, "num_gpus":0.3},
+                    "scoreProxy_options":{"num_cpus":1, "num_gpus":0.3},
                     "scoreProxy_config":{
                         "update_freq": 100,
                         "oracle_config":{"num_threads": 2,},
                         "acquirer_config":{
                             "acq_size": 2,
                             "model_config":{
-                                "train_epochs":3,
+                                "train_epochs":1,
                                 "batch_size":10,
                         }}}}}}}}
 
