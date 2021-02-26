@@ -15,6 +15,7 @@ from torch_geometric.data import Data, InMemoryDataset
 
 import csv
 from torch.utils.data import TensorDataset, DataLoader
+import itertools
 
 def evaluate_regression(regressor,
                         X,
@@ -98,7 +99,7 @@ graphs_list = []
 i = 0
 with open('/home/mkkr/1_step_docking_results_qed0.5.csv') as csvfile:
     reader = csv.reader(csvfile, delimiter=' ')
-    for row in itertools.islice(reader, 100):
+    for row in itertools.islice(reader, 10):
         splitter = row[0].split(",")
         print(splitter[1])
         print(splitter[2])
@@ -107,10 +108,14 @@ with open('/home/mkkr/1_step_docking_results_qed0.5.csv') as csvfile:
             graphs_list.append(mol_to_graph(splitter[1]))
             scores_list.append(splitter[2])
 
-#my_x = [np.array] # a list of numpy arrays
+#print(graphs_list.shape)
+my_x = np.array(graphs_list) # a list of numpy arrays
+print(my_x.shape)
+print(my_x[0].shape)
+print(my_x[0])
 #my_y = [np.array([4.]), np.array([2.])] # another list of numpy arrays (targets)
 
-tensor_x = torch.Tensor(graphs_list) # transform to torch tensor
+tensor_x = torch.Tensor(my_x) # transform to torch tensor
 tensor_y = torch.Tensor(scores_list)
 
 my_dataset = TensorDataset(tensor_x,tensor_y) # create your datset
