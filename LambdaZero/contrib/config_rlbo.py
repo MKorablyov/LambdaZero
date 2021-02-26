@@ -42,8 +42,8 @@ rllib_config = {
 
     },
     "num_workers": 8,
-    "num_gpus_per_worker": 0.25,
-    "num_gpus": 1,
+    "num_gpus_per_worker": 0.05,
+    "num_gpus": 0.5,
     "model": {
         "custom_model": "GraphMolActorCritic_thv1",
         "custom_model_config": {
