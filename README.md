@@ -26,7 +26,7 @@ cd LambdaZero/examples/mpnn
 salloc --time=1:0:0 --cpus-per-task=4 --gres=gpu:1 --mem=32G --account=rrg-bengioy-ad
 
 # Load environment variables (this would load the python environment modules with gcc/cuda modules)
-source /lustre03/project/6004852/mkkr/LambdaZero/misc/beluga_load_env.sh
+source LambdaZero/misc/beluga_load_env.sh
 
 # add current working repo to python path to allow global imports IE: import LambdaZero.some_module
 export PYTHONPATH="${PYTHONPATH}:/path-to-where-you-have-current-work-repo/LambdaZero" 
@@ -39,6 +39,7 @@ python train_mpnn.py
 ```
 
 ### Install using Anaconda 
+Installation is complicated in practice - better default option is to use shared env on Beluga
 Install [anaconda](https://www.anaconda.com/products/individual)
 
 Create the conda environment, based on your os:
