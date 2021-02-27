@@ -1,7 +1,6 @@
 import ray
 from copy import deepcopy
 from ray.tune.integration.wandb import WandbLoggerCallback, _clean_log
-from ray.rllib.agents.callbacks import DefaultCallbacks
 
 @ray.remote
 class RemoteLogger:

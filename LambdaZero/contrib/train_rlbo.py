@@ -50,5 +50,8 @@ if __name__ == "__main__":
         remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
 
     config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
+
+    #print(ray.get(scoreProxy.get_acquisition_func.remote()))
+
     # run
     tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))

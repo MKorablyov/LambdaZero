@@ -208,6 +208,7 @@ class MPNNet_Parametric(nn.Module):
 
         for i in range(6):
             m = F.leaky_relu(self.conv(out, data.edge_index, data.edge_attr))
+            self.gru.flatten_parameters()
             out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
             out = out.squeeze(0)
 

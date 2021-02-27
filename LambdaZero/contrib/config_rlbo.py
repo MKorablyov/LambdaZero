@@ -37,13 +37,13 @@ rllib_config = {
             "clip_dockreward":2.5,
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "scoreProxy_options":{"num_cpus":2, "num_gpus":0.55},
+            "scoreProxy_options":{"num_cpus":2, "num_gpus":0.6},
             "actor_sync_freq": 500,
         },
 
     },
     "num_workers": 8,
-    "num_gpus_per_worker": 0.1,
+    "num_gpus_per_worker": 0.15,
     "num_gpus": 0.5,
     "model": {
         "custom_model": "GraphMolActorCritic_thv1",
@@ -92,8 +92,8 @@ debug_config = {
                         "acquirer_config":{
                             "acq_size": 2,
                             "model_config":{
-                                "train_epochs":1,
-                                "batch_size":10,
+                                "train_epochs":2,
+                                "batch_size":5,
                         }}}}}}}}
 
 rlbo_001 = {}

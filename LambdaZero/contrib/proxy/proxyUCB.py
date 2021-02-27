@@ -21,12 +21,10 @@ class ProxyUCB(Proxy):
         self.logger.log.remote([{"acquired_acq_mean": np.mean(acq), "acquired_acq_max":np.max(acq),
                                  "acquired_y_mean":np.mean(y), "acquired_y_max": np.max(y)
                                  }])
-
         self.seen_x.extend(x)
         self.seen_y.extend(y)
         self.UCB.update_with_seen(self.seen_x, self.seen_y) # todo: evaluate on newly acquired data
         return None
 
     def get_acquisition_func(self):
-        # todo: I need to make sure this passes copy but not a reference
         return self.UCB

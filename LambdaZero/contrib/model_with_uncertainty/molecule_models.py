@@ -43,9 +43,9 @@ class MolMCDropGNN(ModelWithUncertainty):
 
     def fit(self,x,y):
         # initialize new model and optimizer
-        self.model = MPNNetDrop(True, False, True, 0.1, 16)
-        self.model.to(self.device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        model = MPNNetDrop(True, False, True, 0.1, 16)
+        model.to(self.device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
         # from many possible properties take molecule graph
         graphs = [m["mol_graph"] for m in x]
@@ -56,11 +56,12 @@ class MolMCDropGNN(ModelWithUncertainty):
         dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list, shuffle=True)
 
         for i in range(self.train_epochs):
-            metrics = train_epoch(dataloader, self.model, self.optimizer, self.device)
+            metrics = train_epoch(dataloader, model, optimizer, self.device)
             # todo: add weight decay etc.
             self.logger.log.remote(metrics)
             print("train GNNDrop", metrics)
-            #wandb.log(metrics)
+        model.eval()
+        self.model = model
 
     def get_mean_and_variance(self,x):
         y_hat_mc = self.get_samples(x, num_samples=self.num_mc_samples)

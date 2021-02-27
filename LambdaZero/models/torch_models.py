@@ -220,6 +220,7 @@ class MPNNetDrop(nn.Module):
         for i in range(3):
             m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
             if self.drop_weights: m = F.dropout(m, training=do_dropout, p=self.drop_prob)
+            self.gru.flatten_parameters()
             out, h = self.gru(m.unsqueeze(0), h)
             if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
             out = out.squeeze(0)
