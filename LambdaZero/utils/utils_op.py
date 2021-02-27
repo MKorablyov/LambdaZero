@@ -19,11 +19,8 @@ def get_external_dirs():
     config = configparser.ConfigParser()
 
     if not os.path.exists(os.path.join(ROOT, 'external_dirs.cfg')):
-        raise ImportError("Locator file is missing. Can't locate third party dependencies. "
-                          "Please, run install_prog_data.sh which will install datasets and third party dependencies "
-                          "and also create external_dirs.cfg  in process needed to locate to these softwares."
-                          "In case you already have datasets and programs installed, you could create "
-                          "external_dirs.cfg manually to point to installations.")
+        raise ImportError("Locator file is missing external_dirs.cfg is missing." 
+                          "This file, individual for each user should be a part of installation. Please, follow installation instructions in README.md")
 
     config.read(os.path.join(ROOT, 'external_dirs.cfg'))
 
