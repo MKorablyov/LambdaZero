@@ -16,5 +16,6 @@ source /lustre03/project/6004852/mkkr/anaconda3/etc/profile.d/conda.sh
 conda activate lz
 
 
-# in order to run LambdaZero, you may also want to add the particular version you have to PYTHONPATH
+# LambdaZero is being developed to become a package to be able to run package imports like from LambdaZero.models import MPNN. As a solution, we
+# add repo to the PYTHONPATH before running.
 # export PYTHONPATH="${PYTHONPATH}:/home/mkkr/scratch/Projects/15_LambdaZero"
