@@ -69,8 +69,8 @@ DEFAULT_CONFIG = {
         "checkpoint_freq": 250,
         "stop":{"training_iteration": 2000},
     },
-    "memory": 30 * 10 ** 9,
-    "object_store_memory": 30 * 10 ** 9
+    "memory": 60 * 10 ** 9,
+    "object_store_memory": 60 * 10 ** 9
 }
 
 debug_config = {
