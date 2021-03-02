@@ -20,8 +20,8 @@ def sync_wandb(logs_path, since_time):
         dates += [osp.getmtime(osp.join(logs_path, run, "logs", l))
                   for l in os.listdir(os.path.join(logs_path, run, "logs"))]
         # sync if needed
-        since_time_logged = int(min([curr_time - d for d in dates]))  #
-        if since_time_logged < since_time:
+        since_logged_time = int(min([curr_time - d for d in dates]))  #
+        if since_logged_time < since_time:
             try:
                 subprocess.run(['wandb', 'sync', osp.join(logs_path, run)], check=True)
             except subprocess.CalledProcessError as e:

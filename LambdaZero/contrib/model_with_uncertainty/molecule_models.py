@@ -30,7 +30,7 @@ def train_epoch(loader, model, optimizer, device):
     epoch_y = np.concatenate(epoch_y,0)
     epoch_y_hat = np.concatenate(epoch_y_hat, 0)
     # todo: make more detailed metrics including examples being acquired
-    return {"train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
+    return {"model/train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
 
 class MolMCDropGNN(ModelWithUncertainty):

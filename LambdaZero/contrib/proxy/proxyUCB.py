@@ -18,8 +18,8 @@ class ProxyUCB(Proxy):
     def acquire_and_update(self):
         x, d, acq = self.UCB.acquire_batch(self.proposed_x, self.proposed_d, self.proposed_acq)
         y = self.oracle(x)
-        self.logger.log.remote([{"acquired_acq_mean": np.mean(acq), "acquired_acq_max":np.max(acq),
-                                 "acquired_y_mean":np.mean(y), "acquired_y_max": np.max(y)
+        self.logger.log.remote([{"proxy/acquired_acq_mean": np.mean(acq), "proxy/acquired_acq_max":np.max(acq),
+                                 "proxy/acquired_y_mean":np.mean(y), "proxy/acquired_y_max": np.max(y)
                                  }])
         self.seen_x.extend(x)
         self.seen_y.extend(y)
