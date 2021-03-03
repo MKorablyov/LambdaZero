@@ -138,6 +138,10 @@ class BlockMoleculeData:
             self._mol, _ = chem.mol_from_frag(jun_bonds=self.jbonds, frags=self.blocks)
         return self._mol
 
+    @property
+    def smiles(self):
+        return Chem.MolToSmiles(self.mol)
+
 
 class MolMDP:
     def __init__(self, blocks_file):
