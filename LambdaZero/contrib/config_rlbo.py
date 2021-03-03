@@ -34,6 +34,7 @@ rllib_config = {
         "reward_config": {
             "synth_options":{"num_gpus":0.05},
             "qed_cutoff": [0.2, 0.5],
+            "synth_cutoff":[0, 4],
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
             "scoreProxy_options":{"num_cpus":2, "num_gpus":1.0},
@@ -91,7 +92,7 @@ debug_config = {
                         "acquirer_config":{
                             "acq_size": 2,
                             "model_config":{
-                                "train_epochs":2,
+                                "train_epochs":50,
                                 "batch_size":5,
                         }}}}}}}}
 

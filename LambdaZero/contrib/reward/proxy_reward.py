@@ -29,21 +29,21 @@ class ProxyReward:
         return None
 
     def eval(self, molecule):
-        #smiles = Chem.MolToSmiles(molecule.mol)
         qed = self.qed_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
         synth_score = self.synth_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
         # stop optimizing qed/synth beyond thresholds
         clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
-        dockreward = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph, "env_name": self.env_name}],
+        proxy_dock = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph, "env_name": self.env_name}],
                                           [clip_qed * clip_synth])[0]
-        self.rewards.append(dockreward)
-        if dockreward > 0: # reward should be rarely negative
-            reward = clip_qed * clip_synth * dockreward
+        self.rewards.append(proxy_dock)
+        if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
+            reward = clip_qed * clip_synth * proxy_dock
         else:
-            reward = dockreward
-        info = {"dockreward": dockreward, "synth_score": synth_score, "qed":qed}
+            reward = proxy_dock
+        info = {"proxy_dock": proxy_dock, "synth_score": synth_score, "qed_score":qed,
+                "clip_qed":clip_qed, "clip_synth":clip_synth}
         return reward, info
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):
