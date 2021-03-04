@@ -32,9 +32,10 @@ class DockingOracle:
     def __call__(self, data):
         smiles = [d["smiles"] for d in data]
         dockscores = list(self.pool.map(lambda actor, smi: actor.eval.remote(smi), smiles))
+        print("raw dockscores", dockscores)
         dockscores = [min(0, d) for d in dockscores] # when docking score is positive, clip at 0
         dockscores = [(self.mean -d) / self.std for d in dockscores] # this normalizes and flips dockscore
-        print("dosckscores", dockscores)
+        print("norm dockscores", dockscores)
         return dockscores
 
 

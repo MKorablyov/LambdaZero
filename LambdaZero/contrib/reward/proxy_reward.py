@@ -23,8 +23,6 @@ class ProxyReward:
         self.synth_oracle = SynthOracle(synth_options, synth_config)
         self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
 
-        self.rewards = []
-
     def reset(self, previous_reward=0.0):
         return None
 
@@ -35,15 +33,19 @@ class ProxyReward:
         clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
-        proxy_dock = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph, "env_name": self.env_name}],
-                                          [clip_qed * clip_synth])[0]
-        self.rewards.append(proxy_dock)
+        proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
+                                                  "env_name": self.env_name}], [clip_qed * clip_synth])
+
+        proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
         if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
             reward = clip_qed * clip_synth * proxy_dock
         else:
             reward = proxy_dock
-        info = {"proxy_dock": proxy_dock, "synth_score": synth_score, "qed_score":qed,
-                "clip_qed":clip_qed, "clip_synth":clip_synth}
+        info = {"proxy_dock": proxy_dock,
+                "proxy_dock_mean":actor_info["mean"][0],
+                "proxy_dock_var": actor_info["var"][0],
+                "synth_score": synth_score, "qed_score":qed,
+                "clip_qed": clip_qed, "clip_synth": clip_synth}
         return reward, info
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):
@@ -69,6 +71,4 @@ class DummyReward:
         return None
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):
-        print(molecule, float(random()))
-
         return float(random()), {"reward": 1.0, "discounted_reward": 1.0, "QED": 1.0, "discount": 1.0}

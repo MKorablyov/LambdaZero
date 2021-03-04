@@ -87,12 +87,12 @@ debug_config = {
                 "reward_config":{
                     "scoreProxy_options":{"num_cpus":1, "num_gpus":0.3},
                     "scoreProxy_config":{
-                        "update_freq": 100,
+                        "update_freq": 10,
                         "oracle_config":{"num_threads": 2,},
                         "acquirer_config":{
                             "acq_size": 2,
                             "model_config":{
-                                "train_epochs":50,
+                                "train_epochs":3,
                                 "batch_size":5,
                         }}}}}}}}
 

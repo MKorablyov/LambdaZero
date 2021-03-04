@@ -17,11 +17,11 @@ class UCB(AcquisitionFunction):
     def acquisition_value(self, x):
         mean, var = self.model.get_mean_and_variance(x)
         acq = [mean[i] + self.kappa * var[i] for i in range(len(mean))]
-        return acq
+        info = {"mean":mean,"var":var}
+        return acq, info
 
     def acquire_batch(self, x, d, acq=None):
-        if acq is not None:
-            acq = self.acquisition_value(x)
+        if acq is not None: acq,_ = self.acquisition_value(x)
 
         # compute indices with highest acquisition values
         idx = np.argsort(np.asarray(acq) * np.asarray(d))[-self.acq_size:]
@@ -29,4 +29,5 @@ class UCB(AcquisitionFunction):
         x_ = [x[i] for i in idx]
         d_ = [d[i] for i in idx]
         acq_ = [acq[i] for i in idx]
-        return x_, d_, acq_
+        info = {}
+        return x_, d_, acq_ ,info

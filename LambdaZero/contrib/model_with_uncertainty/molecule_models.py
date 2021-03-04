@@ -53,11 +53,11 @@ class MolMCDropGNN(ModelWithUncertainty):
 
         # do train epochs
         dataset = ListGraphDataset(graphs)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=Batch.from_data_list, shuffle=True)
 
         for i in range(self.train_epochs):
             metrics = train_epoch(dataloader, model, optimizer, self.device)
-            # todo: add weight decay etc.
+
             self.logger.log.remote(metrics)
             print("train GNNDrop", metrics)
         model.eval()

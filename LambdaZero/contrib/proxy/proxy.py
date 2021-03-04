@@ -44,13 +44,13 @@ class Actor():
     def __call__(self, x, d):
         # compute acquisition value
         self.num_calls += 1
-        acq = self.acquisition_func.acquisition_value(x)
+        acq, info = self.acquisition_func.acquisition_value(x)
 
         # send molecule to the remote proxy
         self.scoreProxy.propose_x.remote(x, acq, d)
 
         # sync weights with proxy if needed
-        if self.num_calls % self.sync_freq==0:
+        if self.num_calls % self.sync_freq==1:
             # todo - need to figure out to do non-blocking calls here
             self.acquisition_func = ray.get(self.scoreProxy.get_acquisition_func.remote())
-        return acq
+        return acq, info
