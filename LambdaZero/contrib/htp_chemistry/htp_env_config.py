@@ -3,14 +3,14 @@ import os.path as osp
 from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyRewardSparse
 from LambdaZero.contrib.config_rlbo import proxy_config
-from LambdaZero.contrib.htp_chemistry.mc_sampling import MC_sampling_v1a
+from LambdaZero.contrib.htp_chemistry.mc_sampling import MC_sampling_v0
 from LambdaZero.contrib.htp_chemistry.mc_sampling_config import mc_sampling_config_002
 from LambdaZero.utils import get_external_dirs
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 htp_env_config_v0_001 = {
-    "mc_sampling": MC_sampling_v1a,
+    "mc_sampling": MC_sampling_v0,
     "mc_sampling_config": mc_sampling_config_002,
     "reward": ProxyRewardSparse,
     "reward_config": {
@@ -38,7 +38,7 @@ htp_env_config_v0_001 = {
 
 
 htp_env_config_v1_001 = {
-    "mc_sampling": MC_sampling_v1a,
+    "mc_sampling": MC_sampling_v0,
     "mc_sampling_config": mc_sampling_config_002,
     "reward": ProxyRewardSparse,
     "reward_config": {

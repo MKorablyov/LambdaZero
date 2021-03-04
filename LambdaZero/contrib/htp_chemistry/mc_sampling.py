@@ -46,19 +46,7 @@ other considered ones could include:
 we should also consider protection groups
 '''
 
-# amide_formation = AllChem.ReactionFromSmarts('[#6:1][CX3:2](=O)[!$(O,N,F,Cl,Br,I):3].[NX3;H2,H1;!$(NC=O):4]>>[*:1][*:2]([*:3])[*:4]')
-# amide_formation = AllChem.ReactionFromSmarts(
-#     '[CX3:1](=[O:2])[OH].[NX3;H2,H1;!$(NC=O):3][#6:4]>>[CX3:1](=[O:2])[*:3][*:4]')
-# mol1 = Chem.MolFromSmiles('CC(=O)O')
-# mol2 = Chem.MolFromSmiles('NS(=O)(CC1CCOCC1)=O')
-# products = amide_formation.RunReactants((mol1, mol2))
-# print(Chem.MolToSmiles(products[-1][0]))
-# for product in products:
-#     print(Chem.MolToSmiles(product[0]))
-
-# # convergence plots, expansion coefficient, reaction distribution
-
-class MC_sampling_v1a():
+class MC_sampling_v0():
 
     def __init__(self, config):
         self.mols = list(pd.read_csv(config["mols"], sep=r'\\t', header=None, engine='python')[0])
@@ -67,23 +55,13 @@ class MC_sampling_v1a():
         self.monocomponent_reactions = config["monocomponent_reactions"]()
 
         self.num_reaction_steps = config["num_reaction_steps"]
-        self.convergence_criteria = config["convergence_criteria"]
-        self.convergence_check_frequency = config["convergence_check_frequency"]
-        self.update_frequency = config["update_frequency"]
-
         self.qed_cutoff = config["qed_cutoff"]
         self.multi_substitution = config["multi_substitution"]
-        self.generate_molecules_mode = config["generate_molecules_mode"]
+
 
         self.normalizer = MolStandardize.normalize.Normalizer()
         self.lfc = MolStandardize.fragment.LargestFragmentChooser()
         self.uc = MolStandardize.charge.Uncharger()
-
-        self.valid_mols = []
-        self.total_mol = 0.
-        self.current_ratio = 0.
-        self.previous_ratio = 1.
-        self.convergence = 1.
 
     def salt_remover(self, mol):
         mol = self.normalizer.normalize(mol)
@@ -184,140 +162,25 @@ class MC_sampling_v1a():
             return [product, smiles, natm, QED.qed(product)]
 
 
-class MC_sampling_v1(WandbTrainableMixin, tune.Trainable): # tune.Trainable version of v1_a
+# tune.Trainable version of v0, only for generating mols/convergence
+class MC_sampling_v1(WandbTrainableMixin, tune.Trainable):
 
     def setup(self, config):
-        self.mols = list(pd.read_csv(config["mols"], sep=r'\\t', header=None, engine='python')[0])
-
-        self.bicomponent_reactions = config["bicomponent_reactions"]()
-        self.monocomponent_reactions = config["monocomponent_reactions"]()
-
-        self.num_reaction_steps = config["num_reaction_steps"]
+        self.mc_sampling = MC_sampling_v0(config)
         self.convergence_criteria = config["convergence_criteria"]
         self.convergence_check_frequency = config["convergence_check_frequency"]
         self.update_frequency = config["update_frequency"]
-
-        self.qed_cutoff = config["qed_cutoff"]
-        self.multi_substitution = config["multi_substitution"]
         self.generate_molecules_mode = config["generate_molecules_mode"]
-
-        self.normalizer = MolStandardize.normalize.Normalizer()
-        self.lfc = MolStandardize.fragment.LargestFragmentChooser()
-        self.uc = MolStandardize.charge.Uncharger()
 
         self.valid_mols = []
         self.total_mol = 0.
         self.current_ratio = 0.
         self.previous_ratio = 1.
         self.convergence = 1.
-
-    def salt_remover(self, mol):
-        mol = self.normalizer.normalize(mol)
-        mol = self.lfc.choose(mol)
-        mol = self.uc.uncharge(mol)
-        return mol
-
-    def product(self, mol1, mol2):
-        products = []
-        for reaction in self.bicomponent_reactions: #["two_components"]:
-            if self.multi_substitution:
-                rxn_product = ((0,),)
-                step_product = None
-                step = 0
-                while len(rxn_product) > 0:
-                    if step == 0:
-                        rxn_product = reaction.RunReactants((mol1, mol2), maxProducts=50) \
-                                        + reaction.RunReactants((mol2, mol1), maxProducts=50)
-                    else:
-                        rxn_product = reaction.RunReactants((step_product, mol2), maxProducts=50) \
-                                       + reaction.RunReactants((step_product, mol1), maxProducts=50) \
-                                       + reaction.RunReactants((mol2, step_product), maxProducts=50) \
-                                       + reaction.RunReactants((mol1, step_product), maxProducts=50)
-                    if len(rxn_product) > 0:
-                        step_product = rxn_product[-1][0]
-                        # print(Chem.MolToSmiles(step_product), Chem.MolToSmiles(mol1), Chem.MolToSmiles(mol2))
-                        step_product.UpdatePropertyCache()
-                    step += 1
-                    if step >= 5:
-                        # possibly a polymer material
-                        break
-                if step_product is not None:
-                    products.append(step_product)
-            else:
-                # if we only care about monosubstution:
-                rxn_product = reaction.RunReactants((mol1, mol2), maxProducts=50) + \
-                               reaction.RunReactants((mol2, mol1), maxProducts=50)
-                if len(rxn_product) > 0:
-                    step_product = rxn_product[-1][0]
-                    step_product.UpdatePropertyCache()
-                    products.append(step_product)
-
-        for idx, reaction in enumerate(self.monocomponent_reactions):
-            if self.multi_substitution:
-                rxn_product = ((0,),)
-                step_product = None
-                step = 0
-                while len(rxn_product) > 0:
-                    if step == 0:
-                        rxn_product = reaction.RunReactants((mol1, ), maxProducts=50)
-                    else:
-                        rxn_product = reaction.RunReactants((mol1, ), maxProducts=50)
-                    if len(rxn_product) > 0:
-                        step_product = rxn_product[-1][0]
-                        step_product.UpdatePropertyCache()
-                    step += 1
-                    if step >= 5:
-                        break
-                if step_product is not None:
-                    products.append(step_product)
-            else:
-                rxn_product = reaction.RunReactants((mol1, ), maxProducts=50)
-                if len(rxn_product) > 0:
-                    step_product = rxn_product[-1][0]
-                    try:
-                        step_product.UpdatePropertyCache()
-                    except Exception as e:
-                        print(idx, e, Chem.MolToSmiles(mol1), 'opps\n')
-                    products.append(step_product)
-
-        if len(products) > 0:
-            return random.choice(products)
-        else:
-            return None
-
-    def sample_mol(self):
-        mols = random.choices(self.mols, k=(self.num_reaction_steps + 1))  # steps = 1, sample 2 mols
-        # print(mols)
-        # mols = ['COCCn1cc(nn1)C(=O)O', 'NS(=O)(=O)NC1CCOCC1']
-        mols = [self.salt_remover(Chem.MolFromSmiles(mol)) for mol in mols]
-        prev_mol = mols[0]
-        product = None
-        for i in range(1, len(mols)):
-            current_mol = mols[i]
-            product = self.product(prev_mol, current_mol)
-            if product is None:
-                return None
-            prev_mol = product
-
-        smiles = Chem.MolToSmiles(product)
-        natm = product.GetNumAtoms()
-
-        # to avoid generating smiles as it takes time, use the following
-        # if self.generate_molecules_mode is not None:
-        #     smiles = Chem.MolToSmiles(product)
-        # else:
-        #     smiles = True
-
-        if self.qed_cutoff is not None: # additional filter
-            if QED.qed(product) >= self.qed_cutoff:
-                return [product, smiles, natm, QED.qed(product)]
-            else: return None
-        else:
-            return [product, smiles, natm, QED.qed(product)]
 
     def step(self):
         for i in range(self.update_frequency):
-            product = self.sample_mol()
+            product = self.mc_sampling.sample_mol()
             self.total_mol += 1
             if product is not None:
                 self.valid_mols.append(product[1:4])
@@ -326,11 +189,11 @@ class MC_sampling_v1(WandbTrainableMixin, tune.Trainable): # tune.Trainable vers
             self.previous_ratio = self.current_ratio
             wandb.log({"convergence": self.convergence, "valid_mol_ratio": self.current_ratio, "num_valid_mols": len(self.valid_mols)})
 
-        if self.generate_molecules_mode is None:
+        if self.generate_molecules_mode is None: # stop at convergence criteria
             if (self._iteration+1) % self.convergence_check_frequency == 0:
                 if self.convergence <= self.convergence_criteria:
                     self.handcraft_save_checkpoint()
-        elif len(self.valid_mols) >= self.generate_molecules_mode:
+        elif len(self.valid_mols) >= self.generate_molecules_mode: # generate n molecules
             self.handcraft_save_checkpoint()
 
         return {"convergence": self.convergence, "valid_mol_ratio": self.current_ratio, "num_valid_mols": len(self.valid_mols)}
@@ -358,7 +221,7 @@ class MC_sampling_v1(WandbTrainableMixin, tune.Trainable): # tune.Trainable vers
         # wandb.log({"molecule_properties": wandb.plot.scatter(wandb_products, "qed", "natm", title='Molecular properties')})
         return None
 
-def mc_sampling_stopper(trail_id, result):
+def mc_sampling_stopper(trial_id, result):
     if result['config']['generate_molecules_mode'] is None:
         if result['training_iteration'] % result['config']['convergence_check_frequency'] == 0:
             if result['convergence'] <= result['config']['convergence_criteria']:
@@ -367,9 +230,6 @@ def mc_sampling_stopper(trail_id, result):
     elif result['num_valid_mols'] >= result['config']['generate_molecules_mode']:
         return True
     return False
-
-    # if result['training_iteration'] == 30: return True
-    # else: return False
 
 # if len(sys.argv) >= 2: config_name = sys.argv[1]
 # else:
@@ -393,7 +253,7 @@ if __name__ == "__main__":
     config = DEFAULT_CONFIG
     ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
 
-    # # initialize loggers
+    # # initialize loggers, note to log mols and graphs the handcrafted savingpoint is more efficient
     # os.environ['WANDB_DIR'] = summaries_dir
     # remote_logger = RemoteLogger.remote()
     # wandb_callback = WandbRemoteLoggerCalback(
@@ -412,10 +272,3 @@ if __name__ == "__main__":
         num_samples=config["num_samples"],
         # loggers = DEFAULT_LOGGERS + (wandb_callback,),
     )
-
-
-
-
-
-
-

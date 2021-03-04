@@ -1,6 +1,6 @@
 import os.path as osp
 from ray import tune
-from LambdaZero.contrib.htp_chemistry.mc_reactions import rdkit_bicomponent_reactions_v0, rdkit_monocomponent_reactions_v0
+from LambdaZero.contrib.htp_chemistry.htp_reactions import rdkit_bicomponent_reactions_v0, rdkit_monocomponent_reactions_v0
 from LambdaZero.utils import get_external_dirs
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
