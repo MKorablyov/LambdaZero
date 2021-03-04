@@ -1,14 +1,22 @@
-import LambdaZero.chem as chem
-from LambdaZero.environments.block_mol_graph_v1 import ParametricMolData
-from LambdaZero.inputs import mol_to_graph
-from ray import tune
+import random
+import numpy as np
+from rdkit import Chem
+from gym.spaces import Discrete, Dict
 import torch
+
+from ray import tune
+from ray.rllib.policy.policy import Policy
+from ray.rllib.agents.trainer_template import build_trainer
+
+from LambdaZero.inputs import mol_to_graph
+
 
 class BlockMoleculeData_wrapper():
     def __init__(self, mol, smiles):
         self.graph = None
         self.mol = mol
         self.smiles = smiles
+
 
 class HTP_Env_v0(tune.Trainable):
 
@@ -50,9 +58,6 @@ class HTP_Env_v0(tune.Trainable):
         # print(reward, log_vals)
         return {'reward': reward, **info} # None, reward, done, info
 
-import random
-from rdkit import Chem
-from gym.spaces import Discrete, Dict, Box
 
 class HTP_Env_v1():
     def __init__(self, config=None):
@@ -69,7 +74,7 @@ class HTP_Env_v1():
     def reset(self):
         self.num_step = 0
         self.obs = {"step": self.num_step}
-        # initialize with a molecule
+        # initialize with a molecule as reactant
         self.molecule = random.choice(self.mc_sampling.mols)
         # print(self.molecule)
         self.molecule = self.mc_sampling.salt_remover(Chem.MolFromSmiles(self.molecule))
@@ -87,7 +92,6 @@ class HTP_Env_v1():
         mol = product
         smiles = Chem.MolToSmiles(product)
         molecule = BlockMoleculeData_wrapper(mol, smiles)
-        # molecule.mol = molecule
         try:
             graph = mol_to_graph(smiles)
             graph.x = torch.cat([graph.x, torch.zeros([graph.x.shape[0], 2])], dim=1)
@@ -145,9 +149,6 @@ class HTP_Env_v1():
     def get_state(self):
         return self.num_step
 
-from ray.rllib.policy.policy import Policy
-from ray.rllib.agents.trainer_template import build_trainer
-import numpy as np
 
 class HTP_DummyPolicy(Policy):
 
