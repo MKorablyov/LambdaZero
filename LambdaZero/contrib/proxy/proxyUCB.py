@@ -25,7 +25,7 @@ class ProxyUCB(Proxy):
         }])
 
         # todo: evaluate on newly acquired data
-        info = self.UCB.update_with_seen(self.seen_x, self.seen_y, x, y)
+        self.UCB.update_with_seen(self.seen_x, self.seen_y, x, y)
         return None
 
     def get_acquisition_func(self):

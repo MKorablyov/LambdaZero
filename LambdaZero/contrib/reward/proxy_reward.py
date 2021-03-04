@@ -34,7 +34,7 @@ class ProxyReward:
         clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
         proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
-                                                  "env_name": self.env_name}], [clip_qed * clip_synth])
+                                                        "env_name": self.env_name}], [clip_qed * clip_synth])
 
         proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
         if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
@@ -64,7 +64,7 @@ class ProxyRewardSparse(ProxyReward):
 
 class DummyReward:
     def __init__(self, **kwargs):
-        pass
+        self.qed_oracle = QEDOracle(num_threads=1)
 
     def reset(self, previous_reward=0.0):
         self.previous_reward = 0.0
