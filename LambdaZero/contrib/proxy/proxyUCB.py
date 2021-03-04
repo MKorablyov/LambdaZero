@@ -12,20 +12,20 @@ class ProxyUCB(Proxy):
 
         Proxy.__init__(self, update_freq, proposed_x, proposed_d, proposed_acq, logger)
         self.UCB = UCB(**acquirer_config)
-        self.UCB.update_with_seen(self.seen_x, self.seen_y)
+        self.UCB.model.fit(self.seen_x, self.seen_y)
         self.oracle = oracle(**oracle_config)
 
     def acquire_and_update(self):
         x, d, acq, info = self.UCB.acquire_batch(self.proposed_x, self.proposed_d, self.proposed_acq)
         y = self.oracle(x)
         self.logger.log.remote([{
-            "proxy/acq_mean": np.mean(self.proposed_acq), "proxy/acq_max": np.max(self.proposed_acq),
+            "proxy/proposed_acq_mean": np.mean(self.proposed_acq), "proxy/proposed_acq_max": np.max(self.proposed_acq),
             "proxy/acquired_acq_mean": np.mean(acq), "proxy/acquired_acq_max":np.max(acq),
             "proxy/acquired_y_mean": np.mean(y), "proxy/acquired_y_max": np.max(y)
         }])
-        self.seen_x.extend(x)
-        self.seen_y.extend(y)
-        self.UCB.update_with_seen(self.seen_x, self.seen_y) # todo: evaluate on newly acquired data
+
+        # todo: evaluate on newly acquired data
+        info = self.UCB.update_with_seen(self.seen_x, self.seen_y, x, y)
         return None
 
     def get_acquisition_func(self):

@@ -9,9 +9,8 @@ class UCB(AcquisitionFunction):
         self.model = model(**model_config)
         AcquisitionFunction.__init__(self, model, model_config, acq_size)
 
-    def update_with_seen(self, x, y):
-        self.model.fit(x,y)
-        # todo: evaluate acquisition function on a separate train/val set
+    def update_with_seen(self, x, y, x_new, y_new):
+        self.model.update(x, y, x_new, y_new)
         return None
 
     def acquisition_value(self, x):
@@ -26,8 +25,8 @@ class UCB(AcquisitionFunction):
         # compute indices with highest acquisition values
         idx = np.argsort(np.asarray(acq) * np.asarray(d))[-self.acq_size:]
         # take selected indices
-        x_ = [x[i] for i in idx]
-        d_ = [d[i] for i in idx]
-        acq_ = [acq[i] for i in idx]
+        x_acquired = [x[i] for i in idx]
+        d_acquired= [d[i] for i in idx]
+        acq_acquired = [acq[i] for i in idx]
         info = {}
-        return x_, d_, acq_ ,info
+        return x_acquired, d_acquired, acq_acquired, info

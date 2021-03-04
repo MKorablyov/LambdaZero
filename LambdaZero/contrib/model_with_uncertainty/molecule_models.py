@@ -57,11 +57,21 @@ class MolMCDropGNN(ModelWithUncertainty):
 
         for i in range(self.train_epochs):
             metrics = train_epoch(dataloader, model, optimizer, self.device)
-
             self.logger.log.remote(metrics)
             print("train GNNDrop", metrics)
         model.eval()
         self.model = model
+
+    def update(self, x, y, x_new, y_new):
+        mean, var = self.get_mean_and_variance(x_new)
+        self.logger.log.remote({"model/mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
+        self.fit(x+x_new, y+y_new)
+        mean, var = self.get_mean_and_variance(x_new)
+        self.logger.log.remote({"model/mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
+        return None
+
+
+
 
     def get_mean_and_variance(self,x):
         y_hat_mc = self.get_samples(x, num_samples=self.num_mc_samples)
