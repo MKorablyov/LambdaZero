@@ -8,6 +8,8 @@ from LambdaZero.environments.block_mol_v3 import synth_config
 
 import ray
 
+from LambdaZero.inputs.inputs_op import _brutal_dock_proc
+
 def _satlins(x, cutoff0, cutoff1):
     "shifted saturated linearity activation function _/-"
     x = (x - cutoff0) / (cutoff1 - cutoff0)
@@ -27,18 +29,37 @@ class ProxyReward:
         return None
 
     def eval(self, molecule):
+        #print([w.detach().sum().cpu().numpy() for w in self.dockProxy_actor.acquisition_func.model.model.parameters()])
+
         qed = self.qed_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
         synth_score = self.synth_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
         # stop optimizing qed/synth beyond thresholds
         clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
-        graph = molecule.graph
+
         # todo: RL graph carries extra features which we don't have for smiles molecules
-        # ideally, we would be able to reuse the same
-        graph.x = molecule.graph.x[:,:14]
+        # ideally we would like to reuse the same graphs in all model
+        #graph = molecule.graph
+        molecule.graph.x = molecule.graph.x[:,:14]
+        print(molecule.graph.x.shape)
         proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
-                                                  "env_name": self.env_name}], [clip_qed * clip_synth])
+                                                        "env_name": self.env_name}], [clip_qed * clip_synth])
+
+        try:
+            #graph2 = ray.get(_brutal_dock_proc.remote(molecule.smiles, {}, None, None))
+            #print("graph2", graph2)
+            #time.sleep(100)
+            #proxy_dock2, actor_info2 = self.dockProxy_actor([{"smiles": molecule.smiles, "mol_graph": graph2,
+            #                                                "env_name": self.env_name}], [clip_qed * clip_synth])
+            graph3 = ray.get(_brutal_dock_proc.remote("O=C(CN1C(=O)c2ccccc2C1=O)N1CCN(c2nnc(-c3ccccc3)c3ccccc32)CC1",
+                                                      {}, None, None))
+            proxy_dock3, actor_info3 = self.dockProxy_actor([{"smiles": molecule.smiles, "mol_graph": graph3,
+                                                            "env_name": self.env_name}], [clip_qed * clip_synth])
+
+            print("proxy dock", proxy_dock, "good mol", proxy_dock3)
+        except Exception as e:
+            print(e)
 
         proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
         if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied

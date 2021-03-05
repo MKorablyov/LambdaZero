@@ -17,7 +17,7 @@ from config_acquirer import oracle_config, acquirer_config
 
 
 proxy_config = {
-    "update_freq": 10000,
+    "update_freq": 1000,
     "acquirer_config":acquirer_config,
     "oracle": DockingOracle,
     "oracle_config":oracle_config,
@@ -85,14 +85,15 @@ debug_config = {
             "sgd_minibatch_size": 4,
             "env_config":{
                 "reward_config":{
+                    "actor_sync_freq":10,
                     "scoreProxy_options":{"num_cpus":1, "num_gpus":0.3},
                     "scoreProxy_config":{
-                        "update_freq": 100,
-                        "oracle_config":{"num_threads": 2,},
+                        "update_freq": 50,
+                        "oracle_config":{"num_threads": 1,},
                         "acquirer_config":{
                             "acq_size": 2,
                             "model_config":{
-                                "train_epochs":3,
+                                "train_epochs":30,
                                 "batch_size":5,
                         }}}}}}}}
 
