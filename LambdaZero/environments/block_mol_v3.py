@@ -201,6 +201,12 @@ class BlockMolEnv_v3:
             if self._if_terminate():
                 self.molMDP.reset()
         if self.molMDP.molecule is None: self.reset() # reset if molecule is/was empty
+        try: # try if the molecule does not produce valid smiles
+            self.molMDP.molecule.smiles
+        except Exception as e:
+            print("initialized environment with invalid molecule", e)
+            self.reset()
+
         self.num_steps = 0
         return obs
 
@@ -224,6 +230,7 @@ class BlockMolEnv_v3:
         env_stop = self._if_terminate()
 
         molecule = self.molMDP.molecule
+
         molecule.graph = graph
         reward, log_vals = self.reward(molecule, agent_stop, env_stop, self.num_steps)
         if (self.molMDP.molecule.mol is not None):

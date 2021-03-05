@@ -20,21 +20,25 @@ class DockingEstimator(DockVina_smi):
         return dockscore
 
 class DockingOracle:
-    def __init__(self, num_threads, dockVina_config, mean, std):
+    def __init__(self, num_threads, dockVina_config, mean, std, logger):
         self.num_threads = num_threads
         # create actor pool
         self.actors = [DockingEstimator.remote(dockVina_config) for i in range(self.num_threads)]
         self.pool = ray.util.ActorPool(self.actors)
         self.mean = mean
         self.std = std
+        self.logger = logger
         # todo: report statistics
 
     def __call__(self, data):
         smiles = [d["smiles"] for d in data]
         dockscores = list(self.pool.map(lambda actor, smi: actor.eval.remote(smi), smiles))
+        self.logger.log.remote({"docking_oracle/raw_dockscore_mean": np.mean(dockscores),
+                                "docking_oracle/raw_dockscore_min": np.min(dockscores)})
         dockscores = [min(0, d) for d in dockscores] # when docking score is positive, clip at 0
         dockscores = [(self.mean -d) / self.std for d in dockscores] # this normalizes and flips dockscore
-        print("dosckscores", dockscores)
+        self.logger.log.remote({"docking_oracle/norm_dockscore_mean": np.mean(dockscores),
+                                "docking_oracle/norm_dockscore_max": np.max(dockscores)})
         return dockscores
 
 

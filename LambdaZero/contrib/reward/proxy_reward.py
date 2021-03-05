@@ -15,39 +15,42 @@ def _satlins(x, cutoff0, cutoff1):
     return x
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, clip_dockreward, synth_options, **kwargs):
+    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, synth_options, **kwargs):
         self.env_name = np.random.uniform()
         self.qed_cutoff = qed_cutoff
         self.synth_cutoff = synth_cutoff
         self.qed_oracle = QEDOracle(num_threads=1)
         self.synth_oracle = SynthOracle(synth_options, synth_config)
         self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
-        self.clip_dockreward = clip_dockreward
-
-        self.rewards = []
 
     def reset(self, previous_reward=0.0):
         return None
 
     def eval(self, molecule):
-        smiles = Chem.MolToSmiles(molecule.mol)
-        qed = self.qed_oracle([{"smiles":smiles, "mol":molecule.mol}])[0]
-        synth_score = self.synth_oracle([{"smiles":smiles, "mol":molecule.mol}])[0]
+        qed = self.qed_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
+        synth_score = self.synth_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
         # stop optimizing qed/synth beyond thresholds
         clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
-        dockreward = self.dockProxy_actor([{"smiles":smiles, "mol_graph":molecule.graph, "env_name": self.env_name}],
-                                          [clip_qed * clip_synth])[0]
-        self.rewards.append(dockreward)
-        if self.clip_dockreward is not None: # rewards are clipped to be non-negative (there is not anything to avoid)
-            # I had to add an artificial reward for any molecule to help this to converge
-            clip_dock = max(self.clip_dockreward + dockreward, 0.0)
-        else:
-            clip_dock = dockreward
+        graph = molecule.graph
+        # todo: RL graph carries extra features which we don't have for smiles molecules
+        # ideally, we would be able to reuse the same
+        graph.x = molecule.graph.x[:,:14]
+        proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
+                                                  "env_name": self.env_name}], [clip_qed * clip_synth])
 
-        info = {"dockreward": dockreward, "synth_score": synth_score, "qed":qed}
-        return clip_qed * clip_synth * clip_dock, info
+        proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
+        if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
+            reward = clip_qed * clip_synth * proxy_dock
+        else:
+            reward = proxy_dock
+        info = {"proxy_dock": proxy_dock,
+                "proxy_dock_mean":actor_info["mean"][0],
+                "proxy_dock_var": actor_info["var"][0],
+                "synth_score": synth_score, "qed_score":qed,
+                "clip_qed": clip_qed, "clip_synth": clip_synth}
+        return reward, info
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):
         return self.eval(molecule)
@@ -65,13 +68,11 @@ class ProxyRewardSparse(ProxyReward):
 
 class DummyReward:
     def __init__(self, **kwargs):
-        pass
+        self.qed_oracle = QEDOracle(num_threads=1)
 
     def reset(self, previous_reward=0.0):
         self.previous_reward = 0.0
         return None
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):
-        print(molecule, float(random()))
-
         return float(random()), {"reward": 1.0, "discounted_reward": 1.0, "QED": 1.0, "discount": 1.0}

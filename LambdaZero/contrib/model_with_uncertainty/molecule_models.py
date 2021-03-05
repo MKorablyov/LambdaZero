@@ -30,7 +30,7 @@ def train_epoch(loader, model, optimizer, device):
     epoch_y = np.concatenate(epoch_y,0)
     epoch_y_hat = np.concatenate(epoch_y_hat, 0)
     # todo: make more detailed metrics including examples being acquired
-    return {"train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
+    return {"model/train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
 
 class MolMCDropGNN(ModelWithUncertainty):
@@ -43,7 +43,7 @@ class MolMCDropGNN(ModelWithUncertainty):
 
     def fit(self,x,y):
         # initialize new model and optimizer
-        model = MPNNetDrop(True, False, True, 0.1, 16)
+        model = MPNNetDrop(True, False, True, 0.1, 14)
         model.to(self.device)
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
@@ -53,15 +53,22 @@ class MolMCDropGNN(ModelWithUncertainty):
 
         # do train epochs
         dataset = ListGraphDataset(graphs)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=Batch.from_data_list, shuffle=True)
 
         for i in range(self.train_epochs):
             metrics = train_epoch(dataloader, model, optimizer, self.device)
-            # todo: add weight decay etc.
             self.logger.log.remote(metrics)
             print("train GNNDrop", metrics)
         model.eval()
         self.model = model
+
+    def update(self, x, y, x_new, y_new):
+        mean, var = self.get_mean_and_variance(x_new)
+        self.logger.log.remote({"model/mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
+        self.fit(x+x_new, y+y_new)
+        mean, var = self.get_mean_and_variance(x_new)
+        self.logger.log.remote({"model/mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
+        return None
 
     def get_mean_and_variance(self,x):
         y_hat_mc = self.get_samples(x, num_samples=self.num_mc_samples)

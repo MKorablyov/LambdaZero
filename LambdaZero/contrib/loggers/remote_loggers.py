@@ -8,6 +8,7 @@ class RemoteLogger:
         self.logs = []
 
     def log(self, logs):
+        print("logger logs", logs)
         if type(logs) == list:
             self.logs.extend(logs)
         elif type(logs) == dict:

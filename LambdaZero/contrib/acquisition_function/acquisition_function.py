@@ -12,7 +12,7 @@ class AcquisitionFunction:
         """
         self.acq_size = acq_size
 
-    def update_with_seen(self,x,y):
+    def update_with_seen(self,x,y, x_new, y_new):
         raise NotImplementedError
 
     def acquisition_value(self,x):
