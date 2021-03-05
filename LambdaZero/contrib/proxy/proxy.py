@@ -19,7 +19,7 @@ class Proxy:
         self.proposed_acq.extend(acq)
         if len(self.proposed_x) == self.update_freq:
             self.acquire_and_update()
-            self.proposed_x, self.proposed_acq, self.proposed_d = [], [], []
+            self.proposed_x, self.proposed_d, self.proposed_acq = [], [], []
         return None
 
     def acquire_and_update(self):
@@ -47,7 +47,7 @@ class Actor():
         acq, info = self.acquisition_func.acquisition_value(x)
 
         # send molecule to the remote proxy
-        self.scoreProxy.propose_x.remote(x, acq, d)
+        self.scoreProxy.propose_x.remote(x, d, acq)
 
         # sync weights with proxy if needed
         if self.num_calls % self.sync_freq==1:

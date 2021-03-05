@@ -33,6 +33,10 @@ class ProxyReward:
         clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
+        graph = molecule.graph
+        # todo: RL graph carries extra features which we don't have for smiles molecules
+        # ideally, we would be able to reuse the same
+        graph.x = molecule.graph.x[:,:14]
         proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
                                                   "env_name": self.env_name}], [clip_qed * clip_synth])
 

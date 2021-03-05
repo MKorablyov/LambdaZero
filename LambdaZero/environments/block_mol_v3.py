@@ -230,6 +230,7 @@ class BlockMolEnv_v3:
         env_stop = self._if_terminate()
 
         molecule = self.molMDP.molecule
+
         molecule.graph = graph
         reward, log_vals = self.reward(molecule, agent_stop, env_stop, self.num_steps)
         if (self.molMDP.molecule.mol is not None):

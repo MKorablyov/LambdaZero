@@ -12,7 +12,7 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
     dataset = dataset(**dataset_config)
 
     train_idxs, val_idxs, test_idxs = np.load(dataset_split_path, allow_pickle=True)
-    # add dimension to the graph # todo: maybe do in inputs
+    # add dimension to the graph
     data_list = []
     y_list = []
     for graph in dataset:
@@ -21,11 +21,7 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
         # append stem and jbond features
         delattr(graph, "pos")
         delattr(graph, "smiles")
-        graph.x = torch.cat([graph.x, torch.zeros([graph.x.shape[0],2])],dim=1)
-        graph.jbond_atmidx=torch.zeros([0, 2])
-        graph.jbond_preds=torch.zeros([0, 0])
-        graph.stem_atmidx=torch.zeros([0])
-        graph.stem_preds=torch.zeros([0, 0])
+        #graph.x = torch.cat([graph.x, torch.zeros([graph.x.shape[0],2])],dim=1)
         data_list.append(graph)
 
     y_list = [(mean - y) / std for y in y_list] # this flips the dockscore to norm version

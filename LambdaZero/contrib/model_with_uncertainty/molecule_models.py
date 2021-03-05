@@ -43,7 +43,7 @@ class MolMCDropGNN(ModelWithUncertainty):
 
     def fit(self,x,y):
         # initialize new model and optimizer
-        model = MPNNetDrop(True, False, True, 0.1, 16)
+        model = MPNNetDrop(True, False, True, 0.1, 14)
         model.to(self.device)
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
