@@ -49,6 +49,8 @@ if __name__ == "__main__":
                 api_key_file=osp.join(summaries_dir, "wandb_key"))
             config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"][
                 "logger"] = remote_logger
+            config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["oracle_config"]\
+                ["logger"] = remote_logger
             config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["acquirer_config"] \
                 ["model_config"]["logger"] = remote_logger
             config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)

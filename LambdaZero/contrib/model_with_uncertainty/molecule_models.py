@@ -63,19 +63,12 @@ class MolMCDropGNN(ModelWithUncertainty):
         self.model = model
 
     def update(self, x, y, x_new, y_new):
-        print("update is called!!!!!!!!!!!!")
-
         mean, var = self.get_mean_and_variance(x_new)
         self.logger.log.remote({"model/mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
         self.fit(x+x_new, y+y_new)
         mean, var = self.get_mean_and_variance(x_new)
         self.logger.log.remote({"model/mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
-
-
         return None
-
-
-
 
     def get_mean_and_variance(self,x):
         y_hat_mc = self.get_samples(x, num_samples=self.num_mc_samples)
