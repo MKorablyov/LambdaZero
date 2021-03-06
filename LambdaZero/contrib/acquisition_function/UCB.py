@@ -24,7 +24,7 @@ class UCB(AcquisitionFunction):
 
         d = np.asarray(d)
         d[np.where(np.array(acq) < 0)[0]] = 1 # todo: discount is 0 whenever the acquisition function is negative;
-                                              # there could be a more correct solution
+                                              # there could be a better algebraic solution
         # to come up with some arithmetic way to do this
 
         # compute indices with highest acquisition values

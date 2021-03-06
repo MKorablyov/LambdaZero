@@ -5,9 +5,8 @@ import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import DataLoader
 #from LambdaZero.models.torch_graph_models import MPNNet_Parametric, fast_from_data_list
+from LambdaZero.inputs.inputs_op import _brutal_dock_proc
 from torch_geometric.data import Batch
-from ray.tune.integration.wandb import wandb_mixin
-import wandb
 from LambdaZero.models import MPNNetDrop
 from LambdaZero.contrib.inputs import ListGraphDataset
 from .model_with_uncertainty import ModelWithUncertainty
@@ -59,6 +58,16 @@ class MolMCDropGNN(ModelWithUncertainty):
             metrics = train_epoch(dataloader, model, optimizer, self.device)
             self.logger.log.remote(metrics)
             print("train GNNDrop", metrics)
+
+            # eval MPNN
+            graph3 = ray.get(_brutal_dock_proc.remote("O=C(CN1C(=O)c2ccccc2C1=O)N1CCN(c2nnc(-c3ccccc3)c3ccccc32)CC1",
+                                                      {}, None, None))
+            print(graph3)
+            d3 = ListGraphDataset([graph3])
+            d3 = DataLoader(d3, batch_size=self.batch_size, collate_fn=Batch.from_data_list)
+            for b in d3:
+                b.to(self.device)
+                print("mean for good molecule", model(b,do_dropout=False))
         model.eval()
         self.model = model
 

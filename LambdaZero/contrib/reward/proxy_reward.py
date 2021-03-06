@@ -58,6 +58,7 @@ class ProxyReward:
                                                             "env_name": self.env_name}], [clip_qed * clip_synth])
 
             print("proxy dock", proxy_dock, "good mol", proxy_dock3)
+            print(actor_info3)
         except Exception as e:
             print(e)
 
