@@ -46,21 +46,22 @@ class ProxyReward:
         proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
                                                         "env_name": self.env_name}], [clip_qed * clip_synth])
 
-        try:
-            #graph2 = ray.get(_brutal_dock_proc.remote(molecule.smiles, {}, None, None))
-            #print("graph2", graph2)
-            #time.sleep(100)
-            #proxy_dock2, actor_info2 = self.dockProxy_actor([{"smiles": molecule.smiles, "mol_graph": graph2,
-            #                                                "env_name": self.env_name}], [clip_qed * clip_synth])
-            graph3 = ray.get(_brutal_dock_proc.remote("O=C(CN1C(=O)c2ccccc2C1=O)N1CCN(c2nnc(-c3ccccc3)c3ccccc32)CC1",
-                                                      {}, None, None))
-            proxy_dock3, actor_info3 = self.dockProxy_actor([{"smiles": molecule.smiles, "mol_graph": graph3,
+        if np.random.uniform() > 0.99:
+            try:
+                #graph2 = ray.get(_brutal_dock_proc.remote(molecule.smiles, {}, None, None))
+                #print("graph2", graph2)
+                #time.sleep(100)
+                #proxy_dock2, actor_info2 = self.dockProxy_actor([{"smiles": molecule.smiles, "mol_graph": graph2,
+                #                                                "env_name": self.env_name}], [clip_qed * clip_synth])
+                graph3 = ray.get(_brutal_dock_proc.remote("O=C(CN1C(=O)c2ccccc2C1=O)N1CCN(c2nnc(-c3ccccc3)c3ccccc32)CC1",
+                                                          {}, None, None))
+                proxy_dock3, actor_info3 = self.dockProxy_actor([{"smiles": molecule.smiles, "mol_graph": graph3,
                                                             "env_name": self.env_name}], [clip_qed * clip_synth])
 
-            print("proxy dock", proxy_dock, "good mol", proxy_dock3)
-            print(actor_info3)
-        except Exception as e:
-            print(e)
+                print("proxy dock", proxy_dock, "good mol", proxy_dock3)
+                print(actor_info3)
+            except Exception as e:
+                print(e)
 
         proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
         if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied

@@ -20,7 +20,7 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
         delattr(graph,"dockscore")
         # append stem and jbond features
         delattr(graph, "pos")
-        delattr(graph, "smiles")
+        #delattr(graph, "smiles")
         #graph.x = torch.cat([graph.x, torch.zeros([graph.x.shape[0],2])],dim=1)
         data_list.append(graph)
 

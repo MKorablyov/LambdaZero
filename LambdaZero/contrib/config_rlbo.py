@@ -93,7 +93,7 @@ debug_config = {
                         "acquirer_config":{
                             "acq_size": 2,
                             "model_config":{
-                                "train_epochs":30,
+                                "train_epochs":3,
                                 "batch_size":5,
                         }}}}}}}}
 

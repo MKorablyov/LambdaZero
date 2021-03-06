@@ -10,7 +10,7 @@ load_seen_config = {
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh"),
-        "props": ["dockscore", "smiles"],
+        "props": ["dockscore"],
         "transform": T.Compose([LambdaZero.utils.Complete()]),
         "file_names": ["Zinc20_docked_neg_randperm_3k"],
     },
