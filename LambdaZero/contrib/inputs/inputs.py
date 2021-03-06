@@ -25,10 +25,15 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
         data_list.append(graph)
 
     y_list = [(mean - y) / std for y in y_list] # this flips the dockscore to norm version
-    train_x = [{"mol_graph":data_list[int(i)]} for i in train_idxs]
+    train_x = [{"mol_graph":data_list[i]} for i in train_idxs]
     train_y = [y_list[i] for i in train_idxs]
-    val_x = [{"mol_graph":data_list[int(i)]} for i in val_idxs]
+    val_x = [{"mol_graph":data_list[i]} for i in val_idxs]
     val_y = [y_list[i] for i in val_idxs]
+
+    #for i in range(len(y_list)):
+    #    #print(train_x[i]["mol_graph"].smiles,train_y[i])
+    #    if train_x[i]["mol_graph"].smiles:
+    #        print()
     return train_x, train_y, val_x, val_y
 
 

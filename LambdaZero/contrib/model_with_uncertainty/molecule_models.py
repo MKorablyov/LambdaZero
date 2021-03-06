@@ -1,4 +1,5 @@
 import sys, time
+from math import isclose
 import ray
 import torch
 import torch.nn.functional as F
@@ -28,6 +29,11 @@ def train_epoch(loader, model, optimizer, device):
         epoch_y_hat.append(y_hat[:,0].detach().cpu().numpy())
     epoch_y = np.concatenate(epoch_y,0)
     epoch_y_hat = np.concatenate(epoch_y_hat, 0)
+
+    for i in range(len(epoch_y)):
+        #print(epoch_y[i])
+        if isclose(float(epoch_y[i]), 5.1818,rel_tol=1e-2):
+            print("epoch good molecule y, pred", epoch_y[i], epoch_y_hat[i])
     # todo: make more detailed metrics including examples being acquired
     return {"model/train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
@@ -49,6 +55,9 @@ class MolMCDropGNN(ModelWithUncertainty):
         # from many possible properties take molecule graph
         graphs = [m["mol_graph"] for m in x]
         [setattr(graphs[i],"y", torch.tensor([y[i]])) for i in range(len(graphs))]
+        #for g in graphs:
+        #    print(g.smiles, g.y)
+        #time.sleep(100)
 
         # do train epochs
         dataset = ListGraphDataset(graphs)
@@ -62,12 +71,11 @@ class MolMCDropGNN(ModelWithUncertainty):
             # eval MPNN
             graph3 = ray.get(_brutal_dock_proc.remote("O=C(CN1C(=O)c2ccccc2C1=O)N1CCN(c2nnc(-c3ccccc3)c3ccccc32)CC1",
                                                       {}, None, None))
-            print(graph3)
             d3 = ListGraphDataset([graph3])
             d3 = DataLoader(d3, batch_size=self.batch_size, collate_fn=Batch.from_data_list)
             for b in d3:
                 b.to(self.device)
-                print("mean for good molecule", model(b,do_dropout=False))
+                print("mean for good molecule", model(b,do_dropout=False).detach().cpu().numpy())
         model.eval()
         self.model = model
 
