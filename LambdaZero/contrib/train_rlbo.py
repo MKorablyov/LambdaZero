@@ -25,12 +25,6 @@ machine = socket.gethostname()
 if machine == "Ikarus":
     config = merge_dicts(DEFAULT_CONFIG, config_rlbo.debug_config)
 
-# debug
-# the agents seem to be updated as expected and I see weights changing
-# logger logs {'docking_oracle/norm_dockscore_mean': 0.68, 'docking_oracle/norm_dockscore_max': 0.7272727}
-# logger logs [{'proxy/proposed_acq_mean': -2.153, 'proxy/proposed_acq_max': -0.6318}
-# It definitely seems like my proxy is much too skeptical
-# in my testsRL/input graphs seem to be same type and produce similar scores
 
 if __name__ == "__main__":
     for i in range(7):

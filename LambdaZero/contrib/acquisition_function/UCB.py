@@ -21,13 +21,10 @@ class UCB(AcquisitionFunction):
 
     def acquire_batch(self, x, d, acq=None):
         if acq is not None: acq,_ = self.acquisition_value(x)
-
         d = np.asarray(d)
-        d[np.where(np.array(acq) < 0)[0]] = 1 # todo: discount is 0 whenever the acquisition function is negative;
-                                              # there could be a better algebraic solution
-        # to come up with some arithmetic way to do this
-
-        # compute indices with highest acquisition values
+        d[np.where(np.array(acq) < 0)[0]] = 1
+        # todo there could be a better algebraic solution how to apply discount to +/- rewards
+        # compute indices with highest   acquisition values
         idx = np.argsort(np.array(acq) * d)[-self.acq_size:]
         # take selected indices
         x_acquired = [x[i] for i in idx]

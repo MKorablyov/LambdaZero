@@ -10,7 +10,6 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
     " "
     # make dataset
     dataset = dataset(**dataset_config)
-
     train_idxs, val_idxs, test_idxs = np.load(dataset_split_path, allow_pickle=True)
     # add dimension to the graph
     data_list = []
@@ -18,10 +17,13 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
     for graph in dataset:
         y_list.append(getattr(graph,"dockscore"))
         delattr(graph,"dockscore")
-        # append stem and jbond features
+        delattr(graph, "smiles")
         delattr(graph, "pos")
-        #delattr(graph, "smiles")
-        #graph.x = torch.cat([graph.x, torch.zeros([graph.x.shape[0],2])],dim=1)
+        # append stem and jbond features
+        graph.jbond_atmidx=torch.zeros([0, 2])
+        graph.jbond_preds=torch.zeros([0, 0])
+        graph.stem_atmidx=torch.zeros([0])
+        graph.stem_preds=torch.zeros([0, 0])
         data_list.append(graph)
 
     y_list = [(mean - y) / std for y in y_list] # this flips the dockscore to norm version
@@ -29,11 +31,6 @@ def temp_load_data_v1(mean, std, dataset_split_path, dataset, dataset_config):
     train_y = [y_list[i] for i in train_idxs]
     val_x = [{"mol_graph":data_list[i]} for i in val_idxs]
     val_y = [y_list[i] for i in val_idxs]
-
-    #for i in range(len(y_list)):
-    #    #print(train_x[i]["mol_graph"].smiles,train_y[i])
-    #    if train_x[i]["mol_graph"].smiles:
-    #        print()
     return train_x, train_y, val_x, val_y
 
 

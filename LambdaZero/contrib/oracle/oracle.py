@@ -45,7 +45,6 @@ class DockingOracle:
 @ray.remote
 class QEDEstimator:
     def __init__(self):
-
         pass
 
     def eval(self, smiles):
@@ -72,7 +71,6 @@ class QEDOracle:
 @ray.remote(num_gpus=0.05)
 class ChempropWrapper_v2(ChempropWrapper_v1):
     def eval(self, m):
-        #print("M:", m)
         return ChempropWrapper_v1.__call__(self, m)
 
 class SynthOracle:
