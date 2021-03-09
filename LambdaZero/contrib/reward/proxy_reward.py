@@ -5,8 +5,8 @@ from rdkit import Chem
 from random import random
 from LambdaZero.contrib.oracle import QEDOracle, SynthOracle
 from LambdaZero.environments.block_mol_v3 import synth_config
-
 import ray
+from LambdaZero.inputs.inputs_op import _brutal_dock_proc
 
 def _satlins(x, cutoff0, cutoff1):
     "shifted saturated linearity activation function _/-"
@@ -33,12 +33,11 @@ class ProxyReward:
         clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
+        # todo: would like to reuse the same graphs in all models (at least within 1 run)
         graph = molecule.graph
-        # todo: RL graph carries extra features which we don't have for smiles molecules
-        # ideally, we would be able to reuse the same
-        graph.x = molecule.graph.x[:,:14]
-        proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
-                                                  "env_name": self.env_name}], [clip_qed * clip_synth])
+        graph.x = graph.x[:,:14]
+        proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":graph,
+                                                        "env_name": self.env_name}], [clip_qed * clip_synth])
 
         proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
         if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
@@ -54,7 +53,6 @@ class ProxyReward:
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):
         return self.eval(molecule)
-
 
 
 class ProxyRewardSparse(ProxyReward):

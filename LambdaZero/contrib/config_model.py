@@ -11,7 +11,7 @@ load_seen_config = {
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh"),
         "props": ["dockscore", "smiles"],
-        "transform": T.Compose([LambdaZero.utils.Complete()]),
+        # todo: putting transform here without putting same in the agent would result incorrect predictions
         "file_names": ["Zinc20_docked_neg_randperm_3k"],
     },
 }

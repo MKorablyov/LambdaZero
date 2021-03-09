@@ -26,7 +26,6 @@ if machine == "Ikarus":
     config = merge_dicts(DEFAULT_CONFIG, config_rlbo.debug_config)
 
 
-
 if __name__ == "__main__":
     for i in range(7):
         try:
@@ -42,7 +41,7 @@ if __name__ == "__main__":
             os.environ['WANDB_DIR'] = summaries_dir
             os.environ["WANDB_MODE"] = "dryrun"
             remote_logger = RemoteLogger.remote()
-            # time.sleep(10) # this might not be needed, but added due to unsolved wandb init errors
+            # this might not be needed, but added due to unsolved wandb init errors
             wandb_logger = WandbRemoteLoggerCallback(
                 remote_logger=remote_logger,
                 project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],
