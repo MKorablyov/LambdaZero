@@ -5,6 +5,26 @@ import torch
 import gpytorch
 from matplotlib import pyplot as plt
 
+import numpy as np
+from ray import tune
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import LambdaZero.chem
+from LambdaZero.chem import build_mol, mpnn_feat
+from torch_sparse import coalesce
+from torch_geometric.data import Data, InMemoryDataset
+
+import csv
+from torch.utils.data import TensorDataset, DataLoader
+import itertools
+
+
+
+
 train_x = torch.linspace(0, 1, 100)
 train_y = torch.sin(train_x * (2 * math.pi)) + torch.randn(train_x.size())
 
@@ -65,3 +85,44 @@ with torch.no_grad():
     ax.set_ylim([-3, 3])
     ax.legend(['Observed Data', 'Mean', 'Confidence'])
 
+def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
+    """convert to PyTorch geometric module"""
+    natm = atmfeat.shape[0]
+    # transform to torch_geometric bond format; send edges both ways; sort bonds
+    atmfeat = torch.tensor(atmfeat, dtype=torch.float32)
+    edge_index = torch.tensor(np.concatenate([bond.T, np.flipud(bond.T)], axis=1), dtype=torch.int64)
+    edge_attr = torch.tensor(np.concatenate([bondfeat, bondfeat], axis=0), dtype=torch.float32)
+    edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
+    # make torch data
+    if coord is not None:
+        coord = torch.tensor(coord, dtype=torch.float32)
+        data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+    else:
+        data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+    return data
+
+def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
+    """mol to graph convertor"""
+    mol, _, _ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
+    if feat == "mpnn":
+        atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
+    else:
+        raise NotImplementedError(feat)
+    graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
+    return graph
+
+
+smiles_list = []
+scores_list = []
+graphs_list = []
+i = 0
+with open('/home/mkkr/1_step_docking_results_qed0.5.csv') as csvfile:
+    reader = csv.reader(csvfile, delimiter=' ')
+    for row in itertools.islice(reader, 10):
+        splitter = row[0].split(",")
+        print(splitter[1])
+        print(splitter[2])
+        if splitter[1] != 'smiles':
+            smiles_list.append(splitter[1])
+            graphs_list.append(mol_to_graph(splitter[1]))
+            scores_list.append(splitter[2])
