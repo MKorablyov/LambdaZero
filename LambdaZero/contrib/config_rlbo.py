@@ -97,6 +97,34 @@ debug_config = {
                                 "batch_size":5,
                         }}}}}}}}
 
+
+config_cpu = {
+    "memory": 7 * 10 ** 9,
+    #"object_store_memory": 7 * 10 ** 9,
+    "tune_config":{
+        "config":{
+            #"num_workers": 2,
+            "num_gpus":0,
+            "num_gpus_per_worker":0,
+            #"train_batch_size": 128,
+            #"sgd_minibatch_size": 4,
+            "env_config":{
+                "reward_config":{
+                    #"actor_sync_freq":10,
+                    "synth_options":{"num_gpus":0},
+                    "scoreProxy_options":{"num_cpus":1, "num_gpus":0},
+                    "scoreProxy_config":{
+                        #"update_freq": 50,
+                        #"oracle_config":{"num_threads": 1, },
+                        "acquirer_config":{
+                            #"acq_size": 2,
+                            "model_config":{
+                                #"train_epochs":3,
+                                #"batch_size":5,
+                                "device":"cpu"
+                        }}}}}}}}
+
+
 rlbo_001 = {}
 rlbo_002 = {
     "tune_config":{

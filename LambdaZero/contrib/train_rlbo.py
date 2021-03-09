@@ -19,6 +19,8 @@ if len(sys.argv) >= 2: config_name = sys.argv[1]
 else: config_name = "rlbo_001"
 config = getattr(config_rlbo,config_name)
 config = merge_dicts(DEFAULT_CONFIG, config)
+if len(sys.argv) >=3:
+    if sys.argv[2] == "cpu": config = merge_dicts(config, config_rlbo.config_cpu)
 
 # convenience option to debug option to be able to run any config on someone's machine
 machine = socket.gethostname()
@@ -35,7 +37,7 @@ if __name__ == "__main__":
             # same exact jobs can run for a while when initialized again. I think the issue is related to how individual
             # remote workers are allocated. Yet, I have not been able to entirely debug it. Therefore this for loop here
 
-            ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
+            ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"],num_gpus=0)
             ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
             # initialize loggers
             os.environ['WANDB_DIR'] = summaries_dir
