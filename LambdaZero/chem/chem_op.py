@@ -417,9 +417,10 @@ class Dock_smi:
 
 
 class GenMolFile:
-    def __init__(self, outpath, mgltools):
+    def __init__(self, outpath, mgltools, mglbin):
         self.outpath = outpath
         self.prepare_ligand4 = os.path.join(mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
+        self.mglbin = mglbin
 
         os.makedirs(os.path.join(outpath, "sdf"), exist_ok=True)
         os.makedirs(os.path.join(outpath, "mol2"), exist_ok=True)
@@ -441,7 +442,7 @@ class GenMolFile:
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
         os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
-        os.system(f"pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+        os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
         return pdbqt_file
 
 
@@ -458,13 +459,14 @@ class DockVina_smi:
 
         self.outpath = outpath
         self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
+        self.mgltools_bin = os.path.join(mgltools_dir, "bin")
         self.vina_bin = os.path.join(vina_dir, "bin/vina")
         self.rec_file = os.path.join(docksetup_dir, rec_file)
         self.bindsite = bindsite
         self.dock_pars = dock_pars
         self.cleanup = cleanup
 
-        self.gen_molfile = GenMolFile(self.outpath, self.mgltools)
+        self.gen_molfile = GenMolFile(self.outpath, self.mgltools, self.mgltools_bin)
         # make vina command
         self.dock_cmd = "{} --receptor {} " \
                         "--center_x {} --center_y {} --center_z {} " \
