@@ -656,7 +656,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
         if one_hot_atom:
             atmfeat[i, ntypes + 9 + atom.GetAtomicNum() - 1] = 1
         else:
-            atmfeat[i, ntypes + 1] = atom.GetAtomicNum()
+            atmfeat[i, ntypes + 1] = (atom.GetAtomicNum() % 16) / 2.
         atmfeat[i, ntypes + 4] = atom.GetIsAromatic()
         hybridization = atom.GetHybridization()
         atmfeat[i, ntypes + 5] = hybridization == HybridizationType.SP
