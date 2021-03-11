@@ -1,3 +1,4 @@
+__spec__ = None
 import argparse
 from copy import copy, deepcopy
 from collections import defaultdict
@@ -16,17 +17,21 @@ import time
 import traceback
 import warnings
 warnings.filterwarnings('ignore')
-
+import lmdb
 import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import QED
+import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.multiprocessing as mp
 if __name__ == "__main__":
-  mp.set_start_method('spawn')
+  try:
+    mp.set_start_method('spawn')
+  except:
+    pass
 from torch_geometric.data import Data, Batch
 import torch_geometric.nn as gnn
 
@@ -48,7 +53,7 @@ importlib.reload(model_block)
 importlib.reload(chem_op)
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-if 0:
+if 'SLURM_TMPDIR' in os.environ:
     print("Syncing locally")
     tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
 
@@ -70,6 +75,9 @@ parser.add_argument("--opt_beta", default=0.9, type=float)
 parser.add_argument("--nemb", default=32, help="#hidden", type=int)
 parser.add_argument("--num_iterations", default=100000, type=int)
 parser.add_argument("--num_conv_steps", default=6, type=int)
+parser.add_argument("--num_bins", default=3, type=int)
+parser.add_argument("--top_bin", default=0, type=int)
+parser.add_argument("--include_qed_data", default=1, type=int)
 parser.add_argument("--array", default='')
 parser.add_argument("--repr_type", default='block_graph')
 parser.add_argument("--model_version", default='v1')
@@ -78,7 +86,9 @@ parser.add_argument("--save_path", default='/miniscratch/bengioe/LambdaZero/imit
 parser.add_argument("--print_array_length", default=False, action='store_true')
 parser.add_argument("--dump_episodes", default='')
 parser.add_argument("--gen_rand", default='')
+parser.add_argument("--gen_rand_qed", default='')
 parser.add_argument("--gen_sample", default='')
+parser.add_argument("--mol_data", default='20k')
 
 
 
@@ -117,7 +127,7 @@ class BlocksData:
 
 
 class SimDockLet:
-    def __init__(self, tmp_dir):
+    def __init__(self, tmp_dir, cpu_req=2):
         #self.dock = chem.Dock_smi(tmp_dir,
         #                          osp.join(programs_dir, 'chimera'),
         #                          osp.join(programs_dir, 'dock6'),
@@ -126,7 +136,7 @@ class SimDockLet:
         #self.target_norm = binding_config['dockscore_std'] #[-26.3, 12.3]
 
         self.target_norm = [-8.6, 1.10]
-        self.dock = chem.DockVina_smi(tmp_dir, cpu_req=2)
+        self.dock = chem.DockVina_smi(tmp_dir, cpu_req=cpu_req)
     def eval(self, mol):
         s = "None"
         try:
@@ -152,9 +162,11 @@ class MolMDPNC(MolMDP):
             stem_idx = None
         try:
             super().add_block(block_idx, stem_idx)
-        except:
+        except Exception as e:
+            import traceback
             print("Failed to add block", block_idx, stem_idx)
             print(self.molecule.blockidxs, self.molecule.jbonds, self.molecule.stems)
+            traceback.print_exc()
 
     def add_block_to(self, mol, block_idx, stem_idx=None, atmidx=None):
         assert (block_idx >= 0) and (block_idx <= len(self.block_mols)), "unknown block"
@@ -166,6 +178,13 @@ class MolMDPNC(MolMDP):
                           block_r=self.block_rs[block_idx],
                           stem_idx=stem_idx, atmidx=atmidx)
         return new_mol
+
+    def a2mol(self, acts):
+        mol = BlockMoleculeDataNoCache()
+        for i in acts:
+          if i[0] >= 0:
+            mol = self.add_block_to(mol, *i)
+        return mol
 
     def reset(self):
         self.molecule = BlockMoleculeDataNoCache()
@@ -192,16 +211,16 @@ class MolMDPNC(MolMDP):
     def mol2repr(self, mol=None):
         if mol is None:
             mol = self.molecule
-        molhash = str(mol.blockidxs)+':'+str(mol.stems)+':'+str(mol.jbonds)
-        if molhash in self.molcache:
-            return self.molcache[molhash]
+        #molhash = str(mol.blockidxs)+':'+str(mol.stems)+':'+str(mol.jbonds)
+        #if molhash in self.molcache:
+        #    return self.molcache[molhash]
         if self.repr_type == 'block_graph':
             r = model_block.mol2graph(mol, self)
         elif self.repr_type == 'atom_graph':
             r = model_atom.mol2graph(mol, self)
         elif self.repr_type == 'morgan_fingerprint':
             r = model_fingerprint.mol2fp(mol, self)
-        self.molcache[molhash] = r
+        #self.molcache[molhash] = r
         return r
 
 
@@ -209,13 +228,14 @@ class MolMDPNC(MolMDP):
 class MolEpisode:
     def __init__(self, actions, rewards, goal, reached, time=0, gtype=None):
         self.actions = actions
-        self.rewards = np.float32(rewards) # the state that was reached [nrg, synth, qed]
+        self.rewards = rewards # the state that was reached [nrg, synth, qed]
         self.goal = goal # the goal given to the agent
         self.reached = reached # 1 if goal ~ rewards
-        self.gdist = ((np.float32(goal)-self.rewards)**2).mean()
+        #self.gdist = ((np.float32(goal)-self.rewards)**2).mean()
         self.time = time # how many training steps/training time has
                          # the agent generating this mol had
         self.gtype = gtype # The type of generating episode
+        self.computed_goal = self.rewards
 
 
     def sample(self, mdp, t=None):
@@ -233,12 +253,12 @@ class MolEpisode:
         s = mdp.molecule.copy()
         # 3.356 is the median (normalized) energy of the raw_dump_2021_01_07 dataset
         # so this splits the dataset in half
-        two_bin_goal = np.float32([1,0,0]) if self.rewards[0] < 3.356 else np.float32([0,1,0])
-        return s, self.actions[t], two_bin_goal#self.rewards
+        #two_bin_goal = np.float32([1,0,0]) if self.rewards[0] < 3.356 else np.float32([0,1,0])
+        return s, self.actions[t], self.computed_goal # two_bin_goal#self.rewards
 
     def iterate(self, mdp):
         for i in range(len(self.actions)):
-            yield self.sample(mdp, t=i)
+            yield self.sample(mdp, t=i)+ (i,)
 
 
 
@@ -246,16 +266,27 @@ def mp_sampler_fn(pid, mol_queue, graph_queue, mdp, stop_event):
     #print("sampler started", pid)
     #print(">>", mol_queue.qsize())
     #print(">>")
-    while not stop_event.is_set():
-        #t0 = time.time()
-        s, a, g = mol_queue.get()
-        #t1 = time.time()
-        #print(f'waited mol queue {t1-t0:.4f}',mol_queue.qsize())
-        s = mdp.mols2batch([mdp.mol2repr(i) for i in s])
-        a = torch.tensor(a, device=mdp.device).long()
-        g = torch.tensor(g, device=mdp.device).float()
-        graph_queue.put((s, a, g))
-    #print("sampler done")
+    import traceback
+    try:
+        while not stop_event.is_set():
+            #t0 = time.time()
+            s, a, g = mol_queue.get()
+            #t1 = time.time()
+            #print(f'waited mol queue {t1-t0:.4f}',mol_queue.qsize())
+            try:
+              s = mdp.mols2batch([mdp.mol2repr(i) for i in s])
+            except Exception as e:
+              print('error while sampling')
+              traceback.print_exc()
+              continue
+            a = torch.tensor(a, device=mdp.device).long()
+            g = torch.tensor(g, device=mdp.device).float()
+            graph_queue.put((s, a, g))
+        #print("sampler done")
+    except Exception as e:
+      print('sampler died')
+      print(e)
+      traceback.print_exc()
 
 
 class ReplayBuffer:
@@ -269,7 +300,29 @@ class ReplayBuffer:
         self._device = device
         self.epsilon = 0.05
         self.seen_molecules = set()
-        self._mahash = lambda actions: '.'.join(','.join(map(str,i)) for i in actions)
+        #self._mahash = lambda actions: '.'.join(','.join(map(str,i)) for i in actions)
+        self._hashdb = lmdb.open('a2fp.db', map_size=int(1e10))
+        self._txn = None
+        self.stop_event = threading.Event()
+        self.mp_stop_event = mp.Event()
+
+    def _mahash(self, actions):
+        ahash = ('.'.join(','.join(map(str,i)) for i in actions)).encode()
+        if self._txn is not None:
+          h = self._txn.get(ahash)
+          if h is not None:
+            return h
+          h = Chem.RDKFingerprint(self.mdp.a2mol(actions).mol).ToBitString().encode()
+          self._txn.put(ahash, h)
+          return h
+        with self._hashdb.begin() as txn:
+          h = txn.get(ahash)
+          if h is not None:
+            return h
+        h = Chem.RDKFingerprint(self.mdp.a2mol(actions).mol).ToBitString().encode()
+        with self._hashdb.begin(write=True) as txn:
+          txn.put(ahash, h)
+        return h
 
     def add_episode(self, actions, rewards, goal, reached, time=0, gtype=None):
         self.seen_molecules.add(self._mahash(actions))
@@ -293,6 +346,23 @@ class ReplayBuffer:
             if len(s) < n:
                 break
 
+    def recompute_k_bin_goal(self, k, quantiles=None, qed=True):
+        for episodes in [self.episodes, self.test_episodes]:
+            all_rs = np.float32([i.rewards[0] for i in episodes if i.rewards[0] is not None])
+            nrg_idx = np.int32([i for i, e in enumerate(episodes) if e.rewards[0] is not None])
+            if quantiles is None:
+              quantiles = np.quantile(all_rs, np.linspace(0,1,k+1))
+            goal_bins = np.digitize(all_rs, quantiles[1:], right=True)
+            goals = np.zeros((len(episodes), k*2))
+            goals[nrg_idx, goal_bins] = 1
+            if qed:
+              all_qeds = np.float32([i.rewards[2] for i in episodes])
+              qed_bins = np.digitize(all_qeds, np.linspace(0,1,k+1)[1:], right=True)
+              goals[np.arange(len(episodes)), k + qed_bins] = 1
+            for i, g in zip(episodes, goals):
+              i.computed_goal = g
+
+
     def sample(self, n):
         eidx = np.random.randint(0, len(self.episodes), n)
         try:
@@ -302,14 +372,15 @@ class ReplayBuffer:
         return zip(*samples)
 
     def sample2batch(self, mb):
-        s, a, g = mb
+        s, a, g, *o = mb
         s = self.mdp.mols2batch([self.mdp.mol2repr(i) for i in s])
         a = torch.tensor(a, device=self._device).long()
         g = torch.tensor(g, device=self._device).float()
-        return s, a, g
+        return (s, a, g, *o)
 
     def load_raw_episodes(self, episodes, test_ratio=0.02):
-        for acts, rewards in episodes:
+
+        for acts, rewards in tqdm.tqdm(episodes, leave=False):
             if self.contains(acts):
                 continue
             self.seen_molecules.add(self._mahash(acts))
@@ -320,9 +391,9 @@ class ReplayBuffer:
                 self.episodes.append(ep)
         self.num_loaded_episodes = len(self.episodes)
 
-    def load_initial_episodes(self, episodes, test_ratio=0.05):
-        for i in episodes:
-            if self.contains(i.actions):
+    def load_initial_episodes(self, episodes, test_ratio=0.05, exclude=lambda x:False):
+        for i in tqdm.tqdm(episodes, leave=False):
+            if self.contains(i.actions) or exclude(i):
                 continue
             self.seen_molecules.add(self._mahash(i.actions))
             if self.test_split_rng.uniform() < test_ratio:
@@ -334,7 +405,6 @@ class ReplayBuffer:
     def start_samplers_mp(self, n, mbsize):
         self.mp_mol_queue = mp.Queue(32)
         self.mp_graph_queue = mp.Queue(32)
-        self.mp_stop_event = mp.Event()
         self.procs = [
             mp.spawn(mp_sampler_fn, (self.mp_mol_queue, self.mp_graph_queue,
                                      self.mdp, self.mp_stop_event),
@@ -370,7 +440,6 @@ class ReplayBuffer:
         self.ready_events = [threading.Event() for i in range(n)]
         self.resume_events = [threading.Event() for i in range(n)]
         self.results = [None] * n
-        self.stop_event = threading.Event()
         def f(idx):
             while not self.stop_event.is_set():
                 try:
@@ -400,9 +469,15 @@ class ReplayBuffer:
 
     def stop_samplers_and_join(self):
         self.stop_event.set()
-        while any([i.is_alive() for i in self.sampler_threads]):
+        self.mp_stop_event.set()
+        if hasattr(self, 'sampler_threads'):
+          while any([i.is_alive() for i in self.sampler_threads]):
             [i.set() for i in self.resume_events]
             [i.join(0.05) for i in self.sampler_threads]
+        if hasattr(self, 'mp_graph_queue'):
+          while self.mp_graph_queue.qsize() > 0:
+            self.mp_graph_queue.get()
+          [i.join() for i in self.procs]
 
     def dump_to_raw(self):
         raw = []
@@ -412,7 +487,7 @@ class ReplayBuffer:
 
 class RolloutActor(threading.Thread):
     def __init__(self, bpath, device, repr_type, model, stop_event, replay, synth_net, sample_type,
-                 stop_after=0, greedy=False):
+                 stop_after=0, greedy=False, set_goal=None, dock_cpu_req=2):
         super().__init__()
         self.device = torch.device(device)
         self.mdp = MolMDPNC(bpath)
@@ -425,7 +500,7 @@ class RolloutActor(threading.Thread):
             self.goal_bounds = self.greedy_goal_bounds
         self.model = model
         self.stop_event = stop_event
-        self.docker = SimDockLet(tmp_dir)
+        self.docker = SimDockLet(tmp_dir, cpu_req=dock_cpu_req)
         self.synth_net = synth_net
         self.replay = replay
         self.failed = False
@@ -433,7 +508,8 @@ class RolloutActor(threading.Thread):
         self.beam_max = 6
         self.stop_after = stop_after
         self.episodes_done = 0
-        self.set_goal = None
+        self.set_goal = set_goal
+        self.just_qed = False
 
 
     def run(self):
@@ -453,8 +529,7 @@ class RolloutActor(threading.Thread):
         self.mdp.reset()
         actions = []
         done = False
-        goal = (torch.tensor(np.random.uniform(*self.goal_bounds))
-                .reshape((1,3)).float().to(self.device))
+        goal = None
         max_len = np.random.randint(*self.max_blocks)
         while not done:
             if (len(self.mdp.molecule.blocks) >= max_len or
@@ -472,16 +547,20 @@ class RolloutActor(threading.Thread):
                 self.mdp.add_block(*action)
             actions.append(action)
         rdmol = self.mdp.molecule.mol
-        if self.replay.contains(actions): return
         if rdmol is None: return
-        energy = self.docker.eval(self.mdp.molecule)
-        synth = self.synth_net(mol=rdmol) / 10
+        if self.replay.contains(actions): return
         qed = QED.qed(rdmol)
-        goal = goal.cpu().numpy()[0]
-        reached_state = np.float32((energy, synth, qed))
+        if self.just_qed:
+          if type(self.just_qed) == float and self.just_qed > qed:
+            return
+          reached_state = (None, None, qed)
+        else:
+          energy = self.docker.eval(self.mdp.molecule)
+          synth = self.synth_net(mol=rdmol) / 10
+          reached_state = np.float32((energy, synth, qed))
         #print(reached_state, goal)
-        goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
-        self.replay.add_episode(actions, reached_state, goal, goal_reached,
+        #goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
+        self.replay.add_episode(actions, reached_state, goal, False, #goal_reached,
                                 self.model.training_steps if self.model is not None else 0,
                                 'random')
 
@@ -494,7 +573,7 @@ class RolloutActor(threading.Thread):
             np.float32([1,0,0]) if np.random.uniform() < 0.5 else np.float32([0,1,0]))
                 .reshape((1,3)).float().to(self.device))
         else:
-          goal = self.set_goal
+          goal = torch.tensor(self.set_goal).float().to(self.device)
         #goal = (torch.tensor(np.random.uniform(*self.goal_bounds))
         max_len = np.random.randint(*self.max_blocks)
         while not done:
@@ -530,42 +609,66 @@ class RolloutActor(threading.Thread):
         goal = goal.cpu().numpy()[0]
         reached_state = np.float32((energy, synth, qed))
         print(reached_state, goal)
-        goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
-        self.replay.add_episode(actions, reached_state, goal, goal_reached,
+        #goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
+        self.replay.add_episode(actions, reached_state, goal, False, #goal_reached,
                                 self.model.training_steps, 'sample')
 
 
     def _beam_episode(self):
         self.mdp.reset()
         done = []
-        goal = (torch.tensor(np.random.uniform(*self.greedy_goal_bounds))
-                .reshape((1,3)).float().to(self.device))
-        beam = [(self.mdp.molecule.copy(), 0, [])]
+        #goal = (torch.tensor(np.random.uniform(*self.greedy_goal_bounds))
+        #        .reshape((1,3)).float().to(self.device))
+        goal = self.set_goal
+        beam = [(self.mdp.molecule.copy(), 0, [], [])]
         actions = []
+        prog = tqdm.tqdm(total=self.beam_max)
+        n_rejects = 0
+        n_mol_rej = 0
+        n_seen = 0
+        n_steps = 0
         while len(done) < self.beam_max:
+            n_steps += 1
             if not len(beam): # Unlikely ?
                 break
-            mol, logprob, actions = beam.pop(0)
+            mol, logprob, actions, lps = beam.pop(0)
+            prog.set_description(f'{n_steps} done:{len(done)} rds: {n_rejects} rmol:{n_mol_rej} seen: {n_seen} nll{logprob:2.3f} {len(actions)}')
             if (len(mol.blocks) >= self.max_blocks[1] - 1 or
                 len(mol.blocks) > 0 and len(mol.stems) == 0 or
                 (len(actions) and actions[-1][0] == -1)):
                 if mol.mol is None: # Ignore invalid molecules
+                    n_mol_rej = 0
                     continue
                 if self.replay.contains(actions): # Ignore previously seen molecules
+                    #print('reject', logprob)
+                    n_rejects += 1
                     continue
                 if len(actions) and actions[-1][0] != -1:
-                    actions += [(-1, 0)]
-                done.append((mol, logprob, actions))
+                  if 0:
+                    print('reject no stem', actions)
+                    continue
+                  else:
+                    actions += [(-1, -1)]
+                #print((len(mol.blocks) >= self.max_blocks[1] - 1,
+                #       len(mol.blocks) > 0 and len(mol.stems) == 0,
+                #       (len(actions) and actions[-1][0] == -1)))
+                #print(actions)
+                done.append((mol, logprob, actions, lps))
+                prog.update(1)
+                prog.refresh()
                 continue
 
-            batch = self.mdp.mols2batch([self.mdp.mol2repr()])
+            batch = self.mdp.mols2batch([self.mdp.mol2repr(mol)])
             stem_o, stop_o = self.model(batch, goal)
-            logits = F.log_softmax(torch.cat([stop_o.reshape(-1), stem_o.reshape(-1)]), 0)
+            policy = torch.cat([i.reshape(-1)
+                                for i in self.model.out_to_policy(batch, stem_o, stop_o)])
+            logits = torch.log(policy)#F.log_softmax(torch.cat([stop_o.reshape(-1), stem_o.reshape(-1)]), 0)
             if torch.isnan(logits).any():
                 self.failed = True
                 self.tb = traceback.extract_stack()
                 raise ValueError("nan found")
             for i in range(logits.shape[0]):
+                n_seen += 1
                 if i == 0:
                     action = ((-1, 0))
                     new_mol = mol
@@ -574,24 +677,28 @@ class RolloutActor(threading.Thread):
                     new_mol = self.mdp.add_block_to(mol, *action)
                 new_logprob = logprob + logits[i].item()
                 new_actions = actions + [action]
-                beam.append((new_mol, new_logprob, new_actions))
-            beam = sorted(beam, key=lambda x: -x[1])
+                beam.append((new_mol, new_logprob, new_actions, lps+[logits[i].item()]))
+            lps = [i[1] for i in beam]
+            #print(np.mean(lps), np.quantile(lps, np.linspace(0,1,10)), len(lps))
+            beam = sorted(beam, key=lambda x: -x[1])[:1024*10]
         print(' '.join(f'{i[1]:.2f}' for i in done))
         goal = goal.cpu().numpy()[0]
-        for mol, lp, actions in done:
+        for mol, lp, actions, lps in done:
+            print(lp, actions, lps)
             rdmol = mol.mol
             if rdmol is None: continue
+            print(Chem.MolToSmiles(rdmol))
             qed = QED.qed(rdmol)
-            synth = self.synth_net(mol=rdmol) / 10
-            if qed < 0.2 or synth < 0.2: # Avoid docking ridiculous molecules
-                continue # I'm not sure I should be doing this, but
-                         # sometimes docking takes forever, because the
-                         # molecules seem absurd.
+            synth = 0#self.synth_net(mol=rdmol) / 10
+            #if qed < 0.2 or synth < 0.2: # Avoid docking ridiculous molecules
+            #    continue # I'm not sure I should be doing this, but
+            #             # sometimes docking takes forever, because the
+            #             # molecules seem absurd.
             energy = self.docker.eval(mol)
             reached_state = np.float32((energy, synth, qed))
             print('beam', reached_state, goal, lp)
-            goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
-            self.replay.add_episode(actions, reached_state, goal, goal_reached,
+            #goal_reached = float(((reached_state - goal)**2).sum() < 0.05)
+            self.replay.add_episode(actions, reached_state, goal, False, #goal_reached,
                                     self.model.training_steps, 'beam')
 
 
@@ -632,10 +739,38 @@ def generate_random_episodes(args):
     while len(replay.episodes) < 10000:
         time.sleep(30)
         print('>>', len(replay.episodes), str(timedelta(seconds=time.time()-t0)))
-        pickle.dump(replay.episodes, gzip.open('replays/random_10000.pkl.gz', 'wb'))
+        pickle.dump(replay.episodes, gzip.open('replays/random_10000_2.pkl.gz', 'wb'))
     stop_event.set()
     [i.join() for i in rollout_threads]
-    pickle.dump(replay.episodes, gzip.open('replays/random_10000.pkl.gz', 'wb'))
+    pickle.dump(replay.episodes, gzip.open('replays/random_10000_2.pkl.gz', 'wb'))
+    return
+
+def generate_random_qed_episodes(args):
+    device = torch.device('cuda')
+    bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
+    #synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
+
+    replay = ReplayBuffer(bpath, device, args.repr_type)
+    stop_event = threading.Event()
+    rollout_threads = (
+        [RolloutActor(bpath, device, None, None,
+                      stop_event, replay, None, 'random')
+         for i in range(8)])
+    for i in rollout_threads:
+      i.just_qed = float(args.gen_rand_qed)
+    with replay._hashdb.begin(write=True) as replay._txn:
+        [i.start() for i in rollout_threads]
+
+        t0 = time.time()
+        while len(replay.episodes) < 10000:
+            time.sleep(30)
+            print('>>', len(replay.episodes), str(timedelta(seconds=time.time()-t0)))
+            pickle.dump(replay.episodes, gzip.open('replays/random_qed_10000_high.pkl.gz', 'wb'))
+            #pickle.dump(replay.episodes, gzip.open('replays/random_qed_100000.pkl.gz', 'wb'))
+        stop_event.set()
+        [i.join() for i in rollout_threads]
+        pickle.dump(replay.episodes, gzip.open('replays/random_qed_10000_high.pkl.gz', 'wb'))
+        #pickle.dump(replay.episodes, gzip.open('replays/random_qed_100000.pkl.gz', 'wb'))
     return
 
 def generate_sampled_episodes(args):
@@ -678,6 +813,9 @@ def generate_sampled_episodes(args):
     return
 
 def main(args):
+    exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
+    os.makedirs(exp_dir, exist_ok=True)
+    print(args)
     debug_no_threads = False
 
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
@@ -688,19 +826,35 @@ def main(args):
 
     synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
 
-    exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
-    os.makedirs(exp_dir, exist_ok=True)
-
 
     replay = ReplayBuffer(bpath, device, args.repr_type)
     #replay.epsilon = 0.95
 
     #past_ep = pickle.load(gzip.open('replays/random_1000.pkl.gz', 'rb'))
     # This includes the tree search mols, to be seen...
-    past_ep = pickle.load(gzip.open('raw_dump_2021_01_07.pkl.gz', 'rb'))
-    replay.load_raw_episodes(past_ep)
+    #past_ep = pickle.load(gzip.open('raw_dump_2021_01_07.pkl.gz', 'rb'))
+    #replay.load_raw_episodes(past_ep)
     #past_ep = pickle.load(gzip.open('replays/random_15000.pkl.gz', 'rb'))
     #replay.load_initial_episodes(past_ep, test_ratio=0.05)
+    if args.mol_data in ['10k', '20k']:
+      past_ep = pickle.load(gzip.open('replays/random_10000.pkl.gz', 'rb'))
+    if args.mol_data in ['20k']:
+      past_ep += pickle.load(gzip.open('replays/random_10000_2.pkl.gz', 'rb'))
+    all_rs = np.float32([i.rewards[0] for i in past_ep])
+    quantiles = np.quantile(all_rs, np.linspace(0,1,args.num_bins+1))
+
+    def excl(ep):
+      return ep.rewards[0] < quantiles[args.top_bin]
+    replay.load_initial_episodes(past_ep, test_ratio=0.05, exclude=excl)
+
+    if args.include_qed_data:
+      past_ep_qed = pickle.load(gzip.open('replays/random_qed_100000.pkl.gz', 'rb'))
+      replay.load_initial_episodes(past_ep_qed, test_ratio=0)
+      past_ep_qed = pickle.load(gzip.open('replays/random_qed_10000_high.pkl.gz', 'rb'))
+      replay.load_initial_episodes(past_ep_qed, test_ratio=0)
+    replay.recompute_k_bin_goal(args.num_bins, quantiles=quantiles,
+                                qed=args.include_qed_data)
+
     #past_ep = pickle.load(gzip.open('replays/latest_oct_22_5.pkl.gz', 'rb'))
     #replay.load_initial_episodes(past_ep)
     print(len(replay.episodes), 'episodes')
@@ -709,7 +863,8 @@ def main(args):
     stop_event = threading.Event()
 
     if args.repr_type == 'block_graph':
-        model = model_block.GraphAgent(args.nemb, 3, mdp.num_blocks, 1, args.num_conv_steps, mdp,
+        model = model_block.GraphAgent(args.nemb, args.num_bins*2, mdp.num_blocks,
+                                       1, args.num_conv_steps, mdp,
                                        args.model_version)
         model.to(device)
     elif args.repr_type == 'atom_graph':
@@ -718,6 +873,13 @@ def main(args):
     elif args.repr_type == 'morgan_fingerprint':
         model = model_fingerprint.MFP_MLP(args.nemb, 3, mdp.num_blocks, 1)
         model.to(device)
+
+    best_model = model
+    best_test_loss = 1000
+    #loaded_params = pickle.load(gzip.open(f'{exp_dir}/params.pkl.gz'))
+    #with torch.no_grad():
+    #  for p, lp in zip(model.parameters(), loaded_params):
+    #    p.set_(torch.tensor(lp, device=device))
 
     opt = torch.optim.Adam(model.parameters(), args.learning_rate, weight_decay=1e-4,
                            betas=(args.opt_beta, 0.999))
@@ -737,7 +899,7 @@ def main(args):
     mbsize = args.mbsize
     ar = torch.arange(mbsize)
     if not debug_no_threads:
-        sampler = replay.start_samplers(4, mbsize)
+        sampler = replay.start_samplers_mp(4, mbsize)
     gamma = 0.99
     last_losses = []
 
@@ -750,11 +912,16 @@ def main(args):
     def save_stuff():
         pickle.dump(replay.episodes[replay.num_loaded_episodes:],
                     gzip.open(f'{exp_dir}/replay.pkl.gz', 'wb'))
+
         pickle.dump([i.data.cpu().numpy() for i in model.parameters()],
                     gzip.open(f'{exp_dir}/params.pkl.gz', 'wb'))
 
+        pickle.dump([i.data.cpu().numpy() for i in best_model.parameters()],
+                    gzip.open(f'{exp_dir}/best_params.pkl.gz', 'wb'))
+
         pickle.dump({'train_losses': train_losses,
                      'test_losses': test_losses,
+                     'test_infos': test_infos,
                      'time_start': time_start,
                      'time_now': time.time(),
                      'args': args,},
@@ -762,8 +929,17 @@ def main(args):
 
     train_losses = []
     test_losses = []
+    test_infos = []
     time_start = time.time()
     time_last_check = time.time()
+    nbatches_per_up = 1
+    nbatches_done = 0
+    batch_inc = 1000000000#5000
+    next_batch_inc = batch_inc
+
+    max_early_stop_tolerance = 5
+    early_stop_tol = max_early_stop_tolerance
+
 
     for i in range(args.num_iterations+1):
         if not debug_no_threads:
@@ -775,11 +951,17 @@ def main(args):
         logit_reg = (mol_o.pow(2).sum() + stem_o.pow(2).sum()) / (np.prod(mol_o.shape) + np.prod(stem_o.shape))
 
         #(negloglike + logit_reg * 1e-1).backward()
-        negloglike.backward()
+        (negloglike/nbatches_per_up).backward()
         last_losses.append(negloglike.item())
         train_losses.append(negloglike.item())
-        opt.step()
-        opt.zero_grad()
+        nbatches_done += 1
+        if nbatches_done >= nbatches_per_up:
+          nbatches_done = 0
+          opt.step()
+          opt.zero_grad()
+          if i > next_batch_inc:
+            next_batch_inc += batch_inc
+            nbatches_per_up += 1
         model.training_steps = i + 1
         #if any([torch.isnan(i).any() for i in model.parameters()]):
         if torch.isnan(negloglike):
@@ -792,11 +974,11 @@ def main(args):
                 stop_event.set()
                 pdb.set_trace()
 
-        if not i % 250:
+        if not i % 500:
             #recent_best = np.argmax([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
             #recent_best_m = np.max([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
             last_losses = np.mean(last_losses)
-            print(i, last_losses)#, np.mean([i.gdist for i in replay.episodes[-100:]]),
+            print(i, last_losses, nbatches_per_up)#, np.mean([i.gdist for i in replay.episodes[-100:]]),
             #recent_best_m, replay.episodes[-100+recent_best].rewards)
             #print(logit_reg)
             #print(stem_o.mean(), stem_o.max(), stem_o.min())
@@ -823,16 +1005,32 @@ def main(args):
             t0 = time.time()
             total_test_loss = 0
             total_test_n = 0
-            for s, a, g in replay.iterate_test(mbsize):
+            all_nlls = []
+            all_ts = []
+            for s, a, g, t in replay.iterate_test(max(mbsize, 128)):
                 with torch.no_grad():
                     stem_o, mol_o = model(s, g)
-                total_test_loss += model.action_negloglikelihood(s, a, g, stem_o, mol_o).sum().item()
+                nlls = model.action_negloglikelihood(s, a, g, stem_o, mol_o)
+                total_test_loss += nlls.sum().item()
                 total_test_n += g.shape[0]
+                all_nlls.append(nlls.data.cpu().numpy())
+                all_ts.append(t)
             test_nll = total_test_loss / total_test_n
+            if test_nll < best_test_loss:
+              best_test_loss = test_nll
+              best_model = deepcopy(model)
+              best_model.to('cpu')
+              early_stop_tol = max_early_stop_tolerance
+            else:
+              early_stop_tol -= 1
             print('test NLL:', test_nll)
             print('test took:', time.time() - t0)
             test_losses.append(test_nll)
+            #test_infos.append((all_nlls, all_ts))
             save_stuff()
+            if early_stop_tol <= 0:
+              print("Early stopping")
+              break
 
 
     stop_everything()
@@ -840,18 +1038,19 @@ def main(args):
 
     print("Running final search")
     stop_event = threading.Event()
+    top_bin_goal = np.float32([[0]*(args.num_bins-1)+[1]+[0]*(args.num_bins-2)+[0,1]])
+    top_bin_goal2 = np.float32([[0]*(args.num_bins-1)+[1]+[0]*(args.num_bins-2)+[1,0]])
     rollout_threads = (
         [RolloutActor(bpath, device, args.repr_type, model,
                       stop_event, replay, synth_net, 'categorical',
-                      greedy=True,
-                      stop_after=5)
-         for i in range(8)]
-        +
+                      set_goal=top_bin_goal,
+                      stop_after=1)
+         for i in range(4)] +
         [RolloutActor(bpath, device, args.repr_type, model,
                       stop_event, replay, synth_net, 'categorical',
-                      greedy=False,
-                      stop_after=5)
-         for i in range(8)])
+                      set_goal=top_bin_goal2,
+                      stop_after=1)
+         for i in range(4)])
     if not debug_no_threads:
         [i.start() for i in rollout_threads]
         [i.join() for i in rollout_threads]
@@ -859,109 +1058,125 @@ def main(args):
     print('Done.')
 
 
-def array_nov_3(args):
-  all_hps = ([
-    {'mbsize': 32,
-     'learning_rate': lr,
-     'num_iterations': 200_000,
-     'nemb': nemb,
-     }
-    for lr in [1e-4, 1e-3, 1e-5]
-    for nemb in [16, 32, 64]
-  ])
-  return all_hps
 
-def array_nov_25(args):
+def array_jan_20(args):
   all_hps = ([
-    {'mbsize': 32,
-     'learning_rate': lr,
-     'num_iterations': 200_000,
-     'nemb': nemb,
-     'repr_type': repr_type,
+    {'mbsize': 64,
+     'learning_rate': 1e-3,
+     'num_iterations': 20_000,
+     'save_path': './results/',
+     'nemb': 64,
+     'repr_type': 'block_graph',
+     'model_version': 'v3',
+     'num_bins': 3,
      }
-    for lr in [1e-4, 1e-3]
-    for nemb in [16, 32, 64]
-    for repr_type in ['block_graph', 'atom_graph']
-  ])
-  return all_hps
-
-def array_dec_02(args):
-  all_hps = ([
-    {'mbsize': 32,
-     'learning_rate': lr,
-     'num_iterations': 200_000,
-     'nemb': nemb,
-     'repr_type': repr_type,
-     }
-    for lr in [1e-4, 1e-3]
-    for nemb in [16, 32, 64]
-    for repr_type in ['morgan_fingerprint']
-  ])
-  return all_hps
-
-def array_dec_08(args):
-  all_hps = ([
-    {'mbsize': 32,
-     'learning_rate': lr,
-     'num_iterations': 200_000,
-     'nemb': nemb,
-     'repr_type': repr_type,
-     'model_version': 'v2',
-     }
-    for lr in [1e-4, 1e-3]
-    for nemb in [16, 32, 64]
-    for repr_type in ['block_graph']
-  ])
-  return all_hps
-
-def array_jan_07(args):
-  all_hps = ([
-    {'mbsize': 512,
-     'learning_rate': lr,
-     'num_iterations': 300_000,
-     'nemb': nemb,
-     'repr_type': repr_type,
-     'model_version': 'v2',
-     }
-    for lr in [1e-3]
-    for nemb in [128, 256]
-    for repr_type in ['block_graph', 'morgan_fingerprint']
   ])
   all_hps += [
-      {**all_hps[0], 'nemb': 256, 'repr_type': 'morgan_fingerprint', 'learning_rate': 1e-4},
-      {**all_hps[0], 'nemb': 128, 'repr_type': 'morgan_fingerprint', 'learning_rate': 1e-4},
-      {**all_hps[0], 'nemb': 128, 'repr_type': 'morgan_fingerprint', 'learning_rate': 1e-4}, ## 15k r
-      {**all_hps[0], 'nemb': 128, 'repr_type': 'morgan_fingerprint', 'learning_rate': 1e-4, # 7
-       'num_iterations': 200000},
-      {**all_hps[0], 'learning_rate': 5e-4,
-       'num_iterations': 200000},
-      {**all_hps[0], 'learning_rate': 5e-4, 'num_conv_steps': 12, 'nemb': 64,
-       'num_iterations': 200000},
-      {**all_hps[0], 'learning_rate': 1e-3, 'num_conv_steps': 12, 'nemb': 64,
-       'num_iterations': 200000},
-      {**all_hps[0], 'learning_rate': 1e-3, 'num_conv_steps': 12, 'nemb': 64, # 11
-       'num_iterations': 200000}, # escort p 6
-      {**all_hps[0], 'learning_rate': 1e-3, 'num_conv_steps': 3, 'nemb': 64,
-       'num_iterations': 200000, 'model_version': 'v3'}, # escort p 8, v3
-      {**all_hps[0], 'learning_rate': 1e-3, 'num_conv_steps': 3, 'nemb': 64,
-       'num_iterations': 200000, 'model_version': 'v3'}, # escort p 8, v3
-      {**all_hps[0], 'learning_rate': 2e-3, 'num_conv_steps': 12, 'nemb': 64,
-       'opt_beta': 0.95,
-       'num_iterations': 500000}, # 14, escort p 6
-      {**all_hps[0], 'learning_rate': 1e-3, 'num_conv_steps': 20, 'nemb': 64,
-       'num_iterations': 500000}, # escort p 6
-      {**all_hps[0], 'learning_rate': 1e-4, 'num_conv_steps': 20, 'nemb': 64,
-       'num_iterations': 500000}, # escort p 6
-      {**all_hps[0], 'learning_rate': 2e-4, 'num_conv_steps': 20, 'nemb': 64,
-       'num_iterations': 500000}, # escort p 6
-      {**all_hps[0], 'learning_rate': 5e-4, 'num_conv_steps': 20, 'nemb': 64,
-       'num_iterations': 500000}, # escort p 6
+    {**all_hps[0], 'top_bin': 2},
+    {**all_hps[0], 'num_iterations': 1000},
+    {**all_hps[0], 'nemb': 256, 'num_iterations': 10000},
+    {**all_hps[0], 'nemb': 256, 'num_iterations': 10000, 'top_bin': 2},
+    {**all_hps[0], 'nemb': 256, 'num_iterations': 50000, 'top_bin': 2},
+    {**all_hps[0], 'nemb': 256, 'num_iterations': 50000, 'top_bin': 0},
+    {**all_hps[0], 'nemb': 512, 'num_iterations': 50000, 'top_bin': 0},
+    {**all_hps[0], 'num_bins': 10},
+    {**all_hps[0], 'num_bins': 10, 'top_bin': 9},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':256, 'num_iterations': 50000},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':512, 'num_iterations': 50000},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':32, 'num_iterations': 50000},
+    # + 100k qed starts here
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':512, 'num_iterations': 50000}, #13
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':32, 'num_iterations': 200000},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':32, 'num_iterations': 200000, 'learning_rate': 2.5e-4},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':32, 'num_iterations': 500000, 'learning_rate': 1e-4},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':64, 'num_iterations': 250000, 'learning_rate': 1e-4},
+    # + 100k + 10k high qed starts here
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':128, 'num_iterations': 250000//2, 'learning_rate': 1e-4}, # 18
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':32, 'num_iterations': 500000, 'learning_rate': 1e-5},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':512, 'num_iterations': 250000//8, 'learning_rate': 1e-4},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':256, 'num_iterations': 250000//4, 'learning_rate': 1e-4},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 512, 'mbsize':4, 'num_iterations': 1000000, 'learning_rate': 1e-4},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 512, 'mbsize':64, 'num_iterations': 1000000, 'learning_rate': 5e-4}, # trick, x32, effective batch size 2048, acually nvm lemme boost that LR, nvm effective 8k x128
+    {**all_hps[0], 'num_bins': 10, 'nemb': 512, 'mbsize':64, 'num_iterations': 1000000, 'learning_rate': 1e-3}, # same, larger LR
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':64, 'num_iterations': 1000000, 'learning_rate': 1e-4},
+    {**all_hps[0], 'num_bins': 10, 'nemb': 256, 'mbsize':64, 'num_iterations': 500000, 'learning_rate': 1e-4}, # progressive batch widening, +1/5000
+    #{**all_hps[0], 'nemb': 128, 'repr_type': 'morgan_fingerprint', 'learning_rate': 1e-4},
   ]
+  return all_hps
+
+def array_jan_25(args):
+  all_hps = ([
+    {'mbsize': 64,
+     'learning_rate': 1e-4,
+     'num_iterations': 200_000,
+     'save_path': './results/',
+     'nemb': 64,
+     'repr_type': 'block_graph',
+     'model_version': 'v3',
+     'num_bins': 8,
+     'top_bin': top_bin,
+     'include_qed_data': qed,
+     }
+    for qed in [True, False]
+    for top_bin in range(0,9)
+  ])
+  return all_hps
+
+def array_feb_17(args):
+  all_hps = ([
+    {'mbsize': 64,
+     'learning_rate': 1e-4,
+     'num_iterations': 200_000,
+     'save_path': './results/',
+     'nemb': 64,
+     'repr_type': 'block_graph',
+     'model_version': 'v3',
+     'num_bins': 8,
+     'top_bin': top_bin,
+     'include_qed_data': qed,
+     }
+    for qed in [True, False]
+    for top_bin in range(0,8)
+  ])
+  return all_hps
+
+def array_feb_23(args):
+  all_hps = ([
+    {'mbsize': 64,
+     'learning_rate': 1e-4,
+     'num_iterations': 200_000,
+     'save_path': './results/',
+     'nemb': 64,
+     'repr_type': 'block_graph',
+     'model_version': 'v3',
+     'num_bins': 8,
+     'top_bin': top_bin,
+     'include_qed_data': qed,
+     'mol_data': mol_data,
+     }
+    for _run in [0,1]
+    for qed in [True, False]
+    for top_bin in range(0,8)
+    for mol_data in ['10k', '20k']
+  ])
   return all_hps
 
 if __name__ == '__main__':
   args = parser.parse_args()
-  if args.array:
+  if 1:
+    all_hps = eval(args.array)(args)
+    #for run in range(0,8):
+    for run in range(len(all_hps)):
+      args.run = run
+      hps = all_hps[run]
+      for k,v in hps.items():
+        setattr(args, k, v)
+      exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
+      if os.path.exists(exp_dir):
+        continue
+      print(hps)
+      main(args)
+  elif args.array:
     all_hps = eval(args.array)(args)
 
     if args.print_array_length:
@@ -970,6 +1185,7 @@ if __name__ == '__main__':
       #print(' '.join(f'run_{i}' for i, h in enumerate(all_hps) if h['opt'] == 'msgd_corr'))
     else:
       hps = all_hps[args.run]
+      print(hps)
       for k,v in hps.items():
         setattr(args, k, v)
       main(args)
@@ -977,7 +1193,16 @@ if __name__ == '__main__':
       dump_episodes(args)
   elif args.gen_rand:
       generate_random_episodes(args)
+  elif args.gen_rand_qed:
+      generate_random_qed_episodes(args)
   elif args.gen_sample:
       generate_sampled_episodes(args)
   else:
     main(args)
+
+
+    """
+- run gen beam 16
+- start 20 with mp vs not (mb 512)
+
+"""
