@@ -15,10 +15,11 @@ def _satlins(x, cutoff0, cutoff1):
     return x
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, synth_options, **kwargs):
+    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, exp_dock, synth_options, **kwargs):
         self.env_name = np.random.uniform()
         self.qed_cutoff = qed_cutoff
         self.synth_cutoff = synth_cutoff
+        self.exp_dock = exp_dock
         self.qed_oracle = QEDOracle(num_threads=1)
         self.synth_oracle = SynthOracle(synth_options, synth_config)
         self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
@@ -33,15 +34,14 @@ class ProxyReward:
         clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
 
-        # todo: would like to reuse the same graphs in all models (at least within 1 run)
-        graph = molecule.graph
-        graph.x = graph.x[:,:14]
-        proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":graph,
+        proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
                                                         "env_name": self.env_name}], [clip_qed * clip_synth])
 
         proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
+        if self.exp_dock:  proxy_dock = self.exp_dock ** proxy_dock
+
         if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
-            reward = clip_qed * clip_synth * proxy_dock
+            reward = proxy_dock * clip_qed * clip_synth
         else:
             reward = proxy_dock
         info = {"proxy_dock": proxy_dock,

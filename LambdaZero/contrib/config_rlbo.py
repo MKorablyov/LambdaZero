@@ -34,11 +34,12 @@ rllib_config = {
         "reward_config": {
             "synth_options":{"num_gpus":0.05},
             "qed_cutoff": [0.2, 0.5],
+            "exp_dock": False,
             "synth_cutoff":[0, 4],
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
             "scoreProxy_options":{"num_cpus":2, "num_gpus":1.0},
-            "actor_sync_freq": 500,
+            "actor_sync_freq": 150,
         },
 
     },
@@ -57,7 +58,7 @@ rllib_config = {
     "lr": 5e-5,
     "logger_config":{
         "wandb": {
-            "project": "rlbo",
+            "project": "rlbo2",
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
 
@@ -159,3 +160,27 @@ rlbo_006 = {
                 "reward": ProxyReward,
             }}}}
 
+
+rlbo_007 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "reward_config":{
+                    "exp_dock":1.5,
+                    }}}}}
+
+rlbo_008 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "reward_config":{
+                    "exp_dock":2,
+                    }}}}}
+
+rlbo_009 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "reward_config":{
+                    "exp_dock":2.5,
+                    }}}}}
