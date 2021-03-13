@@ -34,12 +34,12 @@ def sync_wandb(logs_path, since_sec):
         since_logged_time = int(min([curr_time - d for d in dates]))
         if since_logged_time < since_sec:
             threading.Thread(target=_sync_wandb_dir, args=(logs_path, run)).start()
-
+            time.sleep(30) # sleep 30 seconds to prevent overflow of wandb server and being blocked
 
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2:
-        since_sec = sys.argv[1]
+        since_sec = int(sys.argv[1])
     else:
         since_sec = 600
     while True:
