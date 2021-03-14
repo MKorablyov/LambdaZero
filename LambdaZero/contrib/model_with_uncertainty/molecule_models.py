@@ -76,10 +76,12 @@ class MolMCDropGNN(ModelWithUncertainty):
         val_loader = DataLoader(val_set, batch_size=self.batch_size, collate_fn=Batch.from_data_list, shuffle=False)
 
         for i in range(self.train_epochs):
-            metrics = train_epoch(train_loader, model, optimizer, self.device)
-            self.logger.log.remote(metrics)
-            metrics = val_epoch(val_loader, model, self.device)
-            self.logger.log.remote(metrics)
+            train_metrics = train_epoch(train_loader, model, optimizer, self.device)
+            val_metrics = val_epoch(val_loader, model, self.device)
+            # todo: we want to see some convergence metrics here but I can't log each epoch because that's too much for
+            # logging
+        self.logger.log.remote(train_metrics)
+        self.logger.log.remote(val_metrics)
         # update internal copy of the model
         [delattr(graphs[i], "y") for i in range(len(graphs))]
         model.eval()

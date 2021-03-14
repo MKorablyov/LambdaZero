@@ -36,11 +36,11 @@ class ProxyReward:
 
         proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
                                                         "env_name": self.env_name}], [clip_qed * clip_synth])
-
         proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
-        if self.exp_dock:  proxy_dock = self.exp_dock ** proxy_dock
 
-        if proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
+        if self.exp_dock:
+            reward = (self.exp_dock ** proxy_dock) * clip_qed * clip_synth
+        elif proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
             reward = proxy_dock * clip_qed * clip_synth
         else:
             reward = proxy_dock

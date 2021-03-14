@@ -64,7 +64,6 @@ regressor_config = {
     "train_iterations": 72,
     "finetune_iterations": 16,
     "model": LambdaZero.models.MPNNetDrop,
-    # fixme !!!!!!!! this default model only does drop in the last layer
     "model_config": {"drop_data": False, "drop_weights": False, "drop_last": True, "drop_prob": 0.1},
     "optimizer": torch.optim.Adam,
     "optimizer_config": {
@@ -102,7 +101,7 @@ rllib_config = {
     #"tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
     #"local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
     "env": #BlockMolEnvGraph_v1,
-          BlockMolGraphEnv_PersistentBuffer, # fixme maybe ray.remote the buffer as well
+          BlockMolGraphEnv_PersistentBuffer, #todo maybe ray.remote the buffer as well
     "env_config": {
         "random_steps": 4,
         "allow_removal": True,

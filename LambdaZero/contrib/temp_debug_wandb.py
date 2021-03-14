@@ -1,0 +1,1 @@
+from wandb.cli.cli import cli
