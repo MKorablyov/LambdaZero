@@ -25,7 +25,7 @@ from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo_bayes_reward_008"
+else: config_name = "ppo_bayes_reward_debug"
 config = getattr(config,config_name)
 curr_trial = config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -127,13 +127,18 @@ if machine == "Ikarus":
     config["rllib_config"]["num_gpus"] = 0.3
     config["rllib_config"]["memory"] = 25 * 10**9
     config["rllib_config"]["sgd_minibatch_size"] = 4
-    config["reward_learner_config"]["regressor_config"]["train_iterations"] = 2
-    config["reward_learner_config"]["regressor_config"]["finetune_iterations"] = 2
-    config["reward_learner_config"]["regressor_config"]["T"] = 2
-    config["reward_learner_config"]["aq_size0"] = 10
+
+    config['reward_learner_config']['reward_actor_cpus'] = 1
+    config['reward_learner_config']['reward_actor_gpus'] = 0.25
+    config["reward_learner_config"]["num_mol_retrain"] = 25
+    config["reward_learner_config"]["aq_size0"] = 14
     config["reward_learner_config"]["aq_size"] = 2
     config["reward_learner_config"]["b_size"] = 2
     config["reward_learner_config"]["data"]["b_size"] = 2
+
+    config["reward_learner_config"]["regressor_config"]["train_iterations"] = 2
+    config["reward_learner_config"]["regressor_config"]["finetune_iterations"] = 2
+    config["reward_learner_config"]["regressor_config"]["T"] = 2
 
 
 if __name__ == "__main__":
