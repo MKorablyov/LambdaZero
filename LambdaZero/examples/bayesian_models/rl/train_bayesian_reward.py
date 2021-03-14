@@ -40,13 +40,13 @@ data_config = {
     "dataset_split_path": osp.join(datasets_dir,
                                 #    "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                 #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-                                "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+                                "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh/raw"),
         "props": ["dockscore", "smiles"],
         "transform": T.Compose([LambdaZero.utils.Complete()]),
-        "file_names": "Zinc20_docked_neg_randperm_3k.feather",
+        "file_names": "Zinc20_docked_neg_randperm_30k.feather",
     },
 
     "b_size": 40,
