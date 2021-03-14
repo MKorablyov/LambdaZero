@@ -184,3 +184,15 @@ rlbo_009 = {
                 "reward_config":{
                     "exp_dock":2.5,
                     }}}}}
+
+
+debug_config_v2 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "random_steps":1,
+                "reward_config":{
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa":1.0
+                        }}}}}}}
