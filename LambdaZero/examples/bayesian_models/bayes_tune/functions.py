@@ -215,7 +215,9 @@ def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
         logits = model(data, do_dropout=False)
         # targets_norm = config["data"]["normalizer"].tfm(targets)
         reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
-        loss = F.mse_loss(logits, targets) + reg_loss
+
+        assert logits.shape[1]==1, "only works with 1d logits"
+        loss = F.mse_loss(logits[:,0], targets) + reg_loss
         loss.backward()
         optimizer.step()
 
