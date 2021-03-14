@@ -74,6 +74,8 @@ def sample_logits(loader, model, device, config, num_samples, do_dropout):
         for bidx, data in enumerate(loader):
             data = data.to(device)
             logit = model(data, do_dropout=do_dropout)
+            assert logit.shape[1] ==1, "only defined for 1d inputs"
+            logit = logit[:,0]
             epoch_logits.append(logit.detach().cpu().numpy())
         sample_logits.append(np.concatenate(epoch_logits, 0))
     return np.stack(sample_logits,0)
