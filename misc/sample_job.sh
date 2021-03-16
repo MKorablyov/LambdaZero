@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --account=rrg-bengioy-ad
-#SBATCH --cpus-per-task=12                # Number of CPUs needed
-#SBATCH --gres=gpu:1                      # Number of GPUs needed
-#SBATCH --mem=64G                         # Amount of RAM needed
-#SBATCH --time=12:00:00                   # The time for which the job runs
+#SBATCH --cpus-per-task=40                # Number of CPUs needed
+#SBATCH --gres=gpu:4                      # Number of GPUs needed
+#SBATCH --mem=128G                         # Amount of RAM needed
+#SBATCH --time=24:00:00                   # The time for which the job runs
 #SBATCH -o /scratch/mkkr/slurm-%j.out  # Write the log in $SCRATCH
 
 
@@ -22,7 +22,8 @@ export PATH=/lustre03/project/6004852/mkkr/Programs/mgltools_x86_64Linux2_1.5.6/
 source /lustre03/project/6004852/mkkr/anaconda3/etc/profile.d/conda.sh
 conda activate lz
 
+# PYTHONPATH to the modified version of the repository (change both next lines)
+export PYTHONPATH="${PYTHONPATH}:/lustre03/project/6004852/mkkr/Projects/7_LambdaZero"
+cd /lustre03/project/6004852/mkkr/Projects/7_LambdaZero/LambdaZero/contrib
+python train_rlbo.py rlbo_001
 
-export PYTHONPATH="${PYTHONPATH}:/home/mkkr/scratch/Projects/15_LambdaZero"
-cd /home/mkkr/scratch/Projects/15_LambdaZero/LambdaZero/examples/mpnn
-python train_mpnn.py
