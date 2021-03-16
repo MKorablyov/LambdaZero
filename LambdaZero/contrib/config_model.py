@@ -17,6 +17,6 @@ load_seen_config = {
 model_config = {
     "train_epochs":75,
     "batch_size":75,
-    "num_mc_samples":5,
+    "num_mc_samples":20,
     "device":"cuda"
 }

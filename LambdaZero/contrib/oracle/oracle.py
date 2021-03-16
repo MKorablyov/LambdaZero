@@ -16,7 +16,7 @@ class DockingEstimator(DockVina_smi):
         try:
             mol_name, dockscore, coord = self.dock(smiles)
         except Exception as e:
-            dockscore = 0.0
+            dockscore = None
         return dockscore
 
 class DockingOracle:
@@ -28,17 +28,30 @@ class DockingOracle:
         self.mean = mean
         self.std = std
         self.logger = logger
-        # todo: report statistics
 
     def __call__(self, data):
         smiles = [d["smiles"] for d in data]
         dockscores = list(self.pool.map(lambda actor, smi: actor.eval.remote(smi), smiles))
-        self.logger.log.remote({"docking_oracle/raw_dockscore_mean": np.mean(dockscores),
-                                "docking_oracle/raw_dockscore_min": np.min(dockscores)})
-        dockscores = [min(0, d) for d in dockscores] # when docking score is positive, clip at 0
+        self.logger.log.remote({
+            "docking_oracle/raw_dockscore_max": np.max(dockscores),
+            "docking_oracle/raw_dockscore_mean": np.mean(dockscores),
+            "docking_oracle/raw_dockscore_min": np.min(dockscores)})
+
+        dockscores_ = []
+        for d in dockscores:
+            if d is None:
+                dockscores_.append(self.mean) # some small bad value when failt
+            elif d > self.mean + 3*self.std:
+                dockscores_.append(self.mean + 3*self.std) # cap at 3 stds at worst
+                # docking could result in steric clashes with huge energies; these are capped at negative 3 stds to
+                # prevent fitting to these bad molecules much
+            else:
+                dockscores_.append(d)
         dockscores = [(self.mean -d) / self.std for d in dockscores] # this normalizes and flips dockscore
-        self.logger.log.remote({"docking_oracle/norm_dockscore_mean": np.mean(dockscores),
-                                "docking_oracle/norm_dockscore_max": np.max(dockscores)})
+        self.logger.log.remote({
+            "docking_oracle/norm_dockscore_min": np.min(dockscores),
+            "docking_oracle/norm_dockscore_mean": np.mean(dockscores),
+            "docking_oracle/norm_dockscore_max": np.max(dockscores)})
         return dockscores
 
 

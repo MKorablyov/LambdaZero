@@ -15,11 +15,13 @@ def _satlins(x, cutoff0, cutoff1):
     return x
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, exp_dock, synth_options, **kwargs):
+    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff,
+                 exp_dock, always_discount, synth_options, **kwargs):
         self.env_name = np.random.uniform()
         self.qed_cutoff = qed_cutoff
         self.synth_cutoff = synth_cutoff
         self.exp_dock = exp_dock
+        self.always_discount = always_discount
         self.qed_oracle = QEDOracle(num_threads=1)
         self.synth_oracle = SynthOracle(synth_options, synth_config)
         self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
@@ -40,12 +42,14 @@ class ProxyReward:
 
         if self.exp_dock:
             reward = (self.exp_dock ** proxy_dock) * clip_qed * clip_synth
+        elif self.always_discount:
+            reward = proxy_dock * clip_qed * clip_synth
         elif proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
             reward = proxy_dock * clip_qed * clip_synth
         else:
             reward = proxy_dock
         info = {"proxy_dock": proxy_dock,
-                "proxy_dock_mean":actor_info["mean"][0],
+                "proxy_dock_mean": actor_info["mean"][0],
                 "proxy_dock_var": actor_info["var"][0],
                 "synth_score": synth_score, "qed_score":qed,
                 "clip_qed": clip_qed, "clip_synth": clip_synth}
@@ -62,6 +66,27 @@ class ProxyRewardSparse(ProxyReward):
         else:
             reward, info = 0.0, {}
         return reward, info
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class DummyReward:

@@ -35,6 +35,7 @@ rllib_config = {
             "synth_options":{"num_gpus":0.05},
             "qed_cutoff": [0.2, 0.5],
             "exp_dock": False,
+            "always_discount":False,
             "synth_cutoff":[0, 4],
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
@@ -58,7 +59,7 @@ rllib_config = {
     "lr": 5e-5,
     "logger_config":{
         "wandb": {
-            "project": "rlbo2",
+            "project": "rlbo3",
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
 
@@ -192,6 +193,19 @@ debug_config_v2 = {
             "env_config":{
                 "random_steps":1,
                 "reward_config":{
+                    "always_discount": True,
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa":1.0
+                        }}}}}}}
+
+debug_config_v3 = {
+    "tune_config":{
+        "config":{
+            "env_config":{
+                "random_steps":1,
+                "reward_config":{
+                    "always_discount": False,
                     "scoreProxy_config":{
                         "acquirer_config":{
                             "kappa":1.0
