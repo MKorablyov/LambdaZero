@@ -64,7 +64,8 @@ class MolMCDropGNN(ModelWithUncertainty):
         # from many possible properties take molecule graph
         graphs = [m["mol_graph"] for m in x]
 
-        [setattr(graphs[i],"y", torch.tensor([y[i]])) for i in range(len(graphs))] # this will modify graphs
+
+        [setattr(graphs[i],"y", torch.tensor([y[i]])) for i in range(len(graphs))] # this will modify graphs todo
         train_idx, val_idx = random_split(len(graphs), [0.95, 0.05])
         train_graphs = [graphs[i] for i in train_idx]
         val_graphs = [graphs[i] for i in val_idx]
@@ -78,8 +79,7 @@ class MolMCDropGNN(ModelWithUncertainty):
         for i in range(self.train_epochs):
             train_metrics = train_epoch(train_loader, model, optimizer, self.device)
             val_metrics = val_epoch(val_loader, model, self.device)
-            # todo: we want to see some convergence metrics here but I can't log each epoch because that's too much for
-            # logging
+            # todo: we want to see some convergence metrics, and logging every epoch is too much for wandb
         self.logger.log.remote(train_metrics)
         self.logger.log.remote(val_metrics)
         # update internal copy of the model

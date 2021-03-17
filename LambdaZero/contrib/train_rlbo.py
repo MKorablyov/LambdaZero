@@ -36,7 +36,6 @@ if __name__ == "__main__":
             # what seems to happen is that ray jobs sometimes fail very soon after the initialization
             # same exact jobs can run for a while when initialized again. I think the issue is related to how individual
             # remote workers are allocated. Yet, I have not been able to entirely debug it. Therefore this for loop here
-
             ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
             ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
             # initialize loggers

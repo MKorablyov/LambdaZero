@@ -94,17 +94,22 @@ def temp_load_data_v1(mean, std, dataset_split_path, raw_path, proc_path, file_n
             data, slices = collate(graphs)
             torch.save((data, slices, y), osp.join(proc_path, file_name + ".pt"))
 
-    graph_list, y_list = [], []
+    smis, graph_list, y_list= [], [], []
     for file_name in file_names:
-        data,slices, y = torch.load(osp.join(proc_path, file_name + ".pt"))
+        # load smiles from raw data
+        docked_index = pd.read_feather(osp.join(raw_path, file_name + ".feather"))
+        smis.extend(docked_index["smiles"].tolist())
+        # load processed graphs
+        data, slices, y = torch.load(osp.join(proc_path, file_name + ".pt"))
         graphs = separate(data, slices)
         graph_list.extend(graphs)
         y_list.extend(y)
+
     # split into train test sets
     train_idxs, val_idxs, test_idxs = np.load(dataset_split_path, allow_pickle=True)
-    train_x = [{"mol_graph":graph_list[i]} for i in train_idxs]
+    train_x = [{"smiles":smis[i],"mol_graph":graph_list[i]} for i in train_idxs]
     train_y = [y_list[i] for i in train_idxs]
-    val_x = [{"mol_graph":graph_list[i]} for i in val_idxs]
+    val_x = [{"smiles":smis[i],"mol_graph":graph_list[i]} for i in val_idxs]
     val_y = [y_list[i] for i in val_idxs]
     return train_x, train_y, val_x, val_y
 
