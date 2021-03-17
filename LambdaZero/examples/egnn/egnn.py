@@ -7,14 +7,14 @@ from torch_geometric.typing import Adj, Size, OptTensor, Tensor
 
 class EGNNConv(MessagePassing):
 
-    def __init__(self, feats_dim, pos_dim=3, edge_attr_dim=0, m_dim=64, infer_edges=False, control=False,
+    def __init__(self, feats_dim, pos_dim=3, edge_attr_dim=0, m_dim=64, infer_edges=False, control_exp=False,
                  aggr: str = 'add'):
         super().__init__(aggr=aggr)
         self.aggr = aggr
         self.feats_dim = feats_dim
         self.pos_dim = pos_dim
         self.infer_edges = infer_edges
-        self.control = control
+        self.control_exp = control_exp
 
         edge_input_dim = (feats_dim * 2) + edge_attr_dim + 1
 
@@ -52,7 +52,7 @@ class EGNNConv(MessagePassing):
         if type(module) in {nn.Linear}:
             nn.init.normal_(module.weight, std=1e-3)
 
-    def forward(self, x: Tensor, pos: Tensor, edge_index: Adj, edge_attr: OptTensor = None) -> Tensor:
+    def forward(self, x: Tensor, pos: Tensor, edge_index: Adj, edge_attr: OptTensor = None, size: Size = None) -> Tensor:
         rel_pos = pos[edge_index[0]] - pos[edge_index[1]]
         rel_dist = (rel_pos ** 2).sum(dim=-1, keepdim=True) ** 0.5
 
@@ -68,15 +68,17 @@ class EGNNConv(MessagePassing):
         return hidden_out
 
     def message(self, x_i, x_j, edge_attr) -> Tensor:
-        if self.control:
-            m_ij = self.edge_mlp(torch.cat([x_i, x_j], dim=-1))
+        if self.control_exp:
+            # give random position
+            edge_attr.fill_(0)
+            m_ij = self.edge_mlp(torch.cat([x_i, x_j, edge_attr], dim=-1))
         else:
             m_ij = self.edge_mlp(torch.cat([x_i, x_j, edge_attr], dim=-1))
             # coor_w = self.pos_mlp(m_ij)
         if self.infer_edges:
             e_ij = self.infer_edge_mlp(m_ij)
             m_ij = e_ij * m_ij
-        return m_ij  # , coor_w
+        return m_ij  #, coor_w
 
     def propagate(self, edge_index: Adj, size: Size = None, **kwargs):
         size = self.__check_input__(edge_index, size)
@@ -93,7 +95,6 @@ class EGNNConv(MessagePassing):
 
         # coor_wi = self.aggregate(coor_wij, **aggr_kwargs)
         # coor_ri = self.aggregate(kwargs["rel_pos"], **aggr_kwargs)
-
         # node, pos = kwargs["x"], kwargs["pos"]
         # pos_out = pos + (coor_wi * coor_ri)
         # hidden_out = self.node_mlp(torch.cat([node, m_i], dim=-1))
@@ -101,17 +102,17 @@ class EGNNConv(MessagePassing):
 
         out = self.node_mlp(torch.cat([kwargs["x"], m_i], dim=-1))  # + kwargs["x"]
         update_kwargs = self.inspector.distribute('update', coll_dict)
-        return self.update(out, **update_kwargs)  # self.update((hidden_out, pos_out), )
+        return self.update(out, **update_kwargs)  # (hidden_out, pos_out)
 
 
 class EGNNet(nn.Module):
 
-    def __init__(self, n_layers, feats_dim, pos_dim=3, edge_attr_dim=0, m_dim=16, infer_edges=False, settoset=False,
-                 control=False):
+    def __init__(self, n_layers=3, feats_dim=14, pos_dim=3, edge_attr_dim=0, m_dim=16,
+                 infer_edges=False, settoset=False, control_exp=False):
         super().__init__()
 
         self.n_layers = n_layers
-        self.mpnn_layers = nn.ModuleList()
+        self.egnn_layers = nn.ModuleList()
         self.feats_dim = feats_dim
         self.pos_dim = pos_dim
         self.edge_attr_dim = edge_attr_dim
@@ -122,8 +123,8 @@ class EGNNet(nn.Module):
             EGCLayer = EGNNConv(feats_dim=feats_dim,
                                 pos_dim=pos_dim,
                                 edge_attr_dim=edge_attr_dim,
-                                m_dim=m_dim, infer_edges=infer_edges, control=control)
-            self.mpnn_layers.append(EGCLayer)
+                                m_dim=m_dim, infer_edges=infer_edges, control_exp=control_exp)
+            self.egnn_layers.append(EGCLayer)
 
         if self.settoset:
             self.set2set = Set2Set(feats_dim, processing_steps=3)
@@ -138,7 +139,7 @@ class EGNNet(nn.Module):
     def forward(self, data):
         out = data.x  # or another activation here
 
-        for i, layer in enumerate(self.mpnn_layers):
+        for layer in self.egnn_layers:
             out = layer(out, data.pos, data.edge_index, data.edge_attr, size=data.batch)
 
         if self.settoset:
