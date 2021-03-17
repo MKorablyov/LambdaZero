@@ -132,7 +132,7 @@ class MolMCDropGNN(ModelWithUncertainty):
         embed = None
         for batch in dataloader:
             batch.to(self.device)
-            y_hat_batch = self.model.get_embed(batch, do_dropout=True)
+            y_hat_batch = self.model.get_embed(batch, do_dropout=False)
             if embed is None:
                 embed = y_hat_batch.detach().cpu()
             else:
