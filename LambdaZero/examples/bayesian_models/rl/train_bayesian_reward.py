@@ -29,7 +29,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo_bayes_reward_debug"
+else: config_name = "ppo_bayes_reward_debug_v2"
 config = getattr(config,config_name)
 curr_trial = config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -48,7 +48,6 @@ data_config = {
         "transform": T.Compose([LambdaZero.utils.Complete()]),
         "file_names": "Zinc20_docked_neg_randperm_30k.feather",
     },
-
     "b_size": 40,
     "target_norm": [-8.6, 1.10], # fixme use normalizer everywhere
     "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.10])
