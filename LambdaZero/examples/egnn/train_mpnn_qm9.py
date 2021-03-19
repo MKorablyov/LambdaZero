@@ -7,7 +7,7 @@ import wandb
 from LambdaZero.examples.mpnn.dime_net.qm9 import QM9
 from LambdaZero.examples.mpnn.dime_net.dataloader import DataLoader
 from LambdaZero.models.torch_models import MPNNet
-from LambdaZero.examples.egnn import qm9_config
+from LambdaZero.examples.egnn import egnn_qm9_config
 from LambdaZero.examples.egnn.train_egnn_qm9 import MyTransform
 
 from LambdaZero.utils import get_external_dirs
@@ -15,7 +15,7 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
 else: config_name = "qm9_1k"
-config = getattr(qm9_config,config_name)
+config = getattr(egnn_qm9_config, config_name)
 
 if config["dry_run"]:
     os.environ["WANDB_MODE"] = "dryrun"

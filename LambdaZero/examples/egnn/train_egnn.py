@@ -9,8 +9,8 @@ from ray.tune.logger import DEFAULT_LOGGERS
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger, TrialNameCreator
 
-import LambdaZero.examples.egnn.dock_config as config
-from LambdaZero.examples.egnn.dock_config import DEFAULT_CONFIG
+import LambdaZero.examples.egnn.egnn_dock_config as config
+from LambdaZero.examples.egnn.egnn_dock_config import DEFAULT_CONFIG
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 

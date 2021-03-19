@@ -1,6 +1,6 @@
 import torch
 
-qm9_1k = {
+egnn_qm9_1k = { # for local run
     "target": 1,
     "dry_run": False,
     "control_exp": False,
@@ -12,7 +12,7 @@ qm9_1k = {
     "training_iterations": 500,
 }
 
-qm9_all = {
+egnn_qm9_all = { # for beluga
     "target": 1,
     "train_dataset_size": 0.75,
     "dry_run": True,
@@ -24,7 +24,8 @@ qm9_all = {
     "training_iterations": 1000,
 }
 
-qm9_all_poscontrol = {
+# below are all control experiments
+egnn_qm9_all_poscontrol = {
     "target": 1,
     "train_dataset_size": 0.75,
     "dry_run": True,
@@ -36,7 +37,7 @@ qm9_all_poscontrol = {
     "training_iterations": 1000,
 }
 
-qm9_all_noscheduler = {
+egnn_qm9_all_noscheduler = {
     "target": 1,
     "train_dataset_size": 0.75,
     "dry_run": True,
@@ -48,7 +49,7 @@ qm9_all_noscheduler = {
     "training_iterations": 1000,
 }
 
-qm9_set2set = {
+egnn_qm9_set2set = {
     "target": 1,
     "train_dataset_size": 0.75,
     "dry_run": True,
@@ -60,7 +61,7 @@ qm9_set2set = {
     "training_iterations": 1000,
 }
 
-qm9_distasedges = { # need to redo with proper infer edges
+egnn_qm9_distasedges = { # need to redo with proper infer edges
     "target": 1,
     "train_dataset_size": 0.75,
     "dry_run": True,
@@ -72,7 +73,7 @@ qm9_distasedges = { # need to redo with proper infer edges
     "training_iterations": 1000,
 }
 
-qm9_distasedge_poscontrol = {
+egnn_qm9_distasedge_poscontrol = {
     "target": 1,
     "train_dataset_size": 0.75,
     "dry_run": True,
@@ -84,7 +85,7 @@ qm9_distasedge_poscontrol = {
     "training_iterations": 1000,
 }
 
-qm9_noinferedge = {
+egnn_qm9_noinferedge = {
     "target": 1,
     "train_dataset_size": 0.75,
     "dry_run": True,
@@ -96,7 +97,7 @@ qm9_noinferedge = {
     "training_iterations": 1000,
 }
 
-qm9_10k = {
+egnn_qm9_10k = {
     "target": 1,
     "train_dataset_size": 0.10,
     "dry_run": True,
@@ -108,7 +109,7 @@ qm9_10k = {
     "training_iterations": 1000,
 }
 
-qm9_7_all = {
+egnn_qm9_7_all = {
     "target": 7,
     "train_dataset_size": 0.75,
     "dry_run": True,

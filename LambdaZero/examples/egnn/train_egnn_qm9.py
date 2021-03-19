@@ -7,14 +7,14 @@ import wandb
 from LambdaZero.examples.mpnn.dime_net.qm9 import QM9
 from LambdaZero.examples.mpnn.dime_net.dataloader import DataLoader
 from LambdaZero.examples.egnn.egnn import EGNNet
-from LambdaZero.examples.egnn import qm9_config
+from LambdaZero.examples.egnn import egnn_qm9_config
 
 from LambdaZero.utils import get_external_dirs
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "qm9_1k"
-config = getattr(qm9_config,config_name)
+else: config_name = "egnn_qm9_1k"
+config = getattr(egnn_qm9_config, config_name)
 
 if config["dry_run"]:
     os.environ["WANDB_MODE"] = "dryrun"
@@ -56,15 +56,15 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if config["train_dataset_size"]: # full_size data
     model = EGNNet(n_layers=7, feats_dim=dataset.num_node_features, pos_dim=3, edge_attr_dim=0, m_dim=128,
-                   infer_edges=config['infer_edges'], settoset=config['settoset'], control=config["control_exp"]).to(device)
-else:
+                   infer_edges=config['infer_edges'], settoset=config['settoset'], control_exp=config["control_exp"]).to(device)
+else: # for local machine
     model = EGNNet(n_layers=3, feats_dim=dataset.num_node_features, pos_dim=3, edge_attr_dim=0, m_dim=64,
-                   infer_edges=config['infer_edges'], settoset=config['settoset'], control=config["control_exp"]).to(device)
+                   infer_edges=config['infer_edges'], settoset=config['settoset'], control_exp=config["control_exp"]).to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-16) #amsgrad=True) #
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, weight_decay=1e-16) # amsgrad=True)
 
 if config["scheduler"]:
-    scheduler = config["scheduler"](optimizer, T_max=300)
+    scheduler = config["scheduler"](optimizer, T_max=100)
 
 
 def train(loader):
@@ -73,7 +73,7 @@ def train(loader):
     pbar = tqdm(total=len(loader))
     for data in loader:
         optimizer.zero_grad()
-        # if config["control_exp"]:
+        # if config["control_exp"]: # another way to pass random positions
         #     data.pos = torch.randn(list(data.pos.shape)[0], list(data.pos.shape)[1])
         data = data.to(device)
 

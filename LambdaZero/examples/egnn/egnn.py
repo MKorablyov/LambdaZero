@@ -19,7 +19,7 @@ class EGNNConv(MessagePassing):
         edge_input_dim = (feats_dim * 2) + edge_attr_dim + 1
 
         self.edge_mlp = nn.Sequential(
-            nn.Linear(edge_input_dim, edge_input_dim * 2),  # m_dim),
+            nn.Linear(edge_input_dim, edge_input_dim * 2), # m_dim),
             nn.SiLU(),
             # nn.Linear(m_dim, m_dim),
             nn.Linear(edge_input_dim * 2, m_dim),
@@ -69,7 +69,7 @@ class EGNNConv(MessagePassing):
 
     def message(self, x_i, x_j, edge_attr) -> Tensor:
         if self.control_exp:
-            # give random position
+            # distance set to 0 in control experiment
             edge_attr.fill_(0)
             m_ij = self.edge_mlp(torch.cat([x_i, x_j, edge_attr], dim=-1))
         else:
