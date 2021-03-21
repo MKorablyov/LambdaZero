@@ -294,7 +294,6 @@ debug_config_v8 = {
                             "kappa":0.0,
                             "model_config":{
                                 "transform":LambdaZero.utils.Complete(),
-                                "mpnn_config":{"drop_weights":False}
                             }
                         },
                         "load_seen_config": {
@@ -304,6 +303,52 @@ debug_config_v8 = {
                     }}}}}}
 
 debug_config_v9 = {
+    "tune_config":{
+        "config":{
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config":{
+                "random_steps":1,
+                "reward_config":{
+                    "always_discount": False,
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa":0.0,
+                            "model_config":{
+                                "transform":LambdaZero.utils.Complete(),
+                            }
+                        },
+                        "load_seen_config": {
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k_debug3k.npy"),
+                            "file_names": ["Zinc20_docked_neg_randperm_30k"],}
+                    }}}}}}
+
+
+debug_config_v10 = {
+    "tune_config":{
+        "config":{
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config":{
+                "random_steps":1,
+                "reward_config":{
+                    "always_discount": True,
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa":0.0,
+                            "model_config":{
+                                "transform":LambdaZero.utils.Complete(),
+                                "mpnn_config":{"drop_weights":False}
+                            }
+                        },
+                        "load_seen_config": {
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k_debug3k.npy"),
+                            "file_names": ["Zinc20_docked_neg_randperm_30k"],}
+                    }}}}}}
+
+debug_config_v11 = {
     "tune_config":{
         "config":{
             "lr": 5e-5,
