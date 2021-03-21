@@ -294,6 +294,7 @@ debug_config_v8 = {
                             "kappa":0.0,
                             "model_config":{
                                 "transform":LambdaZero.utils.Complete(),
+                                "mpnn_config":{"drop_weights":False}
                             }
                         },
                         "load_seen_config": {
@@ -316,6 +317,7 @@ debug_config_v9 = {
                             "kappa":0.0,
                             "model_config":{
                                 "transform":LambdaZero.utils.Complete(),
+                                "mpnn_config":{"drop_weights":False}
                             }
                         },
                         "load_seen_config": {
