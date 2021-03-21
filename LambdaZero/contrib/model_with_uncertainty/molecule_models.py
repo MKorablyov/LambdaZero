@@ -12,7 +12,7 @@ from LambdaZero.models import MPNNetDrop
 from LambdaZero.inputs import random_split
 from LambdaZero.contrib.inputs import ListGraphDataset
 from .model_with_uncertainty import ModelWithUncertainty
-
+from copy import deepcopy
 
 def train_epoch(loader, model, optimizer, device):
     model.train()
@@ -48,24 +48,30 @@ def val_epoch(loader, model, device):
 
 
 class MolMCDropGNN(ModelWithUncertainty):
-    def __init__(self, train_epochs, batch_size, num_mc_samples, device, logger):
+    def __init__(self, train_epochs, batch_size, mpnn_config, lr, transform, num_mc_samples, device, logger):
         ModelWithUncertainty.__init__(self, logger)
         self.train_epochs = train_epochs
         self.batch_size = batch_size
+        self.mpnn_config = mpnn_config
+        self.lr = lr
+        self.transform = transform
         self.num_mc_samples = num_mc_samples
+
         self.device = device
 
     def fit(self,x,y):
         # initialize new model and optimizer
-        model = MPNNetDrop(True, False, True, 0.1, 14)
+        model = MPNNetDrop(**self.mpnn_config)
         model.to(self.device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 
         # from many possible properties take molecule graph
         graphs = [m["mol_graph"] for m in x]
+        graphs = deepcopy(graphs) # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
+        if self.transform is not None:
+            graphs = [self.transform(g) for g in graphs]
 
-
-        [setattr(graphs[i],"y", torch.tensor([y[i]])) for i in range(len(graphs))] # this will modify graphs todo
+        [setattr(graphs[i],"y", torch.tensor([y[i]])) for i in range(len(graphs))]
         train_idx, val_idx = random_split(len(graphs), [0.95, 0.05])
         train_graphs = [graphs[i] for i in train_idx]
         val_graphs = [graphs[i] for i in val_idx]
@@ -83,16 +89,16 @@ class MolMCDropGNN(ModelWithUncertainty):
         self.logger.log.remote(train_metrics)
         self.logger.log.remote(val_metrics)
         # update internal copy of the model
-        [delattr(graphs[i], "y") for i in range(len(graphs))]
+        #[delattr(graphs[i], "y") for i in range(len(graphs))]
         model.eval()
         self.model = model
 
     def update(self, x, y, x_new, y_new):
         mean, var = self.get_mean_and_variance(x_new)
-        self.logger.log.remote({"model/mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
+        self.logger.log.remote({"model/acquired_mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
         self.fit(x+x_new, y+y_new)
         mean, var = self.get_mean_and_variance(x_new)
-        self.logger.log.remote({"model/mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
+        self.logger.log.remote({"model/acquired_mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
         return None
 
     def get_mean_and_variance(self,x):

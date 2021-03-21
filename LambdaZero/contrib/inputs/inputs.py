@@ -106,7 +106,7 @@ def temp_load_data_v1(mean, std, dataset_split_path, raw_path, proc_path, file_n
         y_list.extend(y)
 
     # split into train test sets
-    train_idxs, val_idxs, test_idxs = np.load(dataset_split_path, allow_pickle=True)
+    train_idxs, val_idxs, _ = np.load(dataset_split_path, allow_pickle=True)
     train_x = [{"smiles":smis[i],"mol_graph":graph_list[i]} for i in train_idxs]
     train_y = [y_list[i] for i in train_idxs]
     val_x = [{"smiles":smis[i],"mol_graph":graph_list[i]} for i in val_idxs]
@@ -118,8 +118,6 @@ def temp_load_data_v1(mean, std, dataset_split_path, raw_path, proc_path, file_n
 class ListGraphDataset(Dataset):
     def __init__(self, graphs):
         self.graps = graphs
-        # todo use torch geometric to aggregate graphs together
-        # use torch_geometric slices on each batch
 
     def __getitem__(self, idx):
         return self.graps[idx]

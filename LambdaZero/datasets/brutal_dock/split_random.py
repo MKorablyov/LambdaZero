@@ -19,7 +19,7 @@ DEFAULT_CONFIG = {
     "file_names": ["Zinc20_docked_neg_randperm_30k"],
 
 
-    "split_name": "split_Zinc20_docked_neg_randperm_30k_debug3K",
+    "split_name": "split_Zinc20_docked_neg_randperm_30k_debug3k",
     "probs": [0.1, 0.1, 0.8],
 }
 config = DEFAULT_CONFIG
@@ -33,7 +33,6 @@ if __name__ == "__main__":
 
     data.reset_index(drop=True, inplace=True)
     splits = LambdaZero.inputs.random_split(len(data), config["probs"])
-
     split_path = osp.join(config["dataset_root"], "raw", config["split_name"] + ".npy")
-    np.save(split_path, splits[:2])
-    train_set, val_set = np.load(split_path, allow_pickle=True)
+    np.save(split_path, splits)
+    train_set, val_set, test_set = np.load(split_path, allow_pickle=True)

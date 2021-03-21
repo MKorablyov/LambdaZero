@@ -16,16 +16,17 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "debug_config_v6"
+else: config_name = "debug_config_v8"
 config = getattr(config_rlbo,config_name)
 config = merge_dicts(DEFAULT_CONFIG, config)
 if len(sys.argv) >=3:
     if sys.argv[2] == "cpu": config = merge_dicts(config, config_rlbo.config_cpu)
 
-# convenience option to debug option to be able to run any config on someone's machine
+# also make it work on one GPU and less RAM when on Maksym's machine
 machine = socket.gethostname()
 if machine == "Ikarus":
-    config = merge_dicts(DEFAULT_CONFIG, config_rlbo.debug_config)
+    config = merge_dicts(config, config_rlbo.debug_config)
+
 
 
 if __name__ == "__main__":
