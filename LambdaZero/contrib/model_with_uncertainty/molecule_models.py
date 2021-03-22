@@ -56,7 +56,6 @@ class MolMCDropGNN(ModelWithUncertainty):
         self.lr = lr
         self.transform = transform
         self.num_mc_samples = num_mc_samples
-
         self.device = device
 
     def fit(self,x,y):
@@ -65,7 +64,7 @@ class MolMCDropGNN(ModelWithUncertainty):
         model.to(self.device)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 
-        # from many possible properties take molecule graph
+        # from possible properties take molecule graph
         graphs = [m["mol_graph"] for m in x]
         graphs = deepcopy(graphs) # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
         if self.transform is not None:

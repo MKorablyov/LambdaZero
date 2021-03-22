@@ -16,7 +16,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "debug_config_v8"
+else: config_name = "debug_config_v6"
 config = getattr(config_rlbo,config_name)
 config = merge_dicts(DEFAULT_CONFIG, config)
 if len(sys.argv) >=3:
@@ -26,7 +26,6 @@ if len(sys.argv) >=3:
 machine = socket.gethostname()
 if machine == "Ikarus":
     config = merge_dicts(config, config_rlbo.debug_config)
-
 
 
 if __name__ == "__main__":
@@ -60,6 +59,7 @@ if __name__ == "__main__":
             scoreProxy = config["tune_config"]['config']['env_config']['reward_config']['scoreProxy']. \
                 options(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_options']). \
                 remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
+
             config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
             # run
             tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))

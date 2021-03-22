@@ -39,11 +39,12 @@ class DockingOracle:
 
         dockscores_ = []
         for d in dockscores:
-            if d is None:
-                dockscores_.append(self.mean) # some small bad value when failt
+            if d == None:
+                dockscores_.append(self.mean) # mean from Zinc on failures
             elif d > self.mean + 3*self.std:
                 dockscores_.append(self.mean + 3*self.std) # cap at 3 stds at worst
-                # docking could result in steric clashes with huge energies; these are capped at negative 3 stds to
+                # docking could result in steric clashes with huge positive energies; in order to prevent failures in
+                # the MPNN due to especially large values, I am capping how bad the molecule could be
                 # prevent fitting to these bad molecules much
             else:
                 dockscores_.append(d)
@@ -100,5 +101,3 @@ class SynthOracle:
                 synth = 0.0
             synths.append(synth)
         return synths
-
-
