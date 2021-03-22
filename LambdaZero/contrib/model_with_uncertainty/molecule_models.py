@@ -107,6 +107,9 @@ class MolMCDropGNN(ModelWithUncertainty):
 
     def get_samples(self, x, num_samples):
         graphs = [m["mol_graph"] for m in x]
+        graphs = deepcopy(graphs) # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
+        if self.transform is not None:
+            graphs = [self.transform(g) for g in graphs]
         dataset = ListGraphDataset(graphs)
         dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list)
 
