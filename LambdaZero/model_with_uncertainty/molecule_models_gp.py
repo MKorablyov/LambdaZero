@@ -15,21 +15,16 @@ from LambdaZero.contrib.inputs import ListGraphDataset
 from LambdaZero.contrib.model_with_uncertainty import ModelWithUncertainty
 from LambdaZero.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.model_with_uncertainty.molecule_models import train_epoch, val_epoch
+from LambdaZero.utils.utils_op import pearson_correlation
 from botorch.models import SingleTaskGP
 from botorch.fit import fit_gpytorch_model
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 
-def pearson_correlation(y1, y2):
-    y1 = y1 - torch.mean(y1)
-    y2 = y2 - torch.mean(y2)
-    return torch.sum(y1 * y2) / (
-            torch.sqrt(torch.sum(y1 ** 2) + 1e-6) * torch.sqrt(torch.sum(y2 ** 2) + 1e-6))
-
-
 class MolMCDropGNNGP(MolMCDropGNN):
     def __init__(self, train_epochs, batch_size, num_mc_samples, device, logger):
         MolMCDropGNN.__init__(self, train_epochs, batch_size, num_mc_samples, device, logger)
+        self.num_data_points_gp = 1000
 
     def fit(self, x, y):
         # initialize new model and optimizer
@@ -58,8 +53,9 @@ class MolMCDropGNNGP(MolMCDropGNN):
             self.logger.log.remote(metrics)
 
         # fit a gp on the embeddings
-        embed = self.get_embed(x)[-100:, :]
-        self.gp = SingleTaskGP(embed, torch.tensor(y).unsqueeze(-1)[-100:, :])
+        train_x = [x[i] for i in train_idx]
+        embed = self.get_embed(train_x)[-self.num_data_points_gp:, :]
+        self.gp = SingleTaskGP(embed, torch.tensor(y).unsqueeze(-1)[-self.num_data_points_gp:, :])
         self.mll = ExactMarginalLogLikelihood(self.gp.likelihood, self.gp)
         fit_gpytorch_model(self.mll)
 
