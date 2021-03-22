@@ -24,23 +24,23 @@ transform = LambdaZero.utils.Complete()
 DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
     "trainer_config": {
-        "target": "gridscore",
-        "target_norm": [-49.4, 7.057],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-        "batch_size": 16,  # 25
+        "target": "dockscore",
+        "target_norm": [-8.6, 1.1],
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+        "batch_size": 32,  # 25
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
-            "root": os.path.join(datasets_dir, "brutal_dock/mpro_6lze"),
-            "props": ["gridscore"],
+            "root": osp.join(datasets_dir, "brutal_dock/seh"),
+            "props": ["dockscore"],
             "transform": transform,
-            "file_names": ["Zinc15_260k_0"],#, "Zinc15_260k_1", "Zinc15_260k_2", "Zinc15_260k_3"],
+            "file_names": ["Zinc20_docked_neg_randperm_3k"],
         },
         "model": LambdaZero.models.MPNNet,
         "model_config": {},
         "optimizer": {
             "type": torch.optim.Adam,
             "config": {
-                "lr": 0.001
+                "lr": 1e-3
             }
         },
         "train_epoch": train_epoch,
