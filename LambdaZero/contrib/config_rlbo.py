@@ -26,7 +26,7 @@ proxy_config = {
     "load_seen_config": load_seen_config,
 }
 
-rllib_config = {
+trainer_config = { # tune trainable config to be more precise
     "env": BlockMolEnvGraph_v1, # todo: make ray remote environment
     "env_config": {
         "random_steps": 4,
@@ -66,7 +66,7 @@ rllib_config = {
 
 DEFAULT_CONFIG = {
     "tune_config":{
-        "config":rllib_config,
+        "config":trainer_config,
         "local_dir": summaries_dir,
         "run_or_experiment": PPOTrainer,
         "checkpoint_freq": 250,

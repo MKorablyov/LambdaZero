@@ -42,7 +42,6 @@ if __name__ == "__main__":
             os.environ['WANDB_DIR'] = summaries_dir
             os.environ["WANDB_MODE"] = "dryrun"
             remote_logger = RemoteLogger.remote()
-            # this might not be needed, but added due to unsolved wandb init errors
             wandb_logger = WandbRemoteLoggerCallback(
                 remote_logger=remote_logger,
                 project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],

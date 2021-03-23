@@ -48,7 +48,8 @@ def val_epoch(loader, model, device):
 
 
 class MolMCDropGNN(ModelWithUncertainty):
-    def __init__(self, train_epochs, batch_size, mpnn_config, lr, transform, num_mc_samples, device, logger):
+    def __init__(self, train_epochs, batch_size, mpnn_config, lr, transform, num_mc_samples, log_epoch_metrics, device,
+                 logger):
         ModelWithUncertainty.__init__(self, logger)
         self.train_epochs = train_epochs
         self.batch_size = batch_size
@@ -56,6 +57,7 @@ class MolMCDropGNN(ModelWithUncertainty):
         self.lr = lr
         self.transform = transform
         self.num_mc_samples = num_mc_samples
+        self.log_epoch_metrics = log_epoch_metrics
         self.device = device
 
     def fit(self,x,y):
@@ -84,11 +86,14 @@ class MolMCDropGNN(ModelWithUncertainty):
         for i in range(self.train_epochs):
             train_metrics = train_epoch(train_loader, model, optimizer, self.device)
             val_metrics = val_epoch(val_loader, model, self.device)
-            # todo: we want to see some convergence metrics, and logging every epoch is too much for wandb
+            if self.log_epoch_metrics:
+                self.logger.log.remote(train_metrics)
+                self.logger.log.remote(val_metrics)
+
+        # todo: log some general convergence only
         self.logger.log.remote(train_metrics)
         self.logger.log.remote(val_metrics)
         # update internal copy of the model
-        #[delattr(graphs[i], "y") for i in range(len(graphs))]
         model.eval()
         self.model = model
 
