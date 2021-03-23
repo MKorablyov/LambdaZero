@@ -6,7 +6,7 @@ from ray import tune
 from ray.tune.logger import DEFAULT_LOGGERS
 from ray.rllib.utils import merge_dicts
 import LambdaZero.utils
-from LambdaZero.contrib.loggers import RemoteLogger, WandbRemoteLoggerCallback
+from LambdaZero.contrib.loggers import RemoteLogger, WandbRemoteLoggerCallback, TrialNameCreator
 from LambdaZero.contrib import config_model
 from LambdaZero.contrib.config_model import DEFAULT_CONFIG
 
@@ -34,6 +34,6 @@ if __name__ == "__main__":
 
     config["tune_config"]['config']["model_config"]["logger"] = remote_logger
     config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)
-    tune.run(**config["tune_config"])#, trial_name_creator=TrialNameCreator(config_name))
+    tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))
 
 
