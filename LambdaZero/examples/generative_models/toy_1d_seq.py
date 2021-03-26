@@ -1,6 +1,7 @@
 import argparse
 import copy
 import gzip
+import heapq
 import itertools
 import os
 import pickle
@@ -15,20 +16,25 @@ from torch.distributions.categorical import Categorical
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/test_bits2_10.pkl.gz', type=str)
-parser.add_argument("--learning_rate", default=2e-4, help="Learning rate", type=float)
-parser.add_argument("--learning_method", default='td', type=str)
-parser.add_argument("--momentum", default=0., type=float)
+parser.add_argument("--save_path", default='results/test_bits_q_1.pkl.gz', type=str)
+parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
+parser.add_argument("--learning_method", default='is_xent_q', type=str)
+parser.add_argument("--opt", default='adam', type=str)
+parser.add_argument("--adam_beta1", default=0.9, type=float)
+parser.add_argument("--adam_beta2", default=0.999, type=float)
+parser.add_argument("--momentum", default=0.9, type=float)
 parser.add_argument("--bootstrap_tau", default=0.1, type=float)
 parser.add_argument("--mbsize", default=8, help="Minibatch size", type=int)
-parser.add_argument("--horizon", default=15, type=int)
+parser.add_argument("--horizon", default=8, type=int)
 parser.add_argument("--n_hid", default=256, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
 parser.add_argument("--n_train_steps", default=10000, type=int)
 # This is alpha in the note, smooths the learned distribution into a uniform exploratory one
 parser.add_argument("--uniform_sample_prob", default=0.05, type=float)
+parser.add_argument("--do_is_queue", action='store_true')
+parser.add_argument("--queue_thresh", default=10, type=float)
 parser.add_argument("--device", default='cpu', type=str)
-
+parser.add_argument("--progress", action='store_true')
 
 
 class BinaryTreeEnv:
@@ -129,7 +135,11 @@ def main(args):
     policy.to(dev)
     q_target = copy.deepcopy(policy)
 
-    opt = torch.optim.Adam(policy.parameters(), args.learning_rate)
+    if args.opt == 'adam':
+        opt = torch.optim.Adam(policy.parameters(), args.learning_rate,
+                               betas=(args.adam_beta1, args.adam_beta2))
+    elif args.opt == 'msgd':
+        opt = torch.optim.SGD(policy.parameters(), args.learning_rate, momentum=args.momentum)
 
     tf = lambda x: torch.FloatTensor(x).to(dev)
     tl = lambda x: torch.LongTensor(x).to(dev)
@@ -143,6 +153,7 @@ def main(args):
     num_X = all_end_states.shape[0]
 
     losses, visited, distrib_distances = [], [], []
+    ratios = []
 
     #inf = torch.tensor(np.inf).to(dev) # oops, turns out inf * 0 is
                                         # nan rather than 0, so we
@@ -151,22 +162,40 @@ def main(args):
     tau = args.bootstrap_tau
 
     do_td = args.learning_method == 'td'
-    do_isxent = args.learning_method == 'is_xent'
+    do_isxent = 'is_xent' in args.learning_method
+    do_queue = args.do_is_queue or args.learning_method == 'is_xent_q'
+    queue = []
+    queue_thresh = args.queue_thresh
+    qids = itertools.count(0) # tie breaker for entries with equal priority
 
-    for i in tqdm(range(args.n_train_steps+1)):
+    it_range = range(args.n_train_steps+1)
+    it_range = tqdm(it_range) if args.progress else it_range
+    for i in it_range:
         batch = []
         trajs = []
         for j in range(args.mbsize):
+            if do_queue and len(queue) and np.random.random() < 0.5:
+                w, qid, (s, a) = heapq.heappop(queue)
+                log_prob = torch.log_softmax(policy(s), 1)[torch.arange(a.shape[0]), a].sum(0, True)
+                if -w > 1:
+                    heapq.heappush(queue, (-(-w - 1), qid, (s, a)))
+                if -w > 1 or np.random.random() < -w:
+                    trajs.append(queue_thresh * log_prob)
+                    continue
             s = env.reset()
             done = False
             is_random = np.random.random() < alpha
             log_probs = []
+            tstates = []
+            acts = []
             while not done:
+                tstates.append(s)
                 pi = Categorical(logits=policy(tf([s])))
                 if is_random:
                     a = tl([np.random.randint(3)])
                 else:
                     a = pi.sample()
+                acts.append(a)
                 sp, r, done, _ = env.step(a.item())
                 batch.append([tf([i]) for i in (s,a,r,sp,done)])
                 log_probs.append(pi.log_prob(a))
@@ -174,7 +203,14 @@ def main(args):
             log_p_theta_x = sum(log_probs)
             smoothed_prob = (alpha / num_X  +
                              (1 - alpha) * torch.exp(log_p_theta_x)).detach()
-            trajs.append(r / smoothed_prob * log_p_theta_x)
+            rho = r / smoothed_prob
+            ratios.append((rho.item(), log_p_theta_x.item()))
+            if do_queue and rho > queue_thresh:
+                w = rho / queue_thresh - 1
+                rho = queue_thresh
+                heapq.heappush(queue, (-w.item(), next(qids), (tf(tstates), tl(acts))))
+            trajs.append(rho * log_p_theta_x)
+
 
         if do_td:
             s, a, r, sp, d = map(torch.cat, zip(*batch))
@@ -208,7 +244,9 @@ def main(args):
             k1 = abs(estimated_density - true_density).mean().item()
             # KL divergence
             kl = (true_density * torch.log(estimated_density / true_density)).sum().item()
-            print('L1 distance', k1, 'KL', kl, np.mean(losses[-100:]))
+            if args.progress:
+                print('L1 distance', k1, 'KL', kl, np.mean(losses[-100:]),
+                      len(queue) if do_queue else '')
             distrib_distances.append((k1, kl))
 
     root = os.path.split(args.save_path)[0]
@@ -219,6 +257,7 @@ def main(args):
          'est_d': estimated_density.cpu().numpy(),
          'p_dists': distrib_distances,
          'true_d': true_density.cpu().numpy(),
+         'training_ratios': np.float32(ratios),
          'args':args},
         gzip.open(args.save_path, 'wb'))
 
