@@ -32,6 +32,8 @@ class DockingOracle:
     def __call__(self, data):
         smiles = [d["smiles"] for d in data]
         dockscores = list(self.pool.map(lambda actor, smi: actor.eval.remote(smi), smiles))
+        print("dockscores in oracle", dockscores)
+
         self.logger.log.remote({
             "docking_oracle/raw_dockscore_max": np.max(dockscores),
             "docking_oracle/raw_dockscore_mean": np.mean(dockscores),
@@ -48,7 +50,7 @@ class DockingOracle:
                 # prevent fitting to these bad molecules much
             else:
                 dockscores_.append(d)
-        dockscores = [(self.mean -d) / self.std for d in dockscores] # this normalizes and flips dockscore
+        dockscores = [(self.mean -d) / self.std for d in dockscores_] # this normalizes and flips dockscore
         self.logger.log.remote({
             "docking_oracle/norm_dockscore_min": np.min(dockscores),
             "docking_oracle/norm_dockscore_mean": np.mean(dockscores),

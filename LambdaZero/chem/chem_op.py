@@ -515,7 +515,7 @@ class DockVina_smi:
                 os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
                 os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
                 os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
-        return mol_name, dockscore, coord
+        return mol_name, float(dockscore), coord
 
 
 class ScaffoldSplit:

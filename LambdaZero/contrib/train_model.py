@@ -35,5 +35,3 @@ if __name__ == "__main__":
     config["tune_config"]['config']["model_config"]["logger"] = remote_logger
     config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)
     tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))
-
-

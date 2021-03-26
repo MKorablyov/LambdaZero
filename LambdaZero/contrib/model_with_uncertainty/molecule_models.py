@@ -13,7 +13,7 @@ from LambdaZero.inputs import random_split
 from LambdaZero.contrib.inputs import ListGraphDataset
 from .model_with_uncertainty import ModelWithUncertainty
 from copy import deepcopy
-
+from .metrics import uncertainty_metrics
 def train_epoch(loader, model, optimizer, device):
     model.train()
     epoch_y = []
@@ -47,6 +47,20 @@ def val_epoch(loader, model, device):
     return {"model/val_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
 
+class EvaluateOnDatasets():
+    def __init__(self, file_names, data_idxs, logger):
+        # for file_names:
+        # self.xy.append((x, y, name)) = load_data(file_names, data_idx)
+        pass
+
+    def __call__(self, model, ):
+        # model.get_mean_and_variance()
+        # if evaluate_uncertainty()
+        # self.logger.log(uncertainty_metrics)
+        pass
+
+
+
 class MolMCDropGNN(ModelWithUncertainty):
     def __init__(self, train_epochs, batch_size, mpnn_config, lr, transform, num_mc_samples, log_epoch_metrics, device,
                  logger):
@@ -60,6 +74,19 @@ class MolMCDropGNN(ModelWithUncertainty):
         self.log_epoch_metrics = log_epoch_metrics
         self.device = device
 
+    def _preprocess(self, x):
+        graphs = [m["mol_graph"] for m in x]
+        graphs = deepcopy(graphs)
+        # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
+        # todo: I could add a separate field for processed graph to do it once for each molecule
+        if self.transform is not None: graphs = [self.transform(g) for g in graphs]
+        return graphs
+
+    def eval(self, x, y):
+        y_hat_mean, y_hat_var = self.get_mean_and_variance(x)
+        metrics = uncertainty_metrics(y, y_hat_mean, y_hat_var)
+        return metrics
+
     def fit(self,x,y):
         # initialize new model and optimizer
         model = MPNNetDrop(**self.mpnn_config)
@@ -67,11 +94,7 @@ class MolMCDropGNN(ModelWithUncertainty):
         optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 
         # from possible properties take molecule graph
-        graphs = [m["mol_graph"] for m in x]
-        graphs = deepcopy(graphs) # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
-        if self.transform is not None:
-            graphs = [self.transform(g) for g in graphs]
-
+        graphs = self._preprocess(x)
         [setattr(graphs[i],"y", torch.tensor([y[i]])) for i in range(len(graphs))]
         train_idx, val_idx = random_split(len(graphs), [0.95, 0.05])
         train_graphs = [graphs[i] for i in train_idx]
@@ -110,10 +133,7 @@ class MolMCDropGNN(ModelWithUncertainty):
         return y_hat_mc.mean(1), y_hat_mc.var(1)
 
     def get_samples(self, x, num_samples):
-        graphs = [m["mol_graph"] for m in x]
-        graphs = deepcopy(graphs) # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
-        if self.transform is not None:
-            graphs = [self.transform(g) for g in graphs]
+        graphs = self._preprocess(x)
         dataset = ListGraphDataset(graphs)
         dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list)
 

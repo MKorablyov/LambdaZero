@@ -65,5 +65,7 @@ DEFAULT_CONFIG = {
 
 model_001 = {
     "tune_config":{
-        "config": {"model_config": {"log_epoch_metrics":True}}
+        "config": {"model_config": {"log_epoch_metrics":True,
+                                    "train_epochs":75
+                                    }}
 }}
