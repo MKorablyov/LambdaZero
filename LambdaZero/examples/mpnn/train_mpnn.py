@@ -28,14 +28,14 @@ DEFAULT_CONFIG = {
     "trainer_config": {
         "target": "dockscore",
         "target_norm": [-8.6597, 1.0649],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/randsplit_Zinc20_docked_neg_randperm_250k.npy"),
         "batch_size": 96,
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
             "root": os.path.join(datasets_dir, "brutal_dock/seh"),
             "props": ["dockscore", "smiles"],
             "transform": transform,
-            "file_names": ["Zinc20_docked_neg_randperm_3k"],
+            "file_names": ["Zinc20_docked_neg_randperm_250k"],
         },
         "model": LambdaZero.models.MPNNet,
         "model_config": {},
@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
     "stop": {"training_iteration": 500},
     "resources_per_trial": {
         "cpu": 8,  # fixme - calling ray.remote would request resources outside of tune allocation
-        "gpu": 2.0
+        "gpu": 4.0
     },
     "keep_checkpoint_num": 2,
     "checkpoint_score_attr": "train_loss",

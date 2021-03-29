@@ -7,11 +7,11 @@ from LambdaZero.utils import get_external_dirs, BasicRegressor, RegressorWithSch
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 transform = LambdaZero.utils.Complete()
 
-# summary: more layers+scheduler doesn't help, 1e-3 better but fluctuates; AdamW 5e-4 > Adam 5e-4, but 1e-3 is similar
+# summary: more layers doesn't help, 1e-3 lr is better but fluctuates; AdamW 5e-4 > Adam 5e-4, but 1e-3 is similar
 # amsgrad doesn't help with Adam(W)
 # CosineAnnealingLR/CosineAnnealingWarmRestarts scheduler helps with Adam(W) + appropraite Tmax (85~100>125>250~500)
 # ReduceLROnPlateau, CyclicLR, or OneCycleLR does not help
-# egnn_001_007_30k or egnn_001_005 are the best
+# egnn_001_007_30k, egnn_001_005 are the best
 
 DEFAULT_CONFIG = {
     "trainer": BasicRegressor,
@@ -132,7 +132,7 @@ egnn_001_005 = { # Best so far for small dataset
 }
 
 
-egnn_001_007_30k = { # Best so far for larger dataset
+egnn_001_007_30k = { # Best so far for 30k dataset
     "trainer": RegressorWithSchedulerOnEpoch,
     "trainer_config": {
         "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
@@ -152,22 +152,23 @@ egnn_001_007_30k = { # Best so far for larger dataset
         "scheduler": {
             "type": torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
             "config": {
-                "T_0": 100, # 90, 250 is worse
+                "T_0": 100, # 90, 250 is worse, 85 is comparable
             },
         },
     },
 }
 
-egnn_001_011_30k = {
+egnn_001_007_250k_long = { # for 250k dataset
     "trainer": RegressorWithSchedulerOnEpoch,
     "trainer_config": {
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/randsplit_Zinc20_docked_neg_randperm_250k.npy"),
         "dataset_config": {
             "root": osp.join(datasets_dir, "brutal_dock/seh"),
             "props": ["dockscore", "smiles"],
             "transform": transform,
-            "file_names": ["Zinc20_docked_neg_randperm_30k"],
+            "file_names": ["Zinc20_docked_neg_randperm_250k"],
         },
+        "batch_size": 96,
         "optimizer": {
             "type": torch.optim.AdamW,
             "config": {
@@ -177,9 +178,9 @@ egnn_001_011_30k = {
         "scheduler": {
             "type": torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
             "config": {
-                "T_0": 85, # 90, 250 is worse
+                "T_0": 200, # 90, 250 is worse
             },
         },
     },
+    "stop": {"training_iteration": 2000},
 }
-

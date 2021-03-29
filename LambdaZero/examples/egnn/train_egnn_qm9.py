@@ -27,7 +27,9 @@ wandb.run.name = str(config_name)
 
 class MyTransform(object):  # k-NN graph, and feature and target selection.
     def __call__(self, data):
-        if config["kNN"]:
+        if config["control_exp"]:
+            data.pos = torch.randn_like(data.pos)
+        if config["kNN"]: # use pytorch if this is the case
             dist = (data.pos.view(-1, 1, 3) - data.pos.view(1, -1, 3)).norm(dim=-1)
             dist.fill_diagonal_(float('inf'))
             mask = dist <= 5.0
@@ -40,7 +42,7 @@ class MyTransform(object):  # k-NN graph, and feature and target selection.
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'QM9')
 dataset = QM9(path, transform=MyTransform()).shuffle()
 
-if config["train_dataset_size"]:
+if config["train_dataset_size"]: # determine training dataset
     train_dataset = dataset[:int(config["train_dataset_size"]*130000)]
     val_dataset = dataset[int(config["train_dataset_size"]*130000):int(config["train_dataset_size"]*1.15*130000)]
     test_dataset = dataset[int(config["train_dataset_size"]*1.15*130000):int(config["train_dataset_size"]*1.30*130000)]
@@ -55,17 +57,16 @@ test_loader = DataLoader(test_dataset, 96, num_workers=6)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if config["train_dataset_size"]: # full_size data
-    model = EGNNet(n_layers=7, feats_dim=dataset.num_node_features, pos_dim=3, edge_attr_dim=0, m_dim=128,
+    model = EGNNet(n_layers=3, feats_dim=dataset.num_node_features, pos_dim=3, edge_attr_dim=0, m_dim=128,
                    infer_edges=config['infer_edges'], settoset=config['settoset'], control_exp=config["control_exp"]).to(device)
 else: # for local machine
     model = EGNNet(n_layers=3, feats_dim=dataset.num_node_features, pos_dim=3, edge_attr_dim=0, m_dim=64,
                    infer_edges=config['infer_edges'], settoset=config['settoset'], control_exp=config["control_exp"]).to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, weight_decay=1e-16) # amsgrad=True)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3) #, weight_decay=1e-16, amsgrad=True)
 
 if config["scheduler"]:
     scheduler = config["scheduler"](optimizer, T_max=100)
-
 
 def train(loader):
     model.train()
@@ -73,8 +74,6 @@ def train(loader):
     pbar = tqdm(total=len(loader))
     for data in loader:
         optimizer.zero_grad()
-        # if config["control_exp"]: # another way to pass random positions
-        #     data.pos = torch.randn(list(data.pos.shape)[0], list(data.pos.shape)[1])
         data = data.to(device)
 
         out = model(data)
@@ -97,8 +96,6 @@ def test(loader):
     model.eval()
     total_mae = 0
     for data in loader:
-        # if config["control_exp"]:
-        #     data.pos = torch.randn(list(data.pos.shape)[0], list(data.pos.shape)[1])
         data = data.to(device)
         out = model(data)
         total_mae += (out - data.y).abs().sum().item()

@@ -12,6 +12,18 @@ egnn_qm9_1k = { # for local run
     "training_iterations": 500,
 }
 
+egnn_qm9_1k_control = { # for local run
+    "target": 1,
+    "dry_run": False,
+    "control_exp": True,
+    "scheduler": torch.optim.lr_scheduler.CosineAnnealingLR,
+    "train_dataset_size": False,
+    "infer_edges": False,
+    "settoset": False,
+    "kNN": False,
+    "training_iterations": 500,
+}
+
 egnn_qm9_all = { # for beluga
     "target": 1,
     "train_dataset_size": 0.75,
@@ -21,7 +33,7 @@ egnn_qm9_all = { # for beluga
     "infer_edges": False,
     "settoset": False,
     "kNN": False,
-    "training_iterations": 1000,
+    "training_iterations": 2000,
 }
 
 # below are all control experiments
