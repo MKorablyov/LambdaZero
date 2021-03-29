@@ -417,9 +417,10 @@ class Dock_smi:
 
 
 class GenMolFile:
-    def __init__(self, outpath, mgltools):
+    def __init__(self, outpath, mgltools, mglbin):
         self.outpath = outpath
         self.prepare_ligand4 = os.path.join(mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
+        self.mglbin = mglbin
 
         os.makedirs(os.path.join(outpath, "sdf"), exist_ok=True)
         os.makedirs(os.path.join(outpath, "mol2"), exist_ok=True)
@@ -441,7 +442,7 @@ class GenMolFile:
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
         os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
-        os.system(f"pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+        os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
         return pdbqt_file
 
 
@@ -454,17 +455,18 @@ class DockVina_smi:
                  rec_file="4jnc.nohet.aligned.pdbqt",
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
-                 cleanup=False):
+                 cleanup=True):
 
         self.outpath = outpath
         self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
+        self.mgltools_bin = os.path.join(mgltools_dir, "bin")
         self.vina_bin = os.path.join(vina_dir, "bin/vina")
         self.rec_file = os.path.join(docksetup_dir, rec_file)
         self.bindsite = bindsite
         self.dock_pars = dock_pars
         self.cleanup = cleanup
 
-        self.gen_molfile = GenMolFile(self.outpath, self.mgltools)
+        self.gen_molfile = GenMolFile(self.outpath, self.mgltools, self.mgltools_bin)
         # make vina command
         self.dock_cmd = "{} --receptor {} " \
                         "--center_x {} --center_y {} --center_z {} " \
@@ -513,7 +515,7 @@ class DockVina_smi:
                 os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
                 os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
                 os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
-        return mol_name, dockscore, coord
+        return mol_name, float(dockscore), coord
 
 
 class ScaffoldSplit:
@@ -654,7 +656,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
         if one_hot_atom:
             atmfeat[i, ntypes + 9 + atom.GetAtomicNum() - 1] = 1
         else:
-            atmfeat[i, ntypes + 1] = atom.GetAtomicNum()
+            atmfeat[i, ntypes + 1] = (atom.GetAtomicNum() % 16) / 2.
         atmfeat[i, ntypes + 4] = atom.GetIsAromatic()
         hybridization = atom.GetHybridization()
         atmfeat[i, ntypes + 5] = hybridization == HybridizationType.SP

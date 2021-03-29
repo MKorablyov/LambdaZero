@@ -16,14 +16,16 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "rlbo_001"
+else: config_name = "debug_config_v16"
 config = getattr(config_rlbo,config_name)
 config = merge_dicts(DEFAULT_CONFIG, config)
+if len(sys.argv) >=3:
+    if sys.argv[2] == "cpu": config = merge_dicts(config, config_rlbo.config_cpu)
 
-# convenience option to debug option to be able to run any config on someone's machine
+# also make it work on one GPU and less RAM when on Maksym's machine
 machine = socket.gethostname()
 if machine == "Ikarus":
-    config = merge_dicts(DEFAULT_CONFIG, config_rlbo.debug_config)
+    config = merge_dicts(config, config_rlbo.debug_config)
 
 
 if __name__ == "__main__":
@@ -34,14 +36,12 @@ if __name__ == "__main__":
             # what seems to happen is that ray jobs sometimes fail very soon after the initialization
             # same exact jobs can run for a while when initialized again. I think the issue is related to how individual
             # remote workers are allocated. Yet, I have not been able to entirely debug it. Therefore this for loop here
-
             ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
             ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
             # initialize loggers
             os.environ['WANDB_DIR'] = summaries_dir
             os.environ["WANDB_MODE"] = "dryrun"
             remote_logger = RemoteLogger.remote()
-            # this might not be needed, but added due to unsolved wandb init errors
             wandb_logger = WandbRemoteLoggerCallback(
                 remote_logger=remote_logger,
                 project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],
@@ -58,6 +58,7 @@ if __name__ == "__main__":
             scoreProxy = config["tune_config"]['config']['env_config']['reward_config']['scoreProxy']. \
                 options(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_options']). \
                 remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
+
             config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
             # run
             tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))

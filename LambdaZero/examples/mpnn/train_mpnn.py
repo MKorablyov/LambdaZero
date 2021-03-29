@@ -42,7 +42,7 @@ DEFAULT_CONFIG = {
         "optimizer": {
             "type": torch.optim.Adam,
             "config": {
-                "lr": 0.001
+                "lr": 1e-3
             }
         },
         "train_epoch": train_epoch,

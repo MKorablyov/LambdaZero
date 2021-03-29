@@ -29,7 +29,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "ppo_bayes_reward_008"
+else: config_name = "ppo_bayes_reward_debug_v2"
 config = getattr(config,config_name)
 curr_trial = config_name + time.strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -40,16 +40,14 @@ data_config = {
     "dataset_split_path": osp.join(datasets_dir,
                                 #    "brutal_dock/mpro_6lze/raw/randsplit_Zinc15_2k.npy"),
                                 #"brutal_dock/mpro_6lze/raw/randsplit_Zinc15_260k.npy"),
-                                "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+                                "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
     "dataset": LambdaZero.inputs.BrutalDock,
     "dataset_config": {
         "root": osp.join(datasets_dir, "brutal_dock/seh/raw"),
         "props": ["dockscore", "smiles"],
         "transform": T.Compose([LambdaZero.utils.Complete()]),
-        "file_names": "Zinc20_docked_neg_randperm_3k.feather",
+        "file_names": "Zinc20_docked_neg_randperm_30k.feather",
     },
-
-
     "b_size": 40,
     "target_norm": [-8.6, 1.10], # fixme use normalizer everywhere
     "normalizer": LambdaZero.utils.MeanVarianceNormalizer([-8.6, 1.10])
@@ -64,7 +62,6 @@ regressor_config = {
     "train_iterations": 72,
     "finetune_iterations": 16,
     "model": LambdaZero.models.MPNNetDrop,
-    # fixme !!!!!!!! this default model only does drop in the last layer
     "model_config": {"drop_data": False, "drop_weights": False, "drop_last": True, "drop_prob": 0.1},
     "optimizer": torch.optim.Adam,
     "optimizer_config": {
@@ -102,7 +99,7 @@ rllib_config = {
     #"tf_session_args": {"intra_op_parallelism_threads": 1, "inter_op_parallelism_threads": 1},
     #"local_tf_session_args": {"intra_op_parallelism_threads": 4, "inter_op_parallelism_threads": 4},
     "env": #BlockMolEnvGraph_v1,
-          BlockMolGraphEnv_PersistentBuffer, # fixme maybe ray.remote the buffer as well
+          BlockMolGraphEnv_PersistentBuffer, #todo maybe ray.remote the buffer as well
     "env_config": {
         "random_steps": 4,
         "allow_removal": True,
