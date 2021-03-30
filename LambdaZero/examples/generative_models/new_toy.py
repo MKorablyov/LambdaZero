@@ -53,13 +53,7 @@ class BinaryTreeEnv:
 
     def obs(self, s=None):
         s = np.int32(self._state if s is None else s)
-        print("s = ", s)
-        z = np.zeros((self.horizon, 2), dtype=np.float32)
-        print("z = ", z)
-        z[np.arange(len(s)), s] = 1
-        print("z = ", z)
-        z[len(s):, 2] = 1
-        return z.flatten()
+        return s
 
     def s2x(self, s):
         return (self.obs(s).reshape((self.horizon, 2)) * self.bitmap_mul).sum()
