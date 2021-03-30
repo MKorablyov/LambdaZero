@@ -88,10 +88,10 @@ debug_config = {
             "sgd_minibatch_size": 4,
             "env_config":{
                 "reward_config":{
-                    "actor_sync_freq":200,
+                    "actor_sync_freq":100,
                     "scoreProxy_options":{"num_cpus":1, "num_gpus":0.3},
                     "scoreProxy_config":{
-                        "update_freq": 500,
+                        "update_freq": 300,
                         "oracle_config":{"num_threads": 1,},
                         "acquirer_config":{
                             "acq_size": 2,
@@ -451,7 +451,6 @@ debug_config_v15 = {
                     }}}}}}
 
 # this will test with a different pretrain set
-# this did not run for the first time
 debug_config_v16 = {
     "tune_config":{
         "config":{
@@ -469,7 +468,7 @@ debug_config_v16 = {
                         "load_seen_config": {
                             "dataset_split_path": osp.join(datasets_dir,
                             "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
-                            "file_names": ["Zinc20_docked_neg_randperm_30k"], }
+                            "file_names": ["Zinc20_docked_neg_randperm_3k"], }
                     }}}}}}
 
 
@@ -639,6 +638,84 @@ debug_config_v24 = {
                     "scoreProxy_config": {
                         "acquirer_config": {
                             "kappa": 2.7
+                        },
+                        "load_seen_config": {
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k_debug3k.npy"),
+                            "file_names": ["Zinc20_docked_neg_randperm_30k"], }
+                    }}}}}}
+
+
+debug_config_v25 = {
+    "tune_config":{
+        "config":{
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config":{
+                "random_steps":6,
+                "reward_config":{
+                    "always_discount": False,
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa": 4
+                        },
+                        "load_seen_config": {
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k_debug3k.npy"),
+                            "file_names": ["Zinc20_docked_neg_randperm_30k"], }
+                    }}}}}}
+
+
+debug_config_v26 = {
+    "tune_config":{
+        "config":{
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config":{
+                "random_steps":6,
+                "reward_config":{
+                    "always_discount": False,
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa": 6
+                        },
+                        "load_seen_config": {
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k_debug3k.npy"),
+                            "file_names": ["Zinc20_docked_neg_randperm_30k"], }
+                    }}}}}}
+
+debug_config_v27 = {
+    "tune_config":{
+        "config":{
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config":{
+                "random_steps":6,
+                "reward_config":{
+                    "always_discount": False,
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa":2.7
+                        },
+                        "load_seen_config": {
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+                            "file_names": ["Zinc20_docked_neg_randperm_3k"], }
+                    }}}}}}
+
+debug_config_v28 = {
+    "tune_config":{
+        "config":{
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config":{
+                "random_steps":6,
+                "reward_config":{
+                    "always_discount": True,
+                    "scoreProxy_config":{
+                        "acquirer_config":{
+                            "kappa":2.7
                         },
                         "load_seen_config": {
                             "dataset_split_path": osp.join(datasets_dir,
