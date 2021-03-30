@@ -35,7 +35,7 @@ def sync_wandb(logs_path, since_sec):
         if since_logged_time < since_sec:
             print("syncing", logs_path)
             threading.Thread(target=_sync_wandb_dir, args=(logs_path, run)).start()
-            time.sleep(1) # sleep 1 second to prevent being blocked by google_api wandb is using
+            time.sleep(10) # sleep 1 second to prevent being blocked by google_api wandb is using
 
 
 if __name__ == "__main__":
@@ -43,8 +43,8 @@ if __name__ == "__main__":
         since_sec = int(sys.argv[1])
     else:
         since_sec = 600
-    #while True:
-    sync_wandb(osp.join(summaries_dir,"RLBO6"),since_sec)
+    #while True: in practice it seems syncing recurrently would make wandb to
+    sync_wandb(osp.join(summaries_dir,"RLBO7"),since_sec)
     # todo: in order to sync recurrently I think the right way would
     print("synced all runs sleeping", 0.5 * since_sec)
     #time.sleep(0.5 * since_sec)

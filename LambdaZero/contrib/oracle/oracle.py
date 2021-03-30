@@ -32,17 +32,12 @@ class DockingOracle:
     def __call__(self, data):
         smiles = [d["smiles"] for d in data]
         dockscores = list(self.pool.map(lambda actor, smi: actor.eval.remote(smi), smiles))
-        print("dockscores in oracle", dockscores)
-
-        self.logger.log.remote({
-            "docking_oracle/raw_dockscore_max": np.max(dockscores),
-            "docking_oracle/raw_dockscore_mean": np.mean(dockscores),
-            "docking_oracle/raw_dockscore_min": np.min(dockscores)})
-
         dockscores_ = []
+        num_failures = 0
         for d in dockscores:
             if d == None:
                 dockscores_.append(self.mean) # mean from Zinc on failures
+                num_failures+=1
             elif d > self.mean + 3*self.std:
                 dockscores_.append(self.mean + 3*self.std) # cap at 3 stds at worst
                 # docking could result in steric clashes with huge positive energies; in order to prevent failures in
@@ -52,6 +47,7 @@ class DockingOracle:
                 dockscores_.append(d)
         dockscores = [(self.mean -d) / self.std for d in dockscores_] # this normalizes and flips dockscore
         self.logger.log.remote({
+            "docking_oracle/failure_probability": num_failures/float(len(dockscores)),
             "docking_oracle/norm_dockscore_min": np.min(dockscores),
             "docking_oracle/norm_dockscore_mean": np.mean(dockscores),
             "docking_oracle/norm_dockscore_max": np.max(dockscores)})

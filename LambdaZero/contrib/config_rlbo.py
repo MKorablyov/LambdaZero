@@ -451,6 +451,7 @@ debug_config_v15 = {
                     }}}}}}
 
 # this will test with a different pretrain set
+# this did not run for the first time
 debug_config_v16 = {
     "tune_config":{
         "config":{
@@ -479,7 +480,6 @@ debug_config_v17 = {
             "entropy_coeff": 1e-3,
             "env_config":{
                 "random_steps":6,
-
                 "reward_config":{
                     "always_discount": False,
                     "scoreProxy_config":{
@@ -512,6 +512,7 @@ debug_config_v18 = {
                     }}}}}}
 
 debug_config_v19 = {
+    # this did not run for the first time
     "tune_config":{
         "config":{
             "lr": 5e-5,
