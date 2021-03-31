@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--save_path", default='results/test_bits_q_1.pkl.gz', type=str)
 parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
-parser.add_argument("--learning_method", default='is_xent_q', type=str)
+parser.add_argument("--learning_method", default='td', type=str)
 parser.add_argument("--opt", default='adam', type=str)
 parser.add_argument("--adam_beta1", default=0.9, type=float)
 parser.add_argument("--adam_beta2", default=0.999, type=float)
@@ -87,31 +87,75 @@ class BinaryTreeEnv:
                  for i in itertools.product(*[[[1,0,0],[0,1,0]]]*L))
             for L in range(self.horizon+1)], []
         )
+        # print("all_bitseqs= ")
+        # print(all_bitseqs)
+        # print("all_bitseqs shape = ", all_bitseqs.shape)
         # all action sequences
         all_act_seqs = sum([
             list(list(i) + ([2] if L < self.horizon else [])
                  for i in itertools.product(*[[0,1]]*L))
             for L in range(self.horizon+1)], []
         )
+        # print("all action sequences = ")
+        # print(all_act_seqs)
+        # print("all_act_seqs shape = ", all_act_seqs.shape)
         # xs corresponding to bit sequences
+        # print("self.bitmap_mul = ")
+        # print(self.bitmap_mul)
         all_xs = (np.float32(all_bitseqs) * self.bitmap_mul[None]).sum((1,2))
+        # print("all_xs = ")
+        # print(all_xs)
         all_bitseqs, all_xs, all_act_seqs = (
             zip(*sorted(zip(all_bitseqs, all_xs, all_act_seqs), key=lambda x:x[1])))
+
         all_bitseqs = np.float32(all_bitseqs)
         all_xs = np.float32(all_xs)
+
+        print("********** After zipping *********** ")
+        print("all_bitseqs= ")
+        print(all_bitseqs)
+        print("all_bitseqs shape = ", all_bitseqs.shape)
+        print("all action sequences = ")
+        print(all_act_seqs)
+        # print("all action sequences shape = ", all_act_seqs.shape)
+        print("all_xs = ")
+        print(all_xs)
+        print("all_xs shape = ", all_xs.shape)
+
+
         smap = dict(zip(all_xs, range(len(all_xs))))
+        print("smap = ")
+        print(smap)
         # This is to help us compute the index_add in compute_all_probs
         # to compute p_theta(x) for all xs.
         # The flattened sequence of state index in each trajectory
         all_idx_trajs = [smap[(self.bitmap_mul[:k]*i[:k]).sum()]
                          for i, j in zip(all_bitseqs, all_act_seqs)
                          for k in range(len(j))]
+
+        print("all_idx_trajs = ")
+        print(all_idx_trajs)
         # The index of each trajectory
         all_traj_idxs = [[j]*len(i) for j,i in enumerate(all_act_seqs)]
+        print("all_traj_idxs = ")
+        print(all_traj_idxs)
+
         # Vectorized
         a = torch.cat(list(map(torch.LongTensor, all_act_seqs)))
         u = torch.LongTensor(all_idx_trajs)
         v = torch.cat(list(map(torch.LongTensor, all_traj_idxs)))
+
+        print("************* Vectorized stuff ******************")
+        print("a: all_act_seqs = ")
+        print(a)
+        print("a shape = ", a.shape)
+        print("u: all_idx_Trajs = ")
+        print(u)
+        print("u shape = ", u.shape)
+        print("v: all_traj_idxs = ")
+        print(v)
+        print("v shape = ", v.shape)
+
         def compute_all_probs(policy_for_all_states):
             """computes p(x) given pi(a|s) for all s"""
             dev = policy_for_all_states.device
@@ -171,6 +215,7 @@ def main(args):
     it_range = range(args.n_train_steps+1)
     it_range = tqdm(it_range) if args.progress else it_range
     for i in it_range:
+        print(i)
         batch = []
         trajs = []
         for j in range(args.mbsize):
@@ -220,7 +265,10 @@ def main(args):
             q = policy(s)
             with torch.no_grad(): qp = q_target(sp)
             next_q = qp * (1-d).unsqueeze(1) + d.unsqueeze(1) * (-loginf)
-            target = torch.logsumexp(torch.cat([torch.log(r).unsqueeze(1), next_q], 1), 1)
+            # print("r shape = ", r.shape)
+            # print("next_q shape = ", next_q.shape)
+            target, _ = torch.max(torch.cat([torch.log(r).unsqueeze(1), next_q], 1), 1)
+            # print("target shape = ", target.shape)
             loss = (q[torch.arange(q.shape[0]), a] - target).pow(2).mean()
 
         elif do_isxent:
