@@ -8,6 +8,7 @@ from LambdaZero.contrib.reward import ProxyReward, ProxyRewardSparse
 from LambdaZero.contrib.oracle import DockingOracle
 from LambdaZero.contrib.inputs import temp_load_data_v1
 from ray.rllib.agents.ppo import PPOTrainer
+from ray.rllib.agents.impala import ImpalaTrainer
 from LambdaZero.contrib.loggers import log_episode_info
 
 import LambdaZero.utils
@@ -118,6 +119,13 @@ config_cpu = {
 
 
 rlbo_001 = {}
+
+rlbo_impala = {
+    "tune_config": {
+        "run_or_experiment": ImpalaTrainer,
+    },
+}
+
 rlbo_002 = {
     "tune_config":{
         "config":{
