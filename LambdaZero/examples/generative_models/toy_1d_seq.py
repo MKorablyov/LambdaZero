@@ -134,12 +134,19 @@ def main(args):
     policy = make_mlp([args.horizon * 3] + [args.n_hid] * args.n_layers + [3])
     policy.to(dev)
     q_target = copy.deepcopy(policy)
-
-    if args.opt == 'adam':
-        opt = torch.optim.Adam(policy.parameters(), args.learning_rate,
-                               betas=(args.adam_beta1, args.adam_beta2))
-    elif args.opt == 'msgd':
-        opt = torch.optim.SGD(policy.parameters(), args.learning_rate, momentum=args.momentum)
+    if args.learning_method == "l1" or args.learning_method == "l2":
+        c = torch.randn(1, requires_grad=True)
+        if args.opt == 'adam':
+            opt = torch.optim.Adam(list(policy.parameters()) + [c], args.learning_rate,
+                                betas=(args.adam_beta1, args.adam_beta2))
+        elif args.opt == 'msgd':
+            opt = torch.optim.SGD(list(policy.parameters()) + [c], args.learning_rate, momentum=args.momentum)
+    else:
+        if args.opt == 'adam':
+            opt = torch.optim.Adam(policy.parameters(), args.learning_rate,
+                                betas=(args.adam_beta1, args.adam_beta2))
+        elif args.opt == 'msgd':
+            opt = torch.optim.SGD(policy.parameters(), args.learning_rate, momentum=args.momentum)
 
     tf = lambda x: torch.FloatTensor(x).to(dev)
     tl = lambda x: torch.LongTensor(x).to(dev)
@@ -164,6 +171,9 @@ def main(args):
     do_td = args.learning_method == 'td'
     do_isxent = 'is_xent' in args.learning_method
     do_queue = args.do_is_queue or args.learning_method == 'is_xent_q'
+    do_l1 = args.learning_method == 'l1'
+    do_l2 = args.learning_method == 'l2'
+
     queue = []
     queue_thresh = args.queue_thresh
     qids = itertools.count(0) # tie breaker for entries with equal priority
@@ -225,6 +235,10 @@ def main(args):
 
         elif do_isxent:
             loss = -torch.cat(trajs).mean()
+        elif do_l1:
+            loss = torch.abs(torch.exp(log_p_theta_x) - c * r).mean()
+        elif do_l2:
+            loss = torch.pow(torch.exp(log_p_theta_x) - c * r, 2).mean()
 
         loss.backward()
         opt.step()
