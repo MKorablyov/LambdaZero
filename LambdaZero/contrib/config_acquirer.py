@@ -1,5 +1,5 @@
 import os.path as osp
-from config_model import model_config
+from LambdaZero.contrib.config_model import model_config
 from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 import LambdaZero.utils
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()

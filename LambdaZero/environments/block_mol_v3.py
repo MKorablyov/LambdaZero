@@ -11,7 +11,7 @@ import LambdaZero.chem
 import LambdaZero.utils
 from .molMDP import MolMDP
 from .reward import PredDockReward, PredDockReward_v2
-
+import traceback
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 synth_config = {
@@ -140,7 +140,6 @@ class BlockMolEnv_v3:
             "num_steps": Discrete(n=self.max_steps + 1),
             "action_mask": Box(low=0, high=1, shape=(num_actions,)),
         })
-
         self.reward = config["reward"](**config["reward_config"])
         self.get_fps = LambdaZero.chem.FPEmbedding_v2(**config["obs_config"])
         self._prev_obs = None
@@ -199,20 +198,21 @@ class BlockMolEnv_v3:
             self.step(action)
             obs, graph = self._make_obs()
             if self._if_terminate():
+                print("bad molecule init: resetting MDP")
                 self.molMDP.reset()
-        if self.molMDP.molecule is None: self.reset() # reset if molecule is/was empty
-        try: # try if the molecule does not produce valid smiles
+        try:
+            assert self.molMDP.molecule is not None, "molecule is None"
+            # try if the molecule produces valid smiles string
             self.molMDP.molecule.smiles
         except Exception as e:
             print("initialized environment with invalid molecule", e)
-            self.reset()
-
+            return self.reset()
         self.num_steps = 0
         return obs
 
     def step(self, action):
         if not action in np.where(self._prev_obs["action_mask"])[0]:
-            raise ValueError('Illegal actions')
+            raise ValueError('illegal action:', action, "available", np.sum(self._prev_obs["action_mask"]))
 
         if (action == 0):
             agent_stop = True

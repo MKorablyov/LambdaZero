@@ -221,7 +221,6 @@ def tpnn_transform(data):
     data.rel_vec = _rel_vectors(data.pos, data.edge_index)
     data.abs_distances = data.rel_vec.norm(dim=1)
     data.rel_vec = torch.nn.functional.normalize(data.rel_vec, p=2, dim=-1)
-
     return data
 
 

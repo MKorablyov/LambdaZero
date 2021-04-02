@@ -78,9 +78,9 @@ for i in range(5):
 samples_val = np.stack(samples_val,axis=1)
 sele_idx = np.argmax(samples_val, axis=0)
 
-print(samples_val.max())
+#print(samples_val.max())
 
-print(sele_idx.shape)
+#print(sele_idx.shape)
 
 sele_x = x_val_[sele_idx]
 sele_preds = [(samples_val[:,i])[int(sele_idx[i])] for i in range(samples_val.shape[1])]

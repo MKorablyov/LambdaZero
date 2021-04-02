@@ -6,7 +6,7 @@ import torch
 from torch_geometric.utils import remove_self_loops
 from rdkit.Chem import AllChem
 import pickle as pk
-
+from copy import deepcopy
 
 def get_external_dirs():
     """Locate in the filesystem external programs/folders essential for LambdaZero execution
@@ -71,6 +71,7 @@ class MeanVarianceNormalizer:
 
 class Complete(object):
     def __call__(self, data):
+
         device = data.edge_index.device
 
         row = torch.arange(data.num_nodes, dtype=torch.long, device=device)
