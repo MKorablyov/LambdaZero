@@ -48,7 +48,12 @@ class ProxyReward:
             reward = proxy_dock * clip_qed * clip_synth
         else:
             reward = proxy_dock
-        info = {"proxy_dock": proxy_dock,
+
+        info = {
+            "molecule_num_blocks": len(molecule.jbond_atmidxs),
+            "molecule_num_branches":len(molecule.stems),
+            "molecule_num_atoms":molecule.slices[-1],
+            "proxy_dock": proxy_dock,
                 "proxy_dock_mean": actor_info["mean"][0],
                 "proxy_dock_var": actor_info["var"][0],
                 "synth_score": synth_score, "qed_score":qed,
@@ -63,6 +68,7 @@ class ProxyRewardSparse(ProxyReward):
     def __call__(self, molecule, agent_stop, env_stop, num_steps):
         if agent_stop or env_stop:
             reward, info = ProxyReward.eval(self, molecule)
+            info["ended_on_env_stop"] = float(env_stop)
         else:
             reward, info = 0.0, {}
         return reward, info
