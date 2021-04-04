@@ -810,7 +810,6 @@ debug_config_v32 = {
                 "max_blocks": 10,
                 "max_atoms": 75,
                 "max_branches": 40,
-
              "molMDP_config": {
                  "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"), # more blocks
                  },
