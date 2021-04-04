@@ -22,16 +22,9 @@ class Actor(nn.Module):
         self.horizon = horizon
 
     def forward(self, state):
-        print("state shape = ", state.shape)
-        print("state[:,self.particle_size:] = ", state[:,self.particle_size:].shape)
         time_out = F.relu(self.time_embedding(state[:,self.particle_size:]))
-        # time_out = F.relu(self.time_embedding(state[self.particle_size:, :]))
-        # particle_out = F.relu(self.particle_embedding(state[:self.particle_size, :]))
         particle_out = F.relu(self.particle_embedding(state[:, :self.particle_size]))
-        print("time out shape = ", time_out.shape)
-        print("particle out shape = ", particle_out.shape)
         state = torch.cat((time_out, particle_out), 1)
-        print("after: state shape = ", state.shape)
         a = F.relu(self.l1(state))
         a = F.relu(self.l2(a))
         return self.max_action * torch.tanh(self.l3(a))

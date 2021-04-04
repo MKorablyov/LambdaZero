@@ -61,13 +61,9 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    # state_dim = env.state.shape[0]
-    # action_dim = env.obs.shape[0]
-    # max_action = float(env.action_space.high[0])
     state_dim = 12
     action_dim = 4
     max_action = 1.0
-    # max_action = np.array([1.0, 1.0, 1.0, 1.0])
 
     kwargs = {
         "state_dim": state_dim,
@@ -77,8 +73,6 @@ if __name__ == "__main__":
         "tau": args.tau,
     }
 
-    # print("policy noise shape = ", args.policy_noise.shape)
-    # print("max action shape = ", max_action.shape)
     kwargs["policy_noise"] = args.policy_noise * max_action
     kwargs["noise_clip"] = args.noise_clip * max_action
     kwargs["policy_freq"] = args.policy_freq

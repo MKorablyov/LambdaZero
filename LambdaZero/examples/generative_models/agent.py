@@ -49,9 +49,6 @@ class TD3(object):
 
         with torch.no_grad():
             # Select action according to policy and add clipped noise
-            print("noise clip = ", self.noise_clip)
-            print("action = ", action)
-            print("action shape = ", action.shape)
             noise = (
                     torch.randn_like(action) * self.policy_noise
             ).clamp(-self.noise_clip, self.noise_clip)
