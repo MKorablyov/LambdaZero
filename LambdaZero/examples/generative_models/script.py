@@ -4,7 +4,7 @@ import copy
 from itertools import count
 import torch
 import tqdm
-def array_mar_30():
+def array_apr_03():
     cnt = count(0)
     args = [
         {'learning_rate': lr,
@@ -22,7 +22,7 @@ def array_mar_30():
         for method in ['td']]
     return args
 torch.set_num_threads(2)
-toy.parser.add_argument('--array', default='mar_30')
+toy.parser.add_argument('--array', default='apr_03')
 args = toy.parser.parse_args()
 all_args = []
 for i in eval('array_'+args.array)():
