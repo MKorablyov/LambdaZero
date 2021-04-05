@@ -2,14 +2,15 @@
 Systematic generalization 
 Scaffold-based split IE: KNN in the fingerprint space
 Independent dataset ChEMBL with experimental data
-Include optional dock pose in training
+Flag: Include optional dock pose in training
 
 ### Model
-Nequip model (exact implementation)
-PNA
-Channel Mixing
-Hierarchical 
+Nequip model (exact implementation)  
+PNA  
+Channel Mixing  
+Hierarchical   
 Hierarchical (clusters are building blocks) + order messages in higher group 
+Hierarchical -> substructure counting
 E3NN
 Tensor Product
 Directional MPNN (aggregation order)
@@ -30,6 +31,4 @@ learn docking pose as well
 There is no feedback from docking 3D to the RL algo; at smallest GNN could predict some atom features related to binding; 
 maybe xyz coordinates
 learn poses from only energies (link). We could eventually train a full docking algorithm but coarse-grained to the
-junction tree. 
-
-
+junction tree.
