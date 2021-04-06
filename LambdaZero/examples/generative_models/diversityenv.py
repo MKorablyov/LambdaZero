@@ -5,6 +5,8 @@ import heapq
 import itertools
 import os
 import pickle
+import sklearn
+import sklearn.metrics
 
 import numpy as np
 from scipy.stats import norm
@@ -69,7 +71,9 @@ class DiversityEnv(object):
         return self.state
 
     def get_diversity_reward(self, state):
-        return 0
+        diversity_mat = sklearn.metrics.pairwise_distances(state.copy())
+        reward = np.sum(np.concatenate(diversity_mat))
+        return reward
 
     def get_scoring_reward(self, obs):
         obs = obs.copy().squeeze(1)
