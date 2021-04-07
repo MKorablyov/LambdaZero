@@ -9,13 +9,15 @@ from LambdaZero.contrib.oracle import DockingOracle
 from LambdaZero.contrib.inputs import temp_load_data_v1
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.impala import ImpalaTrainer
+from ray.rllib.agents.dqn import DQNTrainer
+from ray.rllib.agents.dqn import ApexTrainer
 from LambdaZero.contrib.loggers import log_episode_info
 
 import LambdaZero.utils
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-from config_model import load_seen_config
-from config_acquirer import oracle_config, acquirer_config
+from LambdaZero.contrib.config_model import load_seen_config
+from LambdaZero.contrib.config_acquirer import oracle_config, acquirer_config
 
 
 proxy_config = {
@@ -120,9 +122,48 @@ config_cpu = {
 
 rlbo_001 = {}
 
+rlbo_001_lr0 = {"tune_config": {"config": {"lr": 0., "env_config": {"random_steps": 2}}}}
+rlbo_001_e1 = {"tune_config": {"config": {"entropy_coeff": 1e-1, "env_config": {"random_steps": 2}}}}
+rlbo_001_e2 = {"tune_config": {"config": {"entropy_coeff": 1e-2, "env_config": {"random_steps": 2}}}}
+rlbo_001_e3 = {"tune_config": {"config": {"entropy_coeff": 1e-3, "env_config": {"random_steps": 2}}}}
+rlbo_001_e4 = {"tune_config": {"config": {"entropy_coeff": 1e-4, "env_config": {"random_steps": 2}}}}
+rlbo_001_e5 = {"tune_config": {"config": {"entropy_coeff": 1e-5, "env_config": {"random_steps": 2}}}}
+
 rlbo_impala = {
     "tune_config": {
         "run_or_experiment": ImpalaTrainer,
+        "config": {
+            "env_config": {"random_steps": 2},
+            "num_workers": 4,
+            "num_gpus_per_worker": 0.15,
+            "num_gpus": 1.0,
+        }
+
+    },
+}
+
+rlbo_dqn = {
+    "tune_config": {
+        "run_or_experiment": DQNTrainer,
+        "config": {
+            "env_config": {"random_steps": 2},
+            "hiddens": [],
+            "dueling": False,
+        }
+
+    },
+}
+
+rlbo_apex = {
+    "tune_config": {
+        "run_or_experiment": ApexTrainer,
+        "config": {
+            "num_workers": 8,
+            "num_gpus_per_worker": 0.15,
+            "num_gpus": 1.0,
+            "hiddens": [],
+            "dueling": False,
+        }
     },
 }
 
