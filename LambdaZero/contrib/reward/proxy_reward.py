@@ -53,6 +53,7 @@ class ProxyReward:
                 "proxy_dock_var": actor_info["var"][0],
                 "synth_score": synth_score, "qed_score":qed,
                 "clip_qed": clip_qed, "clip_synth": clip_synth}
+        info.update(actor_info)
         return reward, info
 
     def __call__(self, molecule, agent_stop, env_stop, num_steps):

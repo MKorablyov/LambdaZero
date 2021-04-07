@@ -7,6 +7,7 @@ class Proxy:
         self.update_freq = update_freq
         self.proposed_x, self.proposed_d, self.proposed_acq = proposed_x, proposed_d, proposed_acq
         self.logger = logger
+        self._model_id = 0
 
     def propose_x(self,x, d, acq):
         """
@@ -26,6 +27,7 @@ class Proxy:
             #self.proposed_x, self.proposed_d, self.proposed_acq = [], [], []
             self.acquire_and_update(self.proposed_x, self.proposed_d, self.proposed_acq)
             self.proposed_x, self.proposed_d, self.proposed_acq = [], [], []
+            self._model_id += 1
         return None
 
     def acquire_and_update(self, proposed_x, proposed_d, proposed_acq):
@@ -37,6 +39,9 @@ class Proxy:
     def get_model(self):
         raise NotImplementedError
 
+    def get_model_id(self):
+        return self._model_id
+
 
 class Actor():
     def __init__(self, scoreProxy, actor_sync_freq):
@@ -46,6 +51,8 @@ class Actor():
         self.num_calls = 0
         self.acquisition_func = ray.get(scoreProxy.get_acquisition_func.remote())
         self.names = []
+        self._acq_update_id = 0
+        self._model_id = ray.get(self.scoreProxy.get_model_id.remote())
 
     def __call__(self, x, d):
         # compute acquisition value
@@ -59,4 +66,11 @@ class Actor():
         if self.num_calls % self.sync_freq==1:
             # todo - need to figure out to do non-blocking calls here
             self.acquisition_func = ray.get(self.scoreProxy.get_acquisition_func.remote())
+            self._model_id = ray.get(self.scoreProxy.get_model_id.remote())
+
+            self._acq_update_id += 1
+
+        info["acq_update_id"] = self._acq_update_id
+        info["model_id"] = self._model_id
+
         return acq, info

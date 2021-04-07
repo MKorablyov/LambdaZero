@@ -29,6 +29,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
     def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kw):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
+
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         self.max_steps = obs_space.original_space["num_steps"].n
         self.num_blocks = model_config['custom_model_config'].get("num_blocks", 135)
@@ -37,7 +38,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         rnd_output_dim = model_config['custom_model_config'].get("rnd_output_dim", 1)
         self.rnd_adv_weight = model_config['custom_model_config'].get("rnd_adv_weight", 1.0)
         self.rnd_vf_loss_weight = model_config['custom_model_config'].get("rnd_vf_loss_weight", 1.0)
-
 
         self.space = obs_space.original_space['mol_graph']
         self.model = MPNNet_Parametric(self.space.num_node_feat,
@@ -101,15 +101,16 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
             break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
 
             actor_logits = torch.cat([stop_logit,
-                                      add_logits,
-                                      break_logits], 1)
+                                      break_logits,
+                                      add_logits], 1)
 
             # mask not available actions
             masked_actions = (1. - action_mask).to(torch.bool)
-            actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
+            actor_logits[masked_actions] = -np.inf  # -np.inf for DQN  # some very small prob that does not lead to inf
             self._value_out = scalar_outs[:, 0]
             if self.rnd:
                 self._value_int = scalar_outs[:, 2]
+
         return actor_logits, state
 
     def value_function(self):
