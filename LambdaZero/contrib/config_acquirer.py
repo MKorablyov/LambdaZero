@@ -4,6 +4,11 @@ from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 import LambdaZero.utils
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
+# Candidate Molecule hard thresholds for logs
+# Should be fixed in order to be able to compare runs across different training configs
+LOG_CANDIDATE_QED_SCORE = 0.5
+LOG_CANDIDATE_SYNTH_SCORE = 4.
+
 acquirer_config = {
     "model": MolMCDropGNN,
     "model_config": model_config,
