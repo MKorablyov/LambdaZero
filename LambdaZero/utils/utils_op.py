@@ -188,7 +188,6 @@ def molecule_pca(mol):
     return log_vals
 
 
-    
 def logP(mu, sigma, x):
     """
     Estimate log likelihood of an estimator
@@ -198,6 +197,7 @@ def logP(mu, sigma, x):
     :return:
     """
     return (-np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) **2))
+
 
 def dataset_creator_v1(config):
     # make dataset
@@ -209,4 +209,3 @@ def dataset_creator_v1(config):
     train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
     val_loader = DataLoader(val_set, batch_size=config["b_size"])
     return train_loader, val_loader
-

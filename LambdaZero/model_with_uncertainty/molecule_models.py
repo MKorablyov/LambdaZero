@@ -12,6 +12,7 @@ from LambdaZero.models import MPNNetDrop
 from LambdaZero.inputs import random_split
 from LambdaZero.contrib.inputs import ListGraphDataset
 from LambdaZero.contrib.model_with_uncertainty import ModelWithUncertainty
+from copy import deepcopy
 
 
 def train_epoch(loader, model, optimizer, device):
@@ -30,10 +31,6 @@ def train_epoch(loader, model, optimizer, device):
         epoch_y_hat.append(y_hat[:,0].detach().cpu().numpy())
     epoch_y = np.concatenate(epoch_y,0)
     epoch_y_hat = np.concatenate(epoch_y_hat, 0)
-
-    for i in range(len(epoch_y)):
-        if isclose(float(epoch_y[i]), 5.1818, rel_tol=1e-2):
-            print("epoch good molecule y, pred", epoch_y[i], epoch_y_hat[i])
     return {"model/train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
 
@@ -51,24 +48,43 @@ def val_epoch(loader, model, device):
     return {"model/val_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
 
 
+def get_mcdrop_var_batch(model, data, num_mc_samples):
+    y_hat_mc = []
+    for i in range(num_mc_samples):
+        y_hat_epoch = []
+        y_hat_batch = model(data, do_dropout=True)[:, 0]
+        y_hat_epoch.append(y_hat_batch.detach().cpu().numpy())
+        y_hat_mc.append(np.concatenate(y_hat_epoch, 0))
+    y_hat_mc = np.stack(y_hat_mc, 1)
+    return y_hat_mc.mean(1), y_hat_mc.var(1)
+
+
 class MolMCDropGNN(ModelWithUncertainty):
-    def __init__(self, train_epochs, batch_size, num_mc_samples, device, logger):
+    def __init__(self, train_epochs, batch_size, mpnn_config, lr, transform, num_mc_samples, log_epoch_metrics, device,
+                   logger):
         ModelWithUncertainty.__init__(self, logger)
         self.train_epochs = train_epochs
         self.batch_size = batch_size
+        self.mpnn_config = mpnn_config
+        self.lr = lr
+        self.transform = transform
         self.num_mc_samples = num_mc_samples
+        self.log_epoch_metrics = log_epoch_metrics
         self.device = device
 
     def fit(self,x,y):
         # initialize new model and optimizer
-        model = MPNNetDrop(True, False, True, 0.1, 14)
+        model = MPNNetDrop(**self.mpnn_config)
         model.to(self.device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 
-        # from many possible properties take molecule graph
+        # from possible properties take molecule graph
         graphs = [m["mol_graph"] for m in x]
+        graphs = deepcopy(graphs) # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
+        if self.transform is not None:
+            graphs = [self.transform(g) for g in graphs]
 
-        [setattr(graphs[i],"y", torch.tensor([y[i]])) for i in range(len(graphs))] # this will modify graphs
+        [setattr(graphs[i],"y", torch.tensor([y[i]])) for i in range(len(graphs))]
         train_idx, val_idx = random_split(len(graphs), [0.95, 0.05])
         train_graphs = [graphs[i] for i in train_idx]
         val_graphs = [graphs[i] for i in val_idx]
@@ -80,21 +96,25 @@ class MolMCDropGNN(ModelWithUncertainty):
         val_loader = DataLoader(val_set, batch_size=self.batch_size, collate_fn=Batch.from_data_list, shuffle=False)
 
         for i in range(self.train_epochs):
-            metrics = train_epoch(train_loader, model, optimizer, self.device)
-            self.logger.log.remote(metrics)
-            metrics = val_epoch(val_loader, model, self.device)
-            self.logger.log.remote(metrics)
+            train_metrics = train_epoch(train_loader, model, optimizer, self.device)
+            val_metrics = val_epoch(val_loader, model, self.device)
+            if self.log_epoch_metrics:
+                self.logger.log.remote(train_metrics)
+                self.logger.log.remote(val_metrics)
+
+        # todo: log some general convergence only
+        self.logger.log.remote(train_metrics)
+        self.logger.log.remote(val_metrics)
         # update internal copy of the model
-        [delattr(graphs[i], "y") for i in range(len(graphs))]
         model.eval()
         self.model = model
 
     def update(self, x, y, x_new, y_new):
         mean, var = self.get_mean_and_variance(x_new)
-        self.logger.log.remote({"model/mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
+        self.logger.log.remote({"model/acquired_mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
         self.fit(x+x_new, y+y_new)
         mean, var = self.get_mean_and_variance(x_new)
-        self.logger.log.remote({"model/mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
+        self.logger.log.remote({"model/acquired_mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
         return None
 
     def get_mean_and_variance(self,x):
@@ -103,6 +123,9 @@ class MolMCDropGNN(ModelWithUncertainty):
 
     def get_samples(self, x, num_samples):
         graphs = [m["mol_graph"] for m in x]
+        graphs = deepcopy(graphs) # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
+        if self.transform is not None:
+            graphs = [self.transform(g) for g in graphs]
         dataset = ListGraphDataset(graphs)
         dataloader = DataLoader(dataset, batch_size=self.batch_size,collate_fn=Batch.from_data_list)
 
