@@ -27,7 +27,6 @@ class ProxyUCB(Proxy):
             "proxy/acquired_acq_max": np.max(acq),
             "proxy/acquired_acq_min": np.min(acq),
 
-
             "proxy/acquired_y_mean": np.mean(y),
             "proxy/acquired_y_max": np.max(y),
             "proxy/acquired_y_min": np.min(y)
