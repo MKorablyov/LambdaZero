@@ -183,6 +183,8 @@ def main(args):
     for i in it_range:
         batch = []
         trajs = []
+        rs = []
+        probs = []
         for j in range(args.mbsize):
             if do_queue and len(queue) and np.random.random() < 0.5:
                 w, qid, (s, a) = heapq.heappop(queue)
@@ -193,6 +195,8 @@ def main(args):
                     trajs.append(queue_thresh * log_prob)
                     continue
             s = env.reset()
+            print(s.shape)
+            import pdb;pdb.set_trace();
             done = False
             is_random = np.random.random() < alpha
             log_probs = []
@@ -220,7 +224,8 @@ def main(args):
                 rho = queue_thresh
                 heapq.heappush(queue, (-w.item(), next(qids), (tf(tstates), tl(acts))))
             trajs.append(rho * log_p_theta_x)
-
+            rs.append(tf([r]))
+            probs.append(torch.exp(log_p_theta_x))
 
         if do_td:
             s, a, r, sp, d = map(torch.cat, zip(*batch))
@@ -236,9 +241,9 @@ def main(args):
         elif do_isxent:
             loss = -torch.cat(trajs).mean()
         elif do_l1:
-            loss = torch.abs(torch.exp(log_p_theta_x) - c * r).mean()
+            loss = torch.abs(torch.cat(probs) - c * torch.cat(rs)).mean()
         elif do_l2:
-            loss = torch.pow(torch.exp(log_p_theta_x) - c * r, 2).mean()
+            loss = torch.pow(torch.cat(probs) - c * torch.cat(rs), 2).mean()
 
         loss.backward()
         opt.step()
