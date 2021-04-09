@@ -135,7 +135,7 @@ def main(args):
     policy.to(dev)
     q_target = copy.deepcopy(policy)
     if args.learning_method == "l1" or args.learning_method == "l2":
-        c = torch.randn(1, requires_grad=True)
+        c = torch.zeros(1, requires_grad=True)
         if args.opt == 'adam':
             opt = torch.optim.Adam(list(policy.parameters()) + [c], args.learning_rate,
                                 betas=(args.adam_beta1, args.adam_beta2))
@@ -159,7 +159,7 @@ def main(args):
     alpha = args.uniform_sample_prob
     num_X = all_end_states.shape[0]
 
-    losses, visited, distrib_distances = [], [], []
+    losses, visited, distrib_distances, all_cs = [], [], [], []
     ratios = []
 
     #inf = torch.tensor(np.inf).to(dev) # oops, turns out inf * 0 is
@@ -183,8 +183,7 @@ def main(args):
     for i in it_range:
         batch = []
         trajs = []
-        rs = []
-        probs = []
+        batch_log_probs = []
         for j in range(args.mbsize):
             if do_queue and len(queue) and np.random.random() < 0.5:
                 w, qid, (s, a) = heapq.heappop(queue)
@@ -223,9 +222,8 @@ def main(args):
                 w = rho / queue_thresh - 1
                 rho = queue_thresh
                 heapq.heappush(queue, (-w.item(), next(qids), (tf(tstates), tl(acts))))
-            trajs.append(rho * log_p_theta_x)
-            rs.append(tf([r]))
-            probs.append(torch.exp(log_p_theta_x))
+            trajs.append((rho, log_p_theta_x, r))
+
 
         if do_td:
             s, a, r, sp, d = map(torch.cat, zip(*batch))
@@ -239,11 +237,14 @@ def main(args):
             loss = (q[torch.arange(q.shape[0]), a] - target).pow(2).mean()
 
         elif do_isxent:
-            loss = -torch.cat(trajs).mean()
+            loss = -torch.cat([i[0] * i[1] for i in trajs]).mean()
         elif do_l1:
-            loss = torch.abs(torch.cat(probs) - c * torch.cat(rs)).mean()
+            log_p_theta_x = torch.cat([i[1] for i in trajs])
+            r = tf([i[2] for i in trajs])            loss = torch.abs(torch.exp(log_p_theta_x) - c * r).mean()
         elif do_l2:
-            loss = torch.pow(torch.cat(probs) - c * torch.cat(rs), 2).mean()
+            log_p_theta_x = torch.cat([i[1] for i in trajs])
+            r = tf([i[2] for i in trajs])
+            loss = torch.pow(torch.exp(log_p_theta_x) - c * r, 2).mean()
 
         loss.backward()
         opt.step()
@@ -263,6 +264,8 @@ def main(args):
             k1 = abs(estimated_density - true_density).mean().item()
             # KL divergence
             kl = (true_density * torch.log(estimated_density / true_density)).sum().item()
+            if do_l1 or do_l2:
+                all_cs.append(c.item())
             if args.progress:
                 print('L1 distance', k1, 'KL', kl, np.mean(losses[-100:]),
                       len(queue) if do_queue else '')
@@ -277,6 +280,7 @@ def main(args):
          'p_dists': distrib_distances,
          'true_d': true_density.cpu().numpy(),
          'training_ratios': np.float32(ratios),
+         'learned_cs': all_cs,
          'args':args},
         gzip.open(args.save_path, 'wb'))
 
