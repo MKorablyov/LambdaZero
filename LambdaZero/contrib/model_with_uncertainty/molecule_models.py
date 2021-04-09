@@ -73,6 +73,7 @@ class MolMCDropGNN(ModelWithUncertainty):
         self.num_mc_samples = num_mc_samples
         self.log_epoch_metrics = log_epoch_metrics
         self.device = device
+        self._istep = 0
 
     def _preprocess(self, x):
         graphs = [m["mol_graph"] for m in x]
@@ -122,9 +123,31 @@ class MolMCDropGNN(ModelWithUncertainty):
 
     def update(self, x, y, x_new, y_new):
         mean, var = self.get_mean_and_variance(x_new)
+
+        # ==========================================================================================
+        # -- Log actual values
+        data = {
+            "before_mean": mean.copy(),
+            "before_var": var.copy(),
+            "target": y_new.copy()
+        }
+        # ==========================================================================================
+
         self.logger.log.remote({"model/acquired_mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
         self.fit(x+x_new, y+y_new)
         mean, var = self.get_mean_and_variance(x_new)
+
+        # ==========================================================================================
+        # -- Log actual values
+        data["after_mean"] = mean
+        data["after_var"] = var
+        out_path = "/home/andrein/scratch/Summaries/debug/30k_acq_model_pred"
+        print(out_path)
+        torch.save(data, f"{out_path}_{self._istep}")
+        print("SAVE ------")
+        self._istep += 1
+        # ==========================================================================================
+
         self.logger.log.remote({"model/acquired_mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
         return None
 
