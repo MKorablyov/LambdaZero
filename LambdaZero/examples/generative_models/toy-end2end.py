@@ -42,6 +42,7 @@ class UCB:
 
 
 def main(args):
+    # Main Loop
     init_data = get_init_data(args, TEST_FUNC)
     init_x, init_y = tf(init_data[:, 0]).unsqueeze(-1), tf(init_data[:, 1])
     for loss in ["td", "is_xent", "l1", "l2"]:
@@ -55,13 +56,12 @@ def main(args):
             likelihood.eval()
             func = UCB(model, 0.1)
             policy = train_generative_model(args, func)
-
             dataset = generate_batch(args, policy, dataset)
-
             model, likelihood = update_proxy(args, dataset)
 
 
 def get_init_data(args, func):
+    # Generate initial data to train proxy
     env = BinaryTreeEnv(args.horizon, func=func)
     all_inputs, true_r, all_end_states, compute_p_of_x = env.all_possible_states()
     data = np.dstack((all_end_states, true_r))
@@ -70,7 +70,11 @@ def get_init_data(args, func):
     init_data = data[0][:args.num_init_points]
     return init_data
 
+
 def generate_batch(args, policy, dataset):
+    # Sample data from trained policy, given dataset. 
+    # Currently only naively samples data and adds to dataset, but should ideally also 
+    # have a diversity constraint based on existing dataset
     env = BinaryTreeEnv(args.horizon, func=TEST_FUNC)
     sampled_x, sampled_y = [], []
     for _ in range(args.num_samples):
@@ -84,8 +88,8 @@ def generate_batch(args, policy, dataset):
     return (x, y)
 
 
-
 def update_proxy(args, data):
+    # Train proxy(GP) on collected data
     train_x, train_y = data
     
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
@@ -93,19 +97,12 @@ def update_proxy(args, data):
     model.train()
     likelihood.train()   
     
-    # Use the adam optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
-
-    # "Loss" for GPs - the marginal log likelihood
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
     for i in range(args.proxy_training_iter):
-        # Zero gradients from previous iteration
         optimizer.zero_grad()
-        # Output from model
         output = model(train_x)
-        # import pdb; pdb.set_trace();
-        # Calc loss and backprop gradients
         loss = -mll(output, train_y)
         loss.backward()
         print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
@@ -118,13 +115,12 @@ def update_proxy(args, data):
 
 
 def train_generative_model(args, func):
+    # Train policy using the generative loss, with the given acquisition function
     env = BinaryTreeEnv(args.horizon, func=func)
-
     policy, q_target, opt, c = initialize_generative_model(args)
 
     all_inputs, true_r, all_end_states, compute_p_of_x = env.all_possible_states()
     true_density = tf(true_r / true_r.sum())
-
 
     # The chance of having a random episode
     alpha = args.uniform_sample_prob
@@ -132,8 +128,6 @@ def train_generative_model(args, func):
 
     losses, visited, distrib_distances = [], [], []
     ratios = []
-
-    loginf = torch.tensor(1000).to(dev)
     tau = args.bootstrap_tau
 
     do_queue = args.do_is_queue or args.learning_method == 'is_xent_q'
@@ -184,23 +178,23 @@ def train_generative_model(args, func):
             for _a,b in zip(policy.parameters(), q_target.parameters()):
                 b.data.mul_(1-tau).add_(tau*_a)
 
-        if not i % 50:
-            with torch.no_grad():
-                pi_a_s = torch.softmax(policy(tf(all_inputs)), 1)
-                estimated_density = compute_p_of_x(pi_a_s)
-            # L1 distance
-            k1 = abs(estimated_density - true_density).mean().item()
-            # KL divergence
-            kl = (true_density * torch.log(estimated_density / true_density)).sum().item()
-            if args.progress:
-                print('L1 distance', k1, 'KL', kl, np.mean(losses[-100:]),
-                      len(queue) if do_queue else '')
-            distrib_distances.append((k1, kl))
-
+        # if not i % 50:
+        #     with torch.no_grad():
+        #         pi_a_s = torch.softmax(policy(tf(all_inputs)), 1)
+        #         estimated_density = compute_p_of_x(pi_a_s)
+        #     # L1 distance
+        #     k1 = abs(estimated_density - true_density).mean().item()
+        #     # KL divergence
+        #     kl = (true_density * torch.log(estimated_density / true_density)).sum().item()
+        #     if args.progress:
+        #         print('L1 distance', k1, 'KL', kl, np.mean(losses[-100:]),
+        #               len(queue) if do_queue else '')
+        #     distrib_distances.append((k1, kl))
     return policy
 
 
 def initialize_generative_model(args):
+    # Initialize params, etc for generative model training
     policy = make_mlp([args.horizon * 3] + [args.n_hid] * args.n_layers + [3])
     policy.to(dev)
     q_target = copy.deepcopy(policy)
@@ -223,6 +217,7 @@ def initialize_generative_model(args):
 
 
 def run_episode(env, args, policy):
+    # Run a single episode with given policy
     s = env.reset()
     done = False
     is_random = np.random.random() < args.uniform_sample_prob
@@ -246,6 +241,7 @@ def run_episode(env, args, policy):
 
 
 def get_loss(loss, **kwargs):
+    # Compute loss for updating generative model
     if loss == "td":
         batch, policy, q_target = kwargs['batch'], kwargs['policy'], kwargs['q_target']
         s, a, r, sp, d = map(torch.cat, zip(*batch))
