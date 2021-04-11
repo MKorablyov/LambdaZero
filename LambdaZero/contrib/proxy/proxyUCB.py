@@ -32,6 +32,7 @@ class ProxyUCB(Proxy):
             "proxy/acquired_y_min": np.min(y)
         }])
         self.UCB.update_with_seen(self.seen_x, self.seen_y, x, y)
+        self.seen_x, self.seen_y = self.seen_x + x, self.seen_y + y
         return None
 
     def get_acquisition_func(self):

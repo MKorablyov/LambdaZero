@@ -50,6 +50,7 @@ def collate(data_list):
         slices[key] = torch.tensor(slices[key], dtype=torch.long)
     return data, slices
 
+
 def separate(data_, slices_):
     num_graphs = len([x for x in slices_.values()][0])-1
     data_list = []
@@ -71,10 +72,14 @@ def separate(data_, slices_):
         data_list.append(data)
     return data_list
 
+
 @ray.remote
-def obs_from_smi(smi):
+def obs_from_smi(smi,):
     molecule = BlockMoleculeData()
     molecule._mol = Chem.MolFromSmiles(smi)
+    # fixme this does not allow me to change default molecule encoding/decoding parameters
+    # config['obs_config'], self.max_branches, self.max_blocks-1
+
     graph, _ = GraphMolObs()(molecule)
     return graph
 

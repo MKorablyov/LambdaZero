@@ -128,12 +128,12 @@ class MolMCDropGNN(ModelWithUncertainty):
     def update(self, x, y, x_new, y_new):
         mean, var = self.get_mean_and_variance(x_new)
         self.logger.log.remote({"model/acquired_mse_before_update":((np.array(y_new) - np.array(mean))**2).mean(),
-                                "model/explained_variance_before_update": explained_variance_score(y_new, mean)
+                                "model/acquired_expvar_before_update": explained_variance_score(y_new, mean)
                                 })
         self.fit(x+x_new, y+y_new)
         mean, var = self.get_mean_and_variance(x_new)
         self.logger.log.remote({"model/acquired_mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean(),
-                                "model/explained_variance_after_update": explained_variance_score(y_new, mean)
+                                "model/acquired_expvar_after_update": explained_variance_score(y_new, mean)
                                 })
         return None
 
