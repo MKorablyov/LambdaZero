@@ -194,8 +194,6 @@ def main(args):
                     trajs.append(queue_thresh * log_prob)
                     continue
             s = env.reset()
-            print(s.shape)
-            import pdb;pdb.set_trace();
             done = False
             is_random = np.random.random() < alpha
             log_probs = []
@@ -240,7 +238,8 @@ def main(args):
             loss = -torch.cat([i[0] * i[1] for i in trajs]).mean()
         elif do_l1:
             log_p_theta_x = torch.cat([i[1] for i in trajs])
-            r = tf([i[2] for i in trajs])            loss = torch.abs(torch.exp(log_p_theta_x) - c * r).mean()
+            r = tf([i[2] for i in trajs])            
+            loss = torch.abs(torch.exp(log_p_theta_x) - c * r).mean()
         elif do_l2:
             log_p_theta_x = torch.cat([i[1] for i in trajs])
             r = tf([i[2] for i in trajs])

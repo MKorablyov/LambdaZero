@@ -13,6 +13,9 @@ import torch
 import gpytorch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
+import matplotlib.pyplot as plt
+from botorch.fit import fit_gpytorch_model
+from botorch.models import SingleTaskGP
 
 from toy_1d_seq import BinaryTreeEnv, make_mlp
 
@@ -21,7 +24,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -43,75 +46,94 @@ class UCB:
 
 def main(args):
     # Main Loop
-    init_data = get_init_data(args, TEST_FUNC)
+    init_data, all_x, all_y = get_init_data(args, TEST_FUNC)
     init_x, init_y = tf(init_data[:, 0]).unsqueeze(-1), tf(init_data[:, 1])
+    exp_name = args.exp_name
+    if not os.path.exists(args.save_path):
+        os.mkdir(args.save_path)
     for loss in ["td", "is_xent", "l1", "l2"]:
-        dataset = (init_x, init_y)
-        model, likelihood = update_proxy(args, dataset)
+        distrib_distances = []
+        base_path = os.path.join(args.save_path, loss)
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
 
+        exp_path = os.path.join(base_path, exp_name)
+        if not os.path.exists(exp_path):
+            os.mkdir(exp_path)
+
+        dataset = (init_x, init_y)
+        model = update_proxy(args, dataset)
+        
         args.learning_method = loss
 
         for i in range(args.num_iter):
             model.eval()
-            likelihood.eval()
+            torch.save(dataset, os.path.join(exp_path, f"dataset-aq-{i}.pth"))
             func = UCB(model, 0.1)
+            plot_model(path=os.path.join(exp_path, f'{i}-model.png'), model=model,
+                        all_x=all_x, all_y=all_y, train_x=dataset[0], train_y=dataset[1], title=f"Proxy at step: {i}")
             policy = train_generative_model(args, func)
-            dataset = generate_batch(args, policy, dataset)
-            model, likelihood = update_proxy(args, dataset)
+            dataset, metrics = generate_batch(args, policy, dataset, i, exp_path)
+            distrib_distances.append(metrics)
+            model = update_proxy(args, dataset)
+        
+            
+        pickle.dump(
+            {
+                'p_dists': distrib_distances,
+                'args':args
+            },
+            gzip.open(os.path.join(exp_path, "result.gz"), 'wb'))
 
 
 def get_init_data(args, func):
     # Generate initial data to train proxy
     env = BinaryTreeEnv(args.horizon, func=func)
     all_inputs, true_r, all_end_states, compute_p_of_x = env.all_possible_states()
-    data = np.dstack((all_end_states, true_r))
+    data = np.dstack((all_end_states, true_r))[0]
 
     np.random.shuffle(data)
-    init_data = data[0][:args.num_init_points]
-    return init_data
+    init_data = data[:args.num_init_points]
+    return init_data, tf(all_end_states), tf(true_r)
 
 
-def generate_batch(args, policy, dataset):
+def generate_batch(args, policy, dataset, it, exp_path):
     # Sample data from trained policy, given dataset. 
     # Currently only naively samples data and adds to dataset, but should ideally also 
     # have a diversity constraint based on existing dataset
     env = BinaryTreeEnv(args.horizon, func=TEST_FUNC)
+    all_inputs, true_r, all_end_states, compute_p_of_x = env.all_possible_states()
+
+    true_density = tf(true_r / true_r.sum())
+    with torch.no_grad():
+        pi_a_s = torch.softmax(policy(tf(all_inputs)), 1)
+        estimated_density = compute_p_of_x(pi_a_s)
+    # L1 distance
+    k1 = abs(estimated_density - true_density).mean().item()
+    # KL divergence
+    kl = (true_density * torch.log(estimated_density / true_density)).sum().item()
+
     sampled_x, sampled_y = [], []
     for _ in range(args.num_samples):
         hist, r, log_probs, acts, tstates = run_episode(env, args, policy)
         sampled_x.append([(tstates[-1].reshape((env.horizon, 3)) * env.bitmap_mul).sum()])
-        sampled_y.append(r)
-    
+        sampled_y.append(r)    
     x, y = dataset
+
+    plot_fn(path=os.path.join(exp_path, f"{it}-aq.png"), all_x=tf(all_end_states), all_y=tf(true_r), 
+            train_x=x, train_y=y, batch_x=sampled_x, batch_y=sampled_y, title=f"Points acquired at step {it}")
     x = torch.cat([x, tf(sampled_x)])
     y = torch.cat([y, tf(sampled_y)])
-    return (x, y)
+    return (x, y), (k1, kl)
 
 
 def update_proxy(args, data):
     # Train proxy(GP) on collected data
     train_x, train_y = data
-    
-    likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    model = ExactGPModel(train_x, train_y, likelihood)
-    model.train()
-    likelihood.train()   
-    
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
-    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-
-    for i in range(args.proxy_training_iter):
-        optimizer.zero_grad()
-        output = model(train_x)
-        loss = -mll(output, train_y)
-        loss.backward()
-        print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
-            i + 1, args.proxy_training_iter, loss.item(),
-            model.covar_module.base_kernel.lengthscale.item(),
-            model.likelihood.noise.item()
-        ))
-        optimizer.step()
-    return model, likelihood
+    model = SingleTaskGP(train_x, train_y.unsqueeze(-1))
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+    fit_gpytorch_model(mll)
+    return model
 
 
 def train_generative_model(args, func):
@@ -178,18 +200,6 @@ def train_generative_model(args, func):
             for _a,b in zip(policy.parameters(), q_target.parameters()):
                 b.data.mul_(1-tau).add_(tau*_a)
 
-        # if not i % 50:
-        #     with torch.no_grad():
-        #         pi_a_s = torch.softmax(policy(tf(all_inputs)), 1)
-        #         estimated_density = compute_p_of_x(pi_a_s)
-        #     # L1 distance
-        #     k1 = abs(estimated_density - true_density).mean().item()
-        #     # KL divergence
-        #     kl = (true_density * torch.log(estimated_density / true_density)).sum().item()
-        #     if args.progress:
-        #         print('L1 distance', k1, 'KL', kl, np.mean(losses[-100:]),
-        #               len(queue) if do_queue else '')
-        #     distrib_distances.append((k1, kl))
     return policy
 
 
@@ -264,9 +274,55 @@ def get_loss(loss, **kwargs):
         loss = torch.pow(torch.cat(probs) - c * torch.cat(rs), 2).mean()
     return loss
 
+
+def plot_fn(path, **kwargs):
+    fig = plt.figure()
+    ax = fig.gca()
+    
+    if "train_x" in kwargs.keys():
+        train_x, train_y = kwargs['train_x'], kwargs['train_y']
+        ax.plot(train_x.numpy(), train_y.numpy(), 'go', label='training points')
+    if "batch_x" in kwargs.keys():
+        batch_x, batch_y = kwargs['batch_x'], kwargs['batch_y']
+        ax.plot(batch_x, batch_y, 'bx', label='acquired points')
+    if "all_x" in kwargs.keys():
+        all_x, all_y =  kwargs["all_x"], kwargs["all_y"]
+        ax.plot(all_x.numpy(), all_y.numpy(), '--', label='true_fn')
+    ax.set_title(kwargs["title"])
+    ax.legend()
+    plt.savefig(path)
+    plt.close(fig)
+    
+    
+def plot_model(path, **kwargs):   
+    fig = plt.figure()
+    ax = fig.gca()
+    
+    if "all_x" in kwargs.keys():
+        all_x, all_y =  kwargs["all_x"], kwargs["all_y"]
+        ax.plot(all_x, all_y, '--', label='true_fn')
+    if "train_x" in kwargs.keys():
+        train_x, train_y = kwargs['train_x'], kwargs['train_y']
+        ax.plot(train_x, train_y, 'k*', label='training points')
+    if "model" in kwargs.keys():
+        model = kwargs["model"]
+        out = model(all_x)
+        mean = out.mean
+        std = torch.sqrt(out.variance)
+        with torch.no_grad():
+            lower, upper = mean + std, mean - std
+            ax.plot(all_x.numpy(), mean.numpy(), 'b', label='Mean')
+            ax.fill_between(all_x.numpy(), lower.numpy(), upper.numpy(), alpha=0.5, label='Confidence')
+    ax.set_title(kwargs["title"])
+    ax.legend()
+    plt.savefig(path)
+    plt.close(fig)
+
+
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/test_bits_q_1.pkl.gz', type=str)
+parser.add_argument("--save_path", default='results/', type=str)
+parser.add_argument("--exp_name", default='test', type=str)
 parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
 parser.add_argument("--learning_method", default='is_xent_q', type=str)
 parser.add_argument("--opt", default='adam', type=str)
@@ -279,10 +335,9 @@ parser.add_argument("--horizon", default=8, type=int)
 parser.add_argument("--n_hid", default=256, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
 parser.add_argument("--n_train_steps", default=10000, type=int)
-parser.add_argument("--num_init_points", default=256, type=int)
-parser.add_argument("--proxy_training_iter", default=100, type=int)
-parser.add_argument("--num_iter", default=100, type=int)
-parser.add_argument("--num_samples", default=32, type=int)
+parser.add_argument("--num_init_points", default=64, type=int)
+parser.add_argument("--num_iter", default=10, type=int)
+parser.add_argument("--num_samples", default=8, type=int)
 # This is alpha in the note, smooths the learned distribution into a uniform exploratory one
 parser.add_argument("--uniform_sample_prob", default=0.05, type=float)
 parser.add_argument("--do_is_queue", action='store_true')
