@@ -77,24 +77,6 @@ class ProxyRewardSparse(ProxyReward):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class DummyReward:
     def __init__(self, **kwargs):
         self.qed_oracle = QEDOracle(num_threads=1)

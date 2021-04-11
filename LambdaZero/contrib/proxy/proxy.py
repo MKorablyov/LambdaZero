@@ -53,7 +53,7 @@ class Actor():
         acq, info = self.acquisition_func.acquisition_value(x)
 
         # send molecule to the remote proxy
-        self.scoreProxy.propose_x.remote(x, d, acq)
+        self.scoreProxy.propose_x.remote(deepcopy(x), float(d), float(acq))
 
         # sync weights with proxy if needed
         if self.num_calls % self.sync_freq==1:
