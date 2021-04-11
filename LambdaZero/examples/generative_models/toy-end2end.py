@@ -281,10 +281,10 @@ def plot_fn(path, **kwargs):
     
     if "train_x" in kwargs.keys():
         train_x, train_y = kwargs['train_x'], kwargs['train_y']
-        ax.plot(train_x.numpy(), train_y.numpy(), 'go', label='training points')
+        ax.plot(train_x.numpy(), train_y.numpy(), 'k*', label='training points')
     if "batch_x" in kwargs.keys():
         batch_x, batch_y = kwargs['batch_x'], kwargs['batch_y']
-        ax.plot(batch_x, batch_y, 'bx', label='acquired points')
+        ax.plot(batch_x, batch_y, 'ro', label='acquired points')
     if "all_x" in kwargs.keys():
         all_x, all_y =  kwargs["all_x"], kwargs["all_y"]
         ax.plot(all_x.numpy(), all_y.numpy(), '--', label='true_fn')
