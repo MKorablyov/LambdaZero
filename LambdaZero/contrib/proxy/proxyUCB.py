@@ -16,7 +16,13 @@ class ProxyUCB(Proxy):
         self.oracle = oracle(**oracle_config)
 
     def acquire_and_update(self, proposed_x, proposed_d, proposed_acq):
-        x, d, acq, info = self.UCB.acquire_batch(proposed_x, proposed_d, proposed_acq)
+        #x, d, acq, info = self.UCB.acquire_batch(proposed_x, proposed_d, proposed_acq) fixme - this is temporary
+        fake_x = self.seen_x[:1000]
+        fake_d = [1. for _ in fake_x]
+        fake_acq = [1. for _ in fake_x]
+        x, d, acq, info = self.UCB.acquire_batch(fake_x, fake_d, fake_acq)
+        #self.seen_x,
+
         y = self.oracle(x)
         self.logger.log.remote([{
             "proxy/proposed_acq_mean": np.mean(proposed_acq),
