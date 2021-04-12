@@ -11,7 +11,7 @@ import pandas as pd
 from itertools import repeat, product
 
 from LambdaZero.environments import BlockMoleculeData, GraphMolObs
-
+from LambdaZero.contrib import functional
 
 def collate(data_list):
     r"""Collates a python list of data objects to the internal storage
@@ -79,20 +79,16 @@ def obs_from_smi(smi,):
     molecule._mol = Chem.MolFromSmiles(smi)
     # fixme this does not allow me to change default molecule encoding/decoding parameters
     # config['obs_config'], self.max_branches, self.max_blocks-1
-
     graph, _ = GraphMolObs()(molecule)
     return graph
 
-def temp_load_data_v1(mean, std, dataset_split_path, raw_path, proc_path, file_names):
-
+def temp_load_data_v1(mean, std, act_y, dataset_split_path, raw_path, proc_path, file_names):
     if not all([osp.exists(osp.join(proc_path, file_name + ".pt")) for file_name in file_names]):
         print("processing graphs from smiles")
         if not osp.exists(proc_path): os.makedirs(proc_path)
-
         for file_name in file_names:
             docked_index = pd.read_feather(osp.join(raw_path, file_name + ".feather"))
             y = list(((mean - docked_index["dockscore"].to_numpy(dtype=np.float32)) / std))
-
             smis = docked_index["smiles"].tolist()
             graphs = ray.get([obs_from_smi.remote(smi) for smi in smis])
             # save graphs
@@ -109,6 +105,9 @@ def temp_load_data_v1(mean, std, dataset_split_path, raw_path, proc_path, file_n
         graphs = separate(data, slices)
         graph_list.extend(graphs)
         y_list.extend(y)
+
+    # apply soft negatives
+    y_list = act_y(y_list)
 
     # split into train test sets
     train_idxs, val_idxs, _ = np.load(dataset_split_path, allow_pickle=True)
