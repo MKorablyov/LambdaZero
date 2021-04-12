@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 # from LambdaZero.models.torch_graph_models import MPNNet_Parametric, fast_from_data_list
 from torch_geometric.data import Batch
 from ray.tune.integration.wandb import wandb_mixin
-import wandb
+import LambdaZero
 from LambdaZero.models import MPNNetDrop
 from LambdaZero.contrib.inputs import ListGraphDataset
 from LambdaZero.inputs import random_split
@@ -19,11 +19,12 @@ from LambdaZero.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.model_with_uncertainty.molecule_models import train_epoch, val_epoch, get_mcdrop_var_batch
 from LambdaZero.contrib.model_with_uncertainty import ModelWithUncertainty
 from LambdaZero.model_with_uncertainty.density_estimator import probability_for_batch
-from LambdaZero.utils.utils_op import pearson_correlation, log_likelihood
 from LambdaZero.model_with_uncertainty.metrics import uncertainty_metrics, scatter_plot
 from sklearn.model_selection import KFold
 from copy import deepcopy
 import math
+
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 def train_deup_epoch(loader, e_model, e_optimizer, feature_to_deup, device):
@@ -179,7 +180,7 @@ class MolMCDropGNNDeup(ModelWithUncertainty):
             y = [i for i, m in zip(y, valid_masks) if m == True]
             [setattr(x[i]["mol_graph"], "density", torch.tensor([densities[i]])) for i in
              range(len(x))]  # this will modify graphs
-
+            self.valid_masks = valid_masks
         # from many possible properties take molecule graph
         graphs = [m["mol_graph"] for m in x]
         graphs = deepcopy(graphs)
@@ -209,26 +210,26 @@ class MolMCDropGNNDeup(ModelWithUncertainty):
         self.logger.log.remote(val_deup_metrics)
 
     def eval(self, x, y):
-        y_hat_mean, deup_error, valid_masks = self.get_mean_and_variance(x)
-        y = [i for i, m in zip(y, valid_masks) if m == True]
-        y_hat_mean = [i for i, m in zip(y_hat_mean, valid_masks) if m == True]
+        y_hat_mean, deup_error = self.get_mean_and_variance(x)
+        y = [i for i, m in zip(y, self.valid_masks) if m == True]
+        y_hat_mean = [i for i, m in zip(y_hat_mean, self.valid_masks) if m == True]
         metrics = uncertainty_metrics(np.abs(np.array(y) - y_hat_mean)**2, deup_error)
         return metrics
 
     def update(self, x, y, x_new, y_new):
-        mean, var, _ = self.get_mean_and_variance(x_new)
+        mean, var = self.get_mean_and_variance(x_new)
         self.logger.log.remote({"model/mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
         self.fit(x+x_new, y+y_new)
-        mean, var, _ = self.get_mean_and_variance(x_new)
+        mean, var = self.get_mean_and_variance(x_new)
         self.logger.log.remote({"model/mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
         return None
 
     def get_mean_and_variance(self, x):
         y_hat_mc = self.get_samples(x, num_samples=self.num_mc_samples)
-        ep_error, valid_masks = self.get_deup_error_samples(x)
+        ep_error = self.get_deup_error_samples(x)
         self.logger.log.remote({"model/var_deup": ep_error, "model/var_mcdrop": y_hat_mc.var(1)})
 
-        return y_hat_mc.mean(1), ep_error, valid_masks
+        return y_hat_mc.mean(1), ep_error
 
     def get_samples(self, x, num_samples):
         graphs = [m["mol_graph"] for m in x]
@@ -247,7 +248,7 @@ class MolMCDropGNNDeup(ModelWithUncertainty):
         return y_hat_mc
 
     def posterior(self, x, observation_noise=False):
-        mean_m, variance_m, _ = self.get_mean_and_variance(x)
+        mean_m, variance_m = self.get_mean_and_variance(x)
         if observation_noise:
             pass
 
@@ -275,18 +276,19 @@ class MolMCDropGNNDeup(ModelWithUncertainty):
             # drop invalid inputs
             x = [i for i, m in zip(x, valid_masks) if m == True]
             [setattr(x[i]["mol_graph"], "density", torch.tensor([densities[i]])) for i in range(len(x))]
-
+        else:
+            valid_masks = [True] * len(x)
+        self.valid_masks = valid_masks
         graphs = [m["mol_graph"] for m in x]
         dataset = ListGraphDataset(graphs)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=Batch.from_data_list)
         e_hat_epoch = []
-        valid_masks = [True]*len(graphs)
         for data in dataloader:
             # import pdb; pdb.set_trace()
             data.to(self.device)
             # todo: find a better way to compute mcdropout var for a batch
             mcdrop_var = get_mcdrop_var_batch(self.model, data, self.num_mc_samples)[1]
-            if self.feature_to_deup is 'xb':
+            if self.feature_to_deup == 'xb':
                 e_hat = self.e_model(data, do_dropout=False, out_sample=1)
             else:
                 deup_input = []
@@ -299,9 +301,9 @@ class MolMCDropGNNDeup(ModelWithUncertainty):
                 deup_input = torch.transpose(torch.tensor(deup_input), 0, 1)
 
                 e_hat = self.e_model(deup_input.to(self.device))
-            e_hat_epoch.append(e_hat.detach().cpu().numpy())
-
-        return np.concatenate(e_hat_epoch, 0), valid_masks
+            e_hat_epoch.append(e_hat.detach().cpu().numpy().ravel())
+        # import pdb; pdb.set_trace()
+        return np.concatenate(e_hat_epoch, 0)
 
     def get_lstm_densities(self, x, load_densities):
         if not load_densities:
@@ -314,14 +316,14 @@ class MolMCDropGNNDeup(ModelWithUncertainty):
                 d, val_mask = probability_for_batch(data, self.device)
                 densities += d.detach().cpu().numpy().tolist()
                 valid_masks += val_mask
-            np.save(f'/home/nekoeiha/tmp/densities_split_Zinc20_docked_neg_randperm_30k.npy',
+                np.save(f'{summaries_dir}densities_split_Zinc20_docked_neg_randperm_30k.npy',
                     np.array(densities))
-            np.save(f'/home/nekoeiha/tmp/valid_masks_split_Zinc20_docked_neg_randperm_30k.npy',
+            np.save(f'{summaries_dir}valid_masks_split_Zinc20_docked_neg_randperm_30k.npy',
                     np.array(valid_masks))
         else:
-            densities = np.load(f'/home/nekoeiha/tmp/densities_split_Zinc20_docked_neg_randperm_30k.npy').tolist()
+            densities = np.load(f'{summaries_dir}densities_split_Zinc20_docked_neg_randperm_30k.npy').tolist()
             valid_masks = np.load(
-                f'/home/nekoeiha/tmp/valid_masks_split_Zinc20_docked_neg_randperm_30k.npy').tolist()
+                f'{summaries_dir}valid_masks_split_Zinc20_docked_neg_randperm_30k.npy').tolist()
 
         return densities, valid_masks
 
