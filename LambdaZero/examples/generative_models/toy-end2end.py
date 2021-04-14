@@ -19,19 +19,6 @@ from botorch.models import SingleTaskGP
 
 from toy_1d_seq import BinaryTreeEnv, make_mlp
 
-        
-class ExactGPModel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood):
-        super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
-        self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())
-
-    def forward(self, x):
-        mean_x = self.mean_module(x)
-        covar_x = self.covar_module(x)
-        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
-
-
 class UCB:
     def __init__(self, model, kappa):
         self.model = model
@@ -46,7 +33,8 @@ class UCB:
 
 def main(args):
     # Main Loop
-    init_data, all_x, all_y = get_init_data(args, TEST_FUNC)
+    init_data, all_end_states, true_r, compute_p_of_x, all_inputs, env = get_init_data(args, TEST_FUNC)
+    all_x, all_y = tf(all_end_states), tf(true_r)
     init_x, init_y = tf(init_data[:, 0]).unsqueeze(-1), tf(init_data[:, 1])
     exp_name = args.exp_name
     if not os.path.exists(args.save_path):
@@ -73,7 +61,8 @@ def main(args):
             plot_model(path=os.path.join(exp_path, f'{i}-model.png'), model=model,
                         all_x=all_x, all_y=all_y, train_x=dataset[0], train_y=dataset[1], title=f"Proxy at step: {i}")
             policy = train_generative_model(args, func)
-            dataset, metrics = generate_batch(args, policy, dataset, i, exp_path)
+            dataset, metrics = generate_batch(args, policy, dataset, i, exp_path, 
+                                                env, all_inputs, true_r, all_end_states, compute_p_of_x)
             distrib_distances.append(metrics)
             model = update_proxy(args, dataset)
         
@@ -94,16 +83,13 @@ def get_init_data(args, func):
 
     np.random.shuffle(data)
     init_data = data[:args.num_init_points]
-    return init_data, tf(all_end_states), tf(true_r)
+    return init_data, all_end_states, true_r, compute_p_of_x, all_inputs, env 
 
 
-def generate_batch(args, policy, dataset, it, exp_path):
+def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r, all_end_states, compute_p_of_x):
     # Sample data from trained policy, given dataset. 
     # Currently only naively samples data and adds to dataset, but should ideally also 
     # have a diversity constraint based on existing dataset
-    env = BinaryTreeEnv(args.horizon, func=TEST_FUNC)
-    all_inputs, true_r, all_end_states, compute_p_of_x = env.all_possible_states()
-
     true_density = tf(true_r / true_r.sum())
     with torch.no_grad():
         pi_a_s = torch.softmax(policy(tf(all_inputs)), 1)
@@ -130,7 +116,8 @@ def generate_batch(args, policy, dataset, it, exp_path):
 def update_proxy(args, data):
     # Train proxy(GP) on collected data
     train_x, train_y = data
-    model = SingleTaskGP(train_x, train_y.unsqueeze(-1))
+    model = SingleTaskGP(train_x, train_y.unsqueeze(-1), 
+                         covar_module=gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=0.5, lengthscale_prior=gpytorch.priors.GammaPrior(0.5, 2.5))))
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
     return model
@@ -141,12 +128,9 @@ def train_generative_model(args, func):
     env = BinaryTreeEnv(args.horizon, func=func)
     policy, q_target, opt, c = initialize_generative_model(args)
 
-    all_inputs, true_r, all_end_states, compute_p_of_x = env.all_possible_states()
-    true_density = tf(true_r / true_r.sum())
-
     # The chance of having a random episode
     alpha = args.uniform_sample_prob
-    num_X = all_end_states.shape[0]
+    num_X = 2 ** args.horizon - 1
 
     losses, visited, distrib_distances = [], [], []
     ratios = []
@@ -203,14 +187,22 @@ def train_generative_model(args, func):
     return policy
 
 
-def initialize_generative_model(args):
+def initialize_generative_model(args, init_params={}):
     # Initialize params, etc for generative model training
+    # init_params will be a dict containing the parameters for each model.
+
     policy = make_mlp([args.horizon * 3] + [args.n_hid] * args.n_layers + [3])
+    if 'policy' in init_params.keys():
+        policy.load_state_dict(init_params['policy'])
     policy.to(dev)
     q_target = copy.deepcopy(policy)
+    if 'q_target' in init_params.keys():
+        q_target.load_state_dict(init_params['q_target'])
     c = None
     if args.learning_method == "l1" or args.learning_method == "l2":
         c = torch.randn(1, requires_grad=True)
+        if 'c' in init_params.keys():
+            c = init_params['c']
         if args.opt == 'adam':
             opt = torch.optim.Adam(list(policy.parameters()) + [c], args.learning_rate,
                                 betas=(args.adam_beta1, args.adam_beta2))
@@ -222,7 +214,8 @@ def initialize_generative_model(args):
                                 betas=(args.adam_beta1, args.adam_beta2))
         elif args.opt == 'msgd':
             opt = torch.optim.SGD(policy.parameters(), args.learning_rate, momentum=args.momentum)
-    
+    if 'opt' in init_params.keys():
+        opt.load_state_dict(init_params['opt'])
     return policy, q_target, opt, c
 
 
@@ -237,7 +230,10 @@ def run_episode(env, args, policy):
     hist = []
     while not done:
         tstates.append(s)
-        pi = Categorical(logits=policy(tf([s])))
+        try:
+            pi = Categorical(logits=policy(tf([s])))
+        except:
+            print(policy(tf([s])))
         if is_random:
             a = tl([np.random.randint(3)])
         else:
@@ -353,7 +349,7 @@ dev = torch.device(args.device)
 tf = lambda x: torch.FloatTensor(x).to(dev)
 tl = lambda x: torch.LongTensor(x).to(dev)
 
-TEST_FUNC = (lambda x: ((np.cos(x * 50) + 1) * norm.pdf(x * 5)) + 0.01)
+TEST_FUNC = (lambda x: ((np.cos(x * 50 - 2) * np.sin(20 * x + 2) + 1) * norm.pdf(x * 5, loc=2, scale=2)) + 0.01)
 LOGINF = torch.tensor(1000).to(dev)
 
 if __name__ == "__main__":
