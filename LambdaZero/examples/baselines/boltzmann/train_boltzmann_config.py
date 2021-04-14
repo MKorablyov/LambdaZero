@@ -1,7 +1,6 @@
 import os.path as osp
 import LambdaZero.utils
-from LambdaZero.examples.baselines.boltzmann.boltzmann_trainer import BoltzmannTrainer
-import LambdaZero.inputs
+from LambdaZero.examples.baselines.boltzmann.boltzmann_trainer import BoltzmannTrainer, on_episode_start
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
 from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyReward, ProxyRewardSparse
@@ -24,7 +23,6 @@ proxy_config = {
     "load_seen": temp_load_data_v1,
     "load_seen_config": load_seen_config,
 }
-
 trainer_config = { # tune trainable config to be more precise
     "env": BlockMolEnvGraph_v1,
     "env_config": {
@@ -33,21 +31,19 @@ trainer_config = { # tune trainable config to be more precise
         "allow_removal": True,
         "reward": ProxyRewardSparse,
         "reward_config": {
-            "synth_options":{"num_gpus":0.00},
+            "synth_options":{"num_gpus":0.05},
             "qed_cutoff": [0.2, 0.5],
-            "exp_dock": False,
-            "always_discount":False,
             "synth_cutoff":[0, 4],
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "scoreProxy_options":{"num_cpus":2}, #, "num_gpus":1.0},
+            "scoreProxy_options":{"num_cpus":2, "num_gpus":1.0},
             "actor_sync_freq": 150,
         },
 
     },
     "num_workers": 8,
-    # "num_gpus_per_worker": 0.15,
-    # "num_gpus": 1.0,
+    "num_gpus_per_worker": 0.15,
+    "num_gpus": 1.0,
     "model": {
         "custom_model": "GraphMolActorCritic_thv1",
         "custom_model_config": {
@@ -55,14 +51,17 @@ trainer_config = { # tune trainable config to be more precise
             "num_hidden": 64
         },
     },
-    "callbacks": {"on_episode_end": log_episode_info},
+    "callbacks": {"on_episode_start": on_episode_start,
+                  "on_episode_end": log_episode_info},
     "framework": "torch",
     "lr": 5e-5,
-    "logger_config":{
+    "logger_config": {
         "wandb": {
             "project": "boltzmann",
             "api_key_file": osp.join(summaries_dir, "wandb_key")
-        }}}
+        }}
+}
+
 
 DEFAULT_CONFIG = {
     "tune_config":{

@@ -50,7 +50,6 @@ if __name__ == "__main__":
         options(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_options']). \
         remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
 
-    # print('dsgfjsdgjfhkasdfkhadsjkfajsdhfjsadgfjlifhaskudfhakjsdfaj\n\n\n\n\n\n')
     config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
 
     tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))
