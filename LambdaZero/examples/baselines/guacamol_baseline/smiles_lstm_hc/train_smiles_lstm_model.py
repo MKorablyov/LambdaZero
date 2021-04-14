@@ -3,7 +3,7 @@ import os
 
 from guacamol.utils.helpers import setup_default_logger
 
-from .smiles_rnn_distribution_learner import SmilesRnnDistributionLearner
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.smiles_rnn_distribution_learner import SmilesRnnDistributionLearner
 
 if __name__ == '__main__':
     setup_default_logger()

@@ -9,8 +9,8 @@ from guacamol.scoring_function import ScoringFunction
 from guacamol.utils.chemistry import canonicalize_list, canonicalize
 from joblib import delayed
 
-from .rnn_generator import SmilesRnnMoleculeGenerator
-from .rnn_utils import load_rnn_model
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.rnn_generator import SmilesRnnMoleculeGenerator
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.rnn_utils import load_rnn_model
 
 
 class SmilesRnnDirectedGenerator(GoalDirectedGenerator):

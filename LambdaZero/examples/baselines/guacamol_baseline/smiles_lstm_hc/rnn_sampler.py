@@ -1,8 +1,8 @@
 import torch
 
-from .action_sampler import ActionSampler
-from .rnn_model import SmilesRnn
-from .smiles_char_dict import SmilesCharDictionary
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.action_sampler import ActionSampler
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.rnn_model import SmilesRnn
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.smiles_char_dict import SmilesCharDictionary
 
 
 class SmilesRnnSampler:

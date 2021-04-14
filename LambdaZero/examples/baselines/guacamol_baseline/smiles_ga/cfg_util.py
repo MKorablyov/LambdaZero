@@ -2,7 +2,7 @@ import nltk
 
 import numpy as np
 
-from . import smiles_grammar
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_ga import smiles_grammar
 
 
 def get_smiles_tokenizer(cfg):

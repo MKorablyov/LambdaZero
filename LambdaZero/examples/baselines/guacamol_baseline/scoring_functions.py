@@ -3,9 +3,13 @@ from rdkit import Chem
 from rdkit.Chem import QED
 from guacamol.scoring_function import ScoringFunctionBasedOnRdkitMol, BatchScoringFunction
 from typing import List
-
 import LambdaZero.chem
 import LambdaZero.utils
+
+from LambdaZero.environments.block_mol_graph_v1 import GraphMolObs
+from LambdaZero.environments.molMDP import BlockMoleculeData
+
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 default_config = {
     "env_eval_config": {
@@ -15,11 +19,16 @@ default_config = {
 }
 
 config = default_config
-datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
-out_dir = osp.join(summaries_dir, "lstm_dock_eval")
+out_dir = osp.join(summaries_dir, "guacamol_oracle_dock_eval")
 mgltools_dir=osp.join(programs_dir, "mgltools_x86_64Linux2_1.5.6")
 vina_dir=osp.join(programs_dir, "vina")
 docksetup_dir=osp.join(datasets_dir, "seh/4jnc")
+
+class BlockMoleculeData_wrapper():
+    def __init__(self, mol, smiles, graph=None):
+        self.graph = graph
+        self.mol = mol
+        self.smiles = smiles
 
 class EnvEval:
     def __init__(self, config):
@@ -51,42 +60,59 @@ class EnvEval:
             print (reward)
             return reward # dock_reward
 
-# class Oracle_wrapper(ScoringFunctionBasedOnRdkitMol):
-#
-#     def __init__(self) -> None:
-#         super().__init__()
-#
-#         self.env_eval = EnvEval(config["env_eval_config"])
-#
-#     def score_mol(self, mol: Chem.Mol) -> float:
-#         reward = self.env_eval(mol)
-#         return reward
 
 class Oracle_wrapper(BatchScoringFunction):
 
-    def __init__(self) -> None:
+    def __init__(self, config) -> None:
         super().__init__()
 
-        self.env_eval = EnvEval(config["env_eval_config"])
+        self.oracle_reward = config["reward"](config["reward_config"])
 
     def raw_score_list(self, smiles_list: List[str]) -> List[float]:
         rewards = []
         for smiles in smiles_list:
-            reward = self.env_eval(smiles)
+            reward = self.oracle_reward(smiles)
             rewards.append(reward)
         return rewards
 
+class Proxy_wrapper(BatchScoringFunction):
 
-class Proxy_wrapper(ScoringFunctionBasedOnRdkitMol):
-
-    def __init__(self, reward, config) -> None:
+    def __init__(self, config) -> None:
         super().__init__()
 
-        self.env_eval = reward(**config["reward_config"])
+        # initialize scoreProxy which would be shared across many agents
+        self.scoreProxy = config['reward_config']['scoreProxy']. \
+            options(**config['reward_config']['scoreProxy_options']). \
+            remote(**config['reward_config']['scoreProxy_config'])
+        config['reward_config']['scoreProxy'] = self.scoreProxy
 
-    def score_mol(self, mol: Chem.Mol) -> float:
-        reward = self.env_eval(mol)
+        # initialize proxy reward
+        self.proxy_reward = config['reward'](**config['reward_config'])
+
+        # initialize mol to graph
+        self.graphmolobs = GraphMolObs()
+
+    def score(self, smiles) -> float:
+        mol = Chem.MolFromSmiles(smiles)
+        molecule = BlockMoleculeData_wrapper(mol, smiles)
+        try:
+            mol_blockmoldata = BlockMoleculeData()
+            mol_blockmoldata._mol = mol
+            graph, _ = self.graphmolobs(mol_blockmoldata)
+            molecule.graph = graph
+            reward, log_vals = self.proxy_reward(molecule, True, True, None)  # always evaluate
+        except Exception as e:
+            print(e)
+            reward = 0.0
+            log_vals = {}
         return reward
+
+    def raw_score_list(self, smiles_list: List[str]) -> List[float]:
+        rewards = []
+        for smiles in smiles_list:
+            reward = self.score(smiles)
+            rewards.append(reward)
+        return rewards
 
 # class Proxy_wrapper(BatchScoringFunction):
 #

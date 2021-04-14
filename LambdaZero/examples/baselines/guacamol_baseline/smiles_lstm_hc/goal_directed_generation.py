@@ -3,9 +3,9 @@ import os.path as osp
 
 from guacamol.utils.helpers import setup_default_logger
 
-from .smiles_rnn_directed_generator import SmilesRnnDirectedGenerator
-
-from LambdaZero.examples.baselines.guacamol_baseline.assess_goal_directed_generation import assess_goal_directed_generation
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.smiles_rnn_directed_generator import SmilesRnnDirectedGenerator
+from guacamol.assess_goal_directed_generation import assess_goal_directed_generation
+# from LambdaZero.examples.baselines.guacamol_baseline.assess_goal_directed_generation import assess_goal_directed_generation
 from LambdaZero.utils import get_external_dirs
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--smiles_file', default=osp.join(datasets_dir, 'guacamol_baseline/data/guacamol_v1_all.smiles'))
     parser.add_argument('--random_start', action='store_true')
     parser.add_argument('--n_jobs', type=int, default=-1)
-    parser.add_argument('--suite', default='v1')
+    parser.add_argument('--suite', default='proxy')
     args = parser.parse_args()
 
     if args.output_dir is None:

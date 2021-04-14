@@ -4,10 +4,10 @@ from typing import List
 import torch
 from guacamol.distribution_matching_generator import DistributionMatchingGenerator
 
-from .rnn_model import SmilesRnn
-from .rnn_trainer import SmilesRnnTrainer
-from .rnn_utils import get_tensor_dataset, load_smiles_from_list, set_random_seed
-from .smiles_char_dict import SmilesCharDictionary
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.rnn_model import SmilesRnn
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.rnn_trainer import SmilesRnnTrainer
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.rnn_utils import get_tensor_dataset, load_smiles_from_list, set_random_seed
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_lstm_hc.smiles_char_dict import SmilesCharDictionary
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

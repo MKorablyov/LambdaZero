@@ -18,11 +18,12 @@ from guacamol.goal_directed_generator import GoalDirectedGenerator
 from guacamol.scoring_function import ScoringFunction
 from guacamol.utils.chemistry import canonicalize
 from guacamol.utils.helpers import setup_default_logger
-from LambdaZero.examples.baselines.guacamol_baseline.assess_goal_directed_generation import assess_goal_directed_generation
+from guacamol.assess_goal_directed_generation import assess_goal_directed_generation
+# from LambdaZero.examples.baselines.guacamol_baseline.assess_goal_directed_generation import assess_goal_directed_generation
 from LambdaZero.utils import get_external_dirs
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
-from . import cfg_util, smiles_grammar
+from LambdaZero.examples.baselines.guacamol_baseline.smiles_ga import cfg_util, smiles_grammar
 
 rdBase.DisableLog('rdApp.error')
 GCFG = smiles_grammar.GCFG
