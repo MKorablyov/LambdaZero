@@ -9,18 +9,15 @@ from matplotlib import pyplot as plt
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-
+np.random.randint()
 DEFAULT_CONFIG = {
     #"dataset_root": os.path.join(datasets_dir, "brutal_dock/d4"),
     #"file_names": ["dock_blocks105_walk40_clust"],
     #"split_name": "randsplit_dock_blocks105_walk40_clust",
-
     "dataset_root": os.path.join(datasets_dir, "brutal_dock/seh"),
-    "file_names": ["Zinc20_docked_neg_randperm_30k"],
-
-
-    "split_name": "split_Zinc20_docked_neg_randperm_30k_debug3k",
-    "probs": [0.1, 0.1, 0.8],
+    "file_names": ["random_molecule_100k_docked"],
+    "split_name": "random_molecule_100k_docked_3k",
+    "probs": [0.03, 0.03, 0.94],
 }
 config = DEFAULT_CONFIG
 

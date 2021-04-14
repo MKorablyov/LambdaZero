@@ -21,7 +21,7 @@ class Proxy:
         # update model and acquisition function if needed
         if len(self.proposed_x) >= self.update_freq:
             # todo: a much better solution would be to re-compute acqusition values of data that has
-            # arrived while this was retraining
+            # arrived while proxy-model  was retraining
             #proposed_x, proposed_d, proposed_acq = self.proposed_x, self.proposed_d, self.proposed_acq
             #self.proposed_x, self.proposed_d, self.proposed_acq = [], [], []
             self.acquire_and_update(self.proposed_x, self.proposed_d, self.proposed_acq)
@@ -53,7 +53,7 @@ class Actor():
         acq, info = self.acquisition_func.acquisition_value(x)
 
         # send molecule to the remote proxy
-        self.scoreProxy.propose_x.remote(x, d, acq)
+        self.scoreProxy.propose_x.remote(deepcopy(x), deepcopy(d), deepcopy(acq))
 
         # sync weights with proxy if needed
         if self.num_calls % self.sync_freq==1:

@@ -97,12 +97,12 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
             scalar_outs, data = self.model(data)
             stop_logit = scalar_outs[:, 1:2]
-            add_logits = data.stem_preds.reshape((data.num_graphs, -1))
             break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
+            add_logits = data.stem_preds.reshape((data.num_graphs, -1))
 
             actor_logits = torch.cat([stop_logit,
-                                      add_logits,
-                                      break_logits], 1)
+                                      break_logits,
+                                      add_logits], 1)
 
             # mask not available actions
             masked_actions = (1. - action_mask).to(torch.bool)

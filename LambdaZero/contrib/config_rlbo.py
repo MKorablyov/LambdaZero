@@ -11,6 +11,7 @@ from ray.rllib.agents.ppo import PPOTrainer
 from LambdaZero.contrib.loggers import log_episode_info
 
 import LambdaZero.utils
+import LambdaZero.contrib.functional
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 from config_model import load_seen_config
@@ -35,8 +36,6 @@ trainer_config = { # tune trainable config to be more precise
         "reward_config": {
             "synth_options":{"num_gpus":0.05},
             "qed_cutoff": [0.2, 0.5],
-            "exp_dock": False,
-            "always_discount":False,
             "synth_cutoff":[0, 4],
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
@@ -60,7 +59,7 @@ trainer_config = { # tune trainable config to be more precise
     "lr": 5e-5,
     "logger_config":{
         "wandb": {
-            "project": "rlbo3",
+            "project": "rlbo4",
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
 
@@ -810,7 +809,6 @@ debug_config_v32 = {
                 "max_blocks": 10,
                 "max_atoms": 75,
                 "max_branches": 40,
-
              "molMDP_config": {
                  "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"), # more blocks
                  },

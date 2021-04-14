@@ -20,13 +20,14 @@ class DockingEstimator(DockVina_smi):
         return dockscore
 
 class DockingOracle:
-    def __init__(self, num_threads, dockVina_config, mean, std, logger):
+    def __init__(self, num_threads, dockVina_config, mean, std, act_y, logger):
         self.num_threads = num_threads
         # create actor pool
         self.actors = [DockingEstimator.remote(dockVina_config) for i in range(self.num_threads)]
         self.pool = ray.util.ActorPool(self.actors)
         self.mean = mean
         self.std = std
+        self.act_y = act_y
         self.logger = logger
 
     def __call__(self, data):
@@ -36,16 +37,12 @@ class DockingOracle:
         num_failures = 0
         for d in dockscores:
             if d == None:
-                dockscores_.append(self.mean) # mean from Zinc on failures
+                dockscores_.append(self.mean) # mean on failures
                 num_failures+=1
-            elif d > self.mean + 3*self.std:
-                dockscores_.append(self.mean + 3*self.std) # cap at 3 stds at worst
-                # docking could result in steric clashes with huge positive energies; in order to prevent failures in
-                # the MPNN due to especially large values, I am capping how bad the molecule could be
-                # prevent fitting to these bad molecules much
             else:
                 dockscores_.append(d)
-        dockscores = [(self.mean -d) / self.std for d in dockscores_] # this normalizes and flips dockscore
+        dockscores = [(self.mean-d) / self.std for d in dockscores_] # this normalizes and flips dockscore
+        dockscores = self.act_y(dockscores)
         self.logger.log.remote({
             "docking_oracle/failure_probability": num_failures/float(len(dockscores)),
             "docking_oracle/norm_dockscore_min": np.min(dockscores),
