@@ -72,7 +72,6 @@ def separate(data_, slices_):
         data_list.append(data)
     return data_list
 
-
 @ray.remote
 def obs_from_smi(smi,):
     molecule = BlockMoleculeData()
@@ -108,6 +107,11 @@ def temp_load_data_v1(mean, std, act_y, dataset_split_path, raw_path, proc_path,
 
     # apply soft negatives
     y_list = act_y(y_list)
+    import seaborn as sns
+    from matplotlib import pyplot as plt
+    sns.distplot(y_list)
+    plt.show()
+
 
     # split into train test sets
     train_idxs, val_idxs, _ = np.load(dataset_split_path, allow_pickle=True)

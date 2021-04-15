@@ -14,8 +14,8 @@ import LambdaZero.utils
 import LambdaZero.contrib.functional
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-from config_model import load_seen_config
-from config_acquirer import oracle_config, acquirer_config
+from .config_model import load_seen_config
+from .config_acquirer import oracle_config, acquirer_config
 
 
 proxy_config = {

@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-np.random.randint()
+
 DEFAULT_CONFIG = {
     #"dataset_root": os.path.join(datasets_dir, "brutal_dock/d4"),
     #"file_names": ["dock_blocks105_walk40_clust"],
