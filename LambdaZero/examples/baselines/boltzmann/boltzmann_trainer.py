@@ -20,10 +20,7 @@ class BoltzmannPolicy(Policy):
         Policy.__init__(self, observation_space, action_space, config)
         # keep a separate copy of the environment
         self.env = _global_registry.get(ENV_CREATOR, config["env"])(config["env_config"])
-        print(self.env)
         self.temperature = config["env_config"]["temperature"]
-        # self.env.reset()
-        # self.obs_space = observation_space
 
     def compute_actions(self,
                         obs_batch,
@@ -33,19 +30,6 @@ class BoltzmannPolicy(Policy):
                         info_batch=None,
                         episodes=None,
                         **kwargs):
-        #
-        # actions = []
-        # obs = torch.tensor(obs_batch).float()
-        # obs = restore_original_dimensions(obs, self.observation_space, "torch")
-        # for i in range(obs['action_mask'].size(0)):
-        #     act_mask = obs['action_mask'][i].numpy()
-        #     for act in act_mask:
-        #         act = act
-        #     act = np.random.choice(len(act_mask))
-        #     while act_mask[act] == 0:
-        #         act = np.random.choice(len(act_mask))
-        #         # act = np.argmax(act_mask == 1)
-        #     actions.append(act)
 
         actions = []
         for i, episode in enumerate(episodes):

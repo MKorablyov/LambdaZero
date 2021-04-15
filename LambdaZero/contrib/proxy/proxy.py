@@ -20,8 +20,8 @@ class Proxy:
         self.proposed_acq.extend(acq)
         # update model and acquisition function if needed
         if len(self.proposed_x) >= self.update_freq:
-            # todo: a much better solution would be to re-compute acqusition values of data that has
-            # arrived while proxy-model  was retraining
+            # todo: a better solution would be to
+            #  keep and re-compute acqusition values of proposed while proxy-model was retraining
             #proposed_x, proposed_d, proposed_acq = self.proposed_x, self.proposed_d, self.proposed_acq
             #self.proposed_x, self.proposed_d, self.proposed_acq = [], [], []
             self.acquire_and_update(self.proposed_x, self.proposed_d, self.proposed_acq)
