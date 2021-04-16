@@ -5,10 +5,13 @@ import LambdaZero.utils
 from LambdaZero.contrib.inputs import temp_load_data_v1
 from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
 from LambdaZero.contrib.trainer import BasicTrainer
+from LambdaZero.contrib.functional import elu2
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 load_seen_config = {
-    "mean": -8.6, "std": 1.1,
+    "mean": -8.6,
+    "std": 1.1,
+    "act_y": elu2,
     "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
     "raw_path": osp.join(datasets_dir, "brutal_dock/seh/raw"),
     "proc_path": osp.join(datasets_dir, "brutal_dock/seh/processed_rlbo"),

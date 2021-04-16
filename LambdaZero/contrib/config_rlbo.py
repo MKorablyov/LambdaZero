@@ -1,4 +1,5 @@
 import os.path as osp
+from ray.rllib.agents.ppo import PPOTrainer
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
@@ -7,11 +8,14 @@ from LambdaZero.contrib.proxy import ProxyUCB
 from LambdaZero.contrib.reward import ProxyReward, ProxyRewardSparse
 from LambdaZero.contrib.oracle import DockingOracle
 from LambdaZero.contrib.inputs import temp_load_data_v1
+
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.impala import ImpalaTrainer
 from ray.rllib.agents.dqn import DQNTrainer
 from ray.rllib.agents.dqn import ApexTrainer
+
 from LambdaZero.contrib.loggers import log_episode_info
+import LambdaZero.contrib.functional
 
 import LambdaZero.utils
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -19,6 +23,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 from LambdaZero.contrib.config_model import load_seen_config
 from LambdaZero.contrib.config_acquirer import oracle_config, acquirer_config
 
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 proxy_config = {
     "update_freq": 1000,
@@ -38,8 +43,6 @@ trainer_config = { # tune trainable config to be more precise
         "reward_config": {
             "synth_options":{"num_gpus":0.05},
             "qed_cutoff": [0.2, 0.5],
-            "exp_dock": False,
-            "always_discount":False,
             "synth_cutoff":[0, 4],
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
@@ -63,7 +66,7 @@ trainer_config = { # tune trainable config to be more precise
     "lr": 5e-5,
     "logger_config":{
         "wandb": {
-            "project": "rlbo3",
+            "project": "rlbo4",
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
 

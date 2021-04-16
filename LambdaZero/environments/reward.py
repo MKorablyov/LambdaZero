@@ -273,3 +273,29 @@ class MorganDistReward:
         else:
             reward, discounted_reward = 0.0, 0.0
         return reward, discounted_reward
+
+
+class SynthQEDReward:
+    def __init__(self, qed_cutoff, synth_cutoff, synth_config, **kwargs):
+        self.qed_cutoff = qed_cutoff
+        self.synth_cutoff = synth_cutoff
+        self.synth_net = LambdaZero.models.ChempropWrapper_v1(synth_config)
+
+    def reset(self, previous_reward=0.0):
+        pass
+
+    def __call__(self, molecule, simulate , done, num_steps):
+        mol = molecule.mol
+        if (mol is not None) and (len(molecule.jbonds) > 0):
+            qed = QED.qed(mol)
+            qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
+            qed_discount = min(max(0.0, qed_discount), 1.0)  # relu to maxout at 1
+
+            # Synthesizability constraint
+            synth = self.synth_net(mol=mol)
+            synth_discount = (synth - self.synth_cutoff[0]) / (self.synth_cutoff[1] - self.synth_cutoff[0])
+            synth_discount = min(max(0.0, synth_discount), 1.0)  # relu to maxout at 1
+            discounted_reward = qed_discount * synth_discount
+
+            return discounted_reward, {"discounted_reward": discounted_reward, "QED": qed, "synthesizability": synth}
+        else: return 0.0, {"discounted_reward": 0.0, "QED": 0.0}

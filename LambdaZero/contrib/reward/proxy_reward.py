@@ -6,24 +6,20 @@ from random import random
 from LambdaZero.contrib.oracle import QEDOracle, SynthOracle
 from LambdaZero.environments.block_mol_v3 import synth_config
 import ray
+
 from LambdaZero.inputs.inputs_op import _brutal_dock_proc
 from LambdaZero.contrib.config_acquirer import LOG_CANDIDATE_QED_SCORE, LOG_CANDIDATE_SYNTH_SCORE
 
+import LambdaZero.contrib.functional
 
-def _satlins(x, cutoff0, cutoff1):
-    "shifted saturated linearity activation function _/-"
-    x = (x - cutoff0) / (cutoff1 - cutoff0)
-    x = min(max(0.0, x), 1.0)  # relu to maxout at 1
-    return x
+
+
 
 class ProxyReward:
-    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff,
-                 exp_dock, always_discount, synth_options, **kwargs):
+    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, synth_options, **kwargs):
         self.env_name = np.random.uniform()
         self.qed_cutoff = qed_cutoff
         self.synth_cutoff = synth_cutoff
-        self.exp_dock = exp_dock
-        self.always_discount = always_discount
         self.qed_oracle = QEDOracle(num_threads=1)
         self.synth_oracle = SynthOracle(synth_options, synth_config)
         self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
@@ -40,25 +36,18 @@ class ProxyReward:
         qed = self.qed_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
         synth_score = self.synth_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
         # stop optimizing qed/synth beyond thresholds
-        clip_qed = _satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
-        clip_synth = _satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
-
-        proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles,
-                                                        "mol_graph":molecule.graph,
-                                                        "env_name": self.env_name,
-                                                        "qed": qed,
-                                                        "synth_score": synth_score,}],
+        clip_qed = LambdaZero.contrib.functional.satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
+        clip_synth = LambdaZero.contrib.functional.satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
+        proxy_dock, actor_info = self.dockProxy_actor([{"smiles": molecule.smiles,
+                                                        "mol_graph": molecule.graph,
+                                                        "blockidxs": molecule.blockidxs,
+                                                        "slices": molecule.slices,
+                                                        "jbonds": molecule.jbonds,
+                                                        "stems": molecule.stems,
+                                                        "env_name": self.env_name}],
                                                       [clip_qed * clip_synth])
-        proxy_dock = float(proxy_dock[0]) # actor works on multiple x by default
 
-        if self.exp_dock:
-            reward = (self.exp_dock ** proxy_dock) * clip_qed * clip_synth
-        elif self.always_discount:
-            reward = proxy_dock * clip_qed * clip_synth
-        elif proxy_dock > 0: # reward should be rarely negative; when negative, discount won't be applied
-            reward = proxy_dock * clip_qed * clip_synth
-        else:
-            reward = proxy_dock
+        reward = float(proxy_dock[0]) * clip_qed * clip_synth
 
         # log feasible
         cand_dock_mean = actor_info["mean"][0] \
@@ -117,24 +106,6 @@ class ProxyRewardOradcle(ProxyReward):
         else:
             reward, info = 0.0, {}
         return reward, info
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

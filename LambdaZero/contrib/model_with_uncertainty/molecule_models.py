@@ -7,7 +7,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from sklearn.metrics import explained_variance_score
 #from LambdaZero.models.torch_graph_models import MPNNet_Parametric, fast_from_data_list
-from LambdaZero.inputs.inputs_op import _brutal_dock_proc
+#from LambdaZero.inputs.inputs_op import _brutal_dock_proc
 from torch_geometric.data import Batch
 from LambdaZero.models import MPNNetDrop
 from LambdaZero.inputs import random_split
@@ -38,7 +38,6 @@ def train_epoch(loader, model, optimizer, device):
             "model/train_explained_variance": explained_variance_score(epoch_y, epoch_y_hat)
             }
 
-
 def val_epoch(loader, model, device):
     model.eval()
     epoch_y = []
@@ -54,7 +53,6 @@ def val_epoch(loader, model, device):
             "model/val_explained_variance": explained_variance_score(epoch_y, epoch_y_hat)
             }
 
-
 class EvaluateOnDatasets():
     def __init__(self, file_names, data_idxs, logger):
         # for file_names:
@@ -66,7 +64,6 @@ class EvaluateOnDatasets():
         # if evaluate_uncertainty()
         # self.logger.log(uncertainty_metrics)
         pass
-
 
 
 class MolMCDropGNN(ModelWithUncertainty):
@@ -86,8 +83,8 @@ class MolMCDropGNN(ModelWithUncertainty):
     def _preprocess(self, x):
         graphs = [m["mol_graph"] for m in x]
         graphs = deepcopy(graphs)
-        # todo: I am forced to deepcopy graphs to prevent transform modyfying original graphs
-        # todo: I could add a separate field for processed graph to do it once for each molecule
+        # todo: I am forced to deepcopy graphs; I could solve that at data loading
+        # todo: maybe try to save processed graphs in a separate field ..
         if self.transform is not None: graphs = [self.transform(g) for g in graphs]
         return graphs
 
@@ -143,12 +140,12 @@ class MolMCDropGNN(ModelWithUncertainty):
         # ==========================================================================================
 
         self.logger.log.remote({"model/acquired_mse_before_update":((np.array(y_new) - np.array(mean))**2).mean(),
-                                "model/explained_variance_before_update": explained_variance_score(y_new, mean)
+                                "model/acquired_expvar_before_update": explained_variance_score(y_new, mean)
                                 })
         self.fit(x+x_new, y+y_new)
         mean, var = self.get_mean_and_variance(x_new)
         self.logger.log.remote({"model/acquired_mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean(),
-                                "model/explained_variance_after_update": explained_variance_score(y_new, mean)
+                                "model/acquired_expvar_after_update": explained_variance_score(y_new, mean)
                                 })
 
         # ==========================================================================================
