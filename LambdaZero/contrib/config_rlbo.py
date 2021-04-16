@@ -121,6 +121,16 @@ config_cpu = {
 
 
 rlbo_001 = {}
+rlbo_001_30k = {"tune_config":
+    {"config": {"env_config":{
+        "reward_config": {
+                "load_seen_config": {
+                    "dataset_split_path": osp.join(datasets_dir,
+                                                   "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k_debug3k.npy"),
+                    "file_names": ["Zinc20_docked_neg_randperm_30k"], }
+        }}
+    }}
+}
 
 rlbo_001_lr0 = {"tune_config": {"config": {"lr": 0., "env_config": {"random_steps": 2}}}}
 rlbo_001_e1 = {"tune_config": {"config": {"entropy_coeff": 1e-1, "env_config": {"random_steps": 2}}}}
@@ -128,6 +138,25 @@ rlbo_001_e2 = {"tune_config": {"config": {"entropy_coeff": 1e-2, "env_config": {
 rlbo_001_e3 = {"tune_config": {"config": {"entropy_coeff": 1e-3, "env_config": {"random_steps": 2}}}}
 rlbo_001_e4 = {"tune_config": {"config": {"entropy_coeff": 1e-4, "env_config": {"random_steps": 2}}}}
 rlbo_001_e5 = {"tune_config": {"config": {"entropy_coeff": 1e-5, "env_config": {"random_steps": 2}}}}
+
+# Ablation
+rlbo_001_nokappa = {"tune_config": {
+    "config": {
+        "entropy_coeff": 1e-3,
+        "env_config": {
+            "random_steps": 2,
+            "reward_config": {
+                "scoreProxy_config": {
+                    "acquirer_config": {
+                        "kappa": 0.0
+                    }}
+            }
+        }}}}
+
+rlbo_001_rsteps1 = {"tune_config": {"config": {"entropy_coeff": 1e-3, "env_config": {"random_steps": 1}}}}
+rlbo_001_rsteps3 = {"tune_config": {"config": {"entropy_coeff": 1e-3, "env_config": {"random_steps": 3}}}}
+rlbo_001_rsteps4 = {"tune_config": {"config": {"entropy_coeff": 1e-3, "env_config": {"random_steps": 4}}}}
+
 
 rlbo_impala = {
     "tune_config": {
