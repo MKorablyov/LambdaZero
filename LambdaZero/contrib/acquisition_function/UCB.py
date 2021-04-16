@@ -30,5 +30,6 @@ class UCB(AcquisitionFunction):
         x_acquired = [x[i] for i in idx]
         d_acquired= [d[i] for i in idx]
         acq_acquired = [acq[i] for i in idx]
-        info = {}
+
+        info = {"x_unacquired": [x[i] for i in range(len(x)) if i not in idx]}
         return x_acquired, d_acquired, acq_acquired, info
