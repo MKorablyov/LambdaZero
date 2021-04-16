@@ -16,7 +16,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 # change default settings for oracle and acquirer
-oracle_config = merge_dicts(oracle_config, {"num_threads":64})
+oracle_config = merge_dicts(oracle_config, {"num_threads": 20})
 acquirer_config = merge_dicts(acquirer_config, {"acq_size": 256, "kappa": 2.0})
 
 
