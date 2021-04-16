@@ -3,6 +3,8 @@ import ray
 from LambdaZero.contrib.acquisition_function import UCB
 from .proxy import Proxy
 import torch
+from sklearn.metrics import explained_variance_score
+import os
 
 @ray.remote(num_gpus=0.3, num_cpus=2)
 class ProxyUCB(Proxy):
@@ -22,10 +24,12 @@ class ProxyUCB(Proxy):
 
         # ==========================================================================================
         # DEBUG - calculate oracle and network prediction for unseed values
-        x_unacquired = list(np.random.choice(info["x_unacquired"],
-                                             min(50, len(info["x_unacquired"])), replace=True))
-        y_unacquired = self.oracle(x_unacquired)
-        before_mean, before_var = self.UCB.model.get_mean_and_variance(x_unacquired)
+        # x_unacquired = list(np.random.choice(info["x_unacquired"],
+        #                                      min(50, len(info["x_unacquired"])), replace=True))
+        # y_unacquired = self.oracle(x_unacquired)
+        # before_mean, before_var = self.UCB.model.get_mean_and_variance(x_unacquired)
+        # unacq_before_expv = explained_variance_score(y_unacquired, before_mean)
+
         # ==========================================================================================
 
         cand_stats = self.post_acquire_and_update(x, y)
@@ -49,20 +53,25 @@ class ProxyUCB(Proxy):
 
         # ==========================================================================================
         # DEBUG - calculate oracle and network prediction for unseed values
-        after_mean, after_var = self.UCB.model.get_mean_and_variance(x_unacquired)
-        unacquired = dict({
-            "unacq_before_mean": before_mean,
-            "unacq_before_var": before_var,
-            "unacq_target": y_unacquired,
-            "unacq_after_mean": after_mean,
-            "unacq_after_var": after_var,
-            "unacq": x_unacquired,
-            "acq": x,
-        })
-        print(out_path)
-        out_path = "/home/andrein/scratch/Summaries/debug/30k_unacq_model_pred_"
-        torch.save(unacquired, f"{out_path}_{self.UCB.model._istep-1}")
-        print("SAVE unacquired------")
+        # after_mean, after_var = self.UCB.model.get_mean_and_variance(x_unacquired)
+        # unacq_after_expv = explained_variance_score(y_unacquired, after_mean)
+        #
+        # unacquired = dict({
+        #     "unacq_before_mean": before_mean,
+        #     "unacq_before_var": before_var,
+        #     "unacq_target": y_unacquired,
+        #     "unacq_after_mean": after_mean,
+        #     "unacq_after_var": after_var,
+        #     "unacq": x_unacquired,
+        #     "acq": x,
+        #     "unacq_before_expv": unacq_before_expv,
+        #     "unacq_after_expv": unacq_after_expv,
+        # })
+        # cfg_name = ray.get(self.logger.config_name.remote())
+        # out_path = f"/home/andrein/scratch/Summaries/debug/{cfg_name}_unacq_model_pred_"
+        # print(out_path)
+        # torch.save(unacquired, f"{out_path}_{self.UCB.model._istep-1}")
+        # print("SAVE unacquired------")
         # ==========================================================================================
 
         return None
