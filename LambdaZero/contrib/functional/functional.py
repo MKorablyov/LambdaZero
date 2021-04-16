@@ -25,7 +25,7 @@ if __name__ == "__main__":
     from matplotlib import pyplot as plt
     x = np.random.uniform(low=-3,high=3,size=1000)
     #print(x)
-    #y = elu2(x)
-    #plt.scatter(x,y)
-    #plt.show()
+    y = elu2(x)
+    plt.scatter(x,y)
+    plt.show()
     #print(elu2([-1]))

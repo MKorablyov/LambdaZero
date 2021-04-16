@@ -18,6 +18,7 @@ class ProxyUCB(Proxy):
         self.oracle = oracle(**oracle_config)
 
     def acquire_and_update(self, proposed_x, proposed_d, proposed_acq):
+        # if self.acquired_batches < self.init_random_batches:
         x, d, acq, info = self.UCB.acquire_batch(proposed_x, proposed_d, proposed_acq)
         y = self.oracle(x)
         v = np.asarray(y) * np.asarray(d)
