@@ -28,8 +28,14 @@ class ProxyReward:
         # stop optimizing qed/synth beyond thresholds
         clip_qed = LambdaZero.contrib.functional.satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = LambdaZero.contrib.functional.satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
-        proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
-                                                        "env_name": self.env_name}], [clip_qed * clip_synth])
+        proxy_dock, actor_info = self.dockProxy_actor([{"smiles": molecule.smiles,
+                                                        "mol_graph": molecule.graph,
+                                                        "blockidxs": molecule.blockidxs,
+                                                        "slices": molecule.slices,
+                                                        "jbonds": molecule.jbonds,
+                                                        "stems": molecule.stems,
+                                                        "env_name": self.env_name}],
+                                                      [clip_qed * clip_synth])
 
         reward = float(proxy_dock[0]) * clip_qed * clip_synth
 
