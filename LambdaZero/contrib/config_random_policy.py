@@ -16,7 +16,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 # change default settings for oracle and acquirer
-oracle_config = merge_dicts(oracle_config, {"num_threads": 20})
+oracle_config = merge_dicts(oracle_config, {"num_threads": 16})
 acquirer_config = merge_dicts(acquirer_config, {"acq_size": 256, "kappa": 2.0})
 
 
@@ -42,14 +42,14 @@ trainer_config = { # tune trainable config to be more precise
             "synth_cutoff":[0, 4],
             "scoreProxy":ProxyUCB,
             "scoreProxy_config":proxy_config,
-            "scoreProxy_options":{"num_cpus":2, "num_gpus":1.0},
+            "scoreProxy_options":{"num_cpus":1, "num_gpus":1.0},
             "actor_sync_freq": 1500,
         },
 
     },
-    "num_workers": 12,
+    "num_workers": 8,
     "num_gpus_per_worker": 0.15,
-    "num_gpus": 1.0,
+    "num_gpus": 0.15,
     "callbacks": {"on_episode_end": log_episode_info},
     "framework": "torch",
     "lr": 5e-5,

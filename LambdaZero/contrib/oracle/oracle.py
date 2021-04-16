@@ -51,7 +51,7 @@ class DockingOracle:
         return dockscores
 
 
-@ray.remote
+@ray.remote(num_cpus=0)
 class QEDEstimator:
     def __init__(self):
         pass
@@ -77,7 +77,7 @@ class QEDOracle:
         return qeds
 
 
-@ray.remote(num_gpus=0.05)
+@ray.remote(num_gpus=0.05, num_cpus=0)
 class ChempropWrapper_v2(ChempropWrapper_v1):
     def eval(self, m):
         return ChempropWrapper_v1.__call__(self, m)
