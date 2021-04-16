@@ -11,8 +11,8 @@ from LambdaZero.contrib.inputs import temp_load_data_v1
 from LambdaZero.contrib.loggers import log_episode_info
 import LambdaZero.contrib.functional
 
-from .config_model import load_seen_config
-from .config_acquirer import oracle_config, acquirer_config
+from LambdaZero.contrib.config_model import load_seen_config
+from LambdaZero.contrib.config_acquirer import oracle_config, acquirer_config
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 

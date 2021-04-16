@@ -1,2 +1,2 @@
 from .trainer import *
-from .boltzmann_trainer import *
+from .random_policy_trainer import *

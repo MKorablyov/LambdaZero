@@ -8,23 +8,22 @@ from ray.tune.logger import DEFAULT_LOGGERS
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger, TrialNameCreator
-from LambdaZero.contrib.config_boltzmann import DEFAULT_CONFIG
-import config_boltzmann
+from LambdaZero.contrib.config_random_policy import DEFAULT_CONFIG
+import config_random_policy
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "bltz_001"
-config = getattr(config_boltzmann,config_name)
+else: config_name = "rand_001"
+config = getattr(config_random_policy, config_name)
 config = merge_dicts(DEFAULT_CONFIG, config)
 
 # also make it work on one GPU and less RAM when on Maksym's machine
 machine = socket.gethostname()
 if machine == "Ikarus":
-    config = merge_dicts(config, config_boltzmann.debug_config)
+    config = merge_dicts(config, config_random_policy.debug_config)
 
 
 if __name__ == "__main__":
-
     ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
