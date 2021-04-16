@@ -93,6 +93,32 @@ class ProxyRewardSparse(ProxyReward):
         return reward, info
 
 
+class ProxyRewardOradcle(ProxyReward):
+    def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff,
+                 exp_dock, always_discount, synth_options, **kwargs):
+        self.env_name = np.random.uniform()
+        self.qed_cutoff = qed_cutoff
+        self.synth_cutoff = synth_cutoff
+        self.exp_dock = exp_dock
+        self.always_discount = always_discount
+        self.qed_oracle = QEDOracle(num_threads=1)
+        self.synth_oracle = SynthOracle(synth_options, synth_config)
+        self.dockProxy_actor = Actor(scoreProxy, actor_sync_freq)
+
+        # Candidate Molecule hard thresholds (Same in Proxy)
+        # Should be fixed in order to be able to compare runs across different training configs
+        self._log_cand_qed_th = LOG_CANDIDATE_QED_SCORE
+        self._log_cand_synth_th = LOG_CANDIDATE_SYNTH_SCORE
+
+    def __call__(self, molecule, agent_stop, env_stop, num_steps):
+        if agent_stop or env_stop:
+            reward, info = ProxyReward.eval(self, molecule)
+            info["ended_on_env_stop"] = float(env_stop)
+        else:
+            reward, info = 0.0, {}
+        return reward, info
+
+
 
 
 
