@@ -1,6 +1,7 @@
 import ray
 from copy import deepcopy
 from ray.tune.integration.wandb import WandbLoggerCallback, _clean_log
+import os
 
 @ray.remote
 class RemoteLogger:
@@ -20,6 +21,12 @@ class RemoteLogger:
         logs = deepcopy(self.logs)
         self.logs = []
         return logs
+
+    def config_name(self):
+        return self._config_name
+
+    def set_config(self, cfgn):
+        self._config_name = cfgn
 
 
 class WandbRemoteLoggerCallback(WandbLoggerCallback):
