@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import DataLoader
+from sklearn.metrics import explained_variance_score
 #from LambdaZero.models.torch_graph_models import MPNNet_Parametric, fast_from_data_list
 from LambdaZero.inputs.inputs_op import _brutal_dock_proc
 from torch_geometric.data import Batch
@@ -14,6 +15,9 @@ from LambdaZero.contrib.inputs import ListGraphDataset
 from .model_with_uncertainty import ModelWithUncertainty
 from copy import deepcopy
 from .metrics import uncertainty_metrics
+import os
+
+
 def train_epoch(loader, model, optimizer, device):
     model.train()
     epoch_y = []
@@ -30,7 +34,9 @@ def train_epoch(loader, model, optimizer, device):
         epoch_y_hat.append(y_hat[:,0].detach().cpu().numpy())
     epoch_y = np.concatenate(epoch_y,0)
     epoch_y_hat = np.concatenate(epoch_y_hat, 0)
-    return {"model/train_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
+    return {"model/train_mse_loss":((epoch_y_hat-epoch_y)**2).mean(),
+            "model/train_explained_variance": explained_variance_score(epoch_y, epoch_y_hat)
+            }
 
 
 def val_epoch(loader, model, device):
@@ -44,7 +50,9 @@ def val_epoch(loader, model, device):
         epoch_y_hat.append(y_hat[:,0].detach().cpu().numpy())
     epoch_y = np.concatenate(epoch_y,0)
     epoch_y_hat = np.concatenate(epoch_y_hat, 0)
-    return {"model/val_mse_loss":((epoch_y_hat-epoch_y)**2).mean()}
+    return {"model/val_mse_loss":((epoch_y_hat-epoch_y)**2).mean(),
+            "model/val_explained_variance": explained_variance_score(epoch_y, epoch_y_hat)
+            }
 
 
 class EvaluateOnDatasets():
@@ -126,29 +134,36 @@ class MolMCDropGNN(ModelWithUncertainty):
 
         # ==========================================================================================
         # -- Log actual values
-        data = {
-            "before_mean": mean.copy(),
-            "before_var": var.copy(),
-            "target": y_new.copy()
-        }
+        # data = {
+        #     "before_mean": mean.copy(),
+        #     "before_var": var.copy(),
+        #     "before_expv": explained_variance_score(y_new, mean),
+        #     "target": y_new.copy()
+        # }
         # ==========================================================================================
 
-        self.logger.log.remote({"model/acquired_mse_before_update":((np.array(y_new) - np.array(mean))**2).mean()})
+        self.logger.log.remote({"model/acquired_mse_before_update":((np.array(y_new) - np.array(mean))**2).mean(),
+                                "model/explained_variance_before_update": explained_variance_score(y_new, mean)
+                                })
         self.fit(x+x_new, y+y_new)
         mean, var = self.get_mean_and_variance(x_new)
+        self.logger.log.remote({"model/acquired_mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean(),
+                                "model/explained_variance_after_update": explained_variance_score(y_new, mean)
+                                })
 
         # ==========================================================================================
         # -- Log actual values
-        data["after_mean"] = mean
-        data["after_var"] = var
-        out_path = "/home/andrein/scratch/Summaries/debug/30k_acq_model_pred"
-        print(out_path)
-        torch.save(data, f"{out_path}_{self._istep}")
-        print("SAVE ------")
-        self._istep += 1
+        # data["after_mean"] = mean
+        # data["after_var"] = var
+        # data["after_expv"] = explained_variance_score(y_new, mean)
+        # cfg_name = ray.get(self.logger.config_name.remote())
+        # out_path = f"/home/andrein/scratch/Summaries/debug/{cfg_name}_acq_model_pred"
+        # print(out_path)
+        # torch.save(data, f"{out_path}_{self._istep}")
+        # print("SAVE ------")
+        # self._istep += 1
         # ==========================================================================================
 
-        self.logger.log.remote({"model/acquired_mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean()})
         return None
 
     def get_mean_and_variance(self,x):
