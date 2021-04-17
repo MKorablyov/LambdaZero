@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from torch.nn import functional as F
 
 def satlins(x, cutoff0, cutoff1, eps_min=0.01):
     "shifted saturated linearity activation function _/-"
@@ -18,7 +19,8 @@ def elu2(x, x_shift=-1., y_shift=1., epsilon=math.e):
             act.append(float(y_shift + (epsilon ** val-1)))
     return act
 
-
+def torch_elu2(x, x_shift=-1, y_shift=1.):
+    return y_shift + F.elu(x_shift + x)
 
 
 if __name__ == "__main__":

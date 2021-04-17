@@ -1,6 +1,8 @@
+import os.path
+import random, string, time
 import os.path as osp
 from ray.rllib.utils import merge_dicts
-
+import pandas as pd
 import LambdaZero.utils
 from LambdaZero.contrib.trainer import RandomPolicyTrainer
 from LambdaZero.contrib.loggers import log_episode_info
@@ -11,13 +13,26 @@ from LambdaZero.contrib.inputs import temp_load_data_v1
 from LambdaZero.environments import BlockMolEnvGraph_v1
 from LambdaZero.contrib.config_model import load_seen_config
 from LambdaZero.contrib.config_acquirer import oracle_config, acquirer_config
-
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-
 # change default settings for oracle and acquirer
-oracle_config = merge_dicts(oracle_config, {"num_threads": 16})
+oracle_config = merge_dicts(oracle_config, {"num_threads": 24})
 acquirer_config = merge_dicts(acquirer_config, {"acq_size": 256, "kappa": 2.0})
+
+
+class SaveDocked:
+    def __init__(self, outpath=osp.join(summaries_dir, "save_docked")):
+        self.outpath = outpath
+        if not osp.exists(outpath):os.makedirs(outpath)
+
+    def __call__(self, proposed_x, proposed_d, proposed_acq, x, d, acq, info, y, oname=None):
+        oname = oname or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+        smiles, qed, synth_score = [xi["smiles"] for xi in x], [xi["qed"] for xi in x], [xi["synth_score"] for xi in x]
+        df = pd.DataFrame(
+            {"smiles": smiles, "qed": qed, "synth_score": synth_score, "norm_dockscore": y, "discount": d})
+        df.to_feather(os.path.join(self.outpath, oname + ".feather"))
+        #print(pd.read_feather(os.path.join(self.outpath, oname + ".feather")))
+        return None
 
 
 proxy_config = {
@@ -27,6 +42,7 @@ proxy_config = {
     "oracle_config":oracle_config,
     "load_seen": temp_load_data_v1,
     "load_seen_config": load_seen_config,
+    "after_acquire":[SaveDocked()],
 }
 
 
