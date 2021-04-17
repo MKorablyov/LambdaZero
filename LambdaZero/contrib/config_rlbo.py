@@ -23,6 +23,7 @@ proxy_config = {
     "oracle_config":oracle_config,
     "load_seen": temp_load_data_v1,
     "load_seen_config": load_seen_config,
+    "after_acquire":[],
 }
 
 trainer_config = { # tune trainable config to be more precise
