@@ -49,6 +49,7 @@ proxy_config = {
 trainer_config = { # tune trainable config to be more precise
     "env": BlockMolEnvGraph_v1,
     "env_config": {
+        "molMDP_config": {"blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json")},
         "random_steps": 4,
         "allow_removal": True,
         "reward": ProxyReward,
@@ -74,6 +75,7 @@ trainer_config = { # tune trainable config to be more precise
             "project": "rlbo4",
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
+
 
 
 DEFAULT_CONFIG = {
@@ -111,5 +113,9 @@ debug_config = {
                                 "train_epochs":2,
                                 "batch_size":5,
                         }}}}}}}}
+
+
+
+
 
 rand_001 = {}
