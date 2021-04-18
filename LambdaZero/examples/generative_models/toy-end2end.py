@@ -349,7 +349,7 @@ dev = torch.device(args.device)
 tf = lambda x: torch.FloatTensor(x).to(dev)
 tl = lambda x: torch.LongTensor(x).to(dev)
 
-TEST_FUNC = (lambda x: ((np.cos(x * 50 - 2) * np.sin(20 * x + 2) + 1) * norm.pdf(x * 5, loc=2, scale=2)) + 0.01)
+TEST_FUNC = (lambda x: ((np.cos(x * 50 - 2) * np.sin(10 * x + 2) + 1) * norm.pdf(x * 5, loc=2, scale=2)) + 0.01)
 LOGINF = torch.tensor(1000).to(dev)
 
 if __name__ == "__main__":
