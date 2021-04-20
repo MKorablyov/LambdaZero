@@ -177,13 +177,21 @@ class BlockMolEnv_v3:
         terminate = False
         molecule = self.molMDP.molecule
         # max steps
-        if self.num_steps >= self.max_steps: terminate = True
+        if self.num_steps >= self.max_steps:
+            terminate = True
+            #print("terminating on max steps!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         # max_branches
-        if len(molecule.stems) >= self.max_branches: terminate = True
+        if len(molecule.stems) >= self.max_branches:
+            terminate = True
+            #print("terminating on max branches!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         # max blocks
-        if len(molecule.jbond_atmidxs) >= self.max_blocks-1: terminate = True
+        if len(molecule.jbond_atmidxs) >= self.max_blocks-1:
+            terminate = True
+            #print("terminating on max jbonds !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         # max_atoms
-        if molecule.slices[-1] >= self.max_atoms: terminate = True
+        if molecule.slices[-1] >= self.max_atoms:
+            terminate = True
+            #print("terminating on max atoms!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         return terminate
 
     def reset(self):

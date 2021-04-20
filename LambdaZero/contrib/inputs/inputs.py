@@ -86,7 +86,15 @@ def temp_load_data_v1(mean, std, act_y, dataset_split_path, raw_path, proc_path,
         if not osp.exists(proc_path): os.makedirs(proc_path)
         for file_name in file_names:
             docked_index = pd.read_feather(osp.join(raw_path, file_name + ".feather"))
-            y = list(((mean - docked_index["dockscore"].to_numpy(dtype=np.float32)) / std))
+
+            if mean == None and std == None and act_y == None:
+                y = docked_index["norm_dockscore"].to_list()
+                print("using norm dockscores from the dataset")
+            else:
+                y = list(((mean - docked_index["dockscore"].to_numpy(dtype=np.float32)) / std))
+                y = act_y(y) # apply soft negatives
+                print("using original dockscores in the dataset and normalizing them")
+
             smis = docked_index["smiles"].tolist()
             graphs = ray.get([obs_from_smi.remote(smi) for smi in smis])
             # save graphs
@@ -103,9 +111,6 @@ def temp_load_data_v1(mean, std, act_y, dataset_split_path, raw_path, proc_path,
         graphs = separate(data, slices)
         graph_list.extend(graphs)
         y_list.extend(y)
-
-    # apply soft negatives
-    y_list = act_y(y_list)
 
     # split into train test sets
     train_idxs, val_idxs, _ = np.load(dataset_split_path, allow_pickle=True)

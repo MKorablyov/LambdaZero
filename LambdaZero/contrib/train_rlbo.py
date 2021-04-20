@@ -16,7 +16,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "rlbo_001"
+else: config_name = "rlbo4_007"
 config = getattr(config_rlbo,config_name)
 config = merge_dicts(DEFAULT_CONFIG, config)
 if len(sys.argv) >=3:
