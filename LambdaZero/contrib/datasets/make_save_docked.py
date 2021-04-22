@@ -1,4 +1,5 @@
 import sys, os, time
+import numpy as np
 import os.path as osp
 import pandas as pd
 from matplotlib import pyplot as plt

@@ -142,8 +142,8 @@ class GraphMolObs:
             stem_idx = mol.stem_atmidxs[:self.max_stems]
             stem_mask = torch.zeros((g.x.shape[0], 1))
             stem_mask[torch.tensor(stem_idx).long()] = 1
-            g.stem_atmidx = torch.tensor(
-                np.concatenate([stem_idx, np.zeros(self.max_stems - len(stem_idx))], 0)).long()
+            g.stem_atmidx = torch.tensor(np.concatenate(
+                [stem_idx, np.zeros(self.max_stems - len(stem_idx))], 0)).long()
             #g.x = torch.cat([g.x, stem_mask], 1)
 
         if self.jbond_indices: # Add jbond indices

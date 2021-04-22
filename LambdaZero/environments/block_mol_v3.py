@@ -113,8 +113,6 @@ DEFAULT_CONFIG = {
 class BlockMolEnv_v3:
     mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems"]
     def __init__(self, config=None):
-        #warnings.warn("BlockMolEnv_v3 is deprecated for BlockMolEnv_v4")
-
         config = merge_dicts(DEFAULT_CONFIG, config)
 
         self.num_blocks = config["num_blocks"]
@@ -206,14 +204,14 @@ class BlockMolEnv_v3:
             self.step(action)
             obs, graph = self._make_obs()
             if self._if_terminate():
-                print("bad molecule init: resetting MDP")
+                #print("bad molecule init: resetting MDP")
                 self.molMDP.reset()
         try:
             assert self.molMDP.molecule is not None, "molecule is None"
             # try if the molecule produces valid smiles string
             self.molMDP.molecule.smiles
         except Exception as e:
-            print("initialized environment with invalid molecule", e)
+            #print("initialized environment with invalid molecule", e)
             return self.reset()
         self.num_steps = 0
         return obs
@@ -222,9 +220,10 @@ class BlockMolEnv_v3:
         if not action in np.where(self._prev_obs["action_mask"])[0]:
             raise ValueError('illegal action:', action, "available", np.sum(self._prev_obs["action_mask"]))
 
-        if (action == 0):
+        print("num atoms before step",  self.molMDP.molecule.slices[-1])
+        if (action == 0): # 0
             agent_stop = True
-        elif action <= (self.max_blocks - 1):
+        elif action <= (self.max_blocks - 1): # 3 max_blocks; action<=2; 0,1,2
             agent_stop = False
             self.molMDP.remove_jbond(jbond_idx=action-1)
         else:
@@ -246,7 +245,8 @@ class BlockMolEnv_v3:
         else:
             smiles = None
         info = {"molecule": smiles, "log_vals": log_vals}
-        done = any((agent_stop, env_stop))
+        done = agent_stop or env_stop
+        print("num atoms after step", self.molMDP.molecule.slices[-1])
         return obs, reward, done, info
 
     def get_state(self):

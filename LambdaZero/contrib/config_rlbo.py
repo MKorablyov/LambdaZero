@@ -958,3 +958,108 @@ rlbo4_007 = {
                             "brutal_dock/seh/raw/random_molecule_proxy_20k_3k.npy"),
                             "file_names": ["random_molecule_proxy_20k"], }
                     }}}}}}
+
+
+
+rlbo4_008 = {
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 5e-4,
+            "model":{"custom_model_config": {"num_blocks": 464}},
+            "env_config": {
+                "random_steps": 4,
+             "molMDP_config": {
+                 "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"), # more blocks
+                 },
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquirer_config": {
+                            "kappa": 1.0
+                        },
+                        "load_seen_config": {
+                            "mean":None, "std":None, "act_y":None,
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
+                            "file_names": ["random_molecule_proxy_20k"], }
+                    }}}}}}
+
+rlbo4_009 = {
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 2e-4,
+            "model":{"custom_model_config": {"num_blocks": 464}},
+            "env_config": {
+                "random_steps": 4,
+             "molMDP_config": {
+                 "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"), # more blocks
+                 },
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquirer_config": {
+                            "kappa": 1.0
+                        },
+                        "load_seen_config": {
+                            "mean":None, "std":None, "act_y":None,
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
+                            "file_names": ["random_molecule_proxy_20k"], }
+                    }}}}}}
+
+rlbo4_010 = {
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config": {
+                "random_steps": 4,
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquirer_config": {
+                            "kappa": 1.0
+                        },
+                        "load_seen_config": {
+                            "mean":None, "std":None, "act_y":None,
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
+                            "file_names": ["random_molecule_proxy_20k"], }
+                    }}}}}}
+
+rlbo4_011 = {
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config": {
+                "random_steps": 4,
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquirer_config": {
+                            "kappa": 5.0
+                        },
+                        "load_seen_config": {
+                            "mean":None, "std":None, "act_y":None,
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
+                            "file_names": ["random_molecule_proxy_20k"], }
+                    }}}}}}
+
+rlbo4_012 = {
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config": {
+                "random_steps": 4,
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquirer_config": {
+                            "kappa": 10.0
+                        },
+                        "load_seen_config": {
+                            "mean":None, "std":None, "act_y":None,
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
+                            "file_names": ["random_molecule_proxy_20k"], }
+                    }}}}}}

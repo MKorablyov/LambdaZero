@@ -16,8 +16,8 @@ DEFAULT_CONFIG = {
     #"split_name": "randsplit_dock_blocks105_walk40_clust",
     "dataset_root": os.path.join(datasets_dir, "brutal_dock/seh"),
     "file_names": ["random_molecule_proxy_20k"],
-    "split_name": "random_molecule_proxy_20k_3k",
-    "probs": [0.35, 0.2, 0.45],
+    "split_name": "random_molecule_proxy_20k",
+    "probs": [0.6, 0.2, 0.2],
 }
 config = DEFAULT_CONFIG
 
