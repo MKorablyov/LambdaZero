@@ -7,6 +7,8 @@ from LambdaZero.environments.molMDP import MolMDP
 import LambdaZero.utils
 from LambdaZero.environments.block_mol_v3 import synth_config
 from LambdaZero.contrib.reward import DummyReward
+from LambdaZero.environments.block_mol_graph_v1 import GraphMolObs
+
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 DEFAULT_CONFIG = {
@@ -29,12 +31,11 @@ DEFAULT_CONFIG = {
     "max_steps": 7,
     "max_blocks": 10,
     "max_atoms": 55,
-    "max_branches": 40,
+    "max_branches": 50,
     "random_steps": 5,
     "reset_min_blocks": 3,
     "allow_removal": True
 }
-
 
 
 class BlockMolGraph_v2:
@@ -45,6 +46,8 @@ class BlockMolGraph_v2:
         self.molMDP = MolMDP(**config["molMDP_config"])
         if config["num_blocks"] is None:
             self.num_blocks = len(self.molMDP.block_smi)
+        else:
+            self.num_blocks = config["num_blocks"]
 
         self.max_steps = config["max_steps"]
         self.max_branches = config["max_branches"]
@@ -55,13 +58,19 @@ class BlockMolGraph_v2:
         self.allow_removal = config["allow_removal"]
         num_actions = self.max_blocks + self.max_branches * self.num_blocks
 
-        self.action_space = Discrete(num_actions,)
+        self.graph_mol_obs = GraphMolObs(config['obs_config'], self.max_branches, self.max_blocks - 1)
+
+        self.action_space = Discrete(num_actions, )
+        self.action_space.max_branches = self.max_branches
+        self.action_space.max_blocks = self.max_blocks
+        self.action_space.num_blocks = self.num_blocks
+
         self.observation_space = Dict({
+            "mol_graph": self.graph_mol_obs.space,
             "num_steps": Discrete(n=self.max_steps + 1),
             "action_mask": Box(low=0, high=1, shape=(num_actions,)),
         })
         self.reward = config["reward"](**config["reward_config"])
-
 
     def _action_mask(self, verbose=False):
         # break actions
@@ -81,7 +90,9 @@ class BlockMolGraph_v2:
 
     def _make_obs(self):
         action_mask = self._action_mask()
-        obs = {"action_mask": action_mask,
+        graph, flat_graph = self.graph_mol_obs(self.molMDP.molecule)
+        obs = {"mol_graph": flat_graph,
+               "action_mask": action_mask,
                "num_steps": self.num_steps}
         return obs, None
 
@@ -89,16 +100,13 @@ class BlockMolGraph_v2:
         terminate = False
         molecule = self.molMDP.molecule
         # max steps
-        if self.num_steps >= self.max_steps:
-            terminate = True
+        if self.num_steps >= self.max_steps: terminate = True
         # max_branches
-        if len(molecule.stems) >= self.max_branches:
-            terminate = True
+        if len(molecule.stems) >= self.max_branches: terminate = True
         # max blocks
         if len(molecule.jbond_atmidxs) >= self.max_blocks-1: terminate = True
         # max_atoms
-        if molecule.slices[-1] >= self.max_atoms:
-            terminate = True
+        if molecule.slices[-1] >= self.max_atoms: terminate = True
         return terminate
 
     def _random_steps(self):
@@ -118,8 +126,8 @@ class BlockMolGraph_v2:
             return obs
 
     def reset(self):
-        reset_success = False
-        while not reset_success:
+        feasible_state = False
+        while not feasible_state:
             obs = self._random_steps()
             try:
                 assert self.molMDP.molecule is not None, "molecule is None"
@@ -129,8 +137,7 @@ class BlockMolGraph_v2:
                 continue
             if self.molMDP.molecule.numblocks < self.reset_min_blocks:
                 continue
-            reset_success = True
-
+            feasible_state = True
         return obs
 
     def step(self, action):

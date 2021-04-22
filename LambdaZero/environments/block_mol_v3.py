@@ -126,6 +126,8 @@ class BlockMolEnv_v3:
         self.max_atoms = config["max_atoms"]
         self.random_steps = config["random_steps"]
         self.allow_removal = config["allow_removal"]
+        print("allow removal", self.allow_removal)
+        time.sleep(100)
         num_actions = self.max_blocks + self.max_branches * self.num_blocks
 
         self.action_space = Discrete(num_actions,)
@@ -220,7 +222,7 @@ class BlockMolEnv_v3:
         if not action in np.where(self._prev_obs["action_mask"])[0]:
             raise ValueError('illegal action:', action, "available", np.sum(self._prev_obs["action_mask"]))
 
-        print("num atoms before step",  self.molMDP.molecule.slices[-1])
+        #print("num atoms before step",  self.molMDP.molecule.slices[-1])
         if (action == 0): # 0
             agent_stop = True
         elif action <= (self.max_blocks - 1): # 3 max_blocks; action<=2; 0,1,2
@@ -246,7 +248,7 @@ class BlockMolEnv_v3:
             smiles = None
         info = {"molecule": smiles, "log_vals": log_vals}
         done = agent_stop or env_stop
-        print("num atoms after step", self.molMDP.molecule.slices[-1])
+        #print("num atoms after step", self.molMDP.molecule.slices[-1])
         return obs, reward, done, info
 
     def get_state(self):

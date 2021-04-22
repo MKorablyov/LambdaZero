@@ -162,7 +162,7 @@ class GraphMolObs:
             g.edge_attr = torch.zeros((1, g.edge_attr.shape[1])).float()
             g.stem_atmidx = torch.zeros((self.max_stems,)).long()
 
-        # todo: check if emty graphs could be acquired!!
+        # todo: check if empty graphs could be acquired!!
         g_flat = self.space.pack(g)
         #g_ = self.space.unpack(g_flat)
         #if g is not None:
@@ -193,6 +193,7 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         self.max_atoms = config["max_atoms"]
         self.random_steps = config["random_steps"]
         self.allow_removal = config["allow_removal"]
+
         num_actions = self.max_blocks + self.max_branches * self.num_blocks
 
         self.graph_mol_obs = GraphMolObs(config['obs_config'], self.max_branches, self.max_blocks-1)
