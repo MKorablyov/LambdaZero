@@ -126,8 +126,6 @@ class BlockMolEnv_v3:
         self.max_atoms = config["max_atoms"]
         self.random_steps = config["random_steps"]
         self.allow_removal = config["allow_removal"]
-        print("allow removal", self.allow_removal)
-        time.sleep(100)
         num_actions = self.max_blocks + self.max_branches * self.num_blocks
 
         self.action_space = Discrete(num_actions,)
@@ -168,7 +166,7 @@ class BlockMolEnv_v3:
                "stem_fps": stem_fps,
                "jbond_fps": jbond_fps,
                "action_mask": action_mask,
-               "num_steps": self.num_steps}
+               "nufm_steps": self.num_steps}
 
         self._prev_obs = obs
         return obs, None

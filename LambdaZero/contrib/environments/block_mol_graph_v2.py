@@ -29,7 +29,7 @@ DEFAULT_CONFIG = {
     "reward": DummyReward,
     "num_blocks": None, # 105, 464
     "max_steps": 7,
-    "max_blocks": 10,
+    "max_blocks": 15,
     "max_atoms": 55,
     "max_branches": 50,
     "random_steps": 5,

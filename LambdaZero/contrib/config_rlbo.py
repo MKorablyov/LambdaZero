@@ -82,7 +82,7 @@ debug_config = {
             "num_workers": 2,
             "num_gpus":0.3,
             "num_gpus_per_worker":0.15,
-            "train_batch_size": 256,
+            "train_batch_size": 256000, # never train
             "sgd_minibatch_size": 4,
             "env_config":{
                 "reward_config":{
