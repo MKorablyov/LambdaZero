@@ -21,7 +21,7 @@ if __name__ == "__main__":
     else:
         config_name = "rlbo4_001"
     config = getattr(config_rlbo, config_name)
-    config = merge_dicts(config_rlbo.DEFAULT_CONFIG, config)
+    config = merge_dicts(config.pop("default"), config)
 
     # also make it work on one GPU and less RAM when on Maksym's machine
     machine = socket.gethostname()

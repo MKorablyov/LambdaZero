@@ -15,8 +15,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 # change default settings for oracle
 config_DockingOracle_def1 = merge_dicts(config_DockingOracle_v1, {"num_threads": 24})
 
-
-trainer_config = { # tune trainable config to be more precise
+config_randpolicy_run_v1 = { # tune trainable config to be more precise
     "env": BlockMolEnvGraph_v1,
     "env_config": {
         "molMDP_config": {"blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json")},
@@ -47,10 +46,9 @@ trainer_config = { # tune trainable config to be more precise
         }}}
 
 
-
-DEFAULT_CONFIG = {
+config_randpolicy_v1 = {
     "tune_config":{
-        "config":trainer_config,
+        "config":config_randpolicy_run_v1,
         "local_dir": summaries_dir,
         "run_or_experiment": RandomPolicyTrainer,
         "checkpoint_freq": 25000000,
@@ -84,4 +82,6 @@ debug_config = {
                                 "batch_size":5,
                         }}}}}}}}
 
-rand_001 = {}
+rand_001 = {
+    "default":config_randpolicy_v1,
+            }

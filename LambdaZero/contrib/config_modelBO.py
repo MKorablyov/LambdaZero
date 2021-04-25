@@ -8,8 +8,7 @@ from LambdaZero.contrib.trainer import BasicTrainer
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
-
-trainer_config = { # tune trainable config
+config_modelBO_run_v1 = { # tune trainable config
     "load_data":temp_load_data,
     "load_data_config":config_temp_load_data_v1,
     "model": MolMCDropGNN,
@@ -21,9 +20,9 @@ trainer_config = { # tune trainable config
         }}
 }
 
-DEFAULT_CONFIG = {
+config_modelBO_v1 = {
     "tune_config":{
-        "config": trainer_config,
+        "config": config_modelBO_run_v1,
         "local_dir": summaries_dir,
         "run_or_experiment": BasicTrainer,
         "checkpoint_freq": 250000, # todo: implement _save to be able to checkpoint
@@ -38,6 +37,7 @@ DEFAULT_CONFIG = {
 }
 
 model_001 = {
+    "default": config_modelBO_v1,
     "tune_config":{
         "config": {"model_config": {"log_epoch_metrics":True,
                                     "train_epochs":75

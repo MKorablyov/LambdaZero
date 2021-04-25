@@ -14,17 +14,7 @@ import LambdaZero.contrib.functional
 import LambdaZero.utils
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-#config = merge_dicts(DEFAULT_CONFIG, config)
-#if len(sys.argv) >=3:
-#    if sys.argv[2] == "cpu": config = merge_dicts(config, config_rlbo.config_cpu)
-# todo: allow to build config with different defaults
-# rlbo
-#   import rlllib_default1
-#   env : { num_steps  :2}
-#   rlbo_001 = merge_dicts(rlib_default1, env)
-
-
-trainer_config = { # tune trainable config to be more precise
+config_rlbo_run_v1 = { # tune trainable config to be more precise
     "env": BlockMolEnvGraph_v1, # todo: make ray remote environment
     "env_config": {
         "random_steps": 4,
@@ -60,9 +50,9 @@ trainer_config = { # tune trainable config to be more precise
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
 
-DEFAULT_CONFIG = {
+config_rlbo_v1 = {
     "tune_config":{
-        "config":trainer_config,
+        "config": config_rlbo_run_v1,
         "local_dir": summaries_dir,
         "run_or_experiment": PPOTrainer,
         "checkpoint_freq": 250,
@@ -111,9 +101,8 @@ config_cpu = {
                                 "device":"cpu"
                         }}}}}}}}
 
-
-
 rlbo4_001 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -137,6 +126,7 @@ rlbo4_001 = {
                     }}}}}}
 
 rlbo4_002 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -161,6 +151,7 @@ rlbo4_002 = {
 
 
 rlbo4_003 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -184,6 +175,7 @@ rlbo4_003 = {
                     }}}}}}
 
 rlbo4_004 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -207,6 +199,7 @@ rlbo4_004 = {
                     }}}}}}
 
 rlbo4_005 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -231,6 +224,7 @@ rlbo4_005 = {
 
 
 rlbo4_006 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -255,6 +249,7 @@ rlbo4_006 = {
 
 
 rlbo4_007 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -280,6 +275,7 @@ rlbo4_007 = {
 
 
 rlbo4_008 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -303,6 +299,7 @@ rlbo4_008 = {
                     }}}}}}
 
 rlbo4_009 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -326,6 +323,7 @@ rlbo4_009 = {
                     }}}}}}
 
 rlbo4_010 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -345,6 +343,7 @@ rlbo4_010 = {
                     }}}}}}
 
 rlbo4_011 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,
@@ -364,26 +363,7 @@ rlbo4_011 = {
                     }}}}}}
 
 rlbo4_012 = {
-    "tune_config": {
-        "config": {
-            "lr": 5e-5,
-            "entropy_coeff": 1e-3,
-            "env_config": {
-                "random_steps": 4,
-                "reward_config": {
-                    "scoreProxy_config": {
-                        "acquisition_config": {
-                            "kappa": 10.0
-                        },
-                        "load_seen_config": {
-                            "mean":None, "std":None, "act_y":None,
-                            "dataset_split_path": osp.join(datasets_dir,
-                            "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
-                            "file_names": ["random_molecule_proxy_20k"], }
-                    }}}}}}
-
-
-rlbo4_013 = {
+    "default":config_rlbo_v1,
     "tune_config": {
         "config": {
             "lr": 5e-5,

@@ -19,7 +19,7 @@ if __name__ == "__main__":
     else:
         config_name = "rand_001"
     config = getattr(config_randpolicy, config_name)
-    config = merge_dicts(config_randpolicy.DEFAULT_CONFIG, config)
+    config = merge_dicts(config.pop("default"), config)
 
     # also make it work on one GPU and less RAM when on Maksym's machine
     machine = socket.gethostname()

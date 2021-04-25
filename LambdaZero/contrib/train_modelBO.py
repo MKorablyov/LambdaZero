@@ -8,7 +8,6 @@ from ray.rllib.utils import merge_dicts
 import LambdaZero.utils
 from LambdaZero.contrib.loggers import RemoteLogger, WandbRemoteLoggerCallback, TrialNameCreator
 from LambdaZero.contrib import config_modelBO
-from LambdaZero.contrib.config_modelBO import DEFAULT_CONFIG
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -20,7 +19,7 @@ if __name__ == "__main__":
     else:
         config_name = "model_001"
     config = getattr(config_modelBO, config_name)
-    config = merge_dicts(DEFAULT_CONFIG, config)
+    config = merge_dicts(config.pop("default"), config)
 
     # initialize loggers
     ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
