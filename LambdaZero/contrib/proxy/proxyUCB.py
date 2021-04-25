@@ -3,7 +3,7 @@ import numpy as np
 import ray
 from LambdaZero.contrib.acquisition import UCB, config_UCB_v1, config_UCB_v2
 from LambdaZero.contrib.oracle import DockingOracle, config_DockingOracle_v1
-from LambdaZero.contrib.data import temp_load_data, config_temp_load_data_v1
+from LambdaZero.contrib.data import temp_load_data, config_temp_load_data_v1, config_temp_load_data_v2
 from .proxy import Proxy, SaveDocked
 
 

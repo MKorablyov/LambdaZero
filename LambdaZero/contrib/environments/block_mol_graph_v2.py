@@ -5,27 +5,32 @@ from ray.rllib.utils import merge_dicts
 
 from LambdaZero.environments.molMDP import MolMDP
 import LambdaZero.utils
-from LambdaZero.environments.block_mol_v3 import synth_config
-from LambdaZero.contrib.reward import DummyReward
+from LambdaZero.contrib.data import config_temp_load_data_v2
+from LambdaZero.contrib.reward import ProxyRewardSparse
+from LambdaZero.contrib.proxy import ProxyUCB, config_ProxyUCB_v1
 from LambdaZero.environments.block_mol_graph_v1 import GraphMolObs
+
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
+# change default config proxy UCB
+config_ProxyUCB = merge_dicts(config_ProxyUCB_v1, {"load_seen_config": config_temp_load_data_v2})
+
 DEFAULT_CONFIG = {
-    "obs_config": {
-    },
+    "obs_config":{}, # can't be changed without changing dataset
     "molMDP_config": {
-        "blocks_file": osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"),
+        "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"),  # 464 blocks
     },
+
+    "reward": ProxyRewardSparse,
     "reward_config": {
-        "binding_model": osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth"),
+        "synth_options": {"num_gpus": 0.05},
         "qed_cutoff": [0.2, 0.5],
         "synth_cutoff": [0, 4],
-        "synth_config": synth_config,
-        "device": "cuda",
+        "actor_sync_freq": 150,
     },
-    "reward": DummyReward,
-    "num_blocks": None, # 105, 464
+
+    "num_blocks": None,
     "max_steps": 7,
     "max_blocks": 15,
     "max_atoms": 55,
@@ -92,7 +97,8 @@ class BlockMolGraph_v2:
         obs = {"mol_graph": flat_graph,
                "action_mask": action_mask,
                "num_steps": self.num_steps}
-        return obs, None
+        self.molMDP.molecule.graph = graph  # fixme: todo is inherited workaround
+        return obs
 
     def _should_stop(self):
         terminate = False
@@ -108,59 +114,56 @@ class BlockMolGraph_v2:
         return terminate
 
     def _random_steps(self):
+        self.molMDP.reset()
+        self.num_steps = 0
         for i in range(self.random_steps):
-            self.num_steps = 0
-            self.molMDP.reset()
-            self.reward.reset()
-            obs, graph = self._make_obs()
-
-            for i in range(self.random_steps):
-                actions = np.where(obs["action_mask"])[0]
-                action = np.random.choice(actions)
-                self.step(action)
-                if self._should_stop(): self.molMDP.reset()
-                obs, graph = self._make_obs()
-                self.num_steps = 0
-            return obs
+            actions = np.where(self._action_mask())[0]
+            action = np.random.choice(actions)
+            self.step(action)
+            if self._should_stop():
+                self.molMDP.reset()
+        self.num_steps = 0
 
     def reset(self):
-        feasible_state = False
-        while not feasible_state:
-            obs = self._random_steps()
-            try:
-                assert self.molMDP.molecule is not None, "molecule is None"
-                # try if the molecule produces valid smiles string
-                self.molMDP.molecule.smiles
-            except Exception as e:
-                continue
+        molMDP_feasible = False
+        while not molMDP_feasible:
+            self._random_steps()
             if self.molMDP.molecule.numblocks < self.reset_min_blocks:
-                continue
-            feasible_state = True
-        return obs
+                molMDP_feasible = False
+            else:
+                molMDP_feasible = True
+        return self._make_obs()
 
     def step(self, action):
         self.num_steps += 1
-        # check if action is legal
-        action_mask = self._action_mask()
-        if not action in np.where(action_mask)[0]:
-            raise ValueError('illegal action:', action, "available", np.sum(action_mask))
+        try:
+            # check if action is legal
+            action_mask = self._action_mask()
+            if not action in np.where(action_mask)[0]:
+                raise ValueError('illegal action:', action, "available", np.sum(action_mask))
 
-        if (action == 0): # 0
-            agent_stop = True
-        elif action <= (self.max_blocks - 1): # 3 max_blocks; action<=2; 0,1,2
-            agent_stop = False
-            self.molMDP.remove_jbond(jbond_idx=action-1)
-        else:
-            agent_stop = False
-            stem_idx = (action - self.max_blocks) // self.num_blocks
-            block_idx = (action - self.max_blocks) % self.num_blocks
-            self.molMDP.add_block(block_idx=block_idx, stem_idx=stem_idx)
+            # do mol MDP step
+            if 0 < action <= (self.max_blocks - 1):  # 3 max_blocks; action<=2; 0,1,2
+                self.molMDP.remove_jbond(jbond_idx=action - 1)
+            elif action > (self.max_blocks-1):
+                stem_idx = (action - self.max_blocks) // self.num_blocks
+                block_idx = (action - self.max_blocks) % self.num_blocks
+                self.molMDP.add_block(block_idx=block_idx, stem_idx=stem_idx)
 
-        obs, graph = self._make_obs()
-        self.molMDP.molecule.graph = graph
-        # if env should stop
-        env_stop = self._should_stop()
-        done = agent_stop or env_stop
+            obs = self._make_obs()
+            env_stop = self._should_stop()
+            # some checks if molecule is reasonable
+            assert self.molMDP.molecule is not None, "molecule is None"
+            some = self.molMDP.molecule.smiles # try if the molecule produces valid smiles string
+            molMDPFailure = False
+        except Exception as e:
+            obs = self.reset()
+            env_stop, molMDPFailure = True, True
+            print("continuing skipping error in step", e)
+        agent_stop = (action==0)
+
         # compute reward
         reward, log_vals = self.reward(self.molMDP.molecule, agent_stop, env_stop, self.num_steps)
+        done = agent_stop or env_stop
+        log_vals["molMDPFailure"] = molMDPFailure # todo: maybe log molecule size etc from here
         return obs, reward, done, {"log_vals":log_vals}

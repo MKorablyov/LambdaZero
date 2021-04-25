@@ -75,3 +75,11 @@ config_temp_load_data_v1 = {
     "proc_path": osp.join(datasets_dir, "brutal_dock/seh/processed_rlbo"),
     "file_names": ["Zinc20_docked_neg_randperm_3k"],
 }
+
+config_temp_load_data_v2 = {
+    "mean": None, "std": None, "act_y": None,
+    "raw_path": osp.join(datasets_dir, "brutal_dock/seh/raw"),
+    "proc_path": osp.join(datasets_dir, "brutal_dock/seh/processed_rlbo"),
+    "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
+    "file_names": ["random_molecule_proxy_20k"],
+}

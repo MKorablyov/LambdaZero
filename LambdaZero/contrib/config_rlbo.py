@@ -3,6 +3,7 @@ from ray.rllib.agents.ppo import PPOTrainer
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.environments.persistent_search.persistent_buffer import BlockMolEnvGraph_v1
+from LambdaZero.contrib.environments import BlockMolGraph_v2
 from LambdaZero.environments.reward import PredDockReward_v2
 from LambdaZero.contrib.proxy import ProxyUCB, config_ProxyUCB_v1
 from LambdaZero.contrib.reward import ProxyReward, ProxyRewardSparse
@@ -50,6 +51,38 @@ config_rlbo_run_v1 = { # tune trainable config to be more precise
             "api_key_file": osp.join(summaries_dir, "wandb_key")
         }}}
 
+
+config_rlbo_run_v2 = { # tune trainable config to be more precise
+    "env": BlockMolGraph_v2,
+    "env_config": {
+        "reward": ProxyRewardSparse,
+        "reward_config": {
+            "scoreProxy": ProxyUCB,
+            "scoreProxy_config": config_ProxyUCB_v1,
+            "scoreProxy_options": {"num_cpus": 2, "num_gpus": 1.0},
+        }
+    },
+
+    "num_workers": 8,
+    "num_gpus_per_worker": 0.15,
+    "num_gpus": 1.0,
+    "model": {
+        "custom_model": "GraphMolActorCritic_thv1",
+        "custom_model_config": {
+            "num_blocks": 464,
+            "num_hidden": 64 # todo - may not be right for 464 blocks
+        },
+    },
+    "callbacks": {"on_episode_end": log_episode_info},
+    "framework": "torch",
+    "lr": 5e-5,
+    "logger_config":{
+        "wandb": {
+            "project": "rlbo4",
+            "api_key_file": osp.join(summaries_dir, "wandb_key")
+        }}}
+
+
 config_rlbo_v1 = {
     "tune_config":{
         "config": config_rlbo_run_v1,
@@ -61,6 +94,20 @@ config_rlbo_v1 = {
     "memory": 60 * 10 ** 9,
     "object_store_memory": 60 * 10 ** 9
 }
+
+
+config_rlbo_v2 = {
+    "tune_config":{
+        "config": config_rlbo_run_v2,
+        "local_dir": summaries_dir,
+        "run_or_experiment": PPOTrainer,
+        "checkpoint_freq": 250,
+        "stop":{"training_iteration": 2000},
+    },
+    "memory": 60 * 10 ** 9,
+    "object_store_memory": 60 * 10 ** 9
+}
+
 
 config_debug = {
     "memory": 7 * 10 ** 9,
@@ -382,3 +429,17 @@ rlbo4_012 = {
                             "file_names": ["random_molecule_proxy_20k"], }
                     }}}}}}
 
+
+rlbo4_013 = {
+    "default":config_rlbo_v2,
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config": {
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquisition_config": {
+                            "kappa": 1.0
+                        },
+                    }}}}}}
