@@ -430,7 +430,33 @@ rlbo4_012 = {
                     }}}}}}
 
 
+
+
 rlbo4_013 = {
+    "default":config_rlbo_v1,
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 2e-4,
+            "model":{"custom_model_config": {"num_blocks": 360}},
+            "env_config": {
+                "random_steps": 4,
+             "molMDP_config": {
+                 "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55_manFix2.json"), # more blocks
+                 },
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquisition_config": {
+                            "kappa": 1.0
+                        },
+                        "load_seen_config": {
+                            "mean":None, "std":None, "act_y":None,
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
+                            "file_names": ["random_molecule_proxy_20k"], }
+                    }}}}}}
+
+rlbo4_014 = {
     "default":config_rlbo_v2,
     "tune_config": {
         "config": {
@@ -443,3 +469,5 @@ rlbo4_013 = {
                             "kappa": 1.0
                         },
                     }}}}}}
+
+

@@ -1,8 +1,21 @@
 import os.path as osp
 import LambdaZero.utils
 import wandb
+import pandas as pd
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+
+
+blocks_file =osp.join(datasets_dir, "fragdb", 'pdb_blocks_55_manualFix2.json')
+#print(osp.exists(blocks_file))
+blocks = pd.read_json(blocks_file)
+
+print(blocks.to_string())
+
+
+
+
+
 
 logger_config = {
     "wandb": {

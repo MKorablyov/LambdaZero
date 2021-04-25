@@ -19,7 +19,7 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         config_name = sys.argv[1]
     else:
-        config_name = "rlbo4_013"
+        config_name = "rlbo4_001"
     config = getattr(config_rlbo, config_name)
     config = merge_dicts(config.pop("default"), config)
 
@@ -61,6 +61,6 @@ if __name__ == "__main__":
     config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
     # run
     tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))
-        #except Exception as e:
-        #    print(e)
+    # except Exception as e:
+    #    print(e)
     ray.shutdown()
