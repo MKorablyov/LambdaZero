@@ -1,4 +1,4 @@
-class ModelWithUncertainty:
+class ModelBO:
     def __init__(self, logger):
         # todo: maybe it could be initialized with x_val, y_val
         self.logger = logger

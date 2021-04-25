@@ -13,12 +13,10 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 DEFAULT_CONFIG = {
     "obs_config": {
-
     },
     "molMDP_config": {
         "blocks_file": osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"),
     },
-
     "reward_config": {
         "binding_model": osp.join(datasets_dir, "brutal_dock/mpro_6lze/trained_weights/vanilla_mpnn/model.pth"),
         "qed_cutoff": [0.2, 0.5],

@@ -1,47 +1,19 @@
 import os.path as osp
-import torch_geometric.transforms as T
+#import torch_geometric.transforms as T
 import LambdaZero.inputs
 import LambdaZero.utils
-from LambdaZero.contrib.inputs import temp_load_data_v1
-from LambdaZero.contrib.model_with_uncertainty import MolMCDropGNN
+from LambdaZero.contrib.data import temp_load_data, config_temp_load_data_v1
+from LambdaZero.contrib.modelBO import MolMCDropGNN, config_MolMCDropGNN_v1
 from LambdaZero.contrib.trainer import BasicTrainer
-from LambdaZero.contrib.functional import elu2
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-load_seen_config = {
-    "mean": -8.6,
-    "std": 1.1,
-    "act_y": elu2,
-    "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
-    "raw_path": osp.join(datasets_dir, "brutal_dock/seh/raw"),
-    "proc_path": osp.join(datasets_dir, "brutal_dock/seh/processed_rlbo"),
-    "file_names": ["Zinc20_docked_neg_randperm_3k"],
-}
 
-
-model_config = {
-    "train_epochs":75,
-    "batch_size":75,
-    "mpnn_config":{
-        "drop_last":True,
-        "drop_data":False,
-        "drop_weights":True,
-        "drop_prob":0.1,
-        "num_feat":14
-    },
-    "lr":1e-3,
-    "transform":None,
-    "num_mc_samples":10,
-    "log_epoch_metrics":False,
-    "device":"cuda"
-
-}
 
 trainer_config = { # tune trainable config
-    "load_data":temp_load_data_v1,
-    "load_data_config":load_seen_config,
+    "load_data":temp_load_data,
+    "load_data_config":config_temp_load_data_v1,
     "model": MolMCDropGNN,
-    "model_config":model_config,
+    "model_config": config_MolMCDropGNN_v1,
     "logger_config": {
         "wandb": {
             "project": "model_with_uncertainty1",
@@ -64,7 +36,6 @@ DEFAULT_CONFIG = {
     "memory": 10 * 10 ** 9,
     "object_store_memory": 10 * 10 ** 9
 }
-
 
 model_001 = {
     "tune_config":{

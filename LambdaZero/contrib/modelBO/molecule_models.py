@@ -11,8 +11,8 @@ from sklearn.metrics import explained_variance_score
 from torch_geometric.data import Batch
 from LambdaZero.models import MPNNetDrop
 from LambdaZero.inputs import random_split
-from LambdaZero.contrib.inputs import ListGraphDataset
-from .model_with_uncertainty import ModelWithUncertainty
+from LambdaZero.contrib.data import ListGraphDataset
+from .modelBO import ModelBO
 from copy import deepcopy
 from .metrics import uncertainty_metrics
 
@@ -65,10 +65,10 @@ class EvaluateOnDatasets():
         pass
 
 
-class MolMCDropGNN(ModelWithUncertainty):
+class MolMCDropGNN(ModelBO):
     def __init__(self, train_epochs, batch_size, mpnn_config, lr, transform, num_mc_samples, log_epoch_metrics, device,
                  logger):
-        ModelWithUncertainty.__init__(self, logger)
+        ModelBO.__init__(self, logger)
         self.train_epochs = train_epochs
         self.batch_size = batch_size
         self.mpnn_config = mpnn_config
@@ -155,3 +155,21 @@ class MolMCDropGNN(ModelWithUncertainty):
             y_hat_mc.append(np.concatenate(y_hat_epoch,0))
         y_hat_mc = np.stack(y_hat_mc,1)
         return y_hat_mc
+
+
+config_MolMCDropGNN_v1 = {
+    "train_epochs":75,
+    "batch_size":75,
+    "mpnn_config":{
+        "drop_last":True,
+        "drop_data":False,
+        "drop_weights":True,
+        "drop_prob":0.1,
+        "num_feat":14
+    },
+    "lr":1e-3,
+    "transform":None,
+    "num_mc_samples":10,
+    "log_epoch_metrics":False,
+    "device":"cuda"
+}

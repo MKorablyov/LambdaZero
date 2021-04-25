@@ -1,6 +1,7 @@
 import time
 import numpy as np
-from .acquisition_function import AcquisitionFunction
+from LambdaZero.contrib.modelBO import MolMCDropGNN, config_MolMCDropGNN_v1
+from .acquisition import AcquisitionFunction
 
 
 class UCB(AcquisitionFunction):
@@ -30,3 +31,18 @@ class UCB(AcquisitionFunction):
         acq_acquired = [acq[i] for i in idx]
         info = {}
         return x_acquired, d_acquired, acq_acquired, info
+
+
+config_UCB_v1 = {
+    "model": MolMCDropGNN,
+    "model_config": config_MolMCDropGNN_v1,
+    "acq_size": 32,
+    "kappa": 0.2,
+}
+
+config_UCB_v2 = {
+    "model": MolMCDropGNN,
+    "model_config": config_MolMCDropGNN_v1,
+    "acq_size": 256,
+    "kappa": 2.0,
+}

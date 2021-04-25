@@ -55,6 +55,23 @@ def log_trajectories(trajs, max_steps):
 log_trajectories(trajs, env.max_steps)
 
 # todo: I need to decide which trajectories to log and how
+# env: episode_smiles [ CC, CO, ..]
+# reward -> episode_smiles
+# proxy: before_acquire: log_best_trajectories, log_worst_trajectories
+
+# todo: I want to monitor molecules being acquired
+# proxy_after_acquire: log_best_trajectories
+
+# todo: after_acquire: log table
+# smiles, synth, qed, dockscore, step
+# ideally I would maintain 50 best molecules/run in a table
+# if new in top_50 add_to_table
+
+# todo: after_acquire_log 3D structures
+# I think in this case I would take smiles + log coordinates
+# ideally I would log mol2molblock
+
+
 #wandb.log({"protein": wandb.Molecule(open("/home/maksym/Downloads/4jnc.pdb"))})
 #molecule = "/home/maksym/Summaries/docking/docked/5F52PRH6C5ACVW1.pdb"
 #wandb.log({"molecule":wandb.Molecule("1")})

@@ -10,25 +10,25 @@ from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger, TrialNameCreator
-from LambdaZero.contrib.config_rlbo import DEFAULT_CONFIG
 import config_rlbo
+
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
-if len(sys.argv) >= 2: config_name = sys.argv[1]
-else: config_name = "rlbo4_001"
-config = getattr(config_rlbo,config_name)
-config = merge_dicts(DEFAULT_CONFIG, config)
-if len(sys.argv) >=3:
-    if sys.argv[2] == "cpu": config = merge_dicts(config, config_rlbo.config_cpu)
-
-# also make it work on one GPU and less RAM when on Maksym's machine
-machine = socket.gethostname()
-if machine == "Ikarus":
-    config = merge_dicts(config, config_rlbo.debug_config)
-
-
 if __name__ == "__main__":
+    if len(sys.argv) >= 2:
+        config_name = sys.argv[1]
+    else:
+        config_name = "rlbo4_001"
+    config = getattr(config_rlbo, config_name)
+    config = merge_dicts(config_rlbo.DEFAULT_CONFIG, config)
+
+    # also make it work on one GPU and less RAM when on Maksym's machine
+    machine = socket.gethostname()
+    if machine == "Ikarus":
+        config = merge_dicts(config, config_rlbo.config_debug)
+
+
     for i in range(7):
         try:
             # Maksym Feb 26
@@ -50,7 +50,7 @@ if __name__ == "__main__":
                 "logger"] = remote_logger
             config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["oracle_config"]\
                 ["logger"] = remote_logger
-            config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["acquirer_config"] \
+            config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["acquisition_config"] \
                 ["model_config"]["logger"] = remote_logger
             config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)
 

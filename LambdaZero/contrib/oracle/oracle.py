@@ -1,11 +1,13 @@
-import time
+import time, os.path as osp
 import numpy as np
 import ray
 from rdkit import Chem
 from rdkit.Chem import QED
 from LambdaZero.chem import DockVina_smi
+import LambdaZero.contrib.functional
 from LambdaZero.models import ChempropWrapper_v1
-
+import LambdaZero.utils
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 @ray.remote(num_gpus=0)
 class DockingEstimator(DockVina_smi):
@@ -49,6 +51,13 @@ class DockingOracle:
             "docking_oracle/norm_dockscore_mean": np.mean(dockscores),
             "docking_oracle/norm_dockscore_max": np.max(dockscores)})
         return dockscores
+
+
+config_DockingOracle_v1 = {"num_threads":8,
+                           "dockVina_config": {"outpath": osp.join(summaries_dir, "docking")},
+                           "mean":-8.6, "std": 1.1, "act_y":LambdaZero.contrib.functional.elu2,
+                           }
+
 
 
 @ray.remote(num_cpus=0)

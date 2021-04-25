@@ -8,8 +8,6 @@ from LambdaZero.environments.block_mol_v3 import synth_config
 import ray
 import LambdaZero.contrib.functional
 
-
-
 class ProxyReward:
     def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, synth_options, **kwargs):
         self.env_name = np.random.uniform()

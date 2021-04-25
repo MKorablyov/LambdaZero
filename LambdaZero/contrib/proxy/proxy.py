@@ -1,6 +1,11 @@
-import time
+import random, string, time, os, os.path as osp
+import pandas as pd
 import ray
 from copy import deepcopy
+
+import LambdaZero.utils
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+
 
 class Proxy:
     def __init__(self, update_freq, proposed_x, proposed_d, proposed_acq, logger):
@@ -60,3 +65,18 @@ class Actor():
             # todo - need to figure out to do non-blocking calls here
             self.acquisition_func = ray.get(self.scoreProxy.get_acquisition_func.remote())
         return acq, info
+
+
+class SaveDocked:
+    def __init__(self, outpath=osp.join(summaries_dir, "save_docked")):
+        self.outpath = outpath
+        if not osp.exists(outpath):os.makedirs(outpath)
+
+    def __call__(self, x, d, acq, info, y, name=None):
+        name = name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+        smiles, qed, synth_score = [xi["smiles"] for xi in x], [xi["qed"] for xi in x], [xi["synth_score"] for xi in x]
+        df = pd.DataFrame(
+            {"smiles": smiles, "qed": qed, "synth_score": synth_score, "norm_dockscore": y, "discount": d})
+        df.to_feather(os.path.join(self.outpath, name + ".feather"))
+        #print(pd.read_feather(os.path.join(self.outpath, oname + ".feather")))
+        return None
