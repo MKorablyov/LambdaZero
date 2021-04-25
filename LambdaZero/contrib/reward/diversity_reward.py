@@ -84,10 +84,11 @@ class VAEDecoder(nn.Module):
 
 
 class DiversityReward:
-    def __init__(self, encoder_model, train=False,
+    def __init__(self,
+                 encoder_model,
+                 train=False,
+                 file_name_smiles=None,
                  dataset=None,
-                 vae_encoder=None,
-                 vae_decoder=None,
                  data_train=None,
                  data_valid=None,
                  num_epochs=500,
@@ -106,13 +107,57 @@ class DiversityReward:
         self.lr_enc = lr_enc
         self.lr_dec = lr_dec
         self.KLD_alpha = KLD_alpha
+        self.file_name_smiles = file_name_smiles
+        self.encoding_list = None
+        self.encoding_alphabet = None
+        self.largest_molecule_len = None
+        self.len_max_molec = None
+        self.len_alphabet = None
+        self.len_max_mol_one_hot = None
+        self.data_train = None
+        self.data_valid = None
+        if train:
+            self.start_training()
 
+    def start_training(self):
+        self.encoding_list, self.encoding_alphabet, self.largest_molecule_len, _, _, _ = \
+            self.get_selfie_and_smiles_encodings_for_dataset(self.file_name_smiles)
+
+        print('--> Creating one-hot encoding...')
+        data = self.multiple_selfies_to_hot()
+        print('Finished creating one-hot encoding.')
+        self.len_max_molec = data.shape[1]
+        self.len_alphabet = data.shape[2]
+        self.len_max_mol_one_hot = self.len_max_molec * self.len_alphabet
+
+        print(' ')
+        print(f"Alphabet has {self.len_alphabet} letters, "
+              f"largest molecule is {self.len_max_molec} letters.")
+
+        batch_size = self.batch_size
+
+        self.vae_encoder = VAEEncoder(in_dimension=self.len_max_mol_one_hot).to(device)
+        self.vae_decoder = VAEDecoder(out_dimension=len(self.encoding_alphabet)).to(device)
+
+        print('*' * 15, ': -->', device)
+
+        data = torch.tensor(data, dtype=torch.float).to(device)
+
+        train_valid_test_size = [0.5, 0.5, 0.0]
+        data = data[torch.randperm(data.size()[0])]
+        idx_train_val = int(len(data) * train_valid_test_size[0])
+        idx_val_test = idx_train_val + int(len(data) * train_valid_test_size[1])
+
+        self.data_train = data[0:idx_train_val]
+        self.data_valid = data[idx_train_val:idx_val_test]
+
+        print("start training")
+        self.train_model()
 
     def reset(self, previous_reward=0.0):
         return None
 
-    def train_model(self,
-                    sample_num, sample_len, alphabet, type_of_encoding):
+    def train_model(self):
         """
         Train the Variational Auto-Encoder
         """
@@ -152,7 +197,7 @@ class DiversityReward:
                     out_one_hot[:, seq_index, :] = out_one_hot_line[0]
 
                 # compute ELBO
-                loss = self.compute_elbo(batch, out_one_hot, mus, log_vars, self.KLD_alpha)
+                loss = self.compute_elbo(batch, out_one_hot, mus, log_vars)
 
                 # perform back propogation
                 optimizer_encoder.zero_grad()
@@ -182,7 +227,7 @@ class DiversityReward:
             if epoch % 10 == 0:
                 self.save_models(self.vae_encoder, self.vae_decoder, epoch)
 
-    def compute_elbo(self, x, x_hat, mus, log_vars, KLD_alpha):
+    def compute_elbo(self, x, x_hat, mus, log_vars):
         inp = x_hat.reshape(-1, x_hat.shape[2])
         target = x.reshape(-1, x.shape[2]).argmax(1)
 
@@ -190,7 +235,7 @@ class DiversityReward:
         recon_loss = criterion(inp, target)
         kld = -0.5 * torch.mean(1. + log_vars - mus.pow(2) - log_vars.exp())
 
-        return recon_loss + KLD_alpha * kld
+        return recon_loss + self.KLD_alpha * kld
 
     def compute_recon_quality(self, x, x_hat):
         x_indices = x.reshape(-1, x.shape[2]).argmax(1)
@@ -203,27 +248,27 @@ class DiversityReward:
 
         return quality
 
-    def quality_in_valid_set(self, vae_encoder, vae_decoder, data_valid, batch_size):
-        data_valid = data_valid[torch.randperm(data_valid.size()[0])]  # shuffle
-        num_batches_valid = len(data_valid) // batch_size
+    def quality_in_valid_set(self):
+        data_valid = self.data_valid[torch.randperm(self.data_valid.size()[0])]  # shuffle
+        num_batches_valid = len(data_valid) // self.batch_size
 
         quality_list = []
         for batch_iteration in range(min(25, num_batches_valid)):
 
             # get batch
-            start_idx = batch_iteration * batch_size
-            stop_idx = (batch_iteration + 1) * batch_size
+            start_idx = batch_iteration * self.batch_size
+            stop_idx = (batch_iteration + 1) * self.batch_size
             batch = data_valid[start_idx: stop_idx]
             _, trg_len, _ = batch.size()
 
             inp_flat_one_hot = batch.flatten(start_dim=1)
-            latent_points, mus, log_vars = vae_encoder(inp_flat_one_hot)
+            latent_points, mus, log_vars = self.vae_encoder(inp_flat_one_hot)
 
             latent_points = latent_points.unsqueeze(0)
-            hidden = vae_decoder.init_hidden(batch_size=batch_size)
+            hidden = self.vae_decoder.init_hidden(batch_size=self.batch_size)
             out_one_hot = torch.zeros_like(batch, device=device)
             for seq_index in range(trg_len):
-                out_one_hot_line, hidden = vae_decoder(latent_points, hidden)
+                out_one_hot_line, hidden = self.vae_decoder(latent_points, hidden)
                 out_one_hot[:, seq_index, :] = out_one_hot_line[0]
 
             # assess reconstruction quality
@@ -295,4 +340,29 @@ class DiversityReward:
         vae_decoder.train()
 
         return gathered_atoms
+
+    def get_selfie_and_smiles_encodings_for_dataset(file_path):
+        df = pd.read_csv(file_path)
+
+        smiles_list = np.asanyarray(df.smiles)
+        print("smiles list shape = ", smiles_list.shape)
+
+        smiles_alphabet = list(set(''.join(smiles_list)))
+        smiles_alphabet.append(' ')  # for padding
+
+        largest_smiles_len = len(max(smiles_list, key=len))
+
+        print('--> Translating SMILES to SELFIES...')
+        selfies_list = list(map(sf.encoder, smiles_list))
+
+        all_selfies_symbols = sf.get_alphabet_from_selfies(selfies_list)
+        all_selfies_symbols.add('[nop]')
+        selfies_alphabet = list(all_selfies_symbols)
+
+        largest_selfies_len = max(sf.len_selfies(s) for s in selfies_list)
+
+        print('Finished translating SMILES to SELFIES.')
+
+        return selfies_list, selfies_alphabet, largest_selfies_len, \
+               smiles_list, smiles_alphabet, largest_smiles_len
 
