@@ -74,6 +74,8 @@ def sample_logits(loader, model, device, config, num_samples, do_dropout):
         for bidx, data in enumerate(loader):
             data = data.to(device)
             logit = model(data, do_dropout=do_dropout)
+            assert logit.shape[1] ==1, "only defined for 1d inputs"
+            logit = logit[:,0]
             epoch_logits.append(logit.detach().cpu().numpy())
         sample_logits.append(np.concatenate(epoch_logits, 0))
     return np.stack(sample_logits,0)
@@ -215,7 +217,9 @@ def train_epoch_with_targets(loader, model, optimizer, device, config, scope):
         logits = model(data, do_dropout=False)
         # targets_norm = config["data"]["normalizer"].tfm(targets)
         reg_loss = config['lambda'] * torch.stack([(p ** 2).sum() for p in model.parameters()]).sum()
-        loss = F.mse_loss(logits, targets) + reg_loss
+
+        assert logits.shape[1]==1, "only works with 1d logits"
+        loss = F.mse_loss(logits[:,0], targets) + reg_loss
         loss.backward()
         optimizer.step()
 

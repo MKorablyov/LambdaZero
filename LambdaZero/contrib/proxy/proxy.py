@@ -1,5 +1,6 @@
 import time
 import ray
+from copy import deepcopy
 
 class Proxy:
     def __init__(self, update_freq, proposed_x, proposed_d, proposed_acq, logger):
@@ -17,12 +18,17 @@ class Proxy:
         self.proposed_x.extend(x)
         self.proposed_d.extend(d)
         self.proposed_acq.extend(acq)
-        if len(self.proposed_x) == self.update_freq:
-            self.acquire_and_update()
+        # update model and acquisition function if needed
+        if len(self.proposed_x) >= self.update_freq:
+            # todo: a much better solution would be to re-compute acqusition values of data that has
+            # arrived while this was retraining
+            #proposed_x, proposed_d, proposed_acq = self.proposed_x, self.proposed_d, self.proposed_acq
+            #self.proposed_x, self.proposed_d, self.proposed_acq = [], [], []
+            self.acquire_and_update(self.proposed_x, self.proposed_d, self.proposed_acq)
             self.proposed_x, self.proposed_d, self.proposed_acq = [], [], []
         return None
 
-    def acquire_and_update(self):
+    def acquire_and_update(self, proposed_x, proposed_d, proposed_acq):
         raise NotImplementedError
 
     def acquire(self, x):

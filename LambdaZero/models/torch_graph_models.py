@@ -31,10 +31,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
         nn.Module.__init__(self)
         self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
         self.max_steps = obs_space.original_space["num_steps"].n
-
-        #print("action space dict", action_space.__dict__)
-        #self.max_blocks = action_space.max_blocks
-        #self.max_branches = action_space.max_branches
         self.num_blocks = model_config['custom_model_config'].get("num_blocks", 135)
         self.rnd_weight = model_config['custom_model_config'].get("rnd_weight", 0)
         self.rnd = (self.rnd_weight != 0)
@@ -44,7 +40,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
 
         self.space = obs_space.original_space['mol_graph']
-
         self.model = MPNNet_Parametric(self.space.num_node_feat,
                                        kw.get('num_hidden', 64),
                                        self.num_blocks,
@@ -112,7 +107,6 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
             # mask not available actions
             masked_actions = (1. - action_mask).to(torch.bool)
             actor_logits[masked_actions] = -20  # some very small prob that does not lead to inf
-
             self._value_out = scalar_outs[:, 0]
             if self.rnd:
                 self._value_int = scalar_outs[:, 2]

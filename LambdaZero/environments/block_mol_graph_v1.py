@@ -102,8 +102,8 @@ class GraphMolObs:
         num_feat = 14
         num_feat += len(chem.atomic_numbers) if self.one_hot_atom else 0
         self.num_base_feat = num_feat
-        num_feat += 1 if self.stem_indices else 0
-        num_feat += 1 if self.jbond_indices else 0
+        #num_feat += 1 if self.stem_indices else 0
+        #num_feat += 1 if self.jbond_indices else 0
 
         self.space = MolGraphSpace(num_node_feat=num_feat,
                                    num_edge_feat=4,
@@ -146,7 +146,7 @@ class GraphMolObs:
             stem_mask[torch.tensor(stem_idx).long()] = 1
             g.stem_atmidx = torch.tensor(
                 np.concatenate([stem_idx, np.zeros(self.max_stems - len(stem_idx))], 0)).long()
-            g.x = torch.cat([g.x, stem_mask], 1)
+            #g.x = torch.cat([g.x, stem_mask], 1)
 
         if self.jbond_indices: # Add jbond indices
             jbond_idx = mol.jbond_atmidxs[:self.max_jbonds]
@@ -157,13 +157,12 @@ class GraphMolObs:
             else:
                 g.jbond_atmidx = torch.tensor(
                     np.concatenate([jbond_idx,np.zeros((self.max_jbonds - len(jbond_idx), 2))], 0)).long()
-            g.x = torch.cat([g.x, jbond_mask], 1)
+            #g.x = torch.cat([g.x, jbond_mask], 1)
 
         if g.edge_index.shape[0] == 0: # Edge case
             g.edge_index = torch.zeros((2, 1)).long()
             g.edge_attr = torch.zeros((1, g.edge_attr.shape[1])).float()
             g.stem_atmidx = torch.zeros((self.max_stems,)).long()
-
         return g, self.space.pack(g)
 
 

@@ -1,9 +1,14 @@
 from LambdaZero.utils import get_external_dirs
-
+from LambdaZero.models import MPNNetDrop
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 mpnn000 = {}
+
+mpnndrop_000 = {
+    "model": MPNNetDrop,
+    "model_config": {"drop_data": False, "drop_weights": False, "drop_last": True, "drop_prob": 0.1},
+}
 #
 # mpnn001 = {
 #     "trainer_config": {
