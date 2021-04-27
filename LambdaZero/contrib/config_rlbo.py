@@ -62,7 +62,6 @@ config_rlbo_run_v2 = { # tune trainable config to be more precise
             "scoreProxy_options": {"num_cpus": 2, "num_gpus": 1.0},
         }
     },
-
     "num_workers": 8,
     "num_gpus_per_worker": 0.15,
     "num_gpus": 1.0,
@@ -124,7 +123,7 @@ config_debug = {
                     "actor_sync_freq":100,
                     "scoreProxy_options":{"num_cpus":1, "num_gpus":0.3},
                     "scoreProxy_config":{
-                        "update_freq": 300,
+                        "update_freq": 200,
                         "oracle_config":{"num_threads": 1,},
                         "acquisition_config":{
                             "acq_size": 2,

@@ -2,10 +2,11 @@ import time
 import numpy as np
 from LambdaZero.contrib.proxy import Actor
 from rdkit import Chem
+
 from random import random
 from LambdaZero.contrib.oracle import QEDOracle, SynthOracle
 from LambdaZero.environments.block_mol_v3 import synth_config
-import ray
+
 import LambdaZero.contrib.functional
 
 
@@ -24,6 +25,7 @@ class ProxyReward_v2:
 
     def eval(self, traj):
         molecule = traj[-1]
+        traj_smi = [m.smiles for m in traj]
 
         qed = self.qed_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
         synth_score = self.synth_oracle([{"smiles":molecule.smiles, "mol":molecule.mol}])[0]
@@ -31,9 +33,8 @@ class ProxyReward_v2:
         clip_qed = LambdaZero.contrib.functional.satlins(qed, self.qed_cutoff[0], self.qed_cutoff[1])
         clip_synth = LambdaZero.contrib.functional.satlins(synth_score, self.synth_cutoff[0], self.synth_cutoff[1])
         proxy_dock, actor_info = self.dockProxy_actor([{"smiles":molecule.smiles, "mol_graph":molecule.graph,
-                                                        "qed":qed, "synth_score":synth_score,
+                                                        "qed":qed, "synth_score":synth_score, "traj_smi":traj_smi,
                                                         "env_name": self.env_name}], [clip_qed * clip_synth])
-
         reward = float(proxy_dock[0]) * clip_qed * clip_synth
 
         info = {

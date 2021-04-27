@@ -1,8 +1,9 @@
 import random, string, time, os, os.path as osp
 import pandas as pd
-import ray
+import ray, wandb
 from copy import deepcopy
-
+from rdkit import Chem
+from rdkit.Chem import Draw
 import LambdaZero.utils
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
@@ -80,3 +81,20 @@ class SaveDocked:
         df.to_feather(os.path.join(self.outpath, name + ".feather"))
         #print(pd.read_feather(os.path.join(self.outpath, oname + ".feather")))
         return None
+
+class LogTrajectories:
+    def __init__(self, max_steps, logger):
+        self.max_steps = max_steps
+        self.logger = logger
+
+    def __call__(self, x, d, acq, info, y):
+        trajs_smi = [xi["traj_smi"] for xi in x]
+        mols = []
+        for i in range(len(trajs_smi)):
+            for j in range(self.max_steps):
+                if j < len(trajs_smi[i]):
+                    mols.append(Chem.MolFromSmiles(trajs_smi[i][j]))
+                else:
+                    mols.append(Chem.MolFromSmiles("H"))
+        img = Draw.MolsToGridImage(mols, molsPerRow=self.max_steps, subImgSize=(250, 250), )
+        self.logger.log.remote({"traj":wandb.Image(img)})

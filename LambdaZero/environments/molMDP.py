@@ -147,8 +147,6 @@ class BlockMoleculeData:
 
 class MolMDP:
     def __init__(self, blocks_file):
-        print(blocks_file)
-
         blocks = pd.read_json(blocks_file)
         self.block_smi = blocks["block_smi"].to_list()
         self.block_rs = blocks["block_r"].to_list()

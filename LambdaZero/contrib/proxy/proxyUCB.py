@@ -1,10 +1,11 @@
 import random
 import numpy as np
 import ray
+import wandb
 from LambdaZero.contrib.acquisition import UCB, config_UCB_v1, config_UCB_v2
 from LambdaZero.contrib.oracle import DockingOracle, config_DockingOracle_v1
 from LambdaZero.contrib.data import temp_load_data, config_temp_load_data_v1, config_temp_load_data_v2
-from .proxy import Proxy, SaveDocked
+from .proxy import Proxy, SaveDocked, LogTrajectories
 
 
 @ray.remote(num_gpus=0.3, num_cpus=2)

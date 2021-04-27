@@ -9,6 +9,7 @@ from ray.tune.logger import DEFAULT_LOGGERS
 from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 import LambdaZero.utils
 import LambdaZero.inputs
+from LambdaZero.contrib.proxy import LogTrajectories
 from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger, TrialNameCreator
 import config_rlbo
 
@@ -40,6 +41,8 @@ if __name__ == "__main__":
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
     os.environ["WANDB_MODE"] = "dryrun"
+
+
     remote_logger = RemoteLogger.remote()
     wandb_logger = WandbRemoteLoggerCallback(
         remote_logger=remote_logger,
@@ -51,7 +54,15 @@ if __name__ == "__main__":
                 ["logger"] = remote_logger
     config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["acquisition_config"] \
                 ["model_config"]["logger"] = remote_logger
+
+    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["after_acquire"] = \
+        config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["after_acquire"] + \
+        [LogTrajectories(10, remote_logger)] # fixme -- not 10
+
+
     config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)
+
+
 
     # initialize scoreProxy which would be shared across many agents
     scoreProxy = config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'].\
@@ -59,6 +70,9 @@ if __name__ == "__main__":
         remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
 
     config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
+
+
+
     # run
     tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))
     # except Exception as e:
