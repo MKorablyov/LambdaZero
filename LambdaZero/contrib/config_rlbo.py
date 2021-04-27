@@ -6,7 +6,7 @@ from LambdaZero.environments.persistent_search.persistent_buffer import BlockMol
 from LambdaZero.contrib.environments import BlockMolGraph_v2
 from LambdaZero.environments.reward import PredDockReward_v2
 from LambdaZero.contrib.proxy import ProxyUCB, config_ProxyUCB_v1
-from LambdaZero.contrib.reward import ProxyReward, ProxyRewardSparse
+from LambdaZero.contrib.reward import ProxyReward, ProxyRewardSparse, ProxyRewardSparse_v2
 from LambdaZero.contrib.oracle import DockingOracle
 from LambdaZero.contrib.data import temp_load_data
 from LambdaZero.contrib.loggers import log_episode_info
@@ -55,7 +55,7 @@ config_rlbo_run_v1 = { # tune trainable config to be more precise
 config_rlbo_run_v2 = { # tune trainable config to be more precise
     "env": BlockMolGraph_v2,
     "env_config": {
-        "reward": ProxyRewardSparse,
+        "reward": ProxyRewardSparse_v2,
         "reward_config": {
             "scoreProxy": ProxyUCB,
             "scoreProxy_config": config_ProxyUCB_v1,

@@ -1,4 +1,5 @@
 import os.path as osp
+from copy import deepcopy
 import numpy as np
 from gym.spaces import Discrete, Dict, Box
 from ray.rllib.utils import merge_dicts
@@ -97,7 +98,7 @@ class BlockMolGraph_v2:
         obs = {"mol_graph": flat_graph,
                "action_mask": action_mask,
                "num_steps": self.num_steps}
-        self.molMDP.molecule.graph = graph  # fixme: todo is inherited workaround
+        self.molMDP.molecule.graph = graph  # todo is inherited workaround
         return obs
 
     def _should_stop(self):
@@ -119,7 +120,7 @@ class BlockMolGraph_v2:
         for i in range(self.random_steps):
             actions = np.where(self._action_mask())[0]
             action = np.random.choice(actions)
-            self.step(action)
+            self._step(action)
             if self._should_stop():
                 self.molMDP.reset()
         self.num_steps = 0
@@ -132,9 +133,10 @@ class BlockMolGraph_v2:
                 molMDP_feasible = False
             else:
                 molMDP_feasible = True
+        self.traj = [deepcopy(self.molMDP.molecule)]
         return self._make_obs()
 
-    def step(self, action):
+    def _step(self, action):
         self.num_steps += 1
         try:
             # check if action is legal
@@ -154,16 +156,25 @@ class BlockMolGraph_v2:
             env_stop = self._should_stop()
             # some checks if molecule is reasonable
             assert self.molMDP.molecule is not None, "molecule is None"
-            some = self.molMDP.molecule.smiles # try if the molecule produces valid smiles string
+            smiles = self.molMDP.molecule.smiles # try if the molecule produces valid smiles string
             molMDPFailure = False
         except Exception as e:
             obs = self.reset()
             env_stop, molMDPFailure = True, True
             print("continuing skipping error in step", e)
         agent_stop = (action==0)
-
-        # compute reward
-        reward, log_vals = self.reward(self.molMDP.molecule, agent_stop, env_stop, self.num_steps)
         done = agent_stop or env_stop
-        log_vals["molMDPFailure"] = molMDPFailure # todo: maybe log molecule size etc from here
+        return agent_stop, env_stop, done, molMDPFailure, obs
+
+    def step(self, action):
+        agent_stop, env_stop, done, molMDPFailure, obs = self._step(action)
+        reward, log_vals = self.reward(self.traj, agent_stop, env_stop)
+        # log some parameters
+        log_vals["molecule_num_blocks"] = len(self.molMDP.molecule.jbond_atmidxs)
+        log_vals["molecule_num_branches"] = len(self.molMDP.molecule.stems)
+        log_vals["molecule_num_atoms"] = self.molMDP.molecule.slices[-1]
+        log_vals["ended_on_env_stop"] = float(env_stop)
+        log_vals["molMDPFailure"] = molMDPFailure
+        self.traj.append(deepcopy(self.molMDP.molecule))
+        # log a few parameters
         return obs, reward, done, {"log_vals":log_vals}
