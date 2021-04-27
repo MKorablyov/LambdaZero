@@ -56,7 +56,7 @@ class MPNNet_v2(nn.Module):
         self.set2set = Set2Set(dim, processing_steps=3)
         self.lin3 = nn.Linear(dim * 2, num_out_per_mol)
 
-    def forward(self, data, vec_data=None):
+    def forward(self, data, vec_data=None, do_stems=True):
         if self.version == 1:
             batch_vec = vec_data[data.batch]
             out = F.leaky_relu(self.lin0(torch.cat([data.x, batch_vec], 1)))
@@ -69,15 +69,17 @@ class MPNNet_v2(nn.Module):
             out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
             out = out.squeeze(0)
 
-        per_atom_out = self.lin2(F.leaky_relu(self.lin1(out)))
+        if do_stems:
+            # Index of the origin atom of each stem in the batch, we
+            # need to adjust for the batch packing)
+            stem_batch_idx = (
+                torch.tensor(data.__slices__['x'], device=out.device)[data.stems_batch]
+                + data.stems)
+            stem_atom_out = out[stem_batch_idx]
+            per_stem_out = self.lin2(F.leaky_relu(self.lin1(stem_atom_out)))
+        else:
+            per_stem_out = None
 
-        # Index of the origin atom of each stem in the batch, we need
-        # to adjust for the batch packing)
-        stem_batch_idx = (
-            torch.tensor(data.__slices__['x'], device=out.device)[data.stems_batch]
-            + data.stems)
-
-        per_stem_out = per_atom_out[stem_batch_idx]
         out = self.set2set(out, data.batch)
         sout = self.lin3(out) # per mol scalar outputs
         return sout, per_stem_out
@@ -97,6 +99,12 @@ class MolAC_GCN(nn.Module):
             num_out_per_stem=num_out_per_stem,
             num_conv_steps=num_conv_steps,
             version=version)
+
+    def out_to_policy(self, s, stem_o, mol_o):
+        stem_e = torch.exp(stem_o)
+        mol_e = torch.exp(mol_o[:, 0])
+        Z = gnn.global_add_pool(stem_e, s.stems_batch).sum(1) + mol_e + 1e-8
+        return mol_e / Z, stem_e / Z[s.stems_batch, None]
 
     def action_negloglikelihood(self, s, a, g, stem_o, mol_o):
         stem_e = torch.exp(stem_o - 2)
@@ -120,8 +128,8 @@ class MolAC_GCN(nn.Module):
     def sum_output(self, s, stem_o, mol_o):
         return gnn.global_add_pool(stem_o, s.stems_batch).sum(1) + mol_o
 
-    def forward(self, graph, vec=None):
-        sout, logits = self.mpnn(graph, vec)
+    def forward(self, graph, vec=None, do_stems=True):
+        sout, logits = self.mpnn(graph, vec, do_stems=do_stems)
         return logits, sout
 
     def _save(self, checkpoint_dir):

@@ -6,6 +6,7 @@ import itertools
 import os
 import pickle
 from collections import defaultdict
+from itertools import count
 
 import numpy as np
 from scipy.stats import norm
@@ -17,7 +18,7 @@ from torch.distributions.categorical import Categorical
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/test_flow_data_22.pkl.gz', type=str)
+parser.add_argument("--save_path", default='results/test_flow_corners_3.pkl.gz', type=str)
 parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
 parser.add_argument("--learning_method", default='is_xent_q', type=str)
 parser.add_argument("--opt", default='adam', type=str)
@@ -27,23 +28,26 @@ parser.add_argument("--momentum", default=0.9, type=float)
 parser.add_argument("--bootstrap_tau", default=0.1, type=float)
 parser.add_argument("--mbsize", default=8, help="Minibatch size", type=int)
 parser.add_argument("--compute_l1k1", default=0, type=int)
-parser.add_argument("--horizon", default=30, type=int)
+parser.add_argument("--horizon", default=20, type=int)
 parser.add_argument("--ndim", default=2, type=int)
 parser.add_argument("--n_hid", default=64, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
 parser.add_argument("--n_train_steps", default=50000, type=int)
+parser.add_argument('--func', default='corners')
 
-parser.add_argument("--datasource", default='dataset_backward', type=str)
+parser.add_argument("--datasource", default='sample', type=str)
 parser.add_argument("--n_dataset_pts", default=50000, type=int)
 parser.add_argument("--test_ratio", default=0.05, type=float)
 
 # This is alpha in the note, smooths the learned distribution into a uniform exploratory one
-parser.add_argument("--uniform_sample_prob", default=0.05, type=float)
+parser.add_argument("--uniform_sample_prob", default=0.00, type=float)
 parser.add_argument("--do_is_queue", action='store_true')
 parser.add_argument("--queue_thresh", default=10, type=float)
 parser.add_argument("--device", default='cpu', type=str)
 parser.add_argument("--progress", action='store_true')
 
+def func_corners(x):
+    return (abs(x) > 0.5).prod(-1) * 0.5 + ((abs(x) < 0.8) * (abs(x) > 0.6)).prod(-1) * 2 + 1e-5
 
 class GridEnv:
 
@@ -176,8 +180,71 @@ class weird_act(nn.Module):
     def forward(self, x):
         return abs(x)
 
+def sample_pol_many(policy, envs, mbsize, alpha, end_freq):
+    batch = []
+    s = tf([i.reset() for i in envs])
+    done = [False] * mbsize
+    ndim = envs[0].ndim
+    while not all(done):
+        # Note to self: this is ugly, ugly code
+        logits = torch.exp(policy(s))
+        pi = logits / (logits.sum(1, keepdim=True) + 1e-10)
+        acts = pi.multinomial(1).flatten()
+        step = [i.step(a) for i,a in zip([e for d, e in zip(done, envs) if not d], acts)]
+        p_a = [envs[0].parent_transitions(sp_state, a == ndim)
+               for a, (sp, r, done, sp_state) in zip(acts, step)]
+        batch += [[tf(i) for i in (p, a, [r], [sp], [d])]
+                  for (p, a), (sp, r, d, _) in zip(p_a, step)]
+        c = count(0)
+        m = {j:next(c) for j in range(mbsize) if not done[j]}
+        done = [bool(d or step[m[i]][2]) for i, d in enumerate(done)]
+        s = tf([i[0] for i in step if not i[2]])
+        for (_, _, d, sp) in step:
+            if d: end_freq[tuple(sp)] += 1
+    return batch
+
+def sample_pol_naive(policy, env, mbsize, alpha, end_freq):
+    batch = []
+    ndim = env.ndim
+    for j in range(mbsize):
+        s = env.reset()
+        done = False
+        is_random = np.random.random() < alpha
+        while not done:
+            if do_log:
+                logits = policy(tf([s]))
+                #pi = Categorical(logits=logits)
+                logits = torch.exp(logits)
+                pi = logits / (logits.sum() + 1e-10)
+                a = pi.multinomial(1)
+            else:
+                q = policy(tf([s]))
+                p = q / (q.sum() + 1e-4)
+                pi = Categorical(probs=p)
+            if is_random:
+                a = tl([np.random.randint(ndim+1)])
+            else:
+                a = a
+                #a = pi.sample()
+            #if env._step == 0 and a == ndim:
+            #    continue # Can't stop in s0
+            sp, r, done, sp_state = env.step(a.item())
+            parents, actions = env.parent_transitions(sp_state, a == ndim)
+            if not len(parents):
+                print("Node with no parents??")
+                import pdb; pdb.set_trace()
+            batch.append([tf(i) for i in (parents, actions,[r],[sp],[done])])
+            s = sp
+        end_freq[tuple(sp_state)] += 1
+    return batch
+
+
 def main(args):
-    env = GridEnv(args.horizon, args.ndim)
+    f = {'default': None,
+         'corners': func_corners}[args.func]
+    env = GridEnv(args.horizon, args.ndim, func=f)
+    envs = [GridEnv(args.horizon, args.ndim, func=f)
+            for i in range(args.mbsize)]
     ndim = args.ndim
     do_log = True
     if do_log:
@@ -238,47 +305,9 @@ def main(args):
     estimated_density = None
     estimated_densities = []
     batch = []
-    if 0:
-        for i in range(2):
-            for j in range(2):
-                print('>>>',i,j)
-                for a in range(3):
-                    print([i,j], 'act', a)
-                    s = [i,j]
-                    sp,r,done,sps = env.step(a, np.int32(s))
-                    parents, actions = env.parent_transitions(sps, a == ndim)
-                    batch.append([tf(i) for i in (parents, actions,[r],[sp],[done])])
-                    print(batch[-1])
-        print(true_r)
-        return
     for i in it_range:
         if do_sample_online:
-            batch = []
-            for j in range(args.mbsize):
-                s = env.reset()
-                done = False
-                is_random = np.random.random() < alpha
-                while not done:
-                    if do_log:
-                        pi = Categorical(logits=policy(tf([s])))
-                    else:
-                        q = policy(tf([s]))
-                        p = q / (q.sum() + 1e-4)
-                        pi = Categorical(probs=p)
-                    if is_random:
-                        a = tl([np.random.randint(ndim+1)])
-                    else:
-                        a = pi.sample()
-                    #if env._step == 0 and a == ndim:
-                    #    continue # Can't stop in s0
-                    sp, r, done, sp_state = env.step(a.item())
-                    parents, actions = env.parent_transitions(sp_state, a == ndim)
-                    if not len(parents):
-                        print("Node with no parents??")
-                        import pdb; pdb.set_trace()
-                    batch.append([tf(i) for i in (parents, actions,[r],[sp],[done])])
-                    s = sp
-                end_freq[tuple(sp_state)] += 1
+            batch = sample_pol_many(policy, envs, args.mbsize, alpha, end_freq)
         elif do_sample_dataset:
             idxs = np.random.randint(0, len(dataset), args.mbsize)
             batch = sum([dataset[i] for i in idxs], [])
@@ -312,6 +341,9 @@ def main(args):
         losses.append(loss.item())
         flow_losses.append((term_loss.item(), flow_loss.item()))
 
+        if not i % 50:
+            print(list(map(np.mean, zip(*flow_losses[-100:]))))
+
         if False and do_td and tau > 0:
             for _a,b in zip(policy.parameters(), q_target.parameters()):
                 b.data.mul_(1-tau).add_(tau*_a)
@@ -338,7 +370,6 @@ def main(args):
                 end_freq = defaultdict(int)
 
 
-            #import pdb; pdb.set_trace()
             # L1 distance
             k1 = abs(estimated_density - true_density).mean().item()
             # KL divergence
@@ -378,6 +409,8 @@ def main(args):
                 print('L1 distance', k1, 'KL', kl, np.mean(losses[-100:]))
             distrib_distances.append((k1, kl))
             estimated_densities.append(estimated_density.cpu().numpy())
+            if not do_sample_dataset:
+                end_freq = defaultdict(int)
 
 
 
@@ -513,5 +546,5 @@ if __name__ == "__main__":
     tl = lambda x: torch.LongTensor(x).to(dev)
     dev = torch.device(args.device)
     args.progress = True
-    torch.set_num_threads(1)
+    torch.set_num_threads(8)
     main(args)
