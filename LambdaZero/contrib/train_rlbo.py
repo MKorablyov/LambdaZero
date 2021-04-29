@@ -40,10 +40,13 @@ if __name__ == "__main__":
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
-    os.environ["WANDB_MODE"] = "dryrun"
+#    os.environ["WANDB_MODE"] = "dryrun"
 
 
     remote_logger = RemoteLogger.remote()
+
+
+
     wandb_logger = WandbRemoteLoggerCallback(
         remote_logger=remote_logger,
         project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],
@@ -59,16 +62,11 @@ if __name__ == "__main__":
         config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["after_acquire"] + \
         [LogTrajectories(10, remote_logger)] # fixme -- not 10
 
-
     config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)
-
-
-
     # initialize scoreProxy which would be shared across many agents
     scoreProxy = config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'].\
         options(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_options']).\
         remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
-
     config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
 
 

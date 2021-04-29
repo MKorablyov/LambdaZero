@@ -116,14 +116,14 @@ config_debug = {
             "num_workers": 2,
             "num_gpus":0.3,
             "num_gpus_per_worker":0.15,
-            "train_batch_size": 250,
+            "train_batch_size": 220,
             "sgd_minibatch_size": 4,
             "env_config":{
                 "reward_config":{
-                    "actor_sync_freq":100,
+                    "actor_sync_freq":50,
                     "scoreProxy_options":{"num_cpus":1, "num_gpus":0.3},
                     "scoreProxy_config":{
-                        "update_freq": 200,
+                        "update_freq": 100,
                         "oracle_config":{"num_threads": 1,},
                         "acquisition_config":{
                             "acq_size": 2,

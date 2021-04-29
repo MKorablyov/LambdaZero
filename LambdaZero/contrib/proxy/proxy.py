@@ -97,4 +97,4 @@ class LogTrajectories:
                 else:
                     mols.append(Chem.MolFromSmiles("H"))
         img = Draw.MolsToGridImage(mols, molsPerRow=self.max_steps, subImgSize=(250, 250), )
-        self.logger.log.remote({"traj":wandb.Image(img)})
+        self.logger.log_wandb_object.remote("traj_img",  img, "image")
