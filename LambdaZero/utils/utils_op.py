@@ -7,6 +7,10 @@ from torch_geometric.utils import remove_self_loops
 from rdkit.Chem import AllChem
 import pickle as pk
 from copy import deepcopy
+try:
+    import dgl
+except:
+    dgl = None
 
 def get_external_dirs():
     """Locate in the filesystem external programs/folders essential for LambdaZero execution
@@ -92,6 +96,33 @@ class Complete(object):
         data.edge_attr = edge_attr
         data.edge_index = edge_index
         return data
+
+
+class CompleteDGL(object):
+    def __call__(self, data):
+        N = data.num_nodes()
+        row = torch.arange(N, dtype=torch.long)
+        col = torch.arange(N, dtype=torch.long)
+        row = row.view(-1, 1).repeat(1, N).view(-1)
+        col = col.repeat(N)
+        edge_index = torch.stack([row, col], dim=0)
+        g = dgl.graph((row, col))
+        for i in data.ndata.keys():
+            g.ndata[i] = data.ndata[i]
+        if len(data.edata):
+            src_edge_index = data.edges('uv')
+            idx = src_edge_index[0] * N + src_edge_index[1]
+            for i in data.edata.keys():
+                a = torch.zeros((N**2, *data.edata[i].shape[1:]),
+                                dtype=data.edata[i].dtype)
+                a[idx] = data.edata[i]
+                g.edata[i] = a
+        g.remove_self_loop()
+        if hasattr(data, '_props'):
+            for i in data._props:
+                setattr(g, i, getattr(data, i))
+            g._props = data._props
+        return g
 
 class Normalize:
     def __init__(self, property, mean, std):

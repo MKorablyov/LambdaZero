@@ -146,9 +146,14 @@ def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}, backend='torch_geome
         data = dgl.graph((edge_index[0], edge_index[1]), num_nodes=atmfeat.shape[0])
         data.ndata['x'] = atmfeat
         data.edata['a'] = edge_attr
+        for i in props:
+            setattr(data, i, props[i])
+        if len(props):
+            data._props = props
         if coord is not None:
             data.ndata['pos'] = torch.tensor(coord, dtype=torch.float32)
-        assert len(props) == 0, "don't know what to do with props"
+        
+        #assert len(props) == 0, "don't know what to do with props"
     else:
         raise ValueError(backend)
     return data
@@ -205,6 +210,7 @@ def _brutal_dock_proc(smi, props, pre_filter, pre_transform, backend="torch_geom
     try:
         graph = mol_to_graph(smi, props, backend=backend)
     except Exception as e:
+        print(e)
         return None
     if pre_filter is not None and not pre_filter(graph):
         return None
@@ -265,7 +271,7 @@ class BrutalDock(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return [file_name + ".pt" for file_name in self.file_names]
+        return [file_name + f".{self.backend}.pt" for file_name in self.file_names]
 
     def download(self):
         pass
@@ -273,6 +279,7 @@ class BrutalDock(InMemoryDataset):
     def process(self):
         print("processing", self.raw_paths)
         for raw_path, processed_path in zip(self.raw_paths, self.processed_paths):
+            print(raw_path, processed_path)
             docked_index = pd.read_feather(raw_path)
             try:
                 smis = docked_index["smi"].tolist()
@@ -281,6 +288,7 @@ class BrutalDock(InMemoryDataset):
                 smis = docked_index["smiles"].tolist()
             except: pass
             props = {pr: docked_index[pr].tolist() for pr in self._props}
+            print(len(smis), 'mols')
             time.sleep(0.5)
             tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
                                            self.pre_filter, self.pre_transform, self.backend)
@@ -293,6 +301,32 @@ class BrutalDock(InMemoryDataset):
             torch.save(self.collate(graphs), processed_path)
         
 
+class BrutalDockDGL(BrutalDock):
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.collate_fn = self._collate_fn
+
+    def get(self, i):
+        return self.data[i]
+
+    def collate(self, graphs):
+        return graphs, None
+
+    def _collate_fn(self, graphs, *a):
+        batch = dgl.batch(graphs)
+        for i in graphs[0]._props:
+            try: torch.tensor([graphs[0]._props[i]])
+            except ValueError as e: continue
+            d = torch.tensor([g._props[i] for g in graphs])
+            setattr(batch, i, d)
+        batch.num_graphs = len(graphs)
+        return batch
+
+    def process(self):
+        super().process()
+
+    def len(self):
+        return len(self.data)
 
 def dataset_creator_v1(config):
     # make dataset

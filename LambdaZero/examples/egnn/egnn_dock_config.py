@@ -1,5 +1,6 @@
 import torch
 import os.path as osp
+from ray.rllib.utils import merge_dicts
 import LambdaZero.inputs
 from LambdaZero.examples.egnn.egnn import EGNNet
 from LambdaZero.utils import get_external_dirs, BasicRegressor, RegressorWithSchedulerOnEpoch, train_epoch, eval_epoch
@@ -185,30 +186,16 @@ egnn_001_007_250k_long = { # for 250k dataset
     "stop": {"training_iteration": 2000},
 }
 
-egnn_cpu_dgl_000 = { # Best so far for 30k dataset --> CPU + DGL
-    "trainer": RegressorWithSchedulerOnEpoch,
+egnn_cpu_dgl_000 = merge_dicts( # --> CPU + DGL
+    egnn_001_007_30k,
+    {
     "trainer_config": {
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
+        "dataset": LambdaZero.inputs.BrutalDockDGL,
         "dataset_config": {
-            "root": osp.join(datasets_dir, "brutal_dock/seh"),
-            "props": ["dockscore", "smiles"],
-            "transform": transform,
-            "file_names": ["Zinc20_docked_neg_randperm_30k"],
+            "transform": LambdaZero.utils.CompleteDGL(),
             "backend": "dgl",
         },
         "batch_size": 96,
-        "optimizer": {
-            "type": torch.optim.AdamW,
-            "config": {
-                "lr": 1e-3, # better than 5e-4
-            },
-        },
-        "scheduler": {
-            "type": torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
-            "config": {
-                "T_0": 100, # 90, 250 is worse, 85 is comparable
-            },
-        },
         "model_config":{
             "backend": "dgl",
         },
@@ -217,4 +204,13 @@ egnn_cpu_dgl_000 = { # Best so far for 30k dataset --> CPU + DGL
         "cpu": 8,
         "gpu": 0,
     },
-}
+})
+
+egnn_cpu_000 = merge_dicts( # --> just CPU
+    egnn_001_007_30k,
+    {
+    "resources_per_trial": {
+        "cpu": 8,
+        "gpu": 0,
+    },
+})

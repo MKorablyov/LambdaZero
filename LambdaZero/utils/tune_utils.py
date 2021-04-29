@@ -29,6 +29,11 @@ class BasicRegressor(tune.Trainable):
         self.train_loader = DataLoader(self.train_set, shuffle=True, batch_size=self.config["batch_size"])
         self.val_loader = DataLoader(self.val_set, batch_size=self.config["batch_size"])
 
+        # patch collate_fn, this is required to allow for dgl
+        if hasattr(dataset, 'collate_fn'):
+            self.train_loader.collate_fn = dataset.collate_fn
+            self.val_loader.collate_fn = dataset.collate_fn
+
         # make model
         self.model = config["model"](**config["model_config"])
         self.model.to(self.device)
