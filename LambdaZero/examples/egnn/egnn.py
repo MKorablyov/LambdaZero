@@ -3,18 +3,22 @@ from torch import nn
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing, Set2Set, global_add_pool
 from torch_geometric.typing import Adj, Size, OptTensor, Tensor
-
+try:
+    import dgl
+except:
+    dgl = None
 
 class EGNNConv(MessagePassing):
 
     def __init__(self, feats_dim, pos_dim=3, edge_attr_dim=0, m_dim=64, infer_edges=False, control_exp=False,
-                 aggr: str = 'add'):
+                 aggr: str = 'add', backend='torch_geometric'):
         super().__init__(aggr=aggr)
         self.aggr = aggr
         self.feats_dim = feats_dim
         self.pos_dim = pos_dim
         self.infer_edges = infer_edges
         self.control_exp = control_exp
+        self.backend = backend
 
         edge_input_dim = (feats_dim * 2) + edge_attr_dim + 1
 
@@ -45,12 +49,24 @@ class EGNNConv(MessagePassing):
         #     nn.SiLU(),
         #     nn.Linear(m_dim * 4, 1)
         # )
+    def forward_dgl(self, g):
+        g.apply_edges(lambda e: {
+            'rdist': (e.src['pos'] - e.dst['pos']).pow(2).sum(dim=-1, keepdim=True).sqrt()})
+        g.update_all(lambda e: {
+            'm': self.edge_mlp(torch.cat([e.src['x'], e.dst['x'], e.data['rdist']], -1))},
+                     dgl.function.sum('m', 'h'))
+        g.apply_nodes(lambda n: {
+            'x': self.node_mlp(torch.cat([n.data['x'], n.data['h']], -1)) + n.data['x']})
+        if self.infer_edges:
+            raise NotImplementedError()
 
     def init_(self, module):
         if type(module) in {nn.Linear}:
             nn.init.normal_(module.weight, std=1e-3)
 
-    def forward(self, x: Tensor, pos: Tensor, edge_index: Adj, edge_attr: OptTensor = None, size: Size = None) -> Tensor:
+    def forward(self, x: Tensor, pos: Tensor, edge_index: Adj, edge_attr: OptTensor = None, size: Size = None, dgl_graph: dgl.DGLGraph = None) -> Tensor:
+        if self.backend == 'dgl':
+            return self.forward_dgl(dgl_graph)
         rel_pos = pos[edge_index[0]] - pos[edge_index[1]]
         rel_dist = (rel_pos ** 2).sum(dim=-1, keepdim=True) ** 0.5
 
@@ -109,7 +125,8 @@ class EGNNConv(MessagePassing):
 class EGNNet(nn.Module):
 
     def __init__(self, n_layers=3, feats_dim=14, pos_dim=3, edge_attr_dim=0, m_dim=16,
-                 infer_edges=False, settoset=False, control_exp=False):
+                 infer_edges=False, settoset=False, control_exp=False,
+                 backend='torch_geometric'):
         super().__init__()
 
         self.n_layers = n_layers
@@ -119,12 +136,16 @@ class EGNNet(nn.Module):
         self.edge_attr_dim = edge_attr_dim
         self.m_dim = m_dim
         self.settoset = settoset
+        self.backend = backend
+        if backend == 'dgl':
+            assert dgl is not None, 'could not import dgl'
 
         for i in range(n_layers):
             EGCLayer = EGNNConv(feats_dim=feats_dim,
                                 pos_dim=pos_dim,
                                 edge_attr_dim=edge_attr_dim,
-                                m_dim=m_dim, infer_edges=infer_edges, control_exp=control_exp)
+                                m_dim=m_dim, infer_edges=infer_edges, control_exp=control_exp,
+                                backend=self.backend)
             self.egnn_layers.append(EGCLayer)
 
         if self.settoset:
@@ -137,7 +158,12 @@ class EGNNet(nn.Module):
             self.lin3 = nn.Linear(feats_dim, m_dim)
             self.lin4 = nn.Linear(m_dim, 1)
 
+        if self.backend == 'dgl':
+            self.global_add = dgl.nn.pytorch.glob.SumPooling()
+
     def forward(self, data):
+        if self.backend == 'dgl':
+            return self.forward_dgl(data)
         out = data.x  # or another activation here
         for layer in self.egnn_layers:
             out = layer(out, data.pos, data.edge_index, data.edge_attr, size=data.batch)
@@ -155,6 +181,19 @@ class EGNNet(nn.Module):
 
         return out.view(-1)
 
+    def forward_dgl(self, data):
+        for layer in self.egnn_layers:
+            layer(None, None, None, dgl_graph=data) # transforms data inplace
+
+        if self.settoset:
+            raise NotImplementedError()
+        else:
+            out = self.lin2(nn.functional.silu(self.lin1(data.ndata['x'])))
+            out = self.global_add(data, out)
+            out = self.lin4(nn.functional.silu(self.lin3(out)))
+
+        return out.view(-1)
+            
 
 class EGNNetDrop(nn.Module):
 

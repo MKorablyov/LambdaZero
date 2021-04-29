@@ -26,6 +26,10 @@ from sklearn.decomposition import PCA as sk_PCA
 #from ..py_tools import geom
 #from ..py_tools import chem
 #from ..py_tools import multithread as mtr
+try:
+    import dgl
+except:
+    dgl = None
 
 import LambdaZero.chem
 
@@ -123,7 +127,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False):
     return atmfeat, coord, bond, bondfeat
 
 
-def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
+def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}, backend='torch_geometric'):
     """convert to PyTorch geometric module"""
     natm = atmfeat.shape[0]
     # transform to torch_geometric bond format; send edges both ways; sort bonds
@@ -132,22 +136,32 @@ def _mol_to_graph(atmfeat, coord, bond, bondfeat, props={}):
     edge_attr = torch.tensor(np.concatenate([bondfeat, bondfeat], axis=0), dtype=torch.float32)
     edge_index, edge_attr = coalesce(edge_index, edge_attr, natm, natm)
     # make torch data
-    if coord is not None:
-        coord = torch.tensor(coord, dtype=torch.float32)
-        data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+    if backend == 'torch_geometric':
+        if coord is not None:
+            coord = torch.tensor(coord, dtype=torch.float32)
+            data = Data(x=atmfeat, pos=coord, edge_index=edge_index, edge_attr=edge_attr, **props)
+        else:
+            data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+    elif backend == 'dgl':
+        data = dgl.graph((edge_index[0], edge_index[1]), num_nodes=atmfeat.shape[0])
+        data.ndata['x'] = atmfeat
+        data.edata['a'] = edge_attr
+        if coord is not None:
+            data.ndata['pos'] = torch.tensor(coord, dtype=torch.float32)
+        assert len(props) == 0, "don't know what to do with props"
     else:
-        data = Data(x=atmfeat, edge_index=edge_index, edge_attr=edge_attr, **props)
+        raise ValueError(backend)
     return data
 
 
-def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn"):
+def mol_to_graph(smiles, props={}, num_conf=1, noh=True, feat="mpnn", backend='torch_geometric'):
     """mol to graph convertor"""
     mol, _, _ = LambdaZero.chem.build_mol(smiles, num_conf=num_conf, noh=noh)
     if feat == "mpnn":
         atmfeat, coord, bond, bondfeat = mpnn_feat(mol)
     else:
         raise NotImplementedError(feat)
-    graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props)
+    graph = _mol_to_graph(atmfeat, coord, bond, bondfeat, props, backend=backend)
     return graph
 
 
@@ -187,9 +201,9 @@ def tpnn_proc(smi, props, pre_filter, pre_transform):
 
 
 @ray.remote
-def _brutal_dock_proc(smi, props, pre_filter, pre_transform):
+def _brutal_dock_proc(smi, props, pre_filter, pre_transform, backend="torch_geometric"):
     try:
-        graph = mol_to_graph(smi, props)
+        graph = mol_to_graph(smi, props, backend=backend)
     except Exception as e:
         return None
     if pre_filter is not None and not pre_filter(graph):
@@ -227,10 +241,12 @@ def tpnn_transform(data):
 class BrutalDock(InMemoryDataset):
     # own internal dataset
     def __init__(self, root, transform=None, pre_transform=None, pre_filter=None,
-                 props=["gridscore"], file_names=['ampc_100k'], proc_func=_brutal_dock_proc):
+                 props=["gridscore"], file_names=['ampc_100k'], proc_func=_brutal_dock_proc,
+                 backend="torch_geometric"):
         self._props = props
         self.file_names = file_names
         self.proc_func = proc_func
+        self.backend = backend
 
         super(BrutalDock, self).__init__(root, transform, pre_transform, pre_filter)
 
@@ -267,13 +283,15 @@ class BrutalDock(InMemoryDataset):
             props = {pr: docked_index[pr].tolist() for pr in self._props}
             time.sleep(0.5)
             tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
-                                           self.pre_filter, self.pre_transform) for j in range(len(smis))]
+                                           self.pre_filter, self.pre_transform, self.backend)
+                     for j in range(len(smis))]
             time.sleep(0.5)
             graphs = ray.get(tasks)
             time.sleep(0.5)
             graphs = [g for g in graphs if g is not None]
             # save to the disk
             torch.save(self.collate(graphs), processed_path)
+        
 
 
 def dataset_creator_v1(config):

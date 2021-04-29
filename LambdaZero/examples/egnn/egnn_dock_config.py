@@ -184,3 +184,37 @@ egnn_001_007_250k_long = { # for 250k dataset
     },
     "stop": {"training_iteration": 2000},
 }
+
+egnn_cpu_dgl_000 = { # Best so far for 30k dataset --> CPU + DGL
+    "trainer": RegressorWithSchedulerOnEpoch,
+    "trainer_config": {
+        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_30k.npy"),
+        "dataset_config": {
+            "root": osp.join(datasets_dir, "brutal_dock/seh"),
+            "props": ["dockscore", "smiles"],
+            "transform": transform,
+            "file_names": ["Zinc20_docked_neg_randperm_30k"],
+            "backend": "dgl",
+        },
+        "batch_size": 96,
+        "optimizer": {
+            "type": torch.optim.AdamW,
+            "config": {
+                "lr": 1e-3, # better than 5e-4
+            },
+        },
+        "scheduler": {
+            "type": torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
+            "config": {
+                "T_0": 100, # 90, 250 is worse, 85 is comparable
+            },
+        },
+        "model_config":{
+            "backend": "dgl",
+        },
+    },
+    "resources_per_trial": {
+        "cpu": 8,
+        "gpu": 0,
+    },
+}
