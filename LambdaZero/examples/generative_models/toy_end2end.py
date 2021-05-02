@@ -102,7 +102,7 @@ def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r,
     with torch.no_grad():
         pi_a_s = torch.softmax(policy(tf(all_inputs)), 1)
         estimated_density = compute_p_of_x(pi_a_s)
-    plot_densities(args, np.array(all_end_states), true_density.numpy(), estimated_density.numpy(), path=os.path.join(exp_path, f"est_dens-{it}.png"))
+    plot_densities(args, np.array(all_end_states), true_density.cpu().numpy(), estimated_density.cpu().numpy(), path=os.path.join(exp_path, f"est_dens-{it}.png"))
     # L1 distance
     k1 = abs(estimated_density - true_density).mean().item()
     # KL divergence
@@ -211,8 +211,8 @@ def get_val_loss(args, policy, val_data, compute_p_of_x):
 def diverse_topk_mean_reward(args, d_prev, d):
     topk_new, new_indices = torch.topk(d[1], k=args.reward_topk)
     topk_old, old_indices = torch.topk(d_prev[1], k=args.reward_topk)
-    new_reward = topk_new.mean() + args.reward_lambda * get_pairwise_distances(d[0][new_indices].numpy())
-    old_reward = topk_old.mean() + args.reward_lambda * get_pairwise_distances(d_prev[0][old_indices].numpy())
+    new_reward = topk_new.mean() + args.reward_lambda * get_pairwise_distances(d[0][new_indices].cpu().numpy())
+    old_reward = topk_old.mean() + args.reward_lambda * get_pairwise_distances(d_prev[0][old_indices].cpu().numpy())
     return (new_reward - old_reward).item()
 
 def get_pairwise_distances(arr):
