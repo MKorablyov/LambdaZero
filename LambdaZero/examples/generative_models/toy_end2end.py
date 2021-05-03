@@ -17,6 +17,7 @@ from torch.distributions.categorical import Categorical
 import matplotlib.pyplot as plt
 from botorch.fit import fit_gpytorch_model
 from botorch.models import SingleTaskGP
+from torch.utils.data import TensorDataset, DataLoader
 
 from toy_1d_seq import BinaryTreeEnv, make_mlp
 
@@ -94,13 +95,31 @@ def get_init_data(args, func):
     return init_data, val_data, all_end_states, true_r, compute_p_of_x, all_inputs, env 
 
 
+def get_network_output(args, network, inputs, mean_std=False):
+    dataset = TensorDataset(inputs)
+    dataloader = DataLoader(dataset, args.inf_batch_size, num_workers=0, shuffle=False)
+    if not mean_std:
+        outputs = []
+        for batch in dataloader:
+            outputs.append(network(batch[0]))
+        return torch.cat(outputs, dim=0)
+    else:
+        mean = []
+        std = []
+        for batch in dataloader:
+            out = network(batch[0])
+            mean.append(out.mean.cpu())
+            std.append(torch.sqrt(out.variance).cpu()) 
+        return torch.cat(mean, dim=0), torch.cat(std, dim=0)
+
+
 def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r, all_end_states, compute_p_of_x):
     # Sample data from trained policy, given dataset. 
     # Currently only naively samples data and adds to dataset, but should ideally also 
     # have a diversity constraint based on existing dataset
     true_density = tf(true_r / true_r.sum())
     with torch.no_grad():
-        pi_a_s = torch.softmax(policy(tf(all_inputs)), 1)
+        pi_a_s = torch.softmax(get_network_output(args, policy, tf(all_inputs)), 1)
         estimated_density = compute_p_of_x(pi_a_s)
     plot_densities(args, np.array(all_end_states), true_density.cpu().numpy(), estimated_density.cpu().numpy(), path=os.path.join(exp_path, f"est_dens-{it}.png"))
     # L1 distance
@@ -214,6 +233,7 @@ def diverse_topk_mean_reward(args, d_prev, d):
     new_reward = topk_new.mean() + args.reward_lambda * get_pairwise_distances(d[0][new_indices].cpu().numpy())
     old_reward = topk_old.mean() + args.reward_lambda * get_pairwise_distances(d_prev[0][old_indices].cpu().numpy())
     return (new_reward - old_reward).item()
+
 
 def get_pairwise_distances(arr):
     return np.sum(np.tril(distance_matrix(arr, arr))) * 2 / (arr.shape[0] * (arr.shape[0] - 1 ))
@@ -365,16 +385,13 @@ def plot_model(path, **kwargs):
         train_x, train_y = train_x.to(dev), train_y.to(dev)
     if "model" in kwargs.keys():
         model = kwargs["model"]
-        out = model(all_x)
+        mean, std = get_network_output(args, model, all_x, mean_std=True)
         all_x = all_x.cpu()
-        mean = out.mean
-        mean = mean.cpu()
-        std = torch.sqrt(out.variance)
-        std = std.cpu()
         with torch.no_grad():
             lower, upper = mean + std, mean - std
             ax.plot(all_x.numpy(), mean.numpy(), 'b', label='Mean')
             ax.fill_between(all_x.numpy(), lower.numpy(), upper.numpy(), alpha=0.5, label='Confidence')
+        all_x = all_x.to(dev)
     ax.set_title(kwargs["title"])
     ax.legend()
     plt.savefig(path)
@@ -406,6 +423,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_iter", default=10, type=int)
     parser.add_argument("--num_val_iters", default=10, type=int)
     parser.add_argument("--reward_topk", default=5, type=int)
+    parser.add_argument("--inf_batch_size", default=32, type=int)
     parser.add_argument("--num_samples", default=8, type=int)
     # This is alpha in the note, smooths the learned distribution into a uniform exploratory one
     parser.add_argument("--uniform_sample_prob", default=0.05, type=float)
