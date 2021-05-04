@@ -170,7 +170,7 @@ def main(args):
 
     do_td = args.learning_method == 'td'
     do_isxent = 'is_xent' in args.learning_method
-    do_queue = args.do_is_queue or args.learning_method == 'is_xent_q'
+    do_queue = args.do_is_queue and args.learning_method == 'is_xent_q'
     do_l1 = args.learning_method == 'l1'
     do_l2 = args.learning_method == 'l2'
 
@@ -191,7 +191,7 @@ def main(args):
                 if -w > 1:
                     heapq.heappush(queue, (-(-w - 1), qid, (s, a)))
                 if -w > 1 or np.random.random() < -w:
-                    trajs.append(queue_thresh * log_prob)
+                    trajs.append((queue_thresh * log_prob, log_prob, None))
                     continue
             s = env.reset()
             done = False
@@ -238,7 +238,7 @@ def main(args):
             loss = -torch.cat([i[0] * i[1] for i in trajs]).mean()
         elif do_l1:
             log_p_theta_x = torch.cat([i[1] for i in trajs])
-            r = tf([i[2] for i in trajs])            
+            r = tf([i[2] for i in trajs])
             loss = torch.abs(torch.exp(log_p_theta_x) - c * r).mean()
         elif do_l2:
             log_p_theta_x = torch.cat([i[1] for i in trajs])
