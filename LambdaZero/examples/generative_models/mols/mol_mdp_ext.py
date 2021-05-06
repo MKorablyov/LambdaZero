@@ -190,8 +190,13 @@ class MolMDPExtended(MolMDP):
         self.repr_type = repr_type
         #self.max_bond_atmidx = max([max(i) for i in self.block_rs])
         self.max_num_atm = max(self.block_natm)
-        self.stem_type_offset = np.int32([0] + list(np.cumsum([max(i)+1 for i in self.block_rs])))
+        # see model_block.mol2graph
+        self.true_block_set = sorted(set(self.block_smi))
+        self.stem_type_offset = np.int32([0] + list(np.cumsum([
+            max(self.block_rs[self.block_smi.index(i)])+1 for i in self.true_block_set])))
         self.num_stem_types = self.stem_type_offset[-1]
+        self.true_blockidx = [self.true_block_set.index(i) for i in self.block_smi]
+        self.num_true_blocks = len(self.true_block_set)
         #print(self.max_num_atm, self.num_stem_types)
         self.molcache = {}
 

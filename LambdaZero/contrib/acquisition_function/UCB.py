@@ -15,7 +15,7 @@ class UCB(AcquisitionFunction):
 
     def acquisition_value(self, x):
         mean, var = self.model.get_mean_and_variance(x)
-        acq = [mean[i] + self.kappa * var[i] for i in range(len(mean))]
+        acq = [mean[i] + self.kappa * (var[i]**0.5) for i in range(len(mean))]
         info = {"mean":mean,"var":var}
         return acq, info
 

@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import QED
-import tqdm as tqdm_mod
+from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -73,28 +73,20 @@ os.makedirs(tmp_dir, exist_ok=True)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--learning_rate", default=2.5e-4, help="Learning rate", type=float)
-parser.add_argument("--mbsize", default=32, help="Minibatch size", type=int)
+parser.add_argument("--mbsize", default=16, help="Minibatch size", type=int)
 parser.add_argument("--opt_beta", default=0.9, type=float)
-parser.add_argument("--nemb", default=64, help="#hidden", type=int)
-parser.add_argument("--num_iterations", default=10000, type=int)
+parser.add_argument("--nemb", default=32, help="#hidden", type=int)
+parser.add_argument("--num_iterations", default=200000, type=int)
 parser.add_argument("--num_conv_steps", default=12, type=int)
-parser.add_argument("--num_bins", default=3, type=int)
-parser.add_argument("--top_bin", default=0, type=int)
-parser.add_argument("--bootstrap_tau", default=0.1, type=float)
-parser.add_argument("--include_qed_data", default=0, type=int)
 parser.add_argument("--array", default='')
 parser.add_argument("--repr_type", default='atom_graph')
 parser.add_argument("--model_version", default='v2')
-parser.add_argument("--run", default=0, help="run", type=int)
+parser.add_argument("--run", default=201, help="run", type=int)
 #parser.add_argument("--save_path", default='/miniscratch/bengioe/LambdaZero/imitation_learning/')
 parser.add_argument("--save_path", default='results/')
+parser.add_argument("--proxy_path", default='results/proxy__6/')
 parser.add_argument("--print_array_length", default=False, action='store_true')
 parser.add_argument("--progress", default='yes')
-parser.add_argument("--dump_episodes", default='')
-parser.add_argument("--gen_rand", default='')
-parser.add_argument("--gen_rand_qed", default='')
-parser.add_argument("--gen_sample", default='')
-parser.add_argument("--mol_data", default='20k')
 
 
 
@@ -108,6 +100,7 @@ class Dataset:
         self.train_rng = np.random.RandomState(int(time.time()))
         self.train_mols = []
         self.test_mols = []
+        self.train_mols_map = {}
         self.mdp = MolMDPExtended(bpath)
         self.mdp.post_init(device, repr_type)
         self.mdp.build_translation_table()
@@ -115,20 +108,78 @@ class Dataset:
         self.seen_molecules = set()
         self.stop_event = threading.Event()
         self.target_norm = [-8.6, 1.10]
+        self.sampling_model = None
+        self.sampling_model_prob = 0
+        self.R_min = 1e-3
+
+    def _get(self, i, dset):
+        if (self.sampling_model_prob > 0 and # don't sample if we don't have to
+            self.train_rng.uniform() < self.sampling_model_prob):
+                return self._get_sample_model()
+        # Sample trajectories by walking backwards from the molecules in our dataset
+        m = dset[i]
+        r = m.reward
+        samples = []
+        # a sample is a tuple (parents(s), parent actions, reward(s), s, done)
+        # an action is (blockidx, stemidx) or (-1, x) for 'stop'
+        # so we start with the stop action
+        samples.append(((m,), ((-1, 0),), r, m, 1))
+        while len(m.blocks): # and go backwards
+            parents, actions = zip(*self.mdp.parents(m))
+            samples.append((parents, actions, 0, m, 0))
+            r = 0
+            m = parents[self.train_rng.randint(len(parents))]
+        return samples
+
+    def set_sampling_model(self, model, proxy_reward, sample_prob=0.5):
+        self.sampling_model = model
+        self.sampling_model_prob = sample_prob
+        self.proxy_reward = proxy_reward
+
+    def _get_sample_model(self):
+        m = BlockMoleculeDataExtended()
+        r = 0
+        done = 0
+        samples = []
+        for t in range(8): # TODO: max blocks config
+            s = self.mdp.mols2batch([self.mdp.mol2repr(m)])
+            s_o, m_o = self.sampling_model(s)
+            m_p, s_p = self.sampling_model.out_to_policy(s, s_o, m_o)
+            action = torch.cat([m_p.reshape(-1), s_p.reshape(-1)]).multinomial(1).item()
+            if t > 2 and action == 0: # TODO: min blocks config as well
+                done = 1
+                action = (-1, 0)
+                r = self._get_reward(m)
+            else:
+                action = max(0, action-1)
+                action = (action % self.mdp.num_blocks, action // self.mdp.num_blocks)
+                m = self.mdp.add_block_to(m, *action)
+                if not len(m.stems): # can't add anything more to this
+                                     # mol so let's make it terminal
+                    done = 1
+                    r = self._get_reward(m)
+            samples.append((*zip(*self.mdp.parents(m)), r, m, done))
+            if done: break
+        return samples
+
+    def _get_reward(self, m):
+        rdmol = m.mol
+        if rdmol is None:
+            return self.R_min
+        smi = m.smiles
+        if smi in self.train_mols_map:
+            return self.train_mols_map[smi].reward
+        return max(self.R_min, self.proxy_reward(m))
+
+    def itertest(self, n):
+        N = len(self.test_mols)
+        for i in range(int(np.ceil(N/n))):
+            samples = sum((self._get(j, self.test_mols) for j in range(i*n, min(N, (i+1)*n))), [])
+            yield self.sample2batch(zip(*samples))
 
     def sample(self, n):
         eidx = self.train_rng.randint(0, len(self.train_mols), n)
-        samples = []
-        # Sample trajectories by walking backwards from the molecules in our dataset
-        for i in eidx:
-            m = self.train_mols[i]
-            r = m.reward
-            samples.append(([m], [(-1, 0)], r, m, 1))
-            while len(m.blocks):
-                parents, actions = zip(*self.mdp.parents(m))
-                samples.append((parents, actions, 0, m, 0))
-                r = 0
-                m = parents[self.train_rng.randint(len(parents))]
+        samples = sum((self._get(i, self.train_mols) for i in eidx), [])
         return zip(*samples)
 
     def sample2batch(self, mb):
@@ -148,7 +199,7 @@ class Dataset:
         d = torch.tensor(d, device=self._device).float()
         return (p, p_batch, a, r, s, d, *o)
 
-    def load_h5(self, path, test_ratio=0.05):
+    def load_h5(self, path, args, test_ratio=0.05):
         import json
         import pandas as pd
         columns = ["smiles", "dockscore", "blockidxs", "slices", "jbonds", "stems"]
@@ -162,24 +213,43 @@ class Dataset:
         test_idxs = self.test_split_rng.choice(len(df), int(test_ratio * len(df)), replace=False)
         split_bool = np.zeros(len(df), dtype=np.bool)
         split_bool[test_idxs] = True
-        for i in tqdm(range(len(df))):
+        for i in tqdm(range(len(df)), disable=not args.progress):
             m = BlockMoleculeDataExtended()
             for c in range(1, len(columns)):
                 setattr(m, columns[c], df.iloc[i, c-1])
             m.blocks = [self.mdp.block_mols[i] for i in m.blockidxs]
             # TODO: compute proper reward with QED & all
-            m.reward = max(1e-4,4-(min(0, m.dockscore)-self.target_norm[0])/self.target_norm[1])
+            m.reward = max(self.R_min,4-(min(0, m.dockscore)-self.target_norm[0])/self.target_norm[1])
             m.numblocks = len(m.blocks)
-            if len(m.jbonds) != len(m.blocks) - 1: # temp: removeme
-                continue
-                #print(i)
-                #raise ValueError('this mol is not a graph')
             if split_bool[i]:
                 self.test_mols.append(m)
             else:
                 self.train_mols.append(m)
+                self.train_mols_map[df.iloc[i].name] = m
         store.close()
-        print(num_broken, min(broks), max(broks))
+
+
+    def load_pkl(self, path, args, test_ratio=0.05):
+        columns = ["smiles", "dockscore", "blockidxs", "slices", "jbonds", "stems"]
+        mols = pickle.load(gzip.open(path))
+        test_idxs = self.test_split_rng.choice(len(mols), int(test_ratio * len(mols)), replace=False)
+        split_bool = np.zeros(len(mols), dtype=np.bool)
+        split_bool[test_idxs] = True
+        for i in tqdm(range(len(mols)), disable=not args.progress):
+            m = BlockMoleculeDataExtended()
+            for c in range(1, len(columns)):
+                setattr(m, columns[c], mols[i][columns[c]])
+            m.blocks = [self.mdp.block_mols[i] for i in m.blockidxs]
+            # TODO: compute proper reward with QED & all
+            m.reward = max(self.R_min,4-(min(0, m.dockscore)-self.target_norm[0])/self.target_norm[1])
+            m.numblocks = len(m.blocks)
+            if split_bool[i]:
+                self.test_mols.append(m)
+            else:
+                self.train_mols.append(m)
+                self.train_mols_map[m.smiles if len(m.blocks) else '[]'] = m
+
+
 
 
     def start_samplers(self, n, mbsize):
@@ -195,7 +265,8 @@ class Dataset:
                     print(e)
                     self.sampler_threads[idx].failed = True
                     self.sampler_threads[idx].exception = e
-                    continue
+                    self.ready_events[idx].set()
+                    break
                 self.ready_events[idx].set()
                 self.resume_events[idx].clear()
                 self.resume_events[idx].wait()
@@ -224,13 +295,53 @@ class Dataset:
             [i.join(0.05) for i in self.sampler_threads]
 
 
+def make_model(args, mdp):
+    if args.repr_type == 'block_graph':
+        model = model_block.GraphAgent(nemb=args.nemb,
+                                       nvec=0,
+                                       out_per_stem=mdp.num_blocks,
+                                       out_per_mol=1,
+                                       num_conv_steps=args.num_conv_steps,
+                                       mdp_cfg=mdp,
+                                       version='v4')#args.model_version)
+    elif args.repr_type == 'atom_graph':
+        model = model_atom.MolAC_GCN(nhid=args.nemb,
+                                     nvec=0,
+                                     num_out_per_stem=mdp.num_blocks,
+                                     num_out_per_mol=1,
+                                     num_conv_steps=args.num_conv_steps,
+                                     version=args.model_version)
+    elif args.repr_type == 'morgan_fingerprint':
+        raise ValueError('reimplement me')
+        model = model_fingerprint.MFP_MLP(args.nemb, 3, mdp.num_blocks, 1)
+    return model
+
+
+class Proxy:
+    def __init__(self, args, bpath, device):
+        eargs = pickle.load(gzip.open(f'{args.proxy_path}/info.pkl.gz'))['args']
+        params = pickle.load(gzip.open(f'{args.proxy_path}/best_params.pkl.gz'))
+        self.mdp = MolMDPExtended(bpath)
+        self.mdp.post_init(device, eargs.repr_type)
+        self.proxy = make_model(eargs, self.mdp)
+        for a,b in zip(self.proxy.parameters(), params):
+            a.data = torch.FloatTensor(b)
+        self.proxy.to(device)
+
+    def __call__(self, m):
+        m = self.mdp.mols2batch([self.mdp.mol2repr(m)])
+        return self.proxy(m, do_stems=False)[1].item()
+
 
 def main(args):
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
 
     dataset = Dataset(bpath, device, args.repr_type)
-    dataset.load_h5("dock_db_1618610362tp_2021_04_16_17h.h5")
+    #dataset.load_h5("dock_db_1618610362tp_2021_04_16_17h.h5")
+    dataset.load_h5("dock_db_1619111711tp_2021_04_22_13h.h5", args)
+    dataset.load_pkl("small_mols.pkl.gz", args)
+    dataset.load_pkl("small_mols_2.05.pkl.gz", args)
 
     exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
     os.makedirs(exp_dir, exist_ok=True)
@@ -246,30 +357,12 @@ def main(args):
     print(len(dataset.test_mols), 'test mols')
 
     stop_event = threading.Event()
+    model = make_model(args, mdp)
+    model.to(device)
 
-    if args.repr_type == 'block_graph':
-        raise ValueError('reimplement me')
-        model = model_block.GraphAgent(nhid=args.nemb,
-                                       nvec=0,
-                                       num_out_per_stem=mdp.num_blocks,
-                                       num_out_per_mol=1,
-                                       num_conv_steps=args.num_conv_steps,
-                                       mdp_cfg=mdp,
-                                       version=args.model_version)
-        model.to(device)
-    elif args.repr_type == 'atom_graph':
-        model = model_atom.MolAC_GCN(nhid=args.nemb,
-                                     nvec=0,
-                                     num_out_per_stem=mdp.num_blocks,
-                                     num_out_per_mol=1,
-                                     num_conv_steps=args.num_conv_steps,
-                                     version=args.model_version)
-        model.to(device)
-    elif args.repr_type == 'morgan_fingerprint':
-        raise ValueError('reimplement me')
-        model = model_fingerprint.MFP_MLP(args.nemb, 3, mdp.num_blocks, 1)
-        model.to(device)
+    proxy = Proxy(args, bpath, device)
 
+    dataset.set_sampling_model(model, proxy, sample_prob=0.75)
 
     best_model = model
     best_test_loss = 1000
@@ -313,10 +406,6 @@ def main(args):
     test_infos = []
     time_start = time.time()
     time_last_check = time.time()
-    nbatches_per_up = 1
-    nbatches_done = 0
-    batch_inc = 1000000000#5000
-    next_batch_inc = batch_inc
 
     max_early_stop_tolerance = 5
     early_stop_tol = max_early_stop_tolerance
@@ -324,7 +413,13 @@ def main(args):
 
     for i in range(args.num_iterations+1):
         if not debug_no_threads:
-            p, pb, a, r, s, d = sampler()
+            r = sampler()
+            for thread in dataset.sampler_threads:
+                if thread.failed:
+                    stop_event.set()
+                    stop_everything()
+                    pdb.post_mortem(thread.exception.__traceback__)
+            p, pb, a, r, s, d = r
         else:
             p, pb, a, r, s, d = dataset.sample2batch(dataset.sample(mbsize))
         # Since we sampled 'mbsize' trajectories, we're going to get
@@ -366,11 +461,6 @@ def main(args):
             stop_everything()
             raise ValueError()
             #pdb.set_trace()
-        for thread in dataset.sampler_threads:
-            if thread.failed:
-                stop_event.set()
-                stop_everything()
-                pdb.post_mortem(thread.exception.__traceback__)
 
         if not i % 100:
             #recent_best = np.argmax([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
@@ -467,10 +557,6 @@ def array_feb_23(args):
 
 if __name__ == '__main__':
   args = parser.parse_args()
-  def tqdm(*a, **kw):
-      if args.progress:
-          return tqdm_mod.tqdm(*a, **kw)
-      return a
   if 0:
     all_hps = eval(args.array)(args)
     #for run in range(0,8):
@@ -497,20 +583,5 @@ if __name__ == '__main__':
       for k,v in hps.items():
         setattr(args, k, v)
       main(args)
-  elif args.dump_episodes:
-      dump_episodes(args)
-  elif args.gen_rand:
-      generate_random_episodes(args)
-  elif args.gen_rand_qed:
-      generate_random_qed_episodes(args)
-  elif args.gen_sample:
-      generate_sampled_episodes(args)
   else:
     main(args)
-
-
-    """
-- run gen beam 16
-- start 20 with mp vs not (mb 512)
-
-"""

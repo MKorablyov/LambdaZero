@@ -455,7 +455,7 @@ class DockVina_smi:
                  rec_file="4jnc.nohet.aligned.pdbqt",
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
-                 cleanup=False):
+                 cleanup=True):
 
         self.outpath = outpath
         self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
@@ -515,7 +515,7 @@ class DockVina_smi:
                 os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
                 os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
                 os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
-        return mol_name, dockscore, coord
+        return mol_name, float(dockscore), coord
 
 
 class ScaffoldSplit:
@@ -656,7 +656,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
         if one_hot_atom:
             atmfeat[i, ntypes + 9 + atom.GetAtomicNum() - 1] = 1
         else:
-            atmfeat[i, ntypes + 1] = atom.GetAtomicNum()
+            atmfeat[i, ntypes + 1] = (atom.GetAtomicNum() % 16) / 2.
         atmfeat[i, ntypes + 4] = atom.GetIsAromatic()
         hybridization = atom.GetHybridization()
         atmfeat[i, ntypes + 5] = hybridization == HybridizationType.SP

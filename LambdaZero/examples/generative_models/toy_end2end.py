@@ -25,12 +25,18 @@ class UCB:
     def __init__(self, model, kappa):
         self.model = model
         self.kappa = kappa
-    
+
     def __call__(self, x):
         t_x = tf(np.array([[x]]))
         output = self.model(t_x)
         mean, std = output.mean, torch.sqrt(output.variance)
         return (mean + self.kappa * std).item()
+        t_x = tf(np.array([[x]]))
+
+    def many(self, x):
+        output = self.model(x)
+        mean, std = output.mean, torch.sqrt(output.variance)
+        return (mean + self.kappa * std)
 
 
 def main(args):
@@ -55,7 +61,6 @@ def main(args):
 
         dataset = (init_x, init_y)
         model = update_proxy(args, dataset)
-        
         args.learning_method = loss
 
         for i in range(args.num_iter):
@@ -66,14 +71,13 @@ def main(args):
                         all_x=all_x, all_y=all_y, train_x=dataset[0], train_y=dataset[1], title=f"Proxy at step: {i}")
             policy, train_loss, val_loss = train_generative_model(args, func, val_data, compute_p_of_x)
             # plot_losses(args, train_loss, val_loss, os.path.join(exp_path, f'losses-{i}.png'))
-            new_dataset, metrics = generate_batch(args, policy, dataset, i, exp_path, 
+            new_dataset, metrics = generate_batch(args, policy, dataset, i, exp_path,
                                                 env, all_inputs, true_r, all_end_states, compute_p_of_x)
             reward.append(diverse_topk_mean_reward(args, dataset, new_dataset))
-            print(reward)
             dataset = new_dataset
             distrib_distances.append(metrics)
             model = update_proxy(args, dataset)
-            
+
         pickle.dump(
             {
                 'p_dists': distrib_distances,
@@ -92,7 +96,7 @@ def get_init_data(args, func):
     init_data = data[:args.num_init_points]
     idx = np.random.randint(0, len(true_r), size=args.num_val_points)
     val_data = (np.array(all_inputs)[idx], np.array(true_r)[idx])
-    return init_data, val_data, all_end_states, true_r, compute_p_of_x, all_inputs, env 
+    return init_data, val_data, all_end_states, true_r, compute_p_of_x, all_inputs, env
 
 
 def get_network_output(args, network, inputs, mean_std=False):
@@ -109,13 +113,13 @@ def get_network_output(args, network, inputs, mean_std=False):
         for batch in dataloader:
             out = network(batch[0].to(dev))
             mean.append(out.mean.cpu())
-            std.append(torch.sqrt(out.variance).cpu()) 
+            std.append(torch.sqrt(out.variance).cpu())
         return torch.cat(mean, dim=0), torch.cat(std, dim=0)
 
 
 def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r, all_end_states, compute_p_of_x):
-    # Sample data from trained policy, given dataset. 
-    # Currently only naively samples data and adds to dataset, but should ideally also 
+    # Sample data from trained policy, given dataset.
+    # Currently only naively samples data and adds to dataset, but should ideally also
     # have a diversity constraint based on existing dataset
     true_density = tfc(true_r / true_r.sum())
     with torch.no_grad():
@@ -131,10 +135,14 @@ def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r,
     for _ in range(args.num_samples):
         hist, r, log_probs, acts, tstates = run_episode(env, args, policy)
         sampled_x.append([(tstates[-1].reshape((env.horizon, 3)) * env.bitmap_mul).sum()])
-        sampled_y.append(r)    
+        sampled_y.append(r)
     x, y = dataset
 
+<<<<<<< HEAD
     plot_fn(path=os.path.join(exp_path, f"aq-{it}.png"), all_x=tfc(all_end_states), all_y=tfc(true_r), 
+=======
+    plot_fn(path=os.path.join(exp_path, f"aq-{it}.png"), all_x=tf(all_end_states), all_y=tf(true_r),
+>>>>>>> 69ea0ef72601d8432373dceed74a6b7052363dc3
             train_x=x, train_y=y, batch_x=sampled_x, batch_y=sampled_y, title=f"Points acquired at step {it}")
     x = torch.cat([x, tfc(sampled_x)])
     y = torch.cat([y, tfc(sampled_y)])
@@ -144,7 +152,11 @@ def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r,
 def update_proxy(args, data):
     # Train proxy(GP) on collected data
     train_x, train_y = data
+<<<<<<< HEAD
     model = SingleTaskGP(train_x.to(dev), train_y.unsqueeze(-1).to(dev), 
+=======
+    model = SingleTaskGP(train_x, train_y.unsqueeze(-1),
+>>>>>>> 69ea0ef72601d8432373dceed74a6b7052363dc3
                          covar_module=gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=0.5, lengthscale_prior=gpytorch.priors.GammaPrior(0.5, 2.5))))
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
@@ -159,49 +171,26 @@ def train_generative_model(args, func, val_data, compute_p_of_x):
     # The chance of having a random episode
     alpha = args.uniform_sample_prob
     num_X = 2 ** args.horizon - 1
+    a_over_X = alpha / num_X
 
     losses, visited, distrib_distances = [], [], []
-    ratios = []
     tau = args.bootstrap_tau
 
     do_queue = args.do_is_queue or args.learning_method == 'is_xent_q'
+    if do_queue:
+        # I've removed this due to the batching update and since we're
+        # not using this method anyways. I will reimplement if
+        # needed. -Emmanuel
+        raise NotImplementedError()
 
-    queue = []
-    queue_thresh = args.queue_thresh
-    qids = itertools.count(0) # tie breaker for entries with equal priority
     val_losses = []
-    it_range = range(args.n_train_steps+1)
-    it_range = tqdm(it_range) if args.progress else it_range
-    for i in it_range:
-        batch = []
-        trajs = []
-        rs = []
-        probs = []
-        for j in range(args.mbsize):
-            if do_queue and len(queue) and np.random.random() < 0.5:
-                w, qid, (s, a) = heapq.heappop(queue)
-                log_prob = torch.log_softmax(policy(s), 1)[torch.arange(a.shape[0]), a].sum(0, True)
-                if -w > 1:
-                    heapq.heappush(queue, (-(-w - 1), qid, (s, a)))
-                if -w > 1 or np.random.random() < -w:
-                    trajs.append(queue_thresh * log_prob)
-                    continue
-            hist, r, log_probs, acts, tstates = run_episode(env, args, policy)
-            batch.extend(hist)
-            log_p_theta_x = sum(log_probs)
-            smoothed_prob = (alpha / num_X  +
-                             (1 - alpha) * torch.exp(log_p_theta_x)).detach()
-            rho = r / smoothed_prob
-            ratios.append((rho.item(), log_p_theta_x.item()))
-            if do_queue and rho > queue_thresh:
-                w = rho / queue_thresh - 1
-                rho = queue_thresh
-                heapq.heappush(queue, (-w.item(), next(qids), (tf(tstates), tl(acts))))
-            trajs.append(rho * log_p_theta_x)
-            rs.append(tf([r]))
-            probs.append(torch.exp(log_p_theta_x))
-
-        loss = get_loss(args.learning_method, batch=batch, trajs=trajs, policy=policy, q_target=q_target, probs=probs, rs=rs, c=c)
+    for i in tqdm(range(args.n_train_steps+1), disable=not args.progress):
+        transitions, rewards, log_p_theta_x, all_obs = run_episodes(
+            env, args, policy, args.mbsize)
+        loss = get_batch_loss(args.learning_method,
+                              transitions=transitions, rewards=rewards, log_p_theta_x=log_p_theta_x,
+                              policy=policy, q_target=q_target, c=c,
+                              alpha=alpha, num_X=num_X)
         loss.backward()
         opt.step()
         opt.zero_grad()
@@ -284,8 +273,8 @@ def run_episode(env, args, policy):
         tstates.append(s)
         try:
             pi = Categorical(logits=policy(tf([s])))
-        except:
-            print(policy(tf([s])))
+        except Exception as e:
+            print(policy(tf([s])), e)
         if is_random:
             a = tl([np.random.randint(3)])
         else:
@@ -296,6 +285,53 @@ def run_episode(env, args, policy):
         log_probs.append(pi.log_prob(a))
         s = sp
     return hist, r, log_probs, acts, tstates
+
+
+def run_episodes(env, args, policy, mbsize):
+    # Run mbsize episodes with the given policy
+    s = [env.get_reset_state() for i in range(mbsize)]
+    done = [False] * mbsize
+    running = tl(range(mbsize))
+    is_random = torch.tensor(np.random.random(mbsize) < args.uniform_sample_prob)
+    n_random = is_random.sum().item()
+    transitions = [] # list of (s,a,r,sp,done) batch-tuples
+    log_probs = torch.zeros(mbsize) # the trajectory log probabilities
+    all_observations = []
+    hist = []
+
+    observations = tf(list(map(env.obs, s)))
+    rewards_to_compute = [] # keep a list of rewards to ask the proxy
+                            # for so we can benefit from batching
+    while len(running):
+        all_observations.append(observations)
+        pi = Categorical(logits=policy(observations))
+        a = pi.sample()
+        if n_random:
+            a[is_random] = tl(np.random.randint(0, 3, n_random))
+        obs_sp, xs, done, sp = zip(*[env.step(ai.item(), si, return_x=True) for ai, si in zip(a, s)])
+        obs_sp = tf(obs_sp)
+        transitions.append([observations, a, torch.zeros(len(xs)), obs_sp, tf(done)])
+        for i, d in enumerate(done):
+            if d: rewards_to_compute.append((len(transitions)-1, i, xs[i]))
+        log_probs = log_probs.index_add(0, tl(running), pi.log_prob(a))
+        if any(done):
+            mask = (1-tl(done)).bool()
+            running = running[mask]
+            observations = obs_sp[mask]
+            is_random = is_random[mask]
+            n_random = is_random.sum().item()
+            s = [i for i, d in zip(sp, done) if not d]
+        else:
+            s = sp
+            observations = obs_sp
+    # Compute rewards and reinsert them into the transitions
+    xs = tf([i[2] for i in rewards_to_compute])
+    rs = env.compute_rewards(xs)
+    for (i, j, _), r in zip(rewards_to_compute, rs):
+        transitions[i][2][j] = r
+    # Stack transition tensors
+    batched_transitions = [torch.cat(i, 0) for i in zip(*transitions)]
+    return batched_transitions, rs, log_probs, all_observations
 
 
 def get_loss(loss, **kwargs):
@@ -323,10 +359,39 @@ def get_loss(loss, **kwargs):
     return loss
 
 
+def get_batch_loss(loss, **kwargs):
+    # Compute loss for updating generative model
+    if loss == "td":
+        policy, q_target = kwargs['policy'], kwargs['q_target']
+        s, a, r, sp, d = kwargs['transitions']
+        s = s
+        sp = sp
+        a = a.long()
+        q = policy(s)
+        with torch.no_grad(): qp = q_target(sp)
+        next_q = qp * (1-d).unsqueeze(1) + d.unsqueeze(1) * (-LOGINF)
+        target = torch.logsumexp(torch.cat([torch.log(r).unsqueeze(1), next_q], 1), 1)
+        loss = (q[torch.arange(q.shape[0]), a] - target).pow(2).mean()
+    elif loss == "is_xent":
+        r, log_p_theta_x = kwargs['rewards'], kwargs['log_p_theta_x']
+        smoothed_prob = (kwargs['alpha'] / kwargs['num_X']  +
+                         (1 - kwargs['alpha']) * torch.exp(log_p_theta_x)).detach()
+        rho = r / smoothed_prob
+        loss = -(rho * log_p_theta_x).mean()
+    elif loss == "l1":
+        log_p_theta_x, rewards, c = kwargs['log_p_theta_x'], kwargs['rewards'], kwargs['c']
+        loss = torch.abs(torch.exp(log_p_theta_x) - c * rewards).mean()
+    elif loss == "l2":
+        log_p_theta_x, rewards, c = kwargs['log_p_theta_x'], kwargs['rewards'], kwargs['c']
+        loss = torch.pow(torch.exp(log_p_theta_x) - c * rewards, 2).mean()
+    return loss
+
+
+
 def plot_losses(args, train_losses, val_losses, path):
     fig = plt.figure()
     ax = fig.gca()
-    
+
     ax.plot(train_losses, label='train_loss')
     ax.plot(np.arange(len(val_losses)) * args.num_val_iters, val_losses, label='train_loss')
     ax.set_title('Losses')
@@ -338,7 +403,7 @@ def plot_losses(args, train_losses, val_losses, path):
 def plot_fn(path, **kwargs):
     fig = plt.figure()
     ax = fig.gca()
-    
+
     if "train_x" in kwargs.keys():
         train_x, train_y = kwargs['train_x'], kwargs['train_y']
         # train_x, train_y = train_x.cpu(), train_y.cpu()
@@ -357,22 +422,22 @@ def plot_fn(path, **kwargs):
     plt.savefig(path)
     plt.close(fig)
 
-def plot_densities(args, x, true_density, estimated_density, path):   
+def plot_densities(args, x, true_density, estimated_density, path):
     fig = plt.figure()
     ax = fig.gca()
-    
+
     ax.plot(x, true_density, '--', label='true_density')
     ax.plot(x, estimated_density, label='estimated density')
 
     ax.set_title("Estimated density")
     ax.legend()
     plt.savefig(path)
-    plt.close(fig)    
-    
-def plot_model(path, **kwargs):   
+    plt.close(fig)
+
+def plot_model(path, **kwargs):
     fig = plt.figure()
     ax = fig.gca()
-    
+
     if "all_x" in kwargs.keys():
         all_x, all_y =  kwargs["all_x"], kwargs["all_y"]
         # all_x, all_y = all_x.cpu(), all_y.cpu()

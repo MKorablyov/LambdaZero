@@ -13,10 +13,9 @@ import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
 
-
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/test_bits_q_1.pkl.gz', type=str)
+parser.add_argument("--save_path", default='results/test_bits_q_2.pkl.gz', type=str)
 parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
 parser.add_argument("--learning_method", default='is_xent_q', type=str)
 parser.add_argument("--opt", default='adam', type=str)
@@ -69,7 +68,21 @@ class BinaryTreeEnv:
         self._step = 0
         return self.obs()
 
-    def step(self, a, s=None):
+    def get_reset_state(self):
+        return []
+
+    def compute_rewards(self, x):
+        if hasattr(self.func, 'many'):
+            return self.func.many(x)
+        return [self.func(i) for i in x]
+
+    def step(self, a, s=None, return_x=False):
+        """
+        steps the env:
+         - a: the action
+         - s: the integer position state (or self._state if s is None)
+         - return_x: if True, returns x instead of self.func(x) (R(x)), useful for batching
+        """
         _s = s
         s = self._state if s is None else s
         if a == 0 or a == 1:
@@ -78,7 +91,13 @@ class BinaryTreeEnv:
         done = len(s) >= self.horizon or a == 2
         if _s is None:
             self._state = s
-        return self.obs(), 0 if not done else self.func(self.s2x(s)), done, s
+        o = self.obs(s)
+        if done:
+            x = self.s2x(s)
+            r = x if return_x else self.func(x)
+        else:
+            r = 0
+        return o, r, done, s
 
     def all_possible_states(self):
         # expanded bit sequences, [0,1,end] turns into [[1,0,0],[0,1,0],[0,0,1],[0,0,1]...]
@@ -170,7 +189,7 @@ def main(args):
 
     do_td = args.learning_method == 'td'
     do_isxent = 'is_xent' in args.learning_method
-    do_queue = args.do_is_queue or args.learning_method == 'is_xent_q'
+    do_queue = args.do_is_queue and args.learning_method == 'is_xent_q'
     do_l1 = args.learning_method == 'l1'
     do_l2 = args.learning_method == 'l2'
 
@@ -191,7 +210,7 @@ def main(args):
                 if -w > 1:
                     heapq.heappush(queue, (-(-w - 1), qid, (s, a)))
                 if -w > 1 or np.random.random() < -w:
-                    trajs.append(queue_thresh * log_prob)
+                    trajs.append((queue_thresh * log_prob, log_prob, None))
                     continue
             s = env.reset()
             done = False
@@ -238,7 +257,7 @@ def main(args):
             loss = -torch.cat([i[0] * i[1] for i in trajs]).mean()
         elif do_l1:
             log_p_theta_x = torch.cat([i[1] for i in trajs])
-            r = tf([i[2] for i in trajs])            
+            r = tf([i[2] for i in trajs])
             loss = torch.abs(torch.exp(log_p_theta_x) - c * r).mean()
         elif do_l2:
             log_p_theta_x = torch.cat([i[1] for i in trajs])

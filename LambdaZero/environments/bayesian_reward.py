@@ -79,7 +79,7 @@ class PredDockBayesianReward_v1:
                 print('synced weights')
 
     def _get_dockscore(self, molecule):
-        # fixme !!!!!!!!!! -- this is not a dockscore but a UCB reward --------------
+        # this is a UCB reward, but not dockscore
         mol = molecule.mol
         atmfeat, _, bond, bondfeat = LambdaZero.chem.mpnn_feat(mol, ifcoord=False)
         graph = LambdaZero.chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
@@ -124,10 +124,8 @@ class PredDockBayesianReward_v1:
         # combine rewards
         disc_reward = dockscore_reward * qed_discount * synth_discount
 
-        # fixme - it's unclear how to use exp/delta
         self.reward_learner.add_molecule.remote(molecule, disc_reward, synth_discount * qed_discount)
 
-        # fixme - it would be more intuitive to compute this with handling exceptions
         if self.exp is not None: disc_reward = self.exp ** disc_reward
 
         # delta reward

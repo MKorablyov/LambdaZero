@@ -15,7 +15,7 @@ class GraphAgent(nn.Module):
         super().__init__()
         self.version = version
         self.embeddings = nn.ModuleList([
-            nn.Embedding(mdp_cfg.num_blocks + 1, nemb),
+            nn.Embedding(mdp_cfg.num_true_blocks + 1, nemb),
             nn.Embedding(mdp_cfg.num_stem_types + 1, nemb),
             nn.Embedding(mdp_cfg.num_stem_types, nemb)])
         self.conv = gnn.NNConv(nemb, nemb, nn.Sequential(), aggr='mean')
@@ -33,14 +33,15 @@ class GraphAgent(nn.Module):
         self.num_conv_steps = num_conv_steps
         self.nemb = nemb
         self.training_steps = 0
-        self.categorical_style = 'escort'
+        self.categorical_style = 'softmax'
         self.escort_p = 6
 
 
-    def forward(self, graph_data, vec_data):
+    def forward(self, graph_data, vec_data=None, do_stems=True):
         blockemb, stememb, bondemb = self.embeddings
         graph_data.x = blockemb(graph_data.x)
-        graph_data.stemtypes = stememb(graph_data.stemtypes)
+        if do_stems:
+            graph_data.stemtypes = stememb(graph_data.stemtypes)
         graph_data.edge_attr = bondemb(graph_data.edge_attr)
         graph_data.edge_attr = (
             graph_data.edge_attr[:, 0][:, :, None] * graph_data.edge_attr[:, 1][:, None, :]
@@ -62,17 +63,20 @@ class GraphAgent(nn.Module):
         # Index of the origin block of each stem in the batch (each
         # stem is a pair [block idx, stem atom type], we need to
         # adjust for the batch packing)
-        stem_block_batch_idx = (
-            torch.tensor(graph_data.__slices__['x'], device=out.device)[graph_data.stems_batch]
-            + graph_data.stems[:, 0])
-        if self.version == 'v1' or self.version == 'v4':
-            stem_out_cat = torch.cat([out[stem_block_batch_idx], graph_data.stemtypes], 1)
-        elif self.version == 'v2' or self.version == 'v3':
-            stem_out_cat = torch.cat([out[stem_block_batch_idx],
-                                      graph_data.stemtypes,
-                                      vec_data[graph_data.stems_batch]], 1)
+        if do_stems:
+            stem_block_batch_idx = (
+                torch.tensor(graph_data.__slices__['x'], device=out.device)[graph_data.stems_batch]
+                + graph_data.stems[:, 0])
+            if self.version == 'v1' or self.version == 'v4':
+                stem_out_cat = torch.cat([out[stem_block_batch_idx], graph_data.stemtypes], 1)
+            elif self.version == 'v2' or self.version == 'v3':
+                stem_out_cat = torch.cat([out[stem_block_batch_idx],
+                                          graph_data.stemtypes,
+                                          vec_data[graph_data.stems_batch]], 1)
 
-        stem_preds = self.stem2pred(stem_out_cat)
+            stem_preds = self.stem2pred(stem_out_cat)
+        else:
+            stem_preds = None
         mol_preds = self.global2pred(gnn.global_mean_pool(out, graph_data.batch))
         return stem_preds, mol_preds
 
@@ -109,7 +113,7 @@ def mol2graph(mol, mdp):
     f = lambda x: torch.tensor(x, dtype=torch.long, device=mdp.device)
     if len(mol.blockidxs) == 0:
         data = Data(# There's an extra block embedding for the empty molecule
-            x=f([mdp.num_blocks]),
+            x=f([mdp.num_true_blocks]),
             edge_index=f([[],[]]),
             edge_attr=f([]).reshape((0,2)),
             stems=f([(0,0)]),
@@ -117,17 +121,21 @@ def mol2graph(mol, mdp):
         return data
     edges = [(i[0], i[1]) for i in mol.jbonds]
     #edge_attrs = [mdp.bond_type_offset[i[2]] +  i[3] for i in mol.jbonds]
+    t = mdp.true_blockidx
     if 0:
-        edge_attrs = [((mdp.stem_type_offset[mol.blockidxs[i[0]]] + i[2]) * mdp.num_stem_types +
-                       (mdp.stem_type_offset[mol.blockidxs[i[1]]] + i[3]))
+        edge_attrs = [((mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2]) * mdp.num_stem_types +
+                       (mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3]))
                       for i in mol.jbonds]
     else:
-        edge_attrs = [(mdp.stem_type_offset[mol.blockidxs[i[0]]] + i[2],
-                       mdp.stem_type_offset[mol.blockidxs[i[1]]] + i[3])
+        edge_attrs = [(mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2],
+                       mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3])
                       for i in mol.jbonds]
-    stemtypes = [mdp.stem_type_offset[mol.blockidxs[i[0]]] + i[1] for i in mol.stems]
+    # Here stem_type_offset is a list of offsets to know which
+    # embedding to use for a particular stem. Each (blockidx, atom)
+    # pair has its own embedding.
+    stemtypes = [mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[1] for i in mol.stems]
 
-    data = Data(x=f(mol.blockidxs),
+    data = Data(x=f([t[i] for i in mol.blockidxs]),
                 edge_index=f(edges).T if len(edges) else f([[],[]]),
                 edge_attr=f(edge_attrs) if len(edges) else f([]).reshape((0,2)),
                 stems=f(mol.stems) if len(mol.stems) else f([(0,0)]),
