@@ -93,6 +93,18 @@ class BinaryTreeEnv:
             return self.func.many(x)
         return self.func(x) # [self.func(i) for i in x]
 
+    @property
+    def true_dist(self):
+        if self._true_dist is None:
+            cube = np.stack(np.meshgrid(*[
+                np.linspace(*self.xrange, 2 * 2 ** self.horizon+1)[1:-1]]*self.ndim))
+            cube = cube.transpose(*range(1, self.ndim+1), 0)
+            r = (self.func.many(torch.tensor(cube).float().reshape(-1, self.ndim))
+                 .numpy().reshape(cube.shape[:-1])
+                 if hasattr(self.func, 'many') else self.func(cube))
+            self._true_dist = r / r.sum()
+        return self._true_dist
+
     def compute_empirical_distribution_error(self, visited_states):
         """return L1 and KL divergence for visited_states a list of xs
 
@@ -102,16 +114,10 @@ class BinaryTreeEnv:
         eps = 1e-3 * 2 ** -self.horizon
         s = np.float32(visited_states)
         x2idx = (s - self.xrange[0]) * 2 ** self.horizon - 1
-        if self._true_dist is None:
-            cube = np.stack(np.meshgrid(*[
-                np.linspace(*self.xrange, 2 * 2 ** self.horizon+1)[1:-1]]*self.ndim))
-            cube = cube.transpose(*range(1, self.ndim+1), 0)
-            r = self.func(cube)
-            self._true_dist = r / r.sum()
         hist, bins = np.histogramdd(x2idx, [np.arange(2*2**self.horizon)]*self.ndim)
         empirical = hist / hist.sum()
-        L1 = abs(empirical - self._true_dist).mean()
-        KL = -(self._true_dist * np.log((empirical + eps) / self._true_dist)).sum()
+        L1 = abs(empirical - self.true_dist).mean()
+        KL = -(self.true_dist * np.log((empirical + eps) / self.true_dist)).sum()
         return L1, KL
 
     def step(self, a, s=None, return_x=False):
@@ -195,6 +201,79 @@ class BinaryTreeEnv:
         traj_rewards = np.float32([self.func(i) for i in all_xs])
         return all_bitseqs.reshape((-1, self.horizon*3)), traj_rewards, all_xs, compute_all_probs
 
+    def construct_validation_set(self, n, seed=142857):
+        '''
+        Constructs a set of trajectories used to test a policy
+        '''
+        if n >= (2 * (2 ** self.horizon)-1) ** self.ndim:
+            raise ValueError("Trying to sample more unique states then there are states")
+        rng = np.random.RandomState(seed)
+        seen = set()
+        # Since we're in a binary search tree, we want each level to
+        # be sampled with probability 1/(2^(H-i)), i.e. we want the
+        # root to be chosen with probability 1/(2^H) and a leaf to be
+        # chosen with probability 1/2
+        p = np.float32([1/2**i for i in range(self.horizon+1)][::-1])
+        p = p / p.sum() # We still need to normalize this because
+                        # sum_i^N 1/2^i == 1 iff N -> infty
+        all_observations = []
+        all_actions = []
+        all_allowed_acts = []
+        all_traj_idxs = []
+        all_probs = []
+        while len(seen) < n:
+            # Sample a state by sampling the bit sequences
+            sp = [rng.randint(0, 2, rng.multinomial(1, p).argmax())
+                  for i in range(self.ndim)]
+            # The corresponding hypercube grid index
+            idx = np.int32((self.s2x(sp) + 1) * 2 ** self.horizon)-1
+            if tuple(idx) in seen:
+                continue
+            seen.add(tuple(idx))
+            # Compute the list of actions and observations that lead
+            # to that state
+            sij = lambda i,j: sp[:i] + [sp[i][:j]] + [[]] * (self.ndim - i - 1)
+            actions = [sp[dim][j] + dim * 2
+                       for dim in range(self.ndim)
+                       for j in range(len(sp[dim]))]
+            allowed_acts = [self.allowed_acts(sij(dim, j))
+                            for dim in range(self.ndim)
+                            for j in range(len(sp[dim]))]
+            observs = [self.obs(sij(dim, j))
+                       for dim in range(self.ndim)
+                       for j in range(len(sp[dim]))]
+            # Terminal state
+            actions.append(self.ndim * 2)
+            allowed_acts.append(self.allowed_acts(sp))
+            observs.append(self.obs(sp))
+            all_traj_idxs += [len(seen) - 1] * len(actions)
+            all_observations += observs
+            all_actions += actions
+            all_allowed_acts += allowed_acts
+            all_probs.append(self.true_dist[tuple(idx)])
+
+        self._valid_observations = torch.tensor(all_observations)
+        self._valid_actions = torch.LongTensor(all_actions)
+        self._valid_allowed_acts = torch.tensor(all_allowed_acts)
+        self._valid_traj_idxs = torch.LongTensor(all_traj_idxs)
+        self._valid_probs = torch.tensor(all_probs)
+
+    def compute_validation_error(self, policy):
+        '''Compute the validation L1 and KL errors.
+
+        Assumes that policy(x) returns the unnormalized logits of a
+        categorical distribution
+        '''
+        with torch.no_grad():
+            logits = policy(self._valid_observations)
+        logits = logits * self._valid_allowed_acts - 100 * (1-self._valid_allowed_acts)
+        pi_a_s = Categorical(logits=logits).log_prob(self._valid_actions)
+
+        p_tau = torch.exp(torch.zeros(self._valid_probs.shape[0])
+                          .index_add_(0, self._valid_traj_idxs, pi_a_s))
+        l1 = abs(p_tau - self._valid_probs).mean()
+        kl = -(self._valid_probs * torch.log(p_tau / self._valid_probs)).sum()
+        return l1.item(), kl.item()
 
 def make_mlp(l, act=nn.LeakyReLU()):
     """makes an MLP with no top layer activation"""

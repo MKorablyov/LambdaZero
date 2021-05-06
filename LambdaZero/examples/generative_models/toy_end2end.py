@@ -28,22 +28,23 @@ class UCB:
 
     def __call__(self, x):
         t_x = tf(np.array([[x]]))
-        output = self.model(t_x)
-        mean, std = output.mean, torch.sqrt(output.variance)
+        with torch.no_grad():
+            output = self.model(t_x)
+            mean, std = output.mean, torch.sqrt(output.variance)
         return (mean + self.kappa * std).item()
 
     def many(self, x):
-        output = self.model(x)
-        mean, std = output.mean, torch.sqrt(output.variance)
+        with torch.no_grad():
+            output = self.model(x)
+            mean, std = output.mean, torch.sqrt(output.variance)
         return (mean + self.kappa * std)
 
 
 def main(args):
     # Main Loop
-    init_data, val_data, all_end_states, true_r, compute_p_of_x, all_inputs, env = get_init_data(args, TEST_FUNC)
+    init_data, all_end_states, true_r, compute_p_of_x, all_inputs, env = get_init_data(args, TEST_FUNC)
     all_x, all_y = tf(all_end_states), tf(true_r)
     init_x, init_y = tf(init_data[:, 0]).unsqueeze(-1), tf(init_data[:, 1])
-    val_data = (tfc(val_data[0]), tfc(val_data[1]))
     exp_name = args.exp_name
     if not os.path.exists(args.save_path):
         os.mkdir(args.save_path)
@@ -68,8 +69,8 @@ def main(args):
             func = UCB(model, 0.1)
             plot_model(path=os.path.join(exp_path, f'model-{i}.png'), model=model,
                         all_x=all_x, all_y=all_y, train_x=dataset[0], train_y=dataset[1], title=f"Proxy at step: {i}")
-            policy, train_loss, val_loss = train_generative_model(args, func, val_data, compute_p_of_x)
-            # plot_losses(args, train_loss, val_loss, os.path.join(exp_path, f'losses-{i}.png'))
+            policy, train_loss, val_loss = train_generative_model(args, func, compute_p_of_x)
+            plot_losses(args, train_loss, val_loss, os.path.join(exp_path, f'losses-{i}.png'))
             new_dataset, metrics = generate_batch(args, policy, dataset, i, exp_path,
                                                 env, all_inputs, true_r, all_end_states, compute_p_of_x)
             reward.append(diverse_topk_mean_reward(args, dataset, new_dataset))
@@ -93,9 +94,7 @@ def get_init_data(args, func):
     data = np.dstack((all_end_states, true_r))[0]
     np.random.shuffle(data)
     init_data = data[:args.num_init_points]
-    idx = np.random.randint(0, len(true_r), size=args.num_val_points)
-    val_data = (np.array(all_inputs)[idx], np.array(true_r)[idx])
-    return init_data, val_data, all_end_states, true_r, compute_p_of_x, all_inputs, env
+    return init_data, all_end_states, true_r, compute_p_of_x, all_inputs, env
 
 
 def get_network_output(args, network, inputs, mean_std=False):
@@ -154,10 +153,13 @@ def update_proxy(args, data):
     return model
 
 
-def train_generative_model(args, func, val_data, compute_p_of_x,
-                           compute_empirical_error=False):
+def train_generative_model(args, func, compute_p_of_x,
+                           compute_empirical_error=False,
+                           compute_validation_error=True):
     # Train policy using the generative loss, with the given acquisition function
     env = BinaryTreeEnv(args.horizon, func=func, ndim=args.num_dims)
+    if compute_validation_error:
+        env.construct_validation_set(args.num_val_points)
     policy, q_target, opt, c = initialize_generative_model(args)
 
     # The chance of having a random episode
@@ -191,27 +193,20 @@ def train_generative_model(args, func, val_data, compute_p_of_x,
         losses.append(loss.item())
         all_visited += visited
 
-        if compute_empirical_error and not i % 500:
+        if compute_empirical_error and not i % args.num_val_iters:
             empirical_losses.append(env.compute_empirical_distribution_error(all_visited[-16000:]))
-            #print('L1, KL', *empirical_losses[-1])
+            #print('empirical L1, KL', *empirical_losses[-1])
+
+        if compute_validation_error and not i % args.num_val_iters:
+            val_loss = env.compute_validation_error(policy)
+            val_losses.append(val_loss)
+            #print('validation L1, KL', *val_loss)
 
         if args.learning_method == "td" and tau > 0:
             for _a,b in zip(policy.parameters(), q_target.parameters()):
                 b.data.mul_(1-tau).add_(tau*_a)
-        # TODO: Add prob density computation for set of points
-        # if i % args.num_val_iters:
-        #     val_loss = get_val_loss(args, policy, val_data, compute_p_of_x)
-        #     val_losses.append(val_loss.item())
 
     return [policy, losses, val_losses] + ([empirical_losses, all_visited] if compute_empirical_error else [])
-
-
-def get_val_loss(args, policy, val_data, compute_p_of_x):
-    with torch.no_grad():
-        pi_a_s = torch.softmax(policy(val_data[0].to(dev)), 1)
-        import pdb; pdb.set_trace();
-        estimated_density = compute_p_of_x(pi_a_s)
-    loss_fn =  lambda c: torch.sum(estimated_density - c * val_data[1])
 
 
 def diverse_topk_mean_reward(args, d_prev, d):
@@ -404,7 +399,7 @@ def plot_losses(args, train_losses, val_losses, path):
     ax = fig.gca()
 
     ax.plot(train_losses, label='train_loss')
-    ax.plot(np.arange(len(val_losses)) * args.num_val_iters, val_losses, label='train_loss')
+    ax.plot(np.arange(len(val_losses)) * args.num_val_iters, val_losses, label='val_loss')
     ax.set_title('Losses')
     ax.legend()
     plt.savefig(path)
@@ -499,7 +494,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_init_points", default=64, type=int)
     parser.add_argument("--num_val_points", default=128, type=int)
     parser.add_argument("--num_iter", default=10, type=int)
-    parser.add_argument("--num_val_iters", default=10, type=int)
+    parser.add_argument("--num_val_iters", default=500, type=int)
     parser.add_argument("--reward_topk", default=5, type=int)
     parser.add_argument("--inf_batch_size", default=32, type=int)
     parser.add_argument("--num_samples", default=8, type=int)

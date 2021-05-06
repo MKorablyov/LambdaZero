@@ -18,8 +18,8 @@ from toy_end2end import train_generative_model
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/test_bits_ndim_7.pkl.gz', type=str)
-parser.add_argument("--reward_func", default='cos_sin_N', type=str)
+parser.add_argument("--save_path", default='results/test_bits_ndim_8.pkl.gz', type=str)
+parser.add_argument("--reward_func", default='cos_N', type=str)
 parser.add_argument("--learning_rate", default=2e-4, help="Learning rate", type=float)
 parser.add_argument("--learning_method", default='td', type=str)
 parser.add_argument("--opt", default='adam', type=str)
@@ -33,6 +33,8 @@ parser.add_argument("--num_dims", default=2, type=int)
 parser.add_argument("--n_hid", default=256, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
 parser.add_argument("--n_train_steps", default=10000, type=int)
+parser.add_argument("--num_val_iters", default=500, type=int)
+parser.add_argument("--num_val_points", default=512, type=int)
 # This is alpha in the note, smooths the learned distribution into a uniform exploratory one
 parser.add_argument("--uniform_sample_prob", default=0.001, type=float)
 parser.add_argument("--do_is_queue", action='store_true')
@@ -44,11 +46,12 @@ def main(args):
     env = BinaryTreeEnv(args.horizon, func=funcs[args.reward_func], ndim=args.num_dims)
     policy, train_loss, val_loss, empirical_losses, all_visited = (
         train_generative_model(args, funcs[args.reward_func], None, None,
-                               compute_empirical=True))
+                               compute_empirical_error=True,
+                               compute_validation_error=True))
     pickle.dump((train_loss, empirical_losses, all_visited, args), gzip.open(args.save_path, 'wb'))
 
 if __name__ == "__main__":
-    torch.set_num_threads(2)
+    torch.set_num_threads(1)
     args = parser.parse_args()
 
     dev = torch.device(args.device)
