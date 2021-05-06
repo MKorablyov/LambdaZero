@@ -138,11 +138,7 @@ def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r,
         sampled_y.append(r)
     x, y = dataset
 
-<<<<<<< HEAD
     plot_fn(path=os.path.join(exp_path, f"aq-{it}.png"), all_x=tfc(all_end_states), all_y=tfc(true_r), 
-=======
-    plot_fn(path=os.path.join(exp_path, f"aq-{it}.png"), all_x=tf(all_end_states), all_y=tf(true_r),
->>>>>>> 69ea0ef72601d8432373dceed74a6b7052363dc3
             train_x=x, train_y=y, batch_x=sampled_x, batch_y=sampled_y, title=f"Points acquired at step {it}")
     x = torch.cat([x, tfc(sampled_x)])
     y = torch.cat([y, tfc(sampled_y)])
@@ -152,11 +148,7 @@ def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r,
 def update_proxy(args, data):
     # Train proxy(GP) on collected data
     train_x, train_y = data
-<<<<<<< HEAD
     model = SingleTaskGP(train_x.to(dev), train_y.unsqueeze(-1).to(dev), 
-=======
-    model = SingleTaskGP(train_x, train_y.unsqueeze(-1),
->>>>>>> 69ea0ef72601d8432373dceed74a6b7052363dc3
                          covar_module=gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=0.5, lengthscale_prior=gpytorch.priors.GammaPrior(0.5, 2.5))))
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
