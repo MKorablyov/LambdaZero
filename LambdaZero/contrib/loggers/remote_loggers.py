@@ -28,6 +28,12 @@ class RemoteLogger:
     def set_config(self, cfgn):
         self._config_name = cfgn
 
+    def log_dir(self):
+        return self._log_dir
+
+    def set_log_dir(self, log_dir):
+        self._log_dir = log_dir
+
 
 class WandbRemoteLoggerCallback(WandbLoggerCallback):
     def __init__(self, remote_logger, **kwargs):
