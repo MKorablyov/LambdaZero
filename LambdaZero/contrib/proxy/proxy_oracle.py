@@ -1,14 +1,5 @@
-import random
-
-import numpy as np
 import ray
-from LambdaZero.contrib.acquisition_function import UCB
 from .proxy import Proxy
-import torch
-from sklearn.metrics import explained_variance_score
-import os
-
-from LambdaZero.contrib.oracle import DockingOracle
 
 
 @ray.remote(num_gpus=0.0, num_cpus=2)
