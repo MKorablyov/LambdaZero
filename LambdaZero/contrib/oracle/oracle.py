@@ -1,3 +1,4 @@
+import copy
 import os
 import time
 import numpy as np
@@ -11,6 +12,7 @@ from typing import List, Tuple
 import re
 import pandas as pd
 import gc
+from actor_pool_wait import ActorPoolWait
 
 from LambdaZero.chem import DockVina_smi
 from LambdaZero.models import ChempropWrapper_v1
@@ -41,7 +43,7 @@ class PreDockingDB:
         best_db, _ = PreDockingDB.get_last_db()
         if best_db is not None:
             # Read database
-            store = pd.HDFStore(best_db)
+            store = pd.HDFStore(best_db, "r")
             db = store.select('df')
             self.pre_dock_scores = db["dockscore"].to_dict()
 
@@ -54,7 +56,9 @@ class PreDockingDB:
 
     def __call__(self, smiles: str) -> float:
         """ Get dock score if exists in dict """
-        predocked_score = self.pre_dock_scores.get(smiles)
+        res = self.pre_dock_scores.get(smiles)
+        predocked_score = res if res is None else np.around(np.float64(res), 1)
+
         return predocked_score
 
     def local_update(self, smiles: str, dockscore: float):
@@ -149,11 +153,31 @@ class DockingEstimator(DockVina_smi_db):
             mol_name, dockscore, coord = self.dock(smiles, **kwargs)
         except Exception as e:
             dockscore = None
+
         return dockscore
 
 
+class SimpleDockBuffer:
+    def __init__(self, buffer_size=1000):
+        self._max_buffer = buffer_size
+        self._buffer = []
+        self._cnt = 0
+
+    def __call__(self, values):
+        self._buffer += [_x for _x in values if _x is not None]
+        self._cnt += len(values)
+
+    def is_full(self):
+        return self._cnt > self._max_buffer
+
+    def empty_buffer(self):
+        ret = self._buffer, self._cnt
+        self._buffer, self._cnt = [], 0
+        return ret
+
+
 class DockingOracle:
-    def __init__(self, num_threads, dockVina_config, mean, std, act_y, logger):
+    def __init__(self, num_threads, dockVina_config, mean, std, act_y, logger, max_failed_hits=3):
         self.num_threads = num_threads
 
         # Create docked data storage
@@ -165,33 +189,64 @@ class DockingOracle:
 
         # create actor pool
         self.actors = [DockingEstimator.remote(dockVina_config) for i in range(self.num_threads)]
-        self.pool = ray.util.ActorPool(self.actors)
+        self.pool = ActorPoolWait(self.actors, timeout=360)
+
         self.mean = mean
         self.std = std
         self.act_y = act_y
+        self.fix_none = True
+        self.norm_data = True
         self.logger = logger
+        self._simple_buffer = SimpleDockBuffer()
+        self._max_failed_hits = max_failed_hits
+        self._failed_hits = dict()
 
-    def __call__(self, data):
+    def set_fix_none(self, vl):
+        self.fix_none = vl
+
+    def set_norm_data(self, vl):
+        self.norm_data = False
+
+    def __call__(self, data, ret_true_dockscore=False):
+        filter_failed = [False] * len(data)
+
         if self.query_predocked:
             predockedscores, smiles_ids, smiles = [None] * len(data), [], []
+            fh = self._failed_hits
+            fh_max = self._max_failed_hits
 
             # Get predocked scores if not add them for oracle
             for i, d in enumerate(data):
                 res = self.predocked(d["smiles"])
                 if res is None:
-                    smiles.append((d["smiles"], d))
-                    smiles_ids.append(i)
+                    if d["smiles"] in fh and fh[d["smiles"]] > fh_max or fh_max == 0:
+                        # Filter Failed hits... sadly add average
+                        predockedscores[i] = self.mean
+                        filter_failed[i] = True
+                    else:
+                        smiles.append((d["smiles"], d))
+                        smiles_ids.append(i)
                 else:
                     predockedscores[i] = res
 
             # Get oracle scores
-            if len(smiles) > 0:
+            if len(smiles) > 0 and len(self.actors) > 0:
+
                 dockscores = list(self.pool.map(
                     lambda actor, smi: actor.eval.remote(smi[0], mol_data=smi[1]), smiles
                 ))
+
                 # Log them in place
                 for i, ds in zip(smiles_ids, dockscores):
-                    predockedscores[i] = ds
+                    if ds is not None:
+                        predockedscores[i] = ds
+                        self.predocked.local_update(data[i]["smiles"], ds)
+                    else:
+                        if data[i]["smiles"] in fh:
+                            fh[data[i]["smiles"]] += 1
+                        else:
+                            fh[data[i]["smiles"]] = 1
+
             dockscores = predockedscores
         else:
             smiles = [(d["smiles"], d) for d in data]
@@ -199,22 +254,33 @@ class DockingOracle:
                 lambda actor, smi: actor.eval.remote(smi[0], mol_data=smi[1]), smiles
             ))
 
+        true_dockscores = [None if filter_failed[ix] else x for ix, x in enumerate(dockscores)]
         dockscores_ = []
         num_failures = 0
         for d in dockscores:
-            if d == None:
+            if d == None and self.fix_none:
                 dockscores_.append(self.mean) # mean on failures
                 num_failures+=1
             else:
                 dockscores_.append(d)
 
-        dockscores = [(self.mean-d) / self.std for d in dockscores_] # this normalizes and flips dockscore
-        dockscores = self.act_y(dockscores)
-        self.logger.log.remote({
-            "docking_oracle/failure_probability": num_failures/float(len(dockscores)),
-            "docking_oracle/norm_dockscore_min": np.min(dockscores),
-            "docking_oracle/norm_dockscore_mean": np.mean(dockscores),
-            "docking_oracle/norm_dockscore_max": np.max(dockscores)})
+        if self.norm_data and self.fix_none:
+            dockscores = [(self.mean-d) / self.std for d in dockscores_] # this normalizes and flips dockscore
+            dockscores = self.act_y(dockscores)
+
+        self._simple_buffer([x for ix, x in enumerate(dockscores) if not filter_failed[ix]])
+
+        if self._simple_buffer.is_full():
+            log_dock, log_cnt = self._simple_buffer.empty_buffer()
+            self.logger.log.remote({
+                "docking_oracle/failure_probability": (log_cnt-len(log_dock)) / float(log_cnt),
+                "docking_oracle/norm_dockscore_min": np.min(log_dock),
+                "docking_oracle/norm_dockscore_mean": np.mean(log_dock),
+                "docking_oracle/norm_dockscore_max": np.max(log_dock)})
+
+        if ret_true_dockscore:
+            return dockscores, true_dockscores
+
         return dockscores
 
 
