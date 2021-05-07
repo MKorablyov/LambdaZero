@@ -19,7 +19,7 @@ from botorch.fit import fit_gpytorch_model
 from botorch.models import SingleTaskGP
 from torch.utils.data import TensorDataset, DataLoader
 
-from toy_1d_seq import BinaryTreeEnv, make_mlp
+from toy_1d_seq import BinaryTreeEnv, make_mlp, funcs
 
 class UCB:
     def __init__(self, model, kappa):
@@ -28,23 +28,23 @@ class UCB:
 
     def __call__(self, x):
         t_x = tf(np.array([[x]]))
-        output = self.model(t_x)
-        mean, std = output.mean, torch.sqrt(output.variance)
+        with torch.no_grad():
+            output = self.model(t_x)
+            mean, std = output.mean, torch.sqrt(output.variance)
         return (mean + self.kappa * std).item()
-        t_x = tf(np.array([[x]]))
 
     def many(self, x):
-        output = self.model(x)
-        mean, std = output.mean, torch.sqrt(output.variance)
+        with torch.no_grad():
+            output = self.model(x)
+            mean, std = output.mean, torch.sqrt(output.variance)
         return (mean + self.kappa * std)
 
 
 def main(args):
     # Main Loop
-    init_data, val_data, all_end_states, true_r, compute_p_of_x, all_inputs, env = get_init_data(args, TEST_FUNC)
-    all_x, all_y = tfc(all_end_states), tfc(true_r)
-    init_x, init_y = tfc(init_data[:, 0]).unsqueeze(-1), tfc(init_data[:, 1])
-    val_data = (tfc(val_data[0]), tfc(val_data[1]))
+    init_data, all_end_states, true_r, compute_p_of_x, all_inputs, env = get_init_data(args, TEST_FUNC)
+    all_x, all_y = tf(all_end_states), tf(true_r)
+    init_x, init_y = tf(init_data[:, 0]).unsqueeze(-1), tf(init_data[:, 1])
     exp_name = args.exp_name
     if not os.path.exists(args.save_path):
         os.mkdir(args.save_path)
@@ -69,8 +69,8 @@ def main(args):
             func = UCB(model, 0.1)
             plot_model(path=os.path.join(exp_path, f'model-{i}.png'), model=model,
                         all_x=all_x, all_y=all_y, train_x=dataset[0], train_y=dataset[1], title=f"Proxy at step: {i}")
-            policy, train_loss, val_loss = train_generative_model(args, func, val_data, compute_p_of_x)
-            # plot_losses(args, train_loss, val_loss, os.path.join(exp_path, f'losses-{i}.png'))
+            policy, train_loss, val_loss = train_generative_model(args, func, compute_p_of_x)
+            plot_losses(args, train_loss, val_loss, os.path.join(exp_path, f'losses-{i}.png'))
             new_dataset, metrics = generate_batch(args, policy, dataset, i, exp_path,
                                                 env, all_inputs, true_r, all_end_states, compute_p_of_x)
             reward.append(diverse_topk_mean_reward(args, dataset, new_dataset))
@@ -94,9 +94,7 @@ def get_init_data(args, func):
     data = np.dstack((all_end_states, true_r))[0]
     np.random.shuffle(data)
     init_data = data[:args.num_init_points]
-    idx = np.random.randint(0, len(true_r), size=args.num_val_points)
-    val_data = (np.array(all_inputs)[idx], np.array(true_r)[idx])
-    return init_data, val_data, all_end_states, true_r, compute_p_of_x, all_inputs, env
+    return init_data, all_end_states, true_r, compute_p_of_x, all_inputs, env
 
 
 def get_network_output(args, network, inputs, mean_std=False):
@@ -155,9 +153,13 @@ def update_proxy(args, data):
     return model
 
 
-def train_generative_model(args, func, val_data, compute_p_of_x):
+def train_generative_model(args, func, compute_p_of_x,
+                           compute_empirical_error=False,
+                           compute_validation_error=True):
     # Train policy using the generative loss, with the given acquisition function
-    env = BinaryTreeEnv(args.horizon, func=func)
+    env = BinaryTreeEnv(args.horizon, func=func, ndim=args.num_dims)
+    if compute_validation_error:
+        env.construct_validation_set(args.num_val_points)
     policy, q_target, opt, c = initialize_generative_model(args)
 
     # The chance of having a random episode
@@ -165,7 +167,8 @@ def train_generative_model(args, func, val_data, compute_p_of_x):
     num_X = 2 ** args.horizon - 1
     a_over_X = alpha / num_X
 
-    losses, visited, distrib_distances = [], [], []
+    losses, all_visited, distrib_distances = [], [], []
+    empirical_losses = []
     tau = args.bootstrap_tau
 
     do_queue = args.do_is_queue or args.learning_method == 'is_xent_q'
@@ -177,7 +180,7 @@ def train_generative_model(args, func, val_data, compute_p_of_x):
 
     val_losses = []
     for i in tqdm(range(args.n_train_steps+1), disable=not args.progress):
-        transitions, rewards, log_p_theta_x, all_obs = run_episodes(
+        transitions, rewards, log_p_theta_x, all_obs, visited = run_episodes(
             env, args, policy, args.mbsize)
         loss = get_batch_loss(args.learning_method,
                               transitions=transitions, rewards=rewards, log_p_theta_x=log_p_theta_x,
@@ -188,24 +191,22 @@ def train_generative_model(args, func, val_data, compute_p_of_x):
         opt.zero_grad()
 
         losses.append(loss.item())
+        all_visited += visited
+
+        if compute_empirical_error and not i % args.num_val_iters:
+            empirical_losses.append(env.compute_empirical_distribution_error(all_visited[-16000:]))
+            #print('empirical L1, KL', *empirical_losses[-1])
+
+        if compute_validation_error and not i % args.num_val_iters:
+            val_loss = env.compute_validation_error(policy)
+            val_losses.append(val_loss)
+            #print('validation L1, KL', *val_loss)
 
         if args.learning_method == "td" and tau > 0:
             for _a,b in zip(policy.parameters(), q_target.parameters()):
                 b.data.mul_(1-tau).add_(tau*_a)
-        # TODO: Add prob density computation for set of points
-        # if i % args.num_val_iters:
-        #     val_loss = get_val_loss(args, policy, val_data, compute_p_of_x)
-        #     val_losses.append(val_loss.item())
 
-    return policy, losses, val_losses
-
-
-def get_val_loss(args, policy, val_data, compute_p_of_x):
-    with torch.no_grad():
-        pi_a_s = torch.softmax(policy(val_data[0].to(dev)), 1)
-        import pdb; pdb.set_trace();
-        estimated_density = compute_p_of_x(pi_a_s)
-    loss_fn =  lambda c: torch.sum(estimated_density - c * val_data[1])
+    return [policy, losses, val_losses] + ([empirical_losses, all_visited] if compute_empirical_error else [])
 
 
 def diverse_topk_mean_reward(args, d_prev, d):
@@ -224,7 +225,9 @@ def initialize_generative_model(args, init_params={}):
     # Initialize params, etc for generative model training
     # init_params will be a dict containing the parameters for each model.
 
-    policy = make_mlp([args.horizon * 3] + [args.n_hid] * args.n_layers + [3])
+    policy = make_mlp([args.horizon * args.num_dims * 3] +
+                      [args.n_hid] * args.n_layers +
+                      [args.num_dims * 2 + 1])
     if 'policy' in init_params.keys():
         policy.load_state_dict(init_params['policy'])
     policy.to(dev)
@@ -263,17 +266,19 @@ def run_episode(env, args, policy):
     hist = []
     while not done:
         tstates.append(s)
+        allowed_acts = tf(env.allowed_acts())
+        logits = policy(tf([s]))
         try:
-            pi = Categorical(logits=policy(tf([s])))
+            pi = Categorical(logits=logits * allowed_acts - LOGINF * (1 - allowed_acts))
         except Exception as e:
             print(policy(tf([s])), e)
         if is_random:
-            a = tl([np.random.randint(3)])
+            a = Categorical(logits=allowed_acts * 100).sample()
         else:
             a = pi.sample()
         acts.append(a)
         sp, r, done, _ = env.step(a.item())
-        hist.append([tf([i]) for i in (s,a,r,sp,done)])
+        hist.append([tf([i]) for i in (s,a,r,sp,done)]+[allowed_acts.unsqueeze(0)])
         log_probs.append(pi.log_prob(a))
         s = sp
     return hist, r, log_probs, acts, tstates
@@ -284,25 +289,28 @@ def run_episodes(env, args, policy, mbsize):
     s = [env.get_reset_state() for i in range(mbsize)]
     done = [False] * mbsize
     running = tl(range(mbsize))
-    is_random = torch.tensor(np.random.random(mbsize) < args.uniform_sample_prob)
+    is_random = _ir = torch.tensor(np.random.random(mbsize) < args.uniform_sample_prob)
     n_random = is_random.sum().item()
     transitions = [] # list of (s,a,r,sp,done) batch-tuples
     log_probs = torch.zeros(mbsize) # the trajectory log probabilities
     all_observations = []
-    hist = []
+    n_acts = args.num_dims*2+1
 
     observations = tf(list(map(env.obs, s)))
+    allowed_acts = tf(list(map(env.allowed_acts, s)))
     rewards_to_compute = [] # keep a list of rewards to ask the proxy
                             # for so we can benefit from batching
     while len(running):
         all_observations.append(observations)
-        pi = Categorical(logits=policy(observations))
+        logits = policy(observations)
+        pi = Categorical(logits=logits * allowed_acts - 100 * (1 - allowed_acts))
         a = pi.sample()
         if n_random:
-            a[is_random] = tl(np.random.randint(0, 3, n_random))
+            a[is_random] = Categorical(logits=allowed_acts[is_random] * 100).sample()
         obs_sp, xs, done, sp = zip(*[env.step(ai.item(), si, return_x=True) for ai, si in zip(a, s)])
         obs_sp = tf(obs_sp)
-        transitions.append([observations, a, torch.zeros(len(xs)), obs_sp, tf(done)])
+        allowed_acts = tf(list(map(env.allowed_acts, s)))
+        transitions.append([observations, a, torch.zeros(len(xs)), obs_sp, tf(done), allowed_acts])
         for i, d in enumerate(done):
             if d: rewards_to_compute.append((len(transitions)-1, i, xs[i]))
         log_probs = log_probs.index_add(0, tl(running), pi.log_prob(a))
@@ -311,32 +319,35 @@ def run_episodes(env, args, policy, mbsize):
             running = running[mask]
             observations = obs_sp[mask]
             is_random = is_random[mask]
+            allowed_acts = allowed_acts[mask]
             n_random = is_random.sum().item()
             s = [i for i, d in zip(sp, done) if not d]
         else:
             s = sp
             observations = obs_sp
     # Compute rewards and reinsert them into the transitions
-    xs = tf([i[2] for i in rewards_to_compute])
-    rs = env.compute_rewards(xs)
+    xs = [i[2] for i in rewards_to_compute]
+    rs = env.compute_rewards(tf(xs))
     for (i, j, _), r in zip(rewards_to_compute, rs):
         transitions[i][2][j] = r
     # Stack transition tensors
     batched_transitions = [torch.cat(i, 0) for i in zip(*transitions)]
-    return batched_transitions, rs, log_probs, all_observations
+    return (batched_transitions, rs, log_probs, all_observations,
+            [xs[i] for i in range(mbsize) if not _ir[i]])
 
 
 def get_loss(loss, **kwargs):
     # Compute loss for updating generative model
     if loss == "td":
         batch, policy, q_target = kwargs['batch'], kwargs['policy'], kwargs['q_target']
-        s, a, r, sp, d = map(torch.cat, zip(*batch))
+        s, a, r, sp, d, am = map(torch.cat, zip(*batch))
         s = s
         sp = sp
         a = a.long()
         q = policy(s)
         with torch.no_grad(): qp = q_target(sp)
-        next_q = qp * (1-d).unsqueeze(1) + d.unsqueeze(1) * (-LOGINF)
+        next_q_mask = (1-d).unsqueeze(1) * am
+        next_q = qp * next_q_mask + (1-next_q_mask) * (-LOGINF)
         target = torch.logsumexp(torch.cat([torch.log(r).unsqueeze(1), next_q], 1), 1)
         loss = (q[torch.arange(q.shape[0]), a] - target).pow(2).mean()
     elif loss == "is_xent":
@@ -355,13 +366,16 @@ def get_batch_loss(loss, **kwargs):
     # Compute loss for updating generative model
     if loss == "td":
         policy, q_target = kwargs['policy'], kwargs['q_target']
-        s, a, r, sp, d = kwargs['transitions']
+        s, a, r, sp, d, am = kwargs['transitions']
         s = s
         sp = sp
         a = a.long()
         q = policy(s)
         with torch.no_grad(): qp = q_target(sp)
-        next_q = qp * (1-d).unsqueeze(1) + d.unsqueeze(1) * (-LOGINF)
+        # when the next state is done or some actions aren't allowed, make the logits tiny
+        next_q_mask = (1-d).unsqueeze(1) * am
+        next_q = qp * next_q_mask + (1-next_q_mask) * (-LOGINF)
+        # reduce
         target = torch.logsumexp(torch.cat([torch.log(r).unsqueeze(1), next_q], 1), 1)
         loss = (q[torch.arange(q.shape[0]), a] - target).pow(2).mean()
     elif loss == "is_xent":
@@ -385,7 +399,7 @@ def plot_losses(args, train_losses, val_losses, path):
     ax = fig.gca()
 
     ax.plot(train_losses, label='train_loss')
-    ax.plot(np.arange(len(val_losses)) * args.num_val_iters, val_losses, label='train_loss')
+    ax.plot(np.arange(len(val_losses)) * args.num_val_iters, val_losses, label='val_loss')
     ax.set_title('Losses')
     ax.legend()
     plt.savefig(path)
@@ -462,6 +476,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--save_path", default='results/', type=str)
     parser.add_argument("--exp_name", default='test', type=str)
+    parser.add_argument("--reward_func", default='cos_sin_N', type=str)
     parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
     parser.add_argument("--learning_method", default='is_xent_q', type=str)
     parser.add_argument("--opt", default='adam', type=str)
@@ -472,13 +487,14 @@ if __name__ == "__main__":
     parser.add_argument("--bootstrap_tau", default=0.1, type=float)
     parser.add_argument("--mbsize", default=8, help="Minibatch size", type=int)
     parser.add_argument("--horizon", default=8, type=int)
+    parser.add_argument("--num_dims", default=1, type=int)
     parser.add_argument("--n_hid", default=256, type=int)
     parser.add_argument("--n_layers", default=2, type=int)
     parser.add_argument("--n_train_steps", default=10000, type=int)
     parser.add_argument("--num_init_points", default=64, type=int)
     parser.add_argument("--num_val_points", default=128, type=int)
     parser.add_argument("--num_iter", default=10, type=int)
-    parser.add_argument("--num_val_iters", default=10, type=int)
+    parser.add_argument("--num_val_iters", default=500, type=int)
     parser.add_argument("--reward_topk", default=5, type=int)
     parser.add_argument("--inf_batch_size", default=32, type=int)
     parser.add_argument("--num_samples", default=8, type=int)
@@ -498,6 +514,6 @@ if __name__ == "__main__":
     tfc = lambda x: torch.FloatTensor(x)
     tl = lambda x: torch.LongTensor(x).to(dev)
 
-    TEST_FUNC = (lambda x: ((np.cos(x * 50 - 2) * np.sin(10 * x + 2) + 1) * norm.pdf(x * 5, loc=2, scale=2)) + 0.01)
+    TEST_FUNC = funcs[args.reward_func]
     LOGINF = torch.tensor(1000).to(dev)
     main(args)
