@@ -106,7 +106,7 @@ class GraphMolActorCritic_thv1(TorchModelV2, nn.Module, ABC):
 
             # mask not available actions
             masked_actions = (1. - action_mask).to(torch.bool)
-            actor_logits[masked_actions] = -np.inf  # -np.inf for DQN  # some very small prob that does not lead to inf
+            actor_logits[masked_actions] = -20  # -np.inf for DQN  # some very small prob that does not lead to inf
             self._value_out = scalar_outs[:, 0]
             if self.rnd:
                 self._value_int = scalar_outs[:, 2]
