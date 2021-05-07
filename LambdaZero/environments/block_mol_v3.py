@@ -107,15 +107,23 @@ DEFAULT_CONFIG = {
     "max_atoms": 50,
     "max_branches": 20,
     "random_steps": 2,
-    "allow_removal": False
+    "allow_removal": False,
+
+    "env_seed": 123, # int - seed number / list[int] Same init state from seed list
+    "eval_mode": False,
+    "evaluation_num_episodes": None, # Set from config validation
+    "filter_init_states": [],
+    "logger": None,
+    "random_sample_seed": True,
+    "save_eval_data": False,
 }
+
 
 class BlockMolEnv_v3:
     mol_attr = ["blockidxs", "slices", "numblocks", "jbonds", "stems"]
     def __init__(self, config=None):
         #warnings.warn("BlockMolEnv_v3 is deprecated for BlockMolEnv_v4")
-
-        config = merge_dicts(DEFAULT_CONFIG, config)
+        self._config = config = merge_dicts(DEFAULT_CONFIG, config)
 
         self.num_blocks = config["num_blocks"]
         self.molMDP = MolMDP(**config["molMDP_config"])
@@ -143,6 +151,62 @@ class BlockMolEnv_v3:
         self.reward = config["reward"](**config["reward_config"])
         self.get_fps = LambdaZero.chem.FPEmbedding_v2(**config["obs_config"])
         self._prev_obs = None
+
+        worker_index = getattr(config, "worker_index", 0)
+        vector_index = getattr(config, "vector_index", 0)
+        self._reset_mode = False
+        self._env_rnd_state = None
+        self._env_seed = None
+        self._eval_mode = False
+        self.set_seed(config, worker_index=worker_index, vector_index=vector_index)
+
+    def set_seed(self, config, worker_index=0, vector_index=0):
+        """ Configure env seeds (3 types):
+            (1) list of fixed random seeds which can be sampled randomly or sequentially
+            (2) 1 seed for each worker set at the beginning
+            (3) random seed
+        """
+        if isinstance(config["env_seed"], list) or isinstance(config["env_seed"], np.ndarray):
+            # List
+            self._random_sample_seed = config["random_sample_seed"]
+
+            if not self._random_sample_seed:
+                self._seed_cnt = 0
+
+            self._env_rnd_state = config["env_seed"]
+            print(f"Env seeds: Count: {len(config['env_seed'])} "
+                  f"| Starts with: {config['env_seed'][0]}"
+                  f"| Ends with: {config['env_seed'][-1]}")
+
+            def ret_rnd_state():
+                if self._random_sample_seed:
+                    seed = np.random.choice(self._env_rnd_state)
+                    # self._chosen_seed = seed
+                else:
+                    seed = self._env_rnd_state[self._seed_cnt]
+                    self._seed_cnt = (self._seed_cnt + 1) % len(self._env_rnd_state)
+                    print(f"SEED list:: {seed}")
+                return np.random.RandomState(seed)
+
+            self._env_seed = ret_rnd_state
+        elif isinstance(config["env_seed"], int):
+            unique_offset = vector_index * 1000 + worker_index
+            print(f"USING SEED offset: {unique_offset}")
+            self._env_rnd_state = np.random.RandomState(config["env_seed"] + unique_offset)
+
+            def ret_rnd_state():
+                return self._env_rnd_state
+            self._env_seed = ret_rnd_state
+        else:
+            rnd_seed = np.random.randint(333333)
+            print(f"USING rand seed: {rnd_seed}")
+            self._env_rnd_state = np.random.RandomState(rnd_seed)
+
+            def ret_rnd_state():
+                return self._env_rnd_state
+            self._env_seed = ret_rnd_state
+
+
 
     def _make_obs(self):
         mol_fp, stem_fps_, jbond_fps_ = self.get_fps(self.molMDP.molecule)
@@ -177,7 +241,7 @@ class BlockMolEnv_v3:
         terminate = False
         molecule = self.molMDP.molecule
         # max steps
-        if self.num_steps >= self.max_steps: terminate = True
+        if self.num_steps >= self.max_steps and not self._reset_mode: terminate = True
         # max_branches
         if len(molecule.stems) >= self.max_branches: terminate = True
         # max blocks
@@ -187,14 +251,15 @@ class BlockMolEnv_v3:
         return terminate
 
     def reset(self):
+        self._reset_mode = True  # Signal reset mode
         self.num_steps = 0
         self.molMDP.reset()
         self.reward.reset()
         obs, graph = self._make_obs()
-
+        rnd_state = self._env_seed()
         for i in range(self.random_steps):
             actions = np.where(obs["action_mask"])[0]
-            action = np.random.choice(actions)
+            action = rnd_state.choice(actions)
             self.step(action)
             obs, graph = self._make_obs()
             if self._if_terminate():
@@ -207,7 +272,10 @@ class BlockMolEnv_v3:
         except Exception as e:
             print("initialized environment with invalid molecule", e)
             return self.reset()
+
         self.num_steps = 0
+        self._reset_mode = False
+        obs["num_steps"] = self.num_steps
         return obs
 
     def step(self, action):
@@ -232,13 +300,18 @@ class BlockMolEnv_v3:
         molecule = self.molMDP.molecule
 
         molecule.graph = graph
-        reward, log_vals = self.reward(molecule, agent_stop, env_stop, self.num_steps)
+        if not self._reset_mode:
+            reward, log_vals = self.reward(molecule, agent_stop, env_stop, self.num_steps)
+        else:
+            reward, log_vals = 0, {}
+
         if (self.molMDP.molecule.mol is not None):
             smiles = Chem.MolToSmiles(self.molMDP.molecule.mol)
         else:
             smiles = None
         info = {"molecule": smiles, "log_vals": log_vals}
         done = any((agent_stop, env_stop))
+
         return obs, reward, done, info
 
     def get_state(self):
