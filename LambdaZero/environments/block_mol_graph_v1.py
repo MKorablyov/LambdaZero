@@ -176,11 +176,10 @@ class GraphMolObs:
         return g, g_flat
 
 
-
 class BlockMolEnvGraph_v1(BlockMolEnv_v3):
 
-    def __init__(self, config=None):
-        config = merge_dicts(DEFAULT_CONFIG, config)
+    def __init__(self, config=None, *args, **kwargs):
+        self._config = config = merge_dicts(DEFAULT_CONFIG, config)
 
         self.num_blocks = config["num_blocks"]
         self.molMDP = MolMDP(**config["molMDP_config"])
@@ -209,6 +208,13 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
 
         self.reward = config["reward"](**config["reward_config"])
         self._prev_obs = None
+
+        worker_index = getattr(config, "worker_index", 0)
+        vector_index = getattr(config, "vector_index", 0)
+        self._reset_mode = False
+        self._env_rnd_state = None
+        self._env_seed = None
+        self.set_seed(config, worker_index=worker_index, vector_index=vector_index)
 
     def step(self, action):
         try:
@@ -248,3 +254,5 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         self._prev_obs = obs
 
         return obs, graph
+
+
