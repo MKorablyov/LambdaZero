@@ -12,7 +12,7 @@ from typing import List, Tuple
 import re
 import pandas as pd
 import gc
-from actor_pool_wait import ActorPoolWait
+from LambdaZero.utils.actor_pool_wait import ActorPoolWait
 
 from LambdaZero.chem import DockVina_smi
 from LambdaZero.models import ChempropWrapper_v1
