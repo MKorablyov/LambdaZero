@@ -49,9 +49,9 @@ class ProxyUCB(Proxy):
 
             "proxy/acquired_v_mean": np.mean(v),
             "proxy/acquired_v_max": np.max(v),
-            "proxy/acquired_v_min": np.min(v)
+            "proxy/acquired_v_min": np.min(v),
 
-            ** cand_stats,
+            **cand_stats,
         }])
 
         self.UCB.update_with_seen(self.seen_x, self.seen_y, x, y)
