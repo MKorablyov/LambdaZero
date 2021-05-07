@@ -5,15 +5,25 @@ from ray import tune
 from ray.rllib.models.catalog import ModelCatalog
 from ray.rllib.utils import merge_dicts
 from ray.tune.logger import DEFAULT_LOGGERS
+import shortuuid
 
 from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
+from LambdaZero.models.torch_test_models import MLPTestActorCritic_thv1
+from LambdaZero.models.torch_graph_models_debug import GraphMolActorCritic_Debug
+from LambdaZero.models.torch_graph_models_generic import GraphMolActorCritic_Generic
+from LambdaZero.environments.block_mol_graph_eval import BlockMolEnvGraph_Eval
+
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger, TrialNameCreator
 from LambdaZero.contrib.config_rlbo import DEFAULT_CONFIG
 import config_rlbo
-datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+from datetime import datetime
 
+# import torch
+# torch.autograd.set_detect_anomaly(True)
+
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 if len(sys.argv) >= 2: config_name = sys.argv[1]
 else: config_name = "rlbo_001"
@@ -27,6 +37,29 @@ machine = socket.gethostname()
 if machine == "Ikarus":
     config = merge_dicts(config, config_rlbo.debug_config)
 
+# GENERATE DIR_NAME
+MAX_LEN_IDENTIFIER = int(
+    os.environ.get("TUNE_MAX_LEN_IDENTIFIER",
+                   os.environ.get("MAX_LEN_IDENTIFIER", 130)))
+
+def date_str():
+    return datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
+
+
+def get_dir_name(config, experiment_tag=""):
+    trial = str(config["tune_config"]["run_or_experiment"].__name__)
+    generated_dirname = f"{config_name}_{trial}_{experiment_tag}_{date_str()}_{shortuuid.uuid()}"
+    return generated_dirname
+
+
+def validate_cfg(config):
+    cfg = config["tune_config"]["config"]
+    if cfg["evaluation_num_episodes"] > 0:
+        # Evaluation log freq should be the same as num episodes (hard to get this in the env)
+        c1 = cfg["evaluation_num_episodes"]
+        cfg["evaluation_config"]["env_config"]["evaluation_num_episodes"] = c1
+
+validate_cfg(config)
 
 if __name__ == "__main__":
     for i in range(7):
@@ -36,16 +69,26 @@ if __name__ == "__main__":
             # what seems to happen is that ray jobs sometimes fail very soon after the initialization
             # same exact jobs can run for a while when initialized again. I think the issue is related to how individual
             # remote workers are allocated. Yet, I have not been able to entirely debug it. Therefore this for loop here
-            ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
+            ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"], include_dashboard=False)
             ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
+            ModelCatalog.register_custom_model("MLPTestActorCritic_thv1", MLPTestActorCritic_thv1)
+            ModelCatalog.register_custom_model("GraphMolActorCritic_Debug", GraphMolActorCritic_Debug)
+            ModelCatalog.register_custom_model("GraphMolActorCritic_Generic", GraphMolActorCritic_Generic)
             # initialize loggers
             os.environ['WANDB_DIR'] = summaries_dir
-            os.environ["WANDB_MODE"] = "dryrun"
+            # os.environ["WANDB_MODE"] = "dryrun"
 
             remote_logger = RemoteLogger.remote()
 
+            # ======================================================================================
+            # In order to get dirname
             remote_logger.set_config.remote(config_name)
-
+            local_dir = f"{config['tune_config']['local_dir']}/exp/{get_dir_name(config)}"
+            config["tune_config"]["local_dir"] = local_dir
+            os.mkdir(local_dir)
+            remote_logger.set_log_dir.remote(local_dir)
+            config["tune_config"]['config']['env_config']["logger"] = remote_logger
+            # ======================================================================================
             wandb_logger = WandbRemoteLoggerCallback(
                 remote_logger=remote_logger,
                 project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],
@@ -64,6 +107,7 @@ if __name__ == "__main__":
                 remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
 
             config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
+
             # run
             tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))
         except Exception as e:
