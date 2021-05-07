@@ -1,4 +1,6 @@
 .idea/
+wandb/
+data/*
 # User-specific stuff
 #.idea/**/workspace.xml
 #.idea/**/tasks.xml
