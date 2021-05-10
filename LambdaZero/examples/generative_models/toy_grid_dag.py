@@ -15,20 +15,10 @@ import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
 
-"""
-ideas to test:
-- "mixing time" as a function of FLOPS
-- replay:
-   - top k sometimes
-   - dataset only (uniform policy vs uniform data), MCMC?
-- resistance to lots of mediocre states
-- measure "time to global top-k", that is, ultimately, the goal. (can be expected time? to have a smoother measure)
-
-"""
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/test_dag_0.pkl.gz', type=str)
+parser.add_argument("--save_path", default='results/test_dag_1.pkl.gz', type=str)
 parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
 parser.add_argument("--method", default='flownet', type=str)
 parser.add_argument("--opt", default='adam', type=str)
@@ -37,26 +27,26 @@ parser.add_argument("--adam_beta2", default=0.999, type=float)
 parser.add_argument("--momentum", default=0.9, type=float)
 parser.add_argument("--bootstrap_tau", default=0.1, type=float)
 parser.add_argument("--mbsize", default=16, help="Minibatch size", type=int)
-parser.add_argument("--bufsize", default=256, help="MCMC buffer size", type=int)
+parser.add_argument("--bufsize", default=16, help="MCMC buffer size", type=int)
 parser.add_argument("--is_mcmc", default=0, type=int)
 parser.add_argument("--train_to_sample_ratio", default=1, type=float)
-parser.add_argument("--horizon", default=20, type=int)
-parser.add_argument("--ndim", default=2, type=int)
-parser.add_argument("--n_hid", default=64, type=int)
+parser.add_argument("--horizon", default=8, type=int)
+parser.add_argument("--ndim", default=4, type=int)
+parser.add_argument("--n_hid", default=256, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
-parser.add_argument("--n_train_steps", default=int(10000/(256/16)), type=int)
-parser.add_argument("--num_empirical_loss", default=50000, type=int,
+parser.add_argument("--n_train_steps", default=20000, type=int)
+parser.add_argument("--num_empirical_loss", default=200000, type=int,
                     help="Number of samples used to compute the empirical distribution loss")
-parser.add_argument('--func', default='cos_N')
+parser.add_argument('--func', default='corners')
 
-parser.add_argument("--datasource", default='sample', type=str)
-parser.add_argument("--n_dataset_pts", default=50000, type=int)
-parser.add_argument("--test_ratio", default=0.05, type=float)
+parser.add_argument("--replay_strategy", default='none', type=str) # top_k none
+parser.add_argument("--replay_sample_size", default=2, type=int)
+parser.add_argument("--replay_buf_size", default=100, type=float)
 
 # This is alpha in the note, smooths the learned distribution into a uniform exploratory one
-parser.add_argument("--uniform_sample_prob", default=0.00, type=float)
-parser.add_argument("--do_is_queue", action='store_true')
-parser.add_argument("--queue_thresh", default=10, type=float)
+#parser.add_argument("--uniform_sample_prob", default=0.00, type=float)
+#parser.add_argument("--do_is_queue", action='store_true')
+#parser.add_argument("--queue_thresh", default=10, type=float)
 parser.add_argument("--device", default='cpu', type=str)
 parser.add_argument("--progress", action='store_true')
 
@@ -234,6 +224,52 @@ def make_mlp(l, act=nn.LeakyReLU()):
         [[nn.Linear(i, o)] + ([act] if n < len(l)-2 else [])
         for n, (i, o) in enumerate(zip(l, l[1:]))], []))
 
+
+class ReplayBuffer:
+    def __init__(self, args, env):
+        self.buf = []
+        self.strat = args.replay_strategy
+        self.sample_size = args.replay_sample_size
+        self.bufsize = args.replay_buf_size
+        self.env = env
+
+    def add(self, x, r_x):
+        if self.strat == 'top_k':
+            if len(self.buf) < self.bufsize or r_x > self.buf[0][0]:
+                self.buf = sorted(self.buf + [(r_x, x)])[-self.bufsize:]
+
+    def sample(self):
+        if not len(self.buf):
+            return []
+        idxs = np.random.randint(0, len(self.buf), self.sample_size)
+        return sum([self.generate_backward(*self.buf[i]) for i in idxs], [])
+
+    def generate_backward(self, r, s0):
+        s = np.int8(s0)
+        os0 = self.env.obs(s)
+        # If s0 is a forced-terminal state, the the action that leads
+        # to it is s0.argmax() which .parents finds, but if it isn't,
+        # we must indicate that the agent ended the trajectory with
+        # the stop action
+        used_stop_action = s.max() < self.env.horizon - 1
+        done = True
+        # Now we work backward from that last transition
+        traj = []
+        while s.sum() > 0:
+            parents, actions = self.env.parent_transitions(s, used_stop_action)
+            # add the transition
+            traj.append([tf(i) for i in (parents, actions, [r], [self.env.obs(s)], [done])])
+            # Then randomly choose a parent state
+            if not used_stop_action:
+                i = np.random.randint(0, len(parents))
+                a = actions[i]
+                s[a] -= 1
+            # Values for intermediary trajectory states:
+            used_stop_action = False
+            done = False
+            r = 0
+        return traj
+
 class FlowNetAgent:
     def __init__(self, args, envs):
         self.model = make_mlp([args.horizon * args.ndim] +
@@ -241,17 +277,17 @@ class FlowNetAgent:
                               [args.ndim+1])
         self.model.to(args.dev)
         self.target = copy.deepcopy(self.model)
-        self.alpha = args.uniform_sample_prob
         self.envs = envs
         self.ndim = args.ndim
         self.tau = args.bootstrap_tau
+        self.replay = ReplayBuffer(args, envs[0])
 
     def parameters(self):
         return self.model.parameters()
 
-
     def sample_many(self, mbsize, all_visited):
         batch = []
+        batch += self.replay.sample()
         s = tf([i.reset()[0] for i in self.envs])
         done = [False] * mbsize
         while not all(done):
@@ -267,8 +303,10 @@ class FlowNetAgent:
             m = {j:next(c) for j in range(mbsize) if not done[j]}
             done = [bool(d or step[m[i]][2]) for i, d in enumerate(done)]
             s = tf([i[0] for i in step if not i[2]])
-            for (_, _, d, sp) in step:
-                if d: all_visited.append(tuple(sp))
+            for (_, r, d, sp) in step:
+                if d:
+                    all_visited.append(tuple(sp))
+                    self.replay.add(tuple(sp), r)
         return batch
 
 
