@@ -18,9 +18,9 @@ from torch.distributions.categorical import Categorical
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/test_dag_1.pkl.gz', type=str)
-parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
-parser.add_argument("--method", default='flownet', type=str)
+parser.add_argument("--save_path", default='results/low_floor_ppo_1.pkl.gz', type=str)
+parser.add_argument("--learning_rate", default=2.5e-5, help="Learning rate", type=float)
+parser.add_argument("--method", default='ppo', type=str)
 parser.add_argument("--opt", default='adam', type=str)
 parser.add_argument("--adam_beta1", default=0.9, type=float)
 parser.add_argument("--adam_beta2", default=0.999, type=float)
@@ -28,20 +28,26 @@ parser.add_argument("--momentum", default=0.9, type=float)
 parser.add_argument("--bootstrap_tau", default=0.1, type=float)
 parser.add_argument("--mbsize", default=16, help="Minibatch size", type=int)
 parser.add_argument("--bufsize", default=16, help="MCMC buffer size", type=int)
-parser.add_argument("--is_mcmc", default=0, type=int)
 parser.add_argument("--train_to_sample_ratio", default=1, type=float)
 parser.add_argument("--horizon", default=8, type=int)
 parser.add_argument("--ndim", default=4, type=int)
 parser.add_argument("--n_hid", default=256, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
-parser.add_argument("--n_train_steps", default=20000, type=int)
+parser.add_argument("--n_train_steps", default=300, type=int)
 parser.add_argument("--num_empirical_loss", default=200000, type=int,
                     help="Number of samples used to compute the empirical distribution loss")
-parser.add_argument('--func', default='corners')
+parser.add_argument('--func', default='corners_floor_B')
 
 parser.add_argument("--replay_strategy", default='none', type=str) # top_k none
 parser.add_argument("--replay_sample_size", default=2, type=int)
 parser.add_argument("--replay_buf_size", default=100, type=float)
+
+parser.add_argument("--ppo_num_epochs", default=32, type=int) # number of SGD steps per epoch
+parser.add_argument("--ppo_epoch_size", default=16, type=int) # number of sampled minibatches per epoch
+parser.add_argument("--ppo_clip", default=0.2, type=float)
+parser.add_argument("--ppo_entropy_coef", default=1e-1, type=float)
+parser.add_argument("--clip_grad_norm", default=0., type=float)
+
 
 # This is alpha in the note, smooths the learned distribution into a uniform exploratory one
 #parser.add_argument("--uniform_sample_prob", default=0.00, type=float)
@@ -62,6 +68,14 @@ def set_device(dev):
 def func_corners(x):
     ax = abs(x)
     return (ax > 0.5).prod(-1) * 0.5 + ((ax < 0.8) * (ax > 0.6)).prod(-1) * 2 + 1e-1
+
+def func_corners_floor_B(x):
+    ax = abs(x)
+    return (ax > 0.5).prod(-1) * 0.5 + ((ax < 0.8) * (ax > 0.6)).prod(-1) * 2 + 1e-2
+
+def func_corners_floor_A(x):
+    ax = abs(x)
+    return (ax > 0.5).prod(-1) * 0.5 + ((ax < 0.8) * (ax > 0.6)).prod(-1) * 2 + 1e-3
 
 def func_cos_N(x):
     ax = abs(x)
@@ -450,6 +464,104 @@ class MHAgent:
     def learn_from(self, *a):
         return None
 
+
+class PPOAgent:
+    def __init__(self, args, envs):
+        self.model = make_mlp([args.horizon * args.ndim] +
+                              [args.n_hid] * args.n_layers +
+                              [args.ndim+1+1]) # +1 for stop action, +1 for V
+        self.model.to(args.dev)
+        self.envs = envs
+        self.mbsize = args.mbsize
+        self.clip_param = args.ppo_clip
+        self.entropy_coef = args.ppo_entropy_coef
+
+    def parameters(self):
+        return self.model.parameters()
+
+    def sample_many(self, mbsize, all_visited):
+        batch = []
+        s = tf([i.reset()[0] for i in self.envs])
+        done = [False] * mbsize
+        trajs = defaultdict(list)
+        while not all(done):
+            # Note to self: this is ugly, ugly code as well
+            with torch.no_grad():
+                pol = Categorical(logits=self.model(s)[:, :-1])
+                acts = pol.sample()
+            step = [i.step(a) for i,a in zip([e for d, e in zip(done, self.envs) if not d], acts)]
+            log_probs = pol.log_prob(acts)
+            c = count(0)
+            m = {j:next(c) for j in range(mbsize) if not done[j]}
+            for si, a, (sp, r, d, _), (traj_idx, _), lp in zip(s, acts, step, sorted(m.items()), log_probs):
+                trajs[traj_idx].append([si[None,:]] + [tf([i]) for i in (a, r, sp, d, lp)])
+            done = [bool(d or step[m[i]][2]) for i, d in enumerate(done)]
+            s = tf([i[0] for i in step if not i[2]])
+            for (_, r, d, sp) in step:
+                if d:
+                    all_visited.append(tuple(sp))
+        # Compute advantages
+        for tau in trajs.values():
+            s, a, r, sp, d, lp = [torch.cat(i, 0) for i in zip(*tau)]
+            with torch.no_grad():
+                vs = self.model(s)[:, -1]
+                vsp = self.model(sp)[:, -1]
+            adv = r + vsp * (1-d) - vs
+            for i, A in zip(tau, adv):
+                i.append(r[-1].unsqueeze(0)) # The return is always just the last reward, gamma is 1
+                i.append(A.unsqueeze(0))
+        return sum(trajs.values(), [])
+
+    def learn_from(self, it, batch):
+        idxs = np.random.randint(0, len(batch), self.mbsize)
+        s, a, r, sp, d, lp, G, A = [torch.cat(i, 0) for i in zip(*[batch[i] for i in idxs])]
+        o = self.model(s)
+        logits, values = o[:, :-1], o[:, -1]
+
+        new_pol = Categorical(logits=logits)
+        new_logprob = new_pol.log_prob(a)
+        ratio = torch.exp(new_logprob - lp)
+
+        surr1 = ratio * A
+        surr2 = torch.clamp(ratio, 1.0 - self.clip_param,
+                            1.0 + self.clip_param) * A
+        action_loss = -torch.min(surr1, surr2).mean()
+        value_loss = 0.5 * (G - values).pow(2).mean()
+        entropy = new_pol.entropy().mean()
+        if not it % 100:
+            print(G.mean())
+        return (action_loss + value_loss - entropy * self.entropy_coef,
+                action_loss, value_loss, entropy)
+
+class RandomTrajAgent:
+    def __init__(self, args, envs):
+        self.mbsize = args.mbsize
+        self.envs = envs
+        self.nact = args.ndim + 1
+        self.model = None
+
+    def parameters(self):
+        return []
+
+    def sample_many(self, mbsize, all_visited):
+        batch = []
+        [i.reset()[0] for i in self.envs]
+        done = [False] * mbsize
+        trajs = defaultdict(list)
+        while not all(done):
+            acts = np.random.randint(0, self.nact, mbsize)
+            step = [i.step(a) for i,a in zip([e for d, e in zip(done, self.envs) if not d], acts)]
+            c = count(0)
+            m = {j:next(c) for j in range(mbsize) if not done[j]}
+            done = [bool(d or step[m[i]][2]) for i, d in enumerate(done)]
+            for (_, r, d, sp) in step:
+                if d: all_visited.append(tuple(sp))
+        return []
+
+    def learn_from(self, it, batch):
+        return None
+
+
 def make_opt(params, args):
     params = list(params)
     if not len(params):
@@ -482,7 +594,13 @@ def main(args):
     set_device(args.dev)
     f = {'default': None,
          'cos_N': func_cos_N,
-         'corners': func_corners}[args.func]
+         'corners': func_corners,
+         'corners_floor_A': func_corners_floor_A,
+         'corners_floor_B': func_corners_floor_B,
+    }[args.func]
+
+    args.is_mcmc = args.method in ['mars', 'mcmc']
+
     env = GridEnv(args.horizon, args.ndim, func=f, allow_backward=args.is_mcmc)
     envs = [GridEnv(args.horizon, args.ndim, func=f, allow_backward=args.is_mcmc)
             for i in range(args.bufsize)]
@@ -494,6 +612,10 @@ def main(args):
         agent = MARSAgent(args, envs)
     elif args.method == 'mcmc':
         agent = MHAgent(args, envs)
+    elif args.method == 'ppo':
+        agent = PPOAgent(args, envs)
+    elif args.method == 'random_traj':
+        agent = RandomTrajAgent(args, envs)
 
     opt = make_opt(agent.parameters(), args)
 
@@ -505,6 +627,10 @@ def main(args):
     ttsr = max(int(args.train_to_sample_ratio), 1)
     sttr = max(int(1/args.train_to_sample_ratio), 1) # sample to train ratio
 
+    if args.method == 'ppo':
+        ttsr = args.ppo_num_epochs
+        sttr = args.ppo_epoch_size
+
     for i in tqdm(range(args.n_train_steps+1), disable=not args.progress):
         data = []
         for j in range(sttr):
@@ -513,6 +639,9 @@ def main(args):
             losses = agent.learn_from(i * ttsr + j, data) # returns (opt loss, *metrics)
             if losses is not None:
                 losses[0].backward()
+                if args.clip_grad_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(agent.parameters(),
+                                                   args.clip_grad_norm)
                 opt.step()
                 opt.zero_grad()
                 all_losses.append([i.item() for i in losses])
@@ -537,7 +666,6 @@ def main(args):
          'true_d': env.true_density()[0],
          'args':args},
         gzip.open(args.save_path, 'wb'))
-
 
 if __name__ == '__main__':
     args = parser.parse_args()
