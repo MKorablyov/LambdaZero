@@ -9,6 +9,7 @@ import LambdaZero.utils
 from LambdaZero.contrib.data import config_temp_load_data_v2
 from LambdaZero.contrib.reward import ProxyRewardSparse_v2
 from LambdaZero.contrib.proxy import ProxyUCB, config_ProxyUCB_v1
+from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger
 from LambdaZero.environments.block_mol_graph_v1 import GraphMolObs
 
 
@@ -176,3 +177,13 @@ class BlockMolGraph_v2:
         self.traj.append(deepcopy(self.molMDP.molecule))
         # log a few parameters
         return obs, reward, done, {"log_vals":log_vals}
+
+
+def init_proxy_env(env_config):
+    env_config["reward_config"]["scoreProxy_config"]["logger"] = RemoteLogger.remote()
+    # initialize scoreProxy which would be shared across many agents
+    scoreProxy = env_config['reward_config']['scoreProxy'].\
+        options(**env_config['reward_config']['scoreProxy_options']).\
+        remote(**env_config['reward_config']['scoreProxy_config'])
+    env_config['reward_config']['scoreProxy'] = scoreProxy
+    return env_config

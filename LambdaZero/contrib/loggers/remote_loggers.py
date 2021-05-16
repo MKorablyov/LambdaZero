@@ -12,6 +12,7 @@ class RemoteLogger:
         self.logs = []
 
     def log_wandb_object(self, name, data, object_type):
+        # todo: wandb object is not recognized/logged possibly due to separate wandb.init call below is workaround
         if object_type == "graph":
             data = wandb.Graph(data)
         elif object_type == "histogram":
@@ -25,7 +26,7 @@ class RemoteLogger:
         elif object_type == "object3D":
             data = wandb.Object3D(data)
         elif object_type == "table":
-            data = wandb.Table(data)
+            data = wandb.Table(dataframe=data)
         else:
             raise NotImplementedError("not supported data type")
         self.logs.append({name: data})

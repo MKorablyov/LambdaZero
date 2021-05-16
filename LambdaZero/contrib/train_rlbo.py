@@ -10,21 +10,12 @@ from LambdaZero.models.torch_graph_models import GraphMolActorCritic_thv1
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.contrib.proxy import LogTrajectories
+from LambdaZero.contrib.environments import init_proxy_env
 from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger, TrialNameCreator
 import config_rlbo
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-
-def init_proxy_env(env_config):
-    env_config["reward_config"]["scoreProxy_config"]["logger"] = RemoteLogger.remote()
-
-    # initialize scoreProxy which would be shared across many agents
-    scoreProxy = env_config['reward_config']['scoreProxy'].\
-        options(**env_config['reward_config']['scoreProxy_options']).\
-        remote(**env_config['reward_config']['scoreProxy_config'])
-    env_config['reward_config']['scoreProxy'] = scoreProxy
-    return env_config
 
 
 
@@ -32,7 +23,7 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         config_name = sys.argv[1]
     else:
-        config_name = "rlbo4_014"
+        config_name = "rlbo4_001"
     config = getattr(config_rlbo, config_name)
     config = merge_dicts(config.pop("default"), config)
 
@@ -45,7 +36,7 @@ if __name__ == "__main__":
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
-#    os.environ["WANDB_MODE"] = "dryrun"
+    os.environ["WANDB_MODE"] = "dryrun"
 
     # initialize env with proxy
     config["tune_config"]['config']['env_config'] = init_proxy_env(config["tune_config"]['config']['env_config'])

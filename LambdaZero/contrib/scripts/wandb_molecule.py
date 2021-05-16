@@ -13,7 +13,7 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 logger_config = {
     "wandb": {
         "project": "some_plots",
-        #"api_key_file": osp.join(summaries_dir, "wandb_key")
+        "api_key_file": osp.join(summaries_dir, "wandb_key")
     }}
 
 
@@ -62,21 +62,29 @@ def log_trajectories(trajs, max_steps):
 #log_trajectories(trajs, env.max_steps)
 
 
-from PIL import Image
-imarray = np.random.rand(100,100,3) * 255
-im = Image.fromarray(imarray.astype('uint8')).convert('RGBA')
+# from PIL import Image
+# imarray = np.random.rand(100,100,3) * 255
+# im = Image.fromarray(imarray.astype('uint8')).convert('RGBA')
 
 wandb.init()
-wandb.log({"false_traj2": wandb.Image(im)})
+#wandb.log({"false_traj2": wandb.Image(im)})
+table = pd.DataFrame({"soup":[1,2,3,4,8], "borscht":[1,2,3,4,5]})
+
+soup = table["soup"].to_numpy()
+idx = np.argsort(soup)[-2:] # highest values
+table = table.take(idx)
+print("table", table)
 
 
+# wandb.log({ "table":wandb.Table(dataframe=table)})
+# table = pd.DataFrame({"soup":[7,8], "borscht":[9,10]})
+# wandb.log({ "table":wandb.Table(dataframe=table)})
 
 
-
-
-
-
-
+# todo: after_acquire: log table
+# smiles, synth, qed, dockscore, step
+# ideally I would maintain 50 best molecules/run in a table
+# if new in top_50 add_to_table
 
 
 # todo: I need to decide which trajectories to log and how
@@ -86,11 +94,6 @@ wandb.log({"false_traj2": wandb.Image(im)})
 
 # todo: I want to monitor molecules being acquired
 # proxy_after_acquire: log_best_trajectories
-
-# todo: after_acquire: log table
-# smiles, synth, qed, dockscore, step
-# ideally I would maintain 50 best molecules/run in a table
-# if new in top_50 add_to_table
 
 # todo: after_acquire_log 3D structures
 # I think in this case I would take smiles + log coordinates

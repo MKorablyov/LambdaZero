@@ -6,7 +6,7 @@ from ray.tune.utils import merge_dicts
 from LambdaZero.contrib.acquisition import UCB, config_UCB_v1, config_UCB_v2
 from LambdaZero.contrib.oracle import DockingOracle, config_DockingOracle_v1
 from LambdaZero.contrib.data import temp_load_data, config_temp_load_data_v1, config_temp_load_data_v2
-from .proxy import Proxy, SaveDocked, LogTrajectories
+from .proxy import Proxy, SaveDocked, LogTrajectories, LogTopKMols
 
 
 @ray.remote(num_gpus=0.3, num_cpus=2)
@@ -30,7 +30,7 @@ class ProxyUCB(Proxy):
         y = self.oracle(x)
         v = np.asarray(y) * np.asarray(d)
         # perform post acquisition function(s)
-        [func(x, d, acq, info, y, self.num_acquisitions, self.logger) for func in self.after_acquire]
+        [func(x, d, acq, info, y, v, self.num_acquisitions, self.logger) for func in self.after_acquire]
 
         self.logger.log.remote([{
             "proxy/proposed_acq_mean": np.mean(proposed_acq),
@@ -61,7 +61,7 @@ config_ProxyUCB_v1 = {
     "oracle_config": config_DockingOracle_v1,
     "load_seen": temp_load_data,
     "load_seen_config": config_temp_load_data_v1,
-    "after_acquire": [],
+    "after_acquire": [LogTopKMols(k=50,log_freq=10)],
 }
 
 # would be used in RL & BlockMolGraph_v2
@@ -72,7 +72,7 @@ config_ProxyUCB_v2 = {
     "oracle_config": config_DockingOracle_v1,
     "load_seen": temp_load_data,
     "load_seen_config": config_temp_load_data_v2,
-    "after_acquire": [LogTrajectories(max_steps=8,log_freq=10)],
+    "after_acquire": [LogTrajectories(max_steps=8,log_freq=10), LogTopKMols(k=50,log_freq=10)],
 }
 
 
@@ -84,5 +84,5 @@ config_ProxyUCB_rpv1 = {
     "oracle_config":config_DockingOracle_v1,
     "load_seen": temp_load_data,
     "load_seen_config": config_temp_load_data_v1,
-    "after_acquire":[SaveDocked()],
+    "after_acquire":[SaveDocked(), LogTopKMols(k=50,log_freq=10)],
 }

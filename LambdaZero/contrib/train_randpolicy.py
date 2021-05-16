@@ -7,6 +7,7 @@ from ray.tune.logger import DEFAULT_LOGGERS
 import LambdaZero.utils
 import LambdaZero.inputs
 from LambdaZero.contrib.loggers import WandbRemoteLoggerCallback, RemoteLogger, TrialNameCreator
+from LambdaZero.contrib.environments import init_proxy_env
 
 import config_randpolicy
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
@@ -30,24 +31,15 @@ if __name__ == "__main__":
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
     os.environ["WANDB_MODE"] = "dryrun"
-    remote_logger = RemoteLogger.remote()
+
+    # initialize env with proxy
+    config["tune_config"]['config']['env_config'] = init_proxy_env(config["tune_config"]['config']['env_config'])
+
+    # add wandb logger callback
     wandb_logger = WandbRemoteLoggerCallback(
-        remote_logger=remote_logger,
+        remote_logger=config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["logger"],
         project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],
-        api_key_file=osp.join(summaries_dir, "wandb_key"))
-    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"][
-        "logger"] = remote_logger
-    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["oracle_config"] \
-        ["logger"] = remote_logger
-    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["acquisition_config"] \
-        ["model_config"]["logger"] = remote_logger
+        api_key_file=config["tune_config"]["config"]["logger_config"]["wandb"]["api_key_file"],)
     config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)
-
-    # initialize scoreProxy which would be shared across many agents
-    scoreProxy = config["tune_config"]['config']['env_config']['reward_config']['scoreProxy']. \
-        options(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_options']). \
-        remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
-
-    config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
     # run
     tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))
