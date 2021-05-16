@@ -7,23 +7,21 @@ from ray.rllib.utils import merge_dicts
 from LambdaZero.environments.molMDP import MolMDP
 import LambdaZero.utils
 from LambdaZero.contrib.data import config_temp_load_data_v2
-from LambdaZero.contrib.reward import ProxyRewardSparse
+from LambdaZero.contrib.reward import ProxyRewardSparse_v2
 from LambdaZero.contrib.proxy import ProxyUCB, config_ProxyUCB_v1
 from LambdaZero.environments.block_mol_graph_v1 import GraphMolObs
 
 
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
-# change default config proxy UCB
-config_ProxyUCB = merge_dicts(config_ProxyUCB_v1, {"load_seen_config": config_temp_load_data_v2})
 
 DEFAULT_CONFIG = {
-    "obs_config":{}, # can't be changed without changing dataset
+    "obs_config":{}, # fixme can't be changed without changing dataset
     "molMDP_config": {
         "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"),  # 464 blocks
     },
 
-    "reward": ProxyRewardSparse,
+    "reward": ProxyRewardSparse_v2,
     "reward_config": {
         "synth_options": {"num_gpus": 0.05},
         "qed_cutoff": [0.2, 0.5],

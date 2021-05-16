@@ -9,10 +9,13 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
 class Proxy:
-    def __init__(self, update_freq, proposed_x, proposed_d, proposed_acq, logger):
+    def __init__(self, update_freq, oracle, oracle_config, proposed_x, proposed_d, proposed_acq, logger):
         self.update_freq = update_freq
         self.proposed_x, self.proposed_d, self.proposed_acq = proposed_x, proposed_d, proposed_acq
         self.logger = logger
+
+        self.oracle = oracle(**oracle_config,logger=self.logger)
+        self.num_acquisitions = 0
 
     def propose_x(self,x, d, acq):
         """
@@ -73,28 +76,30 @@ class SaveDocked:
         self.outpath = outpath
         if not osp.exists(outpath):os.makedirs(outpath)
 
-    def __call__(self, x, d, acq, info, y, name=None):
-        name = name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+    def __call__(self, x, d, acq, info, y, num_acquisitions, logger):
         smiles, qed, synth_score = [xi["smiles"] for xi in x], [xi["qed"] for xi in x], [xi["synth_score"] for xi in x]
         df = pd.DataFrame(
             {"smiles": smiles, "qed": qed, "synth_score": synth_score, "norm_dockscore": y, "discount": d})
-        df.to_feather(os.path.join(self.outpath, name + ".feather"))
+        fname = str(num_acquisitions).zfill(5) + "_" + \
+               ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+        df.to_feather(os.path.join(self.outpath, fname + ".feather"))
         #print(pd.read_feather(os.path.join(self.outpath, oname + ".feather")))
         return None
 
 class LogTrajectories:
-    def __init__(self, max_steps, logger):
+    def __init__(self, max_steps, log_freq):
         self.max_steps = max_steps
-        self.logger = logger
+        self.log_freq = log_freq
 
-    def __call__(self, x, d, acq, info, y):
-        trajs_smi = [xi["traj_smi"] for xi in x]
-        mols = []
-        for i in range(len(trajs_smi)):
-            for j in range(self.max_steps):
-                if j < len(trajs_smi[i]):
-                    mols.append(Chem.MolFromSmiles(trajs_smi[i][j]))
-                else:
-                    mols.append(Chem.MolFromSmiles("H"))
-        img = Draw.MolsToGridImage(mols, molsPerRow=self.max_steps, subImgSize=(250, 250), )
-        self.logger.log_wandb_object.remote("traj_img",  img, "image")
+    def __call__(self, x, d, acq, info, y, num_acquisitions, logger):
+        if num_acquisitions % self.log_freq == 0:
+            trajs_smi = [xi["traj_smi"] for xi in x]
+            mols = []
+            for i in range(len(trajs_smi)):
+                for j in range(self.max_steps):
+                    if j < len(trajs_smi[i]):
+                        mols.append(Chem.MolFromSmiles(trajs_smi[i][j]))
+                    else:
+                        mols.append(Chem.MolFromSmiles("H"))
+            img = Draw.MolsToGridImage(mols, molsPerRow=self.max_steps, subImgSize=(250, 250), )
+            logger.log_wandb_object.remote("traj_img", img, "image")

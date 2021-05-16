@@ -16,5 +16,3 @@ class TrialNameCreator:
 
     def __call__(self, trial):
         return "{}_{}_{}".format(self.config_name, trial.trainable_name, trial.trial_id)
-
-

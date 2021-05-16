@@ -2,14 +2,11 @@ import time
 import numpy as np
 from LambdaZero.contrib.proxy import Actor
 from rdkit import Chem
-
 from random import random
 from LambdaZero.contrib.oracle import QEDOracle, SynthOracle
 from LambdaZero.environments.block_mol_v3 import synth_config
 
 import LambdaZero.contrib.functional
-
-
 
 class ProxyReward_v2:
     def __init__(self, scoreProxy, actor_sync_freq, qed_cutoff, synth_cutoff, synth_options, **kwargs):
@@ -57,13 +54,6 @@ class ProxyRewardSparse_v2(ProxyReward_v2):
         else:
             reward, info = 0.0, {}
         return reward, info
-
-
-
-
-
-
-
 
 
 

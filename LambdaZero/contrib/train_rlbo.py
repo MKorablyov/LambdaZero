@@ -16,6 +16,18 @@ import config_rlbo
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
+def init_proxy_env(env_config):
+    env_config["reward_config"]["scoreProxy_config"]["logger"] = RemoteLogger.remote()
+
+    # initialize scoreProxy which would be shared across many agents
+    scoreProxy = env_config['reward_config']['scoreProxy'].\
+        options(**env_config['reward_config']['scoreProxy_options']).\
+        remote(**env_config['reward_config']['scoreProxy_config'])
+    env_config['reward_config']['scoreProxy'] = scoreProxy
+    return env_config
+
+
+
 if __name__ == "__main__":
     if len(sys.argv) >= 2:
         config_name = sys.argv[1]
@@ -29,50 +41,22 @@ if __name__ == "__main__":
     if machine == "Ikarus":
         config = merge_dicts(config, config_rlbo.config_debug)
 
-    #for i in range(7):
-    #    try:
-            # Maksym Feb 26
-            # I have been trying to debug the issue of ray sometimes resulting in GPU-OOM
-            # what seems to happen is that ray jobs sometimes fail very soon after the initialization
-            # same exact jobs can run for a while when initialized again. I think the issue is related to how individual
-            # remote workers are allocated. Yet, I have not been able to entirely debug it. Therefore this for loop here
     ray.init(object_store_memory=config["object_store_memory"], _memory=config["memory"])
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
 #    os.environ["WANDB_MODE"] = "dryrun"
 
+    # initialize env with proxy
+    config["tune_config"]['config']['env_config'] = init_proxy_env(config["tune_config"]['config']['env_config'])
 
-    remote_logger = RemoteLogger.remote()
-
-
-
+    # add wandb logger callback
     wandb_logger = WandbRemoteLoggerCallback(
-        remote_logger=remote_logger,
+        remote_logger=config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["logger"],
         project=config["tune_config"]["config"]["logger_config"]["wandb"]["project"],
-        api_key_file=osp.join(summaries_dir, "wandb_key"))
-    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"][
-                "logger"] = remote_logger
-    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["oracle_config"]\
-                ["logger"] = remote_logger
-    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["acquisition_config"] \
-                ["model_config"]["logger"] = remote_logger
-
-    config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["after_acquire"] = \
-        config["tune_config"]['config']['env_config']["reward_config"]["scoreProxy_config"]["after_acquire"] + \
-        [LogTrajectories(10, remote_logger)] # fixme -- not 10
-
+        api_key_file=config["tune_config"]["config"]["logger_config"]["wandb"]["api_key_file"],)
     config["tune_config"]["loggers"] = DEFAULT_LOGGERS + (wandb_logger,)
-    # initialize scoreProxy which would be shared across many agents
-    scoreProxy = config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'].\
-        options(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_options']).\
-        remote(**config["tune_config"]['config']['env_config']['reward_config']['scoreProxy_config'])
-    config["tune_config"]['config']['env_config']['reward_config']['scoreProxy'] = scoreProxy
-
-
 
     # run
     tune.run(**config["tune_config"], trial_name_creator=TrialNameCreator(config_name))
-    # except Exception as e:
-    #    print(e)
     ray.shutdown()
