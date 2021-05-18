@@ -101,7 +101,7 @@ class GraphAgent(nn.Module):
 
     def index_output_by_action(self, s, stem_o, mol_o, a):
         stem_slices = torch.tensor(s.__slices__['stems'][:-1], dtype=torch.long, device=stem_o.device)
-        return -(
+        return (
             stem_o[stem_slices + a[:, 1]][
                 torch.arange(a.shape[0]), a[:, 0]] * (a[:, 0] >= 0)
             + mol_o * (a[:, 0] == -1))

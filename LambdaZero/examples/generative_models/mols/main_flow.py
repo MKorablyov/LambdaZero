@@ -53,6 +53,8 @@ we could compare:
 
 import importlib
 importlib.reload(model_atom)
+import mol_mdp_ext
+importlib.reload(mol_mdp_ext)
 #importlib.reload(chem_op)
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
@@ -76,9 +78,18 @@ parser.add_argument("--learning_rate", default=2.5e-4, help="Learning rate", typ
 parser.add_argument("--mbsize", default=16, help="Minibatch size", type=int)
 parser.add_argument("--opt_beta", default=0.9, type=float)
 parser.add_argument("--nemb", default=32, help="#hidden", type=int)
+parser.add_argument("--min_blocks", default=3, type=int)
+parser.add_argument("--max_blocks", default=10, type=int)
 parser.add_argument("--num_iterations", default=200000, type=int)
 parser.add_argument("--num_conv_steps", default=12, type=int)
-parser.add_argument("--array", default='')
+parser.add_argument("--log_reg_c", default=0, type=float)
+parser.add_argument("--reward_exp", default=1, type=float)
+parser.add_argument("--sample_prob", default=1, type=float)
+parser.add_argument("--clip_grad", default=0, type=float)
+parser.add_argument("--clip_loss", default=0, type=float)
+parser.add_argument("--replay_mode", default='dataset', type=str)
+parser.add_argument("--bootstrap_tau", default=0, type=float)
+parser.add_argument("--array", default='array_may_13')
 parser.add_argument("--repr_type", default='atom_graph')
 parser.add_argument("--model_version", default='v2')
 parser.add_argument("--run", default=201, help="run", type=int)
@@ -110,24 +121,49 @@ class Dataset:
         self.target_norm = [-8.6, 1.10]
         self.sampling_model = None
         self.sampling_model_prob = 0
-        self.R_min = 1e-3
+        self.R_min = 1e-8
+        self.min_blocks = 3
+        self.max_blocks = 10
+        self.floatX = torch.double
+        self.mdp.floatX = self.floatX
+        self.sampled_mols = []
+        self.replay_mode = 'dataset'
+        self.online_mols = []
+        self.max_online_mols = 1000
+        self.reward_exp = 1
 
     def _get(self, i, dset):
-        if (self.sampling_model_prob > 0 and # don't sample if we don't have to
-            self.train_rng.uniform() < self.sampling_model_prob):
+        if ((self.sampling_model_prob > 0 and # don't sample if we don't have to
+             self.train_rng.uniform() < self.sampling_model_prob)
+            or len(dset) < 32):
                 return self._get_sample_model()
         # Sample trajectories by walking backwards from the molecules in our dataset
-        m = dset[i]
+
+        # Handle possible multithreading issues when independent threads
+        # add/substract from dset:
+        while True:
+            try:
+                m = dset[i]
+            except IndexError:
+                i = self.train_rng.randint(0, len(dset))
+                continue
+            break
+        if not isinstance(m, BlockMoleculeDataExtended):
+            m = m[-1]
         r = m.reward
+        done = 1
         samples = []
         # a sample is a tuple (parents(s), parent actions, reward(s), s, done)
         # an action is (blockidx, stemidx) or (-1, x) for 'stop'
-        # so we start with the stop action
-        samples.append(((m,), ((-1, 0),), r, m, 1))
+        # so we start with the stop action, unless the molecule is already
+        # a "terminal" node (if it has no stems, no actions).
+        if len(m.stems):
+            samples.append(((m,), ((-1, 0),), r, m, done))
+            r = done = 0
         while len(m.blocks): # and go backwards
             parents, actions = zip(*self.mdp.parents(m))
-            samples.append((parents, actions, 0, m, 0))
-            r = 0
+            samples.append((parents, actions, r, m, done))
+            r = done = 0
             m = parents[self.train_rng.randint(len(parents))]
         return samples
 
@@ -138,29 +174,60 @@ class Dataset:
 
     def _get_sample_model(self):
         m = BlockMoleculeDataExtended()
-        r = 0
-        done = 0
         samples = []
-        for t in range(8): # TODO: max blocks config
+        max_blocks = self.max_blocks
+        trajectory_stats = []
+        #log_rmin = np.log(self.R_min * 1.1)
+        for t in range(max_blocks): # TODO: max blocks config
             s = self.mdp.mols2batch([self.mdp.mol2repr(m)])
             s_o, m_o = self.sampling_model(s)
-            m_p, s_p = self.sampling_model.out_to_policy(s, s_o, m_o)
-            action = torch.cat([m_p.reshape(-1), s_p.reshape(-1)]).multinomial(1).item()
-            if t > 2 and action == 0: # TODO: min blocks config as well
-                done = 1
-                action = (-1, 0)
+            if 0:
+                m_p, s_p = self.sampling_model.out_to_policy(s, s_o, m_o)
+                action = torch.cat([m_p.reshape(-1), s_p.reshape(-1)]).multinomial(1).item()
+            else:
+                logits = torch.cat([m_o.reshape(-1), s_o.reshape(-1)])
+                #logits = torch.ones_like(logits) ###  run 219
+                # run 218 ##
+                #logits[logits < log_rmin] = -1000
+                # ##
+                cat = torch.distributions.Categorical(
+                    logits=logits)
+                action = cat.sample().item()
+            q = torch.cat([m_o.reshape(-1), s_o.reshape(-1)])
+            trajectory_stats.append((q[action].item(), q.sum().item(), torch.logsumexp(q, 0).item()))
+            if t >= self.min_blocks and action == 0: # TODO: min blocks config as well, not 2
                 r = self._get_reward(m)
+                samples.append(((m,), ((-1,0),), r, m, 1))
+                break
             else:
                 action = max(0, action-1)
                 action = (action % self.mdp.num_blocks, action // self.mdp.num_blocks)
                 m = self.mdp.add_block_to(m, *action)
-                if not len(m.stems): # can't add anything more to this
-                                     # mol so let's make it terminal
-                    done = 1
+                if len(m.blocks) and not len(m.stems) or t == max_blocks - 1:
+                    # can't add anything more to this mol so let's make it
+                    # terminal. Note that this node's parent isn't just m,
+                    # because this is a sink for all parent transitions
                     r = self._get_reward(m)
-            samples.append((*zip(*self.mdp.parents(m)), r, m, done))
-            if done: break
+                    samples.append((*zip(*self.mdp.parents(m)), r, m, 1))
+                    break
+                else:
+                    samples.append((*zip(*self.mdp.parents(m)), 0, m, 0))
+        p = self.mdp.mols2batch([self.mdp.mol2repr(i) for i in samples[-1][0]])
+        qp = self.sampling_model(p, None)
+        qsa_p = self.sampling_model.index_output_by_action(
+            p, qp[0], qp[1][:, 0],
+            torch.tensor(samples[-1][1], device=self._device).long())
+        self.sampled_mols.append((r, m, trajectory_stats, torch.logsumexp(qsa_p.flatten(), 0).item()))
+        if self.replay_mode == 'online':
+            m.reward = r
+            self._add_mol_to_online(r + self.train_rng.normal() * 0.5, m)
         return samples
+
+    def _add_mol_to_online(self, r, m):
+        if len(self.online_mols) < self.max_online_mols or r > self.online_mols[0][0]:
+            self.online_mols.append((r, m))
+        if len(self.online_mols) > self.max_online_mols:
+            self.online_mols = sorted(self.online_mols)[max(int(0.05 * self.max_online_mols), 1):]
 
     def _get_reward(self, m):
         rdmol = m.mol
@@ -169,7 +236,7 @@ class Dataset:
         smi = m.smiles
         if smi in self.train_mols_map:
             return self.train_mols_map[smi].reward
-        return max(self.R_min, self.proxy_reward(m))
+        return self.r2r(normscore=self.proxy_reward(m))
 
     def itertest(self, n):
         N = len(self.test_mols)
@@ -178,8 +245,12 @@ class Dataset:
             yield self.sample2batch(zip(*samples))
 
     def sample(self, n):
-        eidx = self.train_rng.randint(0, len(self.train_mols), n)
-        samples = sum((self._get(i, self.train_mols) for i in eidx), [])
+        if self.replay_mode == 'dataset':
+            eidx = self.train_rng.randint(0, len(self.train_mols), n)
+            samples = sum((self._get(i, self.train_mols) for i in eidx), [])
+        if self.replay_mode == 'online':
+            eidx = self.train_rng.randint(0, max(1,len(self.online_mols)), n)
+            samples = sum((self._get(i, self.online_mols) for i in eidx), [])
         return zip(*samples)
 
     def sample2batch(self, mb):
@@ -195,9 +266,27 @@ class Dataset:
         # Concatenate all the actions (one per parent per sample)
         a = torch.tensor(sum(a, ()), device=self._device).long()
         # rewards and dones
-        r = torch.tensor(r, device=self._device).float()
-        d = torch.tensor(d, device=self._device).float()
+        r = torch.tensor(r, device=self._device).to(self.floatX)
+        d = torch.tensor(d, device=self._device).to(self.floatX)
         return (p, p_batch, a, r, s, d, *o)
+
+    def r2r(self, dockscore=None, normscore=None):
+        if dockscore is not None:
+            normscore = 4-(min(0, dockscore)-self.target_norm[0])/self.target_norm[1]
+        normscore = max(self.R_min, normscore)
+        if 1:
+            return normscore ** self.reward_exp
+        #score = np.exp(normscore/10/0.05) # run 210
+        #score = 1 / (1 + np.exp(-(normscore-10)/2)) # run 211, 213
+        #score = 1 / (1 + np.exp(-(normscore-10)/4)) # run 212
+        #score = 1 / (1 + np.exp(-(normscore-10)*2)) # run 214
+        #score = 1 / (1 + np.exp(-(normscore-10)*1)) # run 215
+        #score = 1 / (1 + np.exp(-(normscore-10)*4)) # run 216
+        score = 1 / (1 + np.exp(-(normscore-10)*2)) # run 218
+        # run 218
+        if score < self.R_min:
+            score = self.R_min
+        return score
 
     def load_h5(self, path, args, test_ratio=0.05):
         import json
@@ -218,8 +307,10 @@ class Dataset:
             for c in range(1, len(columns)):
                 setattr(m, columns[c], df.iloc[i, c-1])
             m.blocks = [self.mdp.block_mols[i] for i in m.blockidxs]
+            if len(m.blocks) > self.max_blocks:
+                continue
             # TODO: compute proper reward with QED & all
-            m.reward = max(self.R_min,4-(min(0, m.dockscore)-self.target_norm[0])/self.target_norm[1])
+            m.reward = self.r2r(dockscore=m.dockscore)
             m.numblocks = len(m.blocks)
             if split_bool[i]:
                 self.test_mols.append(m)
@@ -240,8 +331,10 @@ class Dataset:
             for c in range(1, len(columns)):
                 setattr(m, columns[c], mols[i][columns[c]])
             m.blocks = [self.mdp.block_mols[i] for i in m.blockidxs]
+            if len(m.blocks) > self.max_blocks:
+                continue
             # TODO: compute proper reward with QED & all
-            m.reward = max(self.R_min,4-(min(0, m.dockscore)-self.target_norm[0])/self.target_norm[1])
+            m.reward = self.r2r(dockscore=m.dockscore)#max(self.R_min,4-(min(0, m.dockscore)-self.target_norm[0])/self.target_norm[1])
             m.numblocks = len(m.blocks)
             if split_bool[i]:
                 self.test_mols.append(m)
@@ -323,15 +416,18 @@ class Proxy:
         params = pickle.load(gzip.open(f'{args.proxy_path}/best_params.pkl.gz'))
         self.mdp = MolMDPExtended(bpath)
         self.mdp.post_init(device, eargs.repr_type)
+        self.mdp.floatX = torch.double
         self.proxy = make_model(eargs, self.mdp)
         for a,b in zip(self.proxy.parameters(), params):
-            a.data = torch.FloatTensor(b)
+            a.data = torch.tensor(b, dtype=self.mdp.floatX)
+        #self.proxy.to(self.mdp.floatX)
         self.proxy.to(device)
 
     def __call__(self, m):
         m = self.mdp.mols2batch([self.mdp.mol2repr(m)])
         return self.proxy(m, do_stems=False)[1].item()
 
+_stop = [None]
 
 def main(args):
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
@@ -339,8 +435,9 @@ def main(args):
 
     dataset = Dataset(bpath, device, args.repr_type)
     #dataset.load_h5("dock_db_1618610362tp_2021_04_16_17h.h5")
-    dataset.load_h5("dock_db_1619111711tp_2021_04_22_13h.h5", args)
-    dataset.load_pkl("small_mols.pkl.gz", args)
+    if 0:
+        dataset.load_h5("dock_db_1619111711tp_2021_04_22_13h.h5", args)
+        dataset.load_pkl("small_mols.pkl.gz", args)
     dataset.load_pkl("small_mols_2.05.pkl.gz", args)
 
     exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
@@ -358,19 +455,30 @@ def main(args):
 
     stop_event = threading.Event()
     model = make_model(args, mdp)
+    model.to(torch.double)
     model.to(device)
+
+    tau = args.bootstrap_tau
+    if args.bootstrap_tau > 0:
+        target_model = deepcopy(model)
 
     proxy = Proxy(args, bpath, device)
 
-    dataset.set_sampling_model(model, proxy, sample_prob=0.75)
+    dataset.set_sampling_model(model, proxy, sample_prob=args.sample_prob)
+    dataset.replay_mode = args.replay_mode
+    dataset.min_blocks = args.min_blocks
+    dataset.max_blocks = args.max_blocks
+    dataset.reward_exp = args.reward_exp
 
     best_model = model
     best_test_loss = 1000
 
     opt = torch.optim.Adam(model.parameters(), args.learning_rate, #weight_decay=1e-4,
-                           betas=(args.opt_beta, 0.999))
+                           betas=(args.opt_beta, 0.99))
+    #opt = torch.optim.SGD(model.parameters(), args.learning_rate)
 
-    tf = lambda x: torch.tensor(x, device=device).float()
+    #tf = lambda x: torch.tensor(x, device=device).float()
+    tf = lambda x: torch.tensor(x, device=device).double()
     tint = lambda x: torch.tensor(x, device=device).long()
 
     mbsize = args.mbsize
@@ -385,6 +493,7 @@ def main(args):
         stop_event.set()
         print('joining')
         dataset.stop_samplers_and_join()
+    _stop[0] = stop_everything
 
     def save_stuff():
         pickle.dump([i.data.cpu().numpy() for i in model.parameters()],
@@ -392,6 +501,9 @@ def main(args):
 
         pickle.dump([i.data.cpu().numpy() for i in best_model.parameters()],
                     gzip.open(f'{exp_dir}/best_params.pkl.gz', 'wb'))
+
+        pickle.dump(dataset.sampled_mols,
+                    gzip.open(f'{exp_dir}/sampled_mols.pkl.gz', 'wb'))
 
         pickle.dump({'train_losses': train_losses,
                      'test_losses': test_losses,
@@ -410,6 +522,10 @@ def main(args):
     max_early_stop_tolerance = 5
     early_stop_tol = max_early_stop_tolerance
     loginf = 1000 # to prevent nans
+    #log_reg_c = 1 # run 213
+    log_reg_c = 1e-1 # run 214
+    log_reg_c = args.log_reg_c # run 217
+    clip_loss = tf([args.clip_loss])
 
     for i in range(args.num_iterations+1):
         if not debug_no_threads:
@@ -426,34 +542,57 @@ def main(args):
         # roughly mbsize * H (H is variable) transitions
         ntransitions = r.shape[0]
         # state outputs
-        stem_out_s, mol_out_s = model(s, None)
+        if tau > 0:
+            with torch.no_grad():
+                stem_out_s, mol_out_s = target_model(s, None)
+        else:
+            stem_out_s, mol_out_s = model(s, None)
         # parents of the state outputs
         stem_out_p, mol_out_p = model(p, None)
         # index parents by their corresponding actions
         qsa_p = model.index_output_by_action(p, stem_out_p, mol_out_p[:, 0], a)
         # then sum the parents' contribution, this is the inflow
-        inflow = torch.log(torch.zeros((ntransitions,), device=device)
-                           .index_add_(0, pb, torch.exp(qsa_p))) # pb is the parents' batch index
+        inflow = torch.log(torch.zeros((ntransitions,), device=device, dtype=dataset.floatX)
+                           .index_add_(0, pb, torch.exp(qsa_p)) # pb is the parents' batch index
+                           + log_reg_c)
         # sum the state's Q(s,a), this is the outflow
         outflow = model.sum_output(s, torch.exp(stem_out_s), torch.exp(mol_out_s[:, 0]))
         # include reward and done multiplier, then take the log
         # we're guarenteed that r > 0 iff d = 1, so the log always works
-        outflow_plus_r = torch.log(r + outflow * (1-d))
-        loss = (inflow - outflow_plus_r).pow(2).mean()
-        # todo: reintroduce logsumexp with stem_o and mol_o above? or
-        # have my own index_add_ stable version
+        outflow_plus_r = torch.log(log_reg_c + r + outflow * (1-d))
+        losses = _losses = (inflow - outflow_plus_r).pow(2)
+        if clip_loss > 0:
+            ld = losses.detach()
+            losses = losses / ld * torch.minimum(ld, clip_loss)
+        if 0:
+            loss = (inflow - outflow_plus_r).pow(2).mean()
+            # todo: reintroduce logsumexp with stem_o and mol_o above? or
+            # have my own index_add_ stable version
+            #import pdb; pdb.set_trace()
 
-        with torch.no_grad():
-            term_loss = ((inflow - outflow_plus_r) * d).pow(2).sum() / (d.sum() + 1e-20)
-            flow_loss = ((inflow - outflow_plus_r) * (1-d)).pow(2).sum() / ((1-d).sum() + 1e-20)
-        loss.backward()
-        last_losses.append((loss.item(), term_loss.item(), flow_loss.item()))
-        train_losses.append((loss.item(), term_loss.item(), flow_loss.item()))
-        opt.step()
+            with torch.no_grad():
+                term_loss = ((inflow - outflow_plus_r) * d).pow(2).sum() / (d.sum() + 1e-20)
+                flow_loss = ((inflow - outflow_plus_r) * (1-d)).pow(2).sum() / ((1-d).sum() + 1e-20)
+        else:
+            term_loss = (losses * d).sum() / (d.sum() + 1e-20)
+            flow_loss = (losses * (1-d)).sum() / ((1-d).sum() + 1e-20)
+            loss = term_loss + flow_loss
         opt.zero_grad()
+        loss.backward()
+
+        _term_loss = (_losses * d).sum() / (d.sum() + 1e-20)
+        _flow_loss = (_losses * (1-d)).sum() / ((1-d).sum() + 1e-20)
+        last_losses.append((loss.item(), term_loss.item(), flow_loss.item()))
+        train_losses.append((loss.item(), _term_loss.item(), _flow_loss.item(),
+                             term_loss.item(), flow_loss.item()))
+        if args.clip_grad > 0:
+            torch.nn.utils.clip_grad_value_(model.parameters(),
+                                           args.clip_grad)
+        opt.step()
         model.training_steps = i + 1
-        #for _a,b in zip(model.parameters(), model_target.parameters()):
-        #  b.data.mul_(1-tau).add_(tau*_a)
+        if tau > 0:
+            for _a,b in zip(model.parameters(), target_model.parameters()):
+                b.data.mul_(1-tau).add_(tau*_a)
 
         #if any([torch.isnan(i).any() for i in model.parameters()]):
         if 0 and torch.isnan(loss):
@@ -463,6 +602,11 @@ def main(args):
             #pdb.set_trace()
 
         if not i % 100:
+
+            asd = list(model.mpnn.stem2out.parameters())
+            print([i.grad.pow(2).sum().item() for i in model.parameters() if id(i) not in list(map(id,asd))])
+            print([i.grad.pow(2).sum().item() for i in asd])
+            print(asd[-1])
             #recent_best = np.argmax([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
             #recent_best_m = np.max([i.rewards[0] * max(0,i.rewards[1]) * i.rewards[2] for i in replay.episodes[-100:]])
             #print(qsa)
@@ -470,6 +614,10 @@ def main(args):
             #print(target)
             last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
             print(i, last_losses)#, np.mean([i.gdist for i in replay.episodes[-100:]]),
+            print(torch.logsumexp(stem_out_p[0], 0).item(),
+                  outflow_plus_r[0].item(), inflow[0].item(), a[0])
+            #if inflow[0].item() > torch.logsumexp(stem_out_p[0], 0).item():
+            #    import pdb; pdb.set_trace()
             #recent_best_m, replay.episodes[-100+recent_best].rewards)
             #print(logit_reg)
             #print(stem_o.mean(), stem_o.max(), stem_o.min())
@@ -490,7 +638,7 @@ def main(args):
                     all_rs.append(nrg * synth_discount * qed_discount)
                 print(np.mean(all_rs), sorted(all_rs)[-10:])
 
-            if i % 5000:
+            if i % 1000:
                 continue
 
             if 1:
@@ -555,6 +703,68 @@ def array_feb_23(args):
   ])
   return all_hps
 
+
+def array_may_13(args):
+    base = {'replay_mode': 'online',
+            'sample_prob': 0.9,
+            'mbsize': 8,
+            'nemb': 50,
+    }
+
+    all_hps = [
+        {**base, 'run': 300},
+        {**base, 'run': 301, 'sample_prob': 0.75},
+        {**base, 'run': 302, 'sample_prob': 0.75, 'bootstrap_tau': 0.1},
+        {**base, 'run': 303, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1},
+        {**base, 'run': 304, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1, 'mbsize': 32},
+        {**base, 'run': 305, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1, 'model_version': 'v3'},
+        {**base, 'run': 306, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1, 'model_version': 'v4'},
+        {**base, 'run': 307, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1, 'model_version': 'v4',
+         'num_conv_steps': 6, 'nemb': 128},
+        {**base, 'run': 308, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v4',
+         'num_conv_steps': 6, 'nemb': 128},
+        {**base, 'run': 309, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v4',
+         'num_conv_steps': 6, 'nemb': 256, 'mbsize': 32},
+        {**base, 'run': 310, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v4',
+         'num_conv_steps': 6, 'nemb': 128, 'log_reg_c': 1e-2, 'mbsize': 2},
+        {**base, 'run': 311, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v4',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 2},
+        {**base, 'run': 312, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 2},
+        {**base, 'run': 313, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4},
+        {**base, 'run': 314, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v6',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 2},
+        {**base, 'run': 315, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
+         'reward_exp': 4},
+        {**base, 'run': 316, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
+         'reward_exp': 8},
+        {**base, 'run': 317, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4,
+         'reward_exp': 8},
+        {**base, 'run': 318, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
+         'reward_exp': 8, 'clip_grad': 0.5}, #norm clip
+        {**base, 'run': 319, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
+         'reward_exp': 8, 'clip_grad': 0.5}, # value clip
+        {**base, 'run': 320, 'sample_prob': 0.75, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
+         'reward_exp': 8, 'clip_grad': 0.5},
+        {**base, 'run': 321, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
+         'reward_exp': 8, 'clip_loss': 1},
+        {**base, 'run': 322, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
+         'reward_exp': 8, 'clip_loss': 10},
+        {**base, 'run': 323, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
+         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
+         'reward_exp': 8, 'clip_loss': 100},
+    ]
+    return all_hps
+
 if __name__ == '__main__':
   args = parser.parse_args()
   if 0:
@@ -575,8 +785,6 @@ if __name__ == '__main__':
 
     if args.print_array_length:
       print(len(all_hps))
-      #print(','.join(str(i) for i, h in enumerate(all_hps) if h['opt'] == 'msgd_corr'))
-      #print(' '.join(f'run_{i}' for i, h in enumerate(all_hps) if h['opt'] == 'msgd_corr'))
     else:
       hps = all_hps[args.run]
       print(hps)
@@ -584,4 +792,13 @@ if __name__ == '__main__':
         setattr(args, k, v)
       main(args)
   else:
-    main(args)
+      try:
+          main(args)
+      except KeyboardInterrupt as e:
+          print("stopping for", e)
+          _stop[0]()
+          raise e
+      except Exception as e:
+          print("exception", e)
+          _stop[0]()
+          raise e
