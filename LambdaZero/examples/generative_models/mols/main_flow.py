@@ -77,6 +77,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--learning_rate", default=2.5e-4, help="Learning rate", type=float)
 parser.add_argument("--mbsize", default=4, help="Minibatch size", type=int)
 parser.add_argument("--opt_beta", default=0.9, type=float)
+parser.add_argument("--opt_beta2", default=0.99, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
 parser.add_argument("--max_blocks", default=8, type=int)
@@ -89,6 +90,7 @@ parser.add_argument("--clip_grad", default=0, type=float)
 parser.add_argument("--clip_loss", default=0, type=float)
 parser.add_argument("--replay_mode", default='online', type=str)
 parser.add_argument("--bootstrap_tau", default=0, type=float)
+parser.add_argument("--weight_decay", default=0, type=float)
 parser.add_argument("--array", default='')
 parser.add_argument("--repr_type", default='atom_graph')
 parser.add_argument("--model_version", default='v5')
@@ -105,7 +107,7 @@ parser.add_argument("--progress", default='yes')
 
 class Dataset:
 
-    def __init__(self, args, bpath, device):
+    def __init__(self, args, bpath, device, floatX=torch.double):
         self.test_split_rng = np.random.RandomState(142857)
         self.train_rng = np.random.RandomState(int(time.time()))
         self.train_mols = []
@@ -121,17 +123,22 @@ class Dataset:
         self.sampling_model = None
         self.sampling_model_prob = 0
         self.R_min = 1e-8
-        self.min_blocks = args.min_blocks
-        self.max_blocks = args.max_blocks
-        self.floatX = torch.double
+        self.floatX = floatX
         self.mdp.floatX = self.floatX
         #######
         # This is the "result", here a list of (reward, BlockMolDataExt, info...) tuples
         self.sampled_mols = []
-        self.replay_mode = args.replay_mode
+        if hasattr(args, 'replay_mode'):
+            self.min_blocks = args.min_blocks
+            self.max_blocks = args.max_blocks
+            self.replay_mode = args.replay_mode
+            self.reward_exp = args.reward_exp
+        else:
+            self.reward_exp = 1
+            self.max_blocks = 10
+            self.replay_mode = 'dataset'
         self.online_mols = []
         self.max_online_mols = 1000
-        self.reward_exp = args.reward_exp
 
     def _get(self, i, dset):
         if ((self.sampling_model_prob > 0 and # don't sample if we don't have to
@@ -265,8 +272,9 @@ class Dataset:
         if dockscore is not None:
             normscore = 4-(min(0, dockscore)-self.target_norm[0])/self.target_norm[1]
         normscore = max(self.R_min, normscore)
-        #if 1:
         return normscore ** self.reward_exp
+        # run < 326: return normscore ** self.reward_exp
+        #return (normscore/10) ** self.reward_exp
         #score = 1 / (1 + np.exp(-(normscore-10)*2)) # run 218
         # run 218
         #if score < self.R_min:
@@ -393,9 +401,12 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
                      'args': args,},
                     gzip.open(f'{exp_dir}/info.pkl.gz', 'wb'))
 
+        pickle.dump(train_infos,
+                    gzip.open(f'{exp_dir}/train_info.pkl.gz', 'wb'))
 
-    opt = torch.optim.Adam(model.parameters(), args.learning_rate, #weight_decay=1e-4,
-                           betas=(args.opt_beta, 0.99))
+
+    opt = torch.optim.Adam(model.parameters(), args.learning_rate, weight_decay=args.weight_decay,
+                           betas=(args.opt_beta, args.opt_beta2))
     #opt = torch.optim.SGD(model.parameters(), args.learning_rate)
 
     #tf = lambda x: torch.tensor(x, device=device).float()
@@ -418,6 +429,7 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
     train_losses = []
     test_losses = []
     test_infos = []
+    train_infos = []
     time_start = time.time()
     time_last_check = time.time()
 
@@ -449,14 +461,14 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
         # index parents by their corresponding actions
         qsa_p = model.index_output_by_action(p, stem_out_p, mol_out_p[:, 0], a)
         # then sum the parents' contribution, this is the inflow
-        inflow = torch.log(torch.zeros((ntransitions,), device=device, dtype=dataset.floatX)
-                           .index_add_(0, pb, torch.exp(qsa_p)) # pb is the parents' batch index
-                           + log_reg_c)
+        exp_inflow = (torch.zeros((ntransitions,), device=device, dtype=dataset.floatX)
+                      .index_add_(0, pb, torch.exp(qsa_p))) # pb is the parents' batch index
+        inflow = torch.log(exp_inflow + log_reg_c)
         # sum the state's Q(s,a), this is the outflow
-        outflow = model.sum_output(s, torch.exp(stem_out_s), torch.exp(mol_out_s[:, 0]))
+        exp_outflow = model.sum_output(s, torch.exp(stem_out_s), torch.exp(mol_out_s[:, 0]))
         # include reward and done multiplier, then take the log
         # we're guarenteed that r > 0 iff d = 1, so the log always works
-        outflow_plus_r = torch.log(log_reg_c + r + outflow * (1-d))
+        outflow_plus_r = torch.log(log_reg_c + r + exp_outflow * (1-d))
         losses = _losses = (inflow - outflow_plus_r).pow(2)
         if clip_loss > 0:
             ld = losses.detach()
@@ -473,6 +485,12 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
         last_losses.append((loss.item(), term_loss.item(), flow_loss.item()))
         train_losses.append((loss.item(), _term_loss.item(), _flow_loss.item(),
                              term_loss.item(), flow_loss.item()))
+        train_infos.append((_term_loss.data.cpu().numpy(),
+                            _flow_loss.data.cpu().numpy(),
+                            exp_inflow.data.cpu().numpy(),
+                            exp_outflow.data.cpu().numpy(),
+                            r.data.cpu().numpy(),
+                            ))
         if args.clip_grad > 0:
             torch.nn.utils.clip_grad_value_(model.parameters(),
                                            args.clip_grad)
@@ -586,6 +604,25 @@ def array_may_13(args):
         {**base, 'run': 324, 'sample_prob': 1, 'max_blocks': 4, 'min_blocks': 2, 'model_version': 'v5',
          'num_conv_steps': 1, 'nemb': 2, 'log_reg_c': 1e-2, 'mbsize': 1, 'learning_rate': 5e-4,
          'reward_exp': 4, 'num_iterations': 10},
+
+    ]
+    base2 = {'replay_mode': 'online',
+             'sample_prob': 1,
+             'mbsize': 4,
+             'nemb': 256,
+             'max_blocks': 8,
+             'min_blocks': 2,
+             'model_version': 'v5',
+             'num_conv_steps': 6,
+             'learning_rate': 5e-4,
+             'num_iterations': 30000,
+             'reward_exp': 4,
+    }
+    all_hps += [
+        ##
+        {**base2, 'run': 325, 'log_reg_c': 1e-2},
+        {**base2, 'run': 326, 'log_reg_c': 1e-2, 'weight_decay': 1e-5},
+        {**base2, 'run': 327, 'log_reg_c': 1e-2},
     ]
     return all_hps
 
