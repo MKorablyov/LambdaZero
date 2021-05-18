@@ -1,4 +1,5 @@
 import random
+import os.path as osp
 import numpy as np
 import ray
 import wandb
@@ -6,8 +7,10 @@ from ray.tune.utils import merge_dicts
 from LambdaZero.contrib.acquisition import UCB, config_UCB_v1, config_UCB_v2
 from LambdaZero.contrib.oracle import DockingOracle, config_DockingOracle_v1
 from LambdaZero.contrib.data import temp_load_data, config_temp_load_data_v1, config_temp_load_data_v2
+import LambdaZero.utils
 from .proxy import Proxy, SaveDocked, LogTrajectories, LogTopKMols
 
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 @ray.remote(num_gpus=0.3, num_cpus=2)
 class ProxyUCB(Proxy):
@@ -86,3 +89,4 @@ config_ProxyUCB_rpv1 = {
     "load_seen_config": config_temp_load_data_v1,
     "after_acquire":[SaveDocked(), LogTopKMols(k=50,log_freq=10)],
 }
+

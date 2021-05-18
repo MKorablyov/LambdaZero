@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     "max_blocks": 15,
     "max_atoms": 55,
     "max_branches": 50,
-    "random_steps": 5,
+    "random_steps": 4,
     "reset_min_blocks": 3,
     "allow_removal": True
 }
@@ -101,17 +101,25 @@ class BlockMolGraph_v2:
         return obs
 
     def _should_stop(self):
-        terminate = False
+        should_stop = False
         molecule = self.molMDP.molecule
         # max steps
-        if self.num_steps >= self.max_steps: terminate = True
+        if self.num_steps >= self.max_steps:
+            should_stop = True
+            #print("stop on max steps", self.num_steps)
         # max_branches
-        if len(molecule.stems) >= self.max_branches: terminate = True
+        if len(molecule.stems) >= self.max_branches:
+            should_stop = True
+            #print("stop on max branchres", self.num_steps)
         # max blocks
-        if len(molecule.jbond_atmidxs) >= self.max_blocks-1: terminate = True
+        if len(molecule.jbond_atmidxs) >= self.max_blocks-1:
+            should_stop = True
+            #print("stop on max blocks", self.num_steps)
         # max_atoms
-        if molecule.slices[-1] >= self.max_atoms: terminate = True
-        return terminate
+        if molecule.slices[-1] >= self.max_atoms:
+            should_stop = True
+            #print("stop on max atoms", self.num_steps)
+        return should_stop
 
     def _random_steps(self):
         self.molMDP.reset()
@@ -176,7 +184,7 @@ class BlockMolGraph_v2:
         log_vals["molMDPFailure"] = molMDPFailure
         self.traj.append(deepcopy(self.molMDP.molecule))
         # log a few parameters
-        return obs, reward, done, {"log_vals":log_vals}
+        return obs, reward, done, {"log_vals" : log_vals}
 
 
 def init_proxy_env(env_config):

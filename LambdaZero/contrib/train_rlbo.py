@@ -23,7 +23,7 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         config_name = sys.argv[1]
     else:
-        config_name = "rlbo4_001"
+        config_name = "rlbo4_014"
     config = getattr(config_rlbo, config_name)
     config = merge_dicts(config.pop("default"), config)
 
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
-    os.environ["WANDB_MODE"] = "dryrun"
+#    os.environ["WANDB_MODE"] = "dryrun"
 
     # initialize env with proxy
     config["tune_config"]['config']['env_config'] = init_proxy_env(config["tune_config"]['config']['env_config'])

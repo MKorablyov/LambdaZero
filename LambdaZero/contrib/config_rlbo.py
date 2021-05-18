@@ -318,8 +318,6 @@ rlbo4_007 = {
                             "file_names": ["random_molecule_proxy_20k"], }
                     }}}}}}
 
-
-
 rlbo4_008 = {
     "default":config_rlbo_v1,
     "tune_config": {
@@ -367,6 +365,8 @@ rlbo4_009 = {
                             "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
                             "file_names": ["random_molecule_proxy_20k"], }
                     }}}}}}
+
+
 
 rlbo4_010 = {
     "default":config_rlbo_v1,
@@ -429,8 +429,6 @@ rlbo4_012 = {
                     }}}}}}
 
 
-
-
 rlbo4_013 = {
     "default":config_rlbo_v1,
     "tune_config": {
@@ -441,7 +439,7 @@ rlbo4_013 = {
             "env_config": {
                 "random_steps": 4,
              "molMDP_config": {
-                 "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55_manFix2.json"), # more blocks
+                 "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55_manFix2.json"), # a different set of blocks
                  },
                 "reward_config": {
                     "scoreProxy_config": {
@@ -455,6 +453,9 @@ rlbo4_013 = {
                             "file_names": ["random_molecule_proxy_20k"], }
                     }}}}}}
 
+# this is here to test the new environment that solves some issues in the previous one
+# in particular, early termination caused by limit of 25 branches; this one allows for more branches
+# I would have to launch random search with this same environment as distribution of molecules would be different
 rlbo4_014 = {
     "default":config_rlbo_v2,
     "tune_config": {
@@ -468,5 +469,47 @@ rlbo4_014 = {
                             "kappa": 1.0
                         },
                     }}}}}}
+# same as 14 but default to fewer atoms as in old environment
+rlbo4_015 = {
+    "default":config_rlbo_v2,
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "env_config": {
+                "max_atoms":50,
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquisition_config": {
+                            "kappa": 1.0
+                        },
+                    }}}}}}
 
+rlbo4_016 = {
+    "default":config_rlbo_v1,
+    "tune_config": {
+        "config": {
+            "lr": 5e-5,
+            "entropy_coeff": 1e-3,
+            "model":{"custom_model_config": {"num_blocks": 464}},
+            "env_config": {
+                "random_steps": 4,
+             "molMDP_config": {
+                 "blocks_file": osp.join(datasets_dir, "fragdb/pdb_blocks_55.json"), # more blocks
+                 },
+                "reward_config": {
+                    "scoreProxy_config": {
+                        "acquisiton_config": {
+                            "kappa": 10.0
+                        },
+                        "load_seen_config": {
+                            "mean":None, "std":None, "act_y":None,
+                            "dataset_split_path": osp.join(datasets_dir,
+                            "brutal_dock/seh/raw/random_molecule_proxy_20k.npy"),
+                            "file_names": ["random_molecule_proxy_20k"], }
+                    }}}}}}
 
+# 11 for 24 h because it did not run
+# 13 to understand the space of building blocks
+# 1, 3, 4, 16 to understand the effect of kappa
+# 14, 15 to understand if new env works

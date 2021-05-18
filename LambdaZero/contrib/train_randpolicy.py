@@ -18,7 +18,7 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         config_name = sys.argv[1]
     else:
-        config_name = "rand_001"
+        config_name = "rand_002"
     config = getattr(config_randpolicy, config_name)
     config = merge_dicts(config.pop("default"), config)
 
