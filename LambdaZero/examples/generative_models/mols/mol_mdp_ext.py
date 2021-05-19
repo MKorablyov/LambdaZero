@@ -173,6 +173,11 @@ class MolMDPExtended(MolMDP):
                           stem_idx=stem_idx, atmidx=atmidx)
         return new_mol
 
+    def remove_jbond_from(self, mol, jbond_idx=None, atmidx=None):
+        new_mol = mol.copy()
+        new_mol.remove_jbond(jbond_idx, atmidx)
+        return new_mol
+
     def a2mol(self, acts):
         mol = BlockMoleculeDataExtended()
         for i in acts:
@@ -185,7 +190,7 @@ class MolMDPExtended(MolMDP):
         return None
 
 
-    def post_init(self, device, repr_type):
+    def post_init(self, device, repr_type, include_bonds=False):
         self.device = device
         self.repr_type = repr_type
         #self.max_bond_atmidx = max([max(i) for i in self.block_rs])
@@ -197,6 +202,7 @@ class MolMDPExtended(MolMDP):
         self.num_stem_types = self.stem_type_offset[-1]
         self.true_blockidx = [self.true_block_set.index(i) for i in self.block_smi]
         self.num_true_blocks = len(self.true_block_set)
+        self.include_bonds = include_bonds
         #print(self.max_num_atm, self.num_stem_types)
         self.molcache = {}
 
@@ -211,16 +217,16 @@ class MolMDPExtended(MolMDP):
     def mol2repr(self, mol=None):
         if mol is None:
             mol = self.molecule
-        molhash = str(mol.blockidxs)+':'+str(mol.stems)+':'+str(mol.jbonds)
-        if molhash in self.molcache:
-            return self.molcache[molhash]
+        #molhash = str(mol.blockidxs)+':'+str(mol.stems)+':'+str(mol.jbonds)
+        #if molhash in self.molcache:
+        #    return self.molcache[molhash]
         if self.repr_type == 'block_graph':
-            r = model_block.mol2graph(mol, self)
+            r = model_block.mol2graph(mol, self, self.floatX)
         elif self.repr_type == 'atom_graph':
-            r = model_atom.mol2graph(mol, self)
+            r = model_atom.mol2graph(mol, self, self.floatX, bonds=self.include_bonds)
         elif self.repr_type == 'morgan_fingerprint':
-            r = model_fingerprint.mol2fp(mol, self)
-        self.molcache[molhash] = r
+            r = model_fingerprint.mol2fp(mol, self, self.floatX)
+        #self.molcache[molhash] = r
         return r
 
 def test_mdp_parent():
