@@ -18,6 +18,7 @@ import gc
 from LambdaZero.chem import DockVina_smi
 from LambdaZero.models import ChempropWrapper_v1
 from LambdaZero.utils import get_external_dirs
+from LambdaZero.utils.actor_pool_wait import ActorPoolWait
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
