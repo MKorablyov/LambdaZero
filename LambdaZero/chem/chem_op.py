@@ -426,11 +426,10 @@ class GenMolFile:
         os.makedirs(os.path.join(outpath, "mol2"), exist_ok=True)
         os.makedirs(os.path.join(outpath, "pdbqt"), exist_ok=True)
 
-    def __call__(self, smi, mol_name, num_conf):
+    def __call__(self, smi, mol_name, num_conf, timeout=512):
         sdf_file = os.path.join(self.outpath, "sdf", f"{mol_name}.sdf")
         mol2_file = os.path.join(self.outpath, "mol2", f"{mol_name}.mol2")
         pdbqt_file = os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt")
-
         mol = Chem.MolFromSmiles(smi)
         Chem.SanitizeMol(mol)
         mol_h = Chem.AddHs(mol)
@@ -442,7 +441,16 @@ class GenMolFile:
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
         os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
-        os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+        shell_cmd = f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}"
+
+        # os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+
+        p = subprocess.Popen(shell_cmd, shell=True)
+        try:
+            p.wait(timeout)
+        except subprocess.TimeoutExpired:
+            p.kill()
+
         return pdbqt_file
 
 
