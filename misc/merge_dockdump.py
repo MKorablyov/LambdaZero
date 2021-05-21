@@ -49,6 +49,12 @@ def merge_data(data_path: str = None, test_duplicates: int = 100, duplicates_th:
     df = pd.concat(all_data)
     df.set_index('smiles', inplace=True)
 
+    # Filter nan
+    nan_rows = df.dockscore.isna()
+    if nan_rows.sum() > 0:
+        print(f"Removing {nan_rows.sum()} rows with nan dock score")
+    df = df[~nan_rows]
+
     print(f"Got data for {len(df)} molecules ({len(np.unique(df.index))} unique)")
 
     # Cannot store columns of new size
