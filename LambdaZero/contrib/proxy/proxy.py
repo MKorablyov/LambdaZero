@@ -86,6 +86,8 @@ class SaveDocked:
         #print(pd.read_feather(os.path.join(self.outpath, oname + ".feather")))
         return None
 
+
+
 class LogTrajectories:
     def __init__(self, max_steps, log_freq):
         self.max_steps = max_steps
@@ -102,7 +104,7 @@ class LogTrajectories:
                     else:
                         mols.append(Chem.MolFromSmiles("H"))
             img = Draw.MolsToGridImage(mols, molsPerRow=self.max_steps, subImgSize=(250, 250), )
-            logger.log_wandb_object.remote("traj_img", img, "image")
+            logger.log_wandb_object.remote("acquired_traj_img", img, "image")
 
 class LogTopKMols:
     def __init__(self, k, log_freq):

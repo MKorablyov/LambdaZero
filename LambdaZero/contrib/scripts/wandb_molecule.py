@@ -66,14 +66,6 @@ def log_trajectories(trajs, max_steps):
 # imarray = np.random.rand(100,100,3) * 255
 # im = Image.fromarray(imarray.astype('uint8')).convert('RGBA')
 
-wandb.init()
-#wandb.log({"false_traj2": wandb.Image(im)})
-table = pd.DataFrame({"soup":[1,2,3,4,8], "borscht":[1,2,3,4,5]})
-
-soup = table["soup"].to_numpy()
-idx = np.argsort(soup)[-2:] # highest values
-table = table.take(idx)
-print("table", table)
 
 
 # wandb.log({ "table":wandb.Table(dataframe=table)})

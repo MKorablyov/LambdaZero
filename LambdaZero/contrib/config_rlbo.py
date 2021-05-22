@@ -511,5 +511,5 @@ rlbo4_016 = {
 
 # 11 for 24 h because it did not run
 # 13 to understand the space of building blocks
-# 1, 3, 4, 16 to understand the effect of kappa
 # 14, 15 to understand if new env works
+# 1, 3, 4, 16 to understand the effect of kappa

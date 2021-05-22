@@ -36,7 +36,7 @@ if __name__ == "__main__":
     ModelCatalog.register_custom_model("GraphMolActorCritic_thv1", GraphMolActorCritic_thv1)
     # initialize loggers
     os.environ['WANDB_DIR'] = summaries_dir
-#    os.environ["WANDB_MODE"] = "dryrun"
+    os.environ["WANDB_MODE"] = "dryrun"
 
     # initialize env with proxy
     config["tune_config"]['config']['env_config'] = init_proxy_env(config["tune_config"]['config']['env_config'])
