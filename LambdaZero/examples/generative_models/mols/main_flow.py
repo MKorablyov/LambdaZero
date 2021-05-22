@@ -77,7 +77,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--learning_rate", default=2.5e-4, help="Learning rate", type=float)
 parser.add_argument("--mbsize", default=4, help="Minibatch size", type=int)
 parser.add_argument("--opt_beta", default=0.9, type=float)
-parser.add_argument("--opt_beta2", default=0.99, type=float)
+parser.add_argument("--opt_beta2", default=0.999, type=float)
+parser.add_argument("--opt_epsilon", default=1e-8, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
 parser.add_argument("--max_blocks", default=8, type=int)
@@ -85,12 +86,16 @@ parser.add_argument("--num_iterations", default=20000, type=int)
 parser.add_argument("--num_conv_steps", default=6, type=int)
 parser.add_argument("--log_reg_c", default=1e-2, type=float)
 parser.add_argument("--reward_exp", default=4, type=float)
+parser.add_argument("--reward_norm", default=8, type=float)
 parser.add_argument("--sample_prob", default=1, type=float)
+parser.add_argument("--R_min", default=1e-8, type=float)
+parser.add_argument("--leaf_coef", default=1, type=float)
 parser.add_argument("--clip_grad", default=0, type=float)
 parser.add_argument("--clip_loss", default=0, type=float)
 parser.add_argument("--replay_mode", default='online', type=str)
 parser.add_argument("--bootstrap_tau", default=0, type=float)
 parser.add_argument("--weight_decay", default=0, type=float)
+parser.add_argument("--random_action_prob", default=0, type=float)
 parser.add_argument("--array", default='')
 parser.add_argument("--repr_type", default='atom_graph')
 parser.add_argument("--model_version", default='v5')
@@ -99,6 +104,9 @@ parser.add_argument("--save_path", default='results/')
 parser.add_argument("--proxy_path", default='results/proxy__6/')
 parser.add_argument("--print_array_length", default=False, action='store_true')
 parser.add_argument("--progress", default='yes')
+parser.add_argument("--floatX", default='float64')
+parser.add_argument("--include_nblocks", default=True)
+parser.add_argument("--balanced_loss", default=True)
 
 
 
@@ -114,7 +122,7 @@ class Dataset:
         self.test_mols = []
         self.train_mols_map = {}
         self.mdp = MolMDPExtended(bpath)
-        self.mdp.post_init(device, args.repr_type)
+        self.mdp.post_init(device, args.repr_type, include_nblocks=args.include_nblocks)
         self.mdp.build_translation_table()
         self._device = device
         self.seen_molecules = set()
@@ -122,23 +130,25 @@ class Dataset:
         self.target_norm = [-8.6, 1.10]
         self.sampling_model = None
         self.sampling_model_prob = 0
-        self.R_min = 1e-8
         self.floatX = floatX
         self.mdp.floatX = self.floatX
         #######
         # This is the "result", here a list of (reward, BlockMolDataExt, info...) tuples
         self.sampled_mols = []
-        if hasattr(args, 'replay_mode'):
-            self.min_blocks = args.min_blocks
-            self.max_blocks = args.max_blocks
-            self.replay_mode = args.replay_mode
-            self.reward_exp = args.reward_exp
-        else:
-            self.reward_exp = 1
-            self.max_blocks = 10
-            self.replay_mode = 'dataset'
+
+        get = lambda x, d: getattr(args, x) if hasattr(args, x) else d
+        self.min_blocks = get('min_blocks', 2)
+        self.max_blocks = get('max_blocks', 10)
+        self.mdp._cue_max_blocks = self.max_blocks
+        self.replay_mode = get('replay_mode', 'dataset')
+        self.reward_exp = get('reward_exp', 1)
+        self.reward_norm = get('reward_norm', 1)
+        self.random_action_prob = get('random_action_prob', 0)
+        self.R_min = get('R_min', 1e-8)
+
         self.online_mols = []
         self.max_online_mols = 1000
+
 
     def _get(self, i, dset):
         if ((self.sampling_model_prob > 0 and # don't sample if we don't have to
@@ -189,16 +199,20 @@ class Dataset:
         for t in range(max_blocks): # TODO: max blocks config
             s = self.mdp.mols2batch([self.mdp.mol2repr(m)])
             s_o, m_o = self.sampling_model(s)
-            if 0:
-                m_p, s_p = self.sampling_model.out_to_policy(s, s_o, m_o)
-                action = torch.cat([m_p.reshape(-1), s_p.reshape(-1)]).multinomial(1).item()
-            else:
-                logits = torch.cat([m_o.reshape(-1), s_o.reshape(-1)])
-                cat = torch.distributions.Categorical(
-                    logits=logits)
-                action = cat.sample().item()
+            ## fix from run 330 onwards
+            if t < self.min_blocks:
+                m_o = m_o * 0 - 1000 # prevent assigning prob to stop
+                                     # when we can't stop
+            ##
+            logits = torch.cat([m_o.reshape(-1), s_o.reshape(-1)])
+            cat = torch.distributions.Categorical(
+                logits=logits)
+            action = cat.sample().item()
+            if self.random_action_prob > 0 and self.train_rng.uniform() < self.random_action_prob:
+                action = self.train_rng.randint(int(t < self.min_blocks), logits.shape[0])
+
             q = torch.cat([m_o.reshape(-1), s_o.reshape(-1)])
-            trajectory_stats.append((q[action].item(), q.sum().item(), torch.logsumexp(q, 0).item()))
+            trajectory_stats.append((q[action].item(), action, torch.logsumexp(q, 0).item()))
             if t >= self.min_blocks and action == 0:
                 r = self._get_reward(m)
                 samples.append(((m,), ((-1,0),), r, m, 1))
@@ -253,6 +267,7 @@ class Dataset:
 
     def sample2batch(self, mb):
         p, a, r, s, d, *o = mb
+        mols = (p, s)
         # The batch index of each parent
         p_batch = torch.tensor(sum([[i]*len(p) for i,p in enumerate(p)], []),
                                device=self._device).long()
@@ -266,13 +281,13 @@ class Dataset:
         # rewards and dones
         r = torch.tensor(r, device=self._device).to(self.floatX)
         d = torch.tensor(d, device=self._device).to(self.floatX)
-        return (p, p_batch, a, r, s, d, *o)
+        return (p, p_batch, a, r, s, d, mols, *o)
 
     def r2r(self, dockscore=None, normscore=None):
         if dockscore is not None:
             normscore = 4-(min(0, dockscore)-self.target_norm[0])/self.target_norm[1]
         normscore = max(self.R_min, normscore)
-        return normscore ** self.reward_exp
+        return (normscore/self.reward_norm) ** self.reward_exp
         # run < 326: return normscore ** self.reward_exp
         #return (normscore/10) ** self.reward_exp
         #score = 1 / (1 + np.exp(-(normscore-10)*2)) # run 218
@@ -327,22 +342,24 @@ class Dataset:
             [i.join(0.05) for i in self.sampler_threads]
 
 
-def make_model(args, mdp):
+def make_model(args, mdp, out_per_mol=1):
     if args.repr_type == 'block_graph':
         model = model_block.GraphAgent(nemb=args.nemb,
                                        nvec=0,
                                        out_per_stem=mdp.num_blocks,
-                                       out_per_mol=1,
+                                       out_per_mol=out_per_mol,
                                        num_conv_steps=args.num_conv_steps,
                                        mdp_cfg=mdp,
-                                       version='v4')#args.model_version)
+                                       version=args.model_version)
     elif args.repr_type == 'atom_graph':
         model = model_atom.MolAC_GCN(nhid=args.nemb,
                                      nvec=0,
                                      num_out_per_stem=mdp.num_blocks,
-                                     num_out_per_mol=1,
+                                     num_out_per_mol=out_per_mol,
                                      num_conv_steps=args.num_conv_steps,
-                                     version=args.model_version)
+                                     version=args.model_version,
+                                     do_nblocks=(hasattr(args,'include_nblocks')
+                                                 and args.include_nblocks))
     elif args.repr_type == 'morgan_fingerprint':
         raise ValueError('reimplement me')
         model = model_fingerprint.MFP_MLP(args.nemb, 3, mdp.num_blocks, 1)
@@ -355,7 +372,7 @@ class Proxy:
         params = pickle.load(gzip.open(f'{args.proxy_path}/best_params.pkl.gz'))
         self.mdp = MolMDPExtended(bpath)
         self.mdp.post_init(device, eargs.repr_type)
-        self.mdp.floatX = torch.double
+        self.mdp.floatX = args.floatX
         self.proxy = make_model(eargs, self.mdp)
         for a,b in zip(self.proxy.parameters(), params):
             a.data = torch.tensor(b, dtype=self.mdp.floatX)
@@ -406,11 +423,11 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
 
 
     opt = torch.optim.Adam(model.parameters(), args.learning_rate, weight_decay=args.weight_decay,
-                           betas=(args.opt_beta, args.opt_beta2))
+                           betas=(args.opt_beta, args.opt_beta2),
+                           eps=args.opt_epsilon)
     #opt = torch.optim.SGD(model.parameters(), args.learning_rate)
 
-    #tf = lambda x: torch.tensor(x, device=device).float()
-    tf = lambda x: torch.tensor(x, device=device).double()
+    tf = lambda x: torch.tensor(x, device=device).to(args.floatX)
     tint = lambda x: torch.tensor(x, device=device).long()
 
     mbsize = args.mbsize
@@ -436,6 +453,10 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
     loginf = 1000 # to prevent nans
     log_reg_c = args.log_reg_c
     clip_loss = tf([args.clip_loss])
+    balanced_loss = args.balanced_loss
+    do_nblocks_reg = False
+    max_blocks = args.max_blocks
+    leaf_coef = args.leaf_coef
 
     for i in range(num_steps):
         if not debug_no_threads:
@@ -444,9 +465,10 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
                 if thread.failed:
                     stop_everything()
                     pdb.post_mortem(thread.exception.__traceback__)
-            p, pb, a, r, s, d = r
+                    return
+            p, pb, a, r, s, d, mols = r
         else:
-            p, pb, a, r, s, d = dataset.sample2batch(dataset.sample(mbsize))
+            p, pb, a, r, s, d, mols = dataset.sample2batch(dataset.sample(mbsize))
         # Since we sampled 'mbsize' trajectories, we're going to get
         # roughly mbsize * H (H is variable) transitions
         ntransitions = r.shape[0]
@@ -469,28 +491,41 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
         # include reward and done multiplier, then take the log
         # we're guarenteed that r > 0 iff d = 1, so the log always works
         outflow_plus_r = torch.log(log_reg_c + r + exp_outflow * (1-d))
-        losses = _losses = (inflow - outflow_plus_r).pow(2)
+        if do_nblocks_reg:
+            losses = _losses = ((inflow - outflow_plus_r) / (s.nblocks * max_blocks)).pow(2)
+        else:
+            losses = _losses = (inflow - outflow_plus_r).pow(2)
         if clip_loss > 0:
             ld = losses.detach()
             losses = losses / ld * torch.minimum(ld, clip_loss)
 
         term_loss = (losses * d).sum() / (d.sum() + 1e-20)
         flow_loss = (losses * (1-d)).sum() / ((1-d).sum() + 1e-20)
-        loss = term_loss + flow_loss
+        if balanced_loss:
+            loss = term_loss * leaf_coef + flow_loss
+        else:
+            loss = losses.mean()
         opt.zero_grad()
-        loss.backward()
+        loss.backward(retain_graph=(not i % 50))
 
         _term_loss = (_losses * d).sum() / (d.sum() + 1e-20)
         _flow_loss = (_losses * (1-d)).sum() / ((1-d).sum() + 1e-20)
         last_losses.append((loss.item(), term_loss.item(), flow_loss.item()))
         train_losses.append((loss.item(), _term_loss.item(), _flow_loss.item(),
                              term_loss.item(), flow_loss.item()))
-        train_infos.append((_term_loss.data.cpu().numpy(),
-                            _flow_loss.data.cpu().numpy(),
-                            exp_inflow.data.cpu().numpy(),
-                            exp_outflow.data.cpu().numpy(),
-                            r.data.cpu().numpy(),
-                            ))
+        if not i % 50:
+            train_infos.append((
+                _term_loss.data.cpu().numpy(),
+                _flow_loss.data.cpu().numpy(),
+                exp_inflow.data.cpu().numpy(),
+                exp_outflow.data.cpu().numpy(),
+                r.data.cpu().numpy(),
+                mols[1],
+                [i.pow(2).sum().item() for i in model.parameters()],
+                torch.autograd.grad(loss, qsa_p, retain_graph=True)[0].data.cpu().numpy(),
+                torch.autograd.grad(loss, stem_out_s, retain_graph=True)[0].data.cpu().numpy(),
+                torch.autograd.grad(loss, stem_out_p, retain_graph=True)[0].data.cpu().numpy(),
+            ))
         if args.clip_grad > 0:
             torch.nn.utils.clip_grad_value_(model.parameters(),
                                            args.clip_grad)
@@ -523,7 +558,11 @@ def main(args):
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
 
-    dataset = Dataset(args, bpath, device)
+    if args.floatX == 'float32':
+        args.floatX = torch.float
+    else:
+        args.floatX = torch.double
+    dataset = Dataset(args, bpath, device, floatX=args.floatX)
     print(args)
 
 
@@ -533,7 +572,7 @@ def main(args):
     #replay.load_initial_episodes(past_ep)
 
     model = make_model(args, mdp)
-    model.to(torch.double)
+    model.to(args.floatX)
     model.to(device)
 
     proxy = Proxy(args, bpath, device)
@@ -542,89 +581,45 @@ def main(args):
     print('Done.')
 
 
+try:
+    from arrays import*
+except:
+    print("no arrays")
 
-def array_may_13(args):
-    base = {'replay_mode': 'online',
-            'sample_prob': 0.9,
-            'mbsize': 8,
-            'nemb': 50,
-    }
+good_config = {
+    'replay_mode': 'online',
+    'sample_prob': 1,
+    'mbsize': 4,
+    'max_blocks': 8,
+    'min_blocks': 2,
+    # This repr actually is pretty stable
+    'repr_type': 'block_graph',
+    'model_version': 'v4',
+    'nemb': 256,
+    # at 30k iterations the models usually have "converged" in the
+    # sense that the reward distribution doesn't get better, but the
+    # generated molecules keep being unique, so making this higher
+    # should simply provide more high-reward states.
+    'num_iterations': 30000,
 
-    all_hps = [
-        {**base, 'run': 300},
-        {**base, 'run': 301, 'sample_prob': 0.75},
-        {**base, 'run': 302, 'sample_prob': 0.75, 'bootstrap_tau': 0.1},
-        {**base, 'run': 303, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1},
-        {**base, 'run': 304, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1, 'mbsize': 32},
-        {**base, 'run': 305, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1, 'model_version': 'v3'},
-        {**base, 'run': 306, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1, 'model_version': 'v4'},
-        {**base, 'run': 307, 'sample_prob': 1, 'max_blocks': 3, 'min_blocks': 1, 'model_version': 'v4',
-         'num_conv_steps': 6, 'nemb': 128},
-        {**base, 'run': 308, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v4',
-         'num_conv_steps': 6, 'nemb': 128},
-        {**base, 'run': 309, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v4',
-         'num_conv_steps': 6, 'nemb': 256, 'mbsize': 32},
-        {**base, 'run': 310, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v4',
-         'num_conv_steps': 6, 'nemb': 128, 'log_reg_c': 1e-2, 'mbsize': 2},
-        {**base, 'run': 311, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v4',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 2},
-        {**base, 'run': 312, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 2},
-        {**base, 'run': 313, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4},
-        {**base, 'run': 314, 'sample_prob': 1, 'max_blocks': 2, 'min_blocks': 1, 'model_version': 'v6',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 2},
-        {**base, 'run': 315, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
-         'reward_exp': 4},
-        {**base, 'run': 316, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
-         'reward_exp': 8},
-        {**base, 'run': 317, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4,
-         'reward_exp': 8},
-        {**base, 'run': 318, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
-         'reward_exp': 8, 'clip_grad': 0.5}, #norm clip
-        {**base, 'run': 319, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
-         'reward_exp': 8, 'clip_grad': 0.5}, # value clip
-        {**base, 'run': 320, 'sample_prob': 0.75, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
-         'reward_exp': 8, 'clip_grad': 0.5},
-        {**base, 'run': 321, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
-         'reward_exp': 8, 'clip_loss': 1},
-        {**base, 'run': 322, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
-         'reward_exp': 8, 'clip_loss': 10},
-        {**base, 'run': 323, 'sample_prob': 1, 'max_blocks': 8, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 6, 'nemb': 256, 'log_reg_c': 1e-2, 'mbsize': 4, 'learning_rate': 5e-4,
-         'reward_exp': 8, 'clip_loss': 100},
-        {**base, 'run': 324, 'sample_prob': 1, 'max_blocks': 4, 'min_blocks': 2, 'model_version': 'v5',
-         'num_conv_steps': 1, 'nemb': 2, 'log_reg_c': 1e-2, 'mbsize': 1, 'learning_rate': 5e-4,
-         'reward_exp': 4, 'num_iterations': 10},
-
-    ]
-    base2 = {'replay_mode': 'online',
-             'sample_prob': 1,
-             'mbsize': 4,
-             'nemb': 256,
-             'max_blocks': 8,
-             'min_blocks': 2,
-             'model_version': 'v5',
-             'num_conv_steps': 6,
-             'learning_rate': 5e-4,
-             'num_iterations': 30000,
-             'reward_exp': 4,
-    }
-    all_hps += [
-        ##
-        {**base2, 'run': 325, 'log_reg_c': 1e-2},
-        {**base2, 'run': 326, 'log_reg_c': 1e-2, 'weight_decay': 1e-5},
-        {**base2, 'run': 327, 'log_reg_c': 1e-2},
-    ]
-    return all_hps
+    'R_min': 0.1,
+    'log_reg_c': (0.1/8)**4,
+    # This is to make reward roughly between 0 and 1 (proxy outputs
+    # between ~0 and 10, but very few are above 8). Maybe you will
+    # need to adjust for uncertainty?
+    'reward_norm': 8,
+    # you can play with this, higher is more risky but will give
+    # higher rewards on average if it succeeds.
+    'reward_exp': 10,
+    'learning_rate': 5e-4,
+    'num_conv_steps': 10,
+    # I only tried this and 0, I'm not sure there is much difference
+    # but in priciple exploration is good
+    'random_action_prob': 0.05,
+    'opt_beta2': 0.999,
+    'leaf_coef': 10, # I only tried 1 and 10, 10 works pretty well
+    'include_nblocks': False,
+}
 
 if __name__ == '__main__':
   args = parser.parse_args()
@@ -651,7 +646,16 @@ if __name__ == '__main__':
       print(hps)
       for k,v in hps.items():
         setattr(args, k, v)
-      main(args)
+    try:
+        main(args)
+    except KeyboardInterrupt as e:
+        print("stopping for", e)
+        _stop[0]()
+        raise e
+    except Exception as e:
+        print("exception", e)
+        _stop[0]()
+        raise e
   else:
       try:
           main(args)
