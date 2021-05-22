@@ -625,8 +625,9 @@ if __name__ == '__main__':
   args = parser.parse_args()
   if 0:
     all_hps = eval(args.array)(args)
-    #for run in range(0,8):
-    for run in range(len(all_hps)):
+    #for run in range(66,69):
+    for run in range(69, 72):
+    #for run in range(len(all_hps)):
       args.run = run
       hps = all_hps[run]
       for k,v in hps.items():
