@@ -91,10 +91,8 @@ class ParametricMolData(Data):
         return super().__inc__(key, value)
 
 class GraphMolObs:
-
     def __init__(self, config={}, max_stems=25, max_jbonds=10):
         self.one_hot_atom = config.get('one_hot_atom', False)
-
         self.stem_indices = config.get('stem_indices', True)
         self.jbond_indices = config.get('jbond_indices', True)
         self.max_stems = max_stems
@@ -144,8 +142,8 @@ class GraphMolObs:
             stem_idx = mol.stem_atmidxs[:self.max_stems]
             stem_mask = torch.zeros((g.x.shape[0], 1))
             stem_mask[torch.tensor(stem_idx).long()] = 1
-            g.stem_atmidx = torch.tensor(
-                np.concatenate([stem_idx, np.zeros(self.max_stems - len(stem_idx))], 0)).long()
+            g.stem_atmidx = torch.tensor(np.concatenate(
+                [stem_idx, np.zeros(self.max_stems - len(stem_idx))], 0)).long()
             #g.x = torch.cat([g.x, stem_mask], 1)
 
         if self.jbond_indices: # Add jbond indices
@@ -163,7 +161,19 @@ class GraphMolObs:
             g.edge_index = torch.zeros((2, 1)).long()
             g.edge_attr = torch.zeros((1, g.edge_attr.shape[1])).float()
             g.stem_atmidx = torch.zeros((self.max_stems,)).long()
-        return g, self.space.pack(g)
+
+        # todo: check if empty graphs could be acquired!!
+        g_flat = self.space.pack(g)
+        #g_ = self.space.unpack(g_flat)
+        #if g is not None:
+            #print("g_:", g_)
+        #for var in vars(g):
+        #    if getattr(g,var) is not None:
+        #        print(torch.equal(getattr(g,var), getattr(g_, var)))
+        #        print(torch.sum(getattr(g,var) - getattr(g_, var)))
+        #    else:
+        #        print(var, "is None!")
+        return g, g_flat
 
 
 
@@ -183,6 +193,7 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         self.max_atoms = config["max_atoms"]
         self.random_steps = config["random_steps"]
         self.allow_removal = config["allow_removal"]
+
         num_actions = self.max_blocks + self.max_branches * self.num_blocks
 
         self.graph_mol_obs = GraphMolObs(config['obs_config'], self.max_branches, self.max_blocks-1)

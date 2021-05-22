@@ -1,17 +1,11 @@
-from torch.utils.data import Dataset
-import time
-import os, os.path as osp
-import numpy as np
-from LambdaZero.inputs import mol_to_graph
-
-from rdkit import Chem
-import torch
-import ray
-import pandas as pd
+import os, time, os.path as osp
 from itertools import repeat, product
 
-from LambdaZero.environments import BlockMoleculeData, GraphMolObs
 
+import torch
+from torch.utils.data import Dataset
+import LambdaZero.utils
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 def collate(data_list):
     r"""Collates a python list of data objects to the internal storage
@@ -50,6 +44,7 @@ def collate(data_list):
         slices[key] = torch.tensor(slices[key], dtype=torch.long)
     return data, slices
 
+
 def separate(data_, slices_):
     num_graphs = len([x for x in slices_.values()][0])-1
     data_list = []
@@ -71,49 +66,6 @@ def separate(data_, slices_):
         data_list.append(data)
     return data_list
 
-@ray.remote
-def obs_from_smi(smi):
-    molecule = BlockMoleculeData()
-    molecule._mol = Chem.MolFromSmiles(smi)
-    graph, _ = GraphMolObs()(molecule)
-    return graph
-
-def temp_load_data_v1(mean, std, dataset_split_path, raw_path, proc_path, file_names):
-
-    if not all([osp.exists(osp.join(proc_path, file_name + ".pt")) for file_name in file_names]):
-        print("processing graphs from smiles")
-        if not osp.exists(proc_path): os.makedirs(proc_path)
-
-        for file_name in file_names:
-            docked_index = pd.read_feather(osp.join(raw_path, file_name + ".feather"))
-            y = list(((mean - docked_index["dockscore"].to_numpy(dtype=np.float32)) / std))
-
-            smis = docked_index["smiles"].tolist()
-            graphs = ray.get([obs_from_smi.remote(smi) for smi in smis])
-            # save graphs
-            data, slices = collate(graphs)
-            torch.save((data, slices, y), osp.join(proc_path, file_name + ".pt"))
-
-    smis, graph_list, y_list= [], [], []
-    for file_name in file_names:
-        # load smiles from raw data
-        docked_index = pd.read_feather(osp.join(raw_path, file_name + ".feather"))
-        smis.extend(docked_index["smiles"].tolist())
-        # load processed graphs
-        data, slices, y = torch.load(osp.join(proc_path, file_name + ".pt"))
-        graphs = separate(data, slices)
-        graph_list.extend(graphs)
-        y_list.extend(y)
-
-    # split into train test sets
-    train_idxs, val_idxs, _ = np.load(dataset_split_path, allow_pickle=True)
-    train_x = [{"smiles":smis[i],"mol_graph":graph_list[i]} for i in train_idxs]
-    train_y = [y_list[i] for i in train_idxs]
-    val_x = [{"smiles":smis[i],"mol_graph":graph_list[i]} for i in val_idxs]
-    val_y = [y_list[i] for i in val_idxs]
-    return train_x, train_y, val_x, val_y
-
-
 
 class ListGraphDataset(Dataset):
     def __init__(self, graphs):
@@ -124,4 +76,5 @@ class ListGraphDataset(Dataset):
 
     def __len__(self):
         return len(self.graps)
+
 

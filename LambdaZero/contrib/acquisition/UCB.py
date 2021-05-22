@@ -1,6 +1,7 @@
 import time
 import numpy as np
-from .acquisition_function import AcquisitionFunction
+from LambdaZero.contrib.modelBO import MolMCDropGNN, config_MolMCDropGNN_v1
+from .acquisition import AcquisitionFunction
 
 
 class UCB(AcquisitionFunction):
@@ -16,19 +17,32 @@ class UCB(AcquisitionFunction):
     def acquisition_value(self, x):
         mean, var = self.model.get_mean_and_variance(x)
         acq = [mean[i] + self.kappa * (var[i]**0.5) for i in range(len(mean))]
-        info = {"mean":mean,"var":var}
+        info = {"mean":mean, "var":var}
         return acq, info
 
     def acquire_batch(self, x, d, acq=None):
-        if acq is not None: acq,_ = self.acquisition_value(x)
-        d = np.asarray(d)
-        d[np.where(np.array(acq) < 0)[0]] = 1
-        # todo there could be a better algebraic solution how to apply discount to +/- rewards
-        # compute indices with highest   acquisition values
-        idx = np.argsort(np.array(acq) * d)[-self.acq_size:]
+        if acq is None: acq,_ = self.acquisition_value(x)
+        # compute indices with highest acquisition values
+        v = np.asarray(acq) * np.asarray(d)
+        idx = np.argsort(v)[-self.acq_size:]
         # take selected indices
         x_acquired = [x[i] for i in idx]
-        d_acquired= [d[i] for i in idx]
+        d_acquired = [d[i] for i in idx]
         acq_acquired = [acq[i] for i in idx]
         info = {}
         return x_acquired, d_acquired, acq_acquired, info
+
+
+config_UCB_v1 = {
+    "model": MolMCDropGNN,
+    "model_config": config_MolMCDropGNN_v1,
+    "acq_size": 32,
+    "kappa": 0.2,
+}
+
+config_UCB_v2 = {
+    "model": MolMCDropGNN,
+    "model_config": config_MolMCDropGNN_v1,
+    "acq_size": 256,
+    "kappa": 2.0,
+}

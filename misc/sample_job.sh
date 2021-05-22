@@ -6,7 +6,7 @@
 #SBATCH --time=24:00:00                   # The time for which the job runs
 #SBATCH -o /scratch/mkkr/slurm-%j.out  # Write the log in $SCRATCH
 
-
+module load StdEnv/2018.3
 module load python/3.6 cuda/10.1 cudnn/7.6.5
 module load nixpkgs/16.09
 module load gcc/7.3.0

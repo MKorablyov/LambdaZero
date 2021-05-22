@@ -1,2 +1,2 @@
-from .proxyUCB import ProxyUCB
-from .proxy import Actor
+from .proxyUCB import *
+from .proxy import *
