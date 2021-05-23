@@ -94,7 +94,7 @@ class MPNNet_v2(nn.Module):
 
 
 
-    def forward(self, data, vec_data=None, do_stems=True, do_bonds=False, do_dropout=False):
+    def forward(self, data, vec_data=None, do_stems=True, do_bonds=False, k=None, do_dropout=False):
         if self.version == 1:
             batch_vec = vec_data[data.batch]
             out = self.act(self.lin0(torch.cat([data.x, batch_vec], 1)))
@@ -202,8 +202,8 @@ class MolAC_GCN(nn.Module):
     def sum_output(self, s, stem_o, mol_o):
         return gnn.global_add_pool(stem_o, s.stems_batch).sum(1) + mol_o
 
-    def forward(self, graph, vec=None, do_stems=True, do_bonds=False, k=None):
-        return self.mpnn(graph, vec, do_stems=do_stems, do_bonds=do_bonds, k=k)
+    def forward(self, graph, vec=None, do_stems=True, do_bonds=False, k=None, do_dropout=False):
+        return self.mpnn(graph, vec, do_stems=do_stems, do_bonds=do_bonds, k=k, do_dropout=do_dropout)
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
@@ -216,6 +216,7 @@ class MolAC_GCN(nn.Module):
 def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
     rdmol = mol.mol
     if rdmol is None:
+        print(len(atomic_numbers))
         g = Data(x=torch.zeros((1, 14 + len(atomic_numbers))),
                  edge_attr=torch.zeros((0, 4)),
                  edge_index=torch.zeros((0, 2)).long())

@@ -55,18 +55,18 @@ import importlib
 importlib.reload(model_atom)
 #importlib.reload(chem_op)
 
-datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-if 'SLURM_TMPDIR' in os.environ:
-    print("Syncing locally")
-    tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
+# datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+# if 'SLURM_TMPDIR' in os.environ:
+#     print("Syncing locally")
+#     tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
 
-    os.system(f"rsync -az {programs_dir} {tmp_dir}")
-    os.system(f"rsync -az {datasets_dir} {tmp_dir}")
-    programs_dir = f"{tmp_dir}/Programs"
-    datasets_dir = f"{tmp_dir}/Datasets"
-    print("Done syncing")
-else:
-    tmp_dir = "/tmp/lambdazero"
+#     os.system(f"rsync -az {programs_dir} {tmp_dir}")
+#     os.system(f"rsync -az {datasets_dir} {tmp_dir}")
+#     programs_dir = f"{tmp_dir}/Programs"
+#     datasets_dir = f"{tmp_dir}/Datasets"
+#     print("Done syncing")
+# else:
+tmp_dir = "/tmp/lambdazero"
 
 os.makedirs(tmp_dir, exist_ok=True)
 
@@ -110,7 +110,7 @@ class Dataset(_Dataset):
         r = torch.tensor(r, device=self._device).float()
         return (s, r, *o)
 
-    def load_h5(self, path, args, test_ratio=0.05):
+    def load_h5(self, path, args, test_ratio=0.05, num_examples=None):
         import json
         import pandas as pd
         columns = ["smiles", "dockscore", "blockidxs", "slices", "jbonds", "stems"]
@@ -120,11 +120,16 @@ class Dataset(_Dataset):
         df.dockscore = df.dockscore.astype("float64")
         for cl_mame in columns[2:]:
             df.loc[:, cl_mame] = df[cl_mame].apply(json.loads)
+        if num_examples is None:
+            num_examples = len(df)
+            idxs = range(len(df))
+        else:
+            idxs = self.test_split_rng.choice(len(df), int((1-test_ratio) * num_examples), replace=False)
         # Sample which indices will be our test set
-        test_idxs = self.test_split_rng.choice(len(df), int(test_ratio * len(df)), replace=False)
+        test_idxs = self.test_split_rng.choice(len(df), int(test_ratio * num_examples), replace=False)
         split_bool = np.zeros(len(df), dtype=np.bool)
         split_bool[test_idxs] = True
-        for i in tqdm(range(len(df)), disable=not args.progress):
+        for i in tqdm(idxs, disable=not args.progress):
             m = BlockMoleculeDataExtended()
             for c in range(1, len(columns)):
                 setattr(m, columns[c], df.iloc[i, c-1])
@@ -142,13 +147,18 @@ class Dataset(_Dataset):
         store.close()
 
 
-    def load_pkl(self, path, args, test_ratio=0.05):
+    def load_pkl(self, path, args, test_ratio=0.05, num_examples=None):
         columns = ["smiles", "dockscore", "blockidxs", "slices", "jbonds", "stems"]
         mols = pickle.load(gzip.open(path))
-        test_idxs = self.test_split_rng.choice(len(mols), int(test_ratio * len(mols)), replace=False)
+        if num_examples is None:
+            num_examples = len(mols)
+            idxs = range(len(mols))
+        else:
+            idxs = self.test_split_rng.choice(len(mols), int((1 - test_ratio) * num_examples), replace=False)
+        test_idxs = self.test_split_rng.choice(len(mols), int(test_ratio * num_examples), replace=False)
         split_bool = np.zeros(len(mols), dtype=np.bool)
         split_bool[test_idxs] = True
-        for i in tqdm(range(len(mols)), disable=not args.progress):
+        for i in tqdm(idxs, disable=not args.progress):
             m = BlockMoleculeDataExtended()
             for c in range(1, len(columns)):
                 setattr(m, columns[c], mols[i][columns[c]])

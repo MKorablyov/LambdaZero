@@ -7,6 +7,7 @@ import gzip
 import os
 import os.path as osp
 import pickle
+from types import prepare_class
 import psutil
 import pdb
 import subprocess
@@ -28,6 +29,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.data import Data, Batch
 import torch_geometric.nn as gnn
+from torch.distributions.categorical import Categorical
 
 import LambdaZero.models
 from LambdaZero import chem
@@ -42,7 +44,7 @@ from LambdaZero.utils import get_external_dirs
 from mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
 
 import model_atom, model_block, model_fingerprint
-from train_proxy import Dataset as ProxyDataset
+from train_proxy import Dataset as _ProxyDataset
 from main_flow import Dataset as GenModelDataset
 
 import importlib
@@ -51,7 +53,7 @@ importlib.reload(model_atom)
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 # if 'SLURM_TMPDIR' in os.environ:
 #     print("Syncing locally")
-#     tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
+tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
 
 #     os.system(f"rsync -az {programs_dir} {tmp_dir}")
 #     os.system(f"rsync -az {datasets_dir} {tmp_dir}")
@@ -59,8 +61,8 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 #     datasets_dir = f"{tmp_dir}/Datasets"
 #     print("Done syncing")
 # else:
-tmp_dir = "/tmp/lambdazero"
-
+# tmp_dir = "/tmp/lambdazero"
+os.makedirs(tmp_dir, exist_ok=True)
 
 parser = argparse.ArgumentParser()
 
@@ -70,52 +72,67 @@ parser.add_argument("--proxy_weight_decay", default=1e-5, help="Weight Decay in 
 parser.add_argument("--proxy_mbsize", default=64, help="Minibatch size", type=int)
 parser.add_argument("--proxy_opt_beta", default=0.9, type=float)
 parser.add_argument("--proxy_nemb", default=64, help="#hidden", type=int)
-parser.add_argument("--proxy_num_iterations", default=100, type=int)
+parser.add_argument("--proxy_num_iterations", default=50000, type=int)
 parser.add_argument("--num_init_examples", default=25000, type=int)
-parser.add_argument("--num_outer_loop_iters", default=20, type=int)
-parser.add_argument("--num_samples", default=32, type=int)
+parser.add_argument("--num_outer_loop_iters", default=25, type=int)
+parser.add_argument("--num_samples", default=100, type=int)
 parser.add_argument("--proxy_num_conv_steps", default=12, type=int)
 parser.add_argument("--proxy_repr_type", default='atom_graph')
 parser.add_argument("--proxy_model_version", default='v2')
 parser.add_argument("--save_path", default='results/')
 parser.add_argument("--cpu_req", default=8)
 parser.add_argument("--progress", action='store_true')
+parser.add_argument("--include_nblocks", action='store_true')
 
 # gen_model
-parser.add_argument("--learning_rate", default=2.5e-4, help="Learning rate", type=float)
+parser.add_argument("--learning_rate", default=5e-4, help="Learning rate", type=float)
 parser.add_argument("--mbsize", default=4, help="Minibatch size", type=int)
 parser.add_argument("--opt_beta", default=0.9, type=float)
-parser.add_argument("--opt_beta2", default=0.99, type=float)
+parser.add_argument("--opt_beta2", default=0.999, type=float)
+parser.add_argument("--opt_epsilon", default=1e-8, type=float)
+parser.add_argument("--kappa", default=0.1, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
 parser.add_argument("--max_blocks", default=8, type=int)
-parser.add_argument("--num_iterations", default=200, type=int)
-parser.add_argument("--num_conv_steps", default=6, type=int)
-parser.add_argument("--log_reg_c", default=1e-2, type=float)
-parser.add_argument("--reward_exp", default=4, type=float)
-parser.add_argument("--sample_prob", default=0, type=float)
+parser.add_argument("--num_iterations", default=30000, type=int)
+parser.add_argument("--num_conv_steps", default=10, type=int)
+parser.add_argument("--log_reg_c", default=(0.1/8)**4, type=float)
+parser.add_argument("--reward_exp", default=10, type=float)
+parser.add_argument("--reward_norm", default=8, type=float)
+parser.add_argument("--R_min", default=0.1, type=float)
+parser.add_argument("--sample_prob", default=1, type=float)
 parser.add_argument("--clip_grad", default=0, type=float)
 parser.add_argument("--clip_loss", default=0, type=float)
-# parser.add_argument("--replay_mode", default='online', type=str)
+parser.add_argument("--random_action_prob", default=0.05, type=float)
+parser.add_argument("--leaf_coef", default=10, type=float)
+parser.add_argument("--replay_mode", default='online', type=str)
 parser.add_argument("--bootstrap_tau", default=0, type=float)
 parser.add_argument("--weight_decay", default=0, type=float)
 parser.add_argument("--array", default='')
-parser.add_argument("--repr_type", default='atom_graph')
-parser.add_argument("--model_version", default='v5')
+parser.add_argument("--repr_type", default='block_graph')
+parser.add_argument("--model_version", default='v4')
 parser.add_argument("--run", default=0, help="run", type=int)
-parser.add_argument("--proxy_path", default='results/proxy__6/')
+# parser.add_argument("--proxy_path", default='results/proxy__6/')
+parser.add_argument("--balanced_loss", default=True)
+parser.add_argument("--floatX", default='float64')
 
+
+class ProxyDataset(_ProxyDataset):
+    def add_samples(self, samples):
+        for m in samples:
+            self.train_mols.append(m)
 
 
 class Docker:
     def __init__(self, tmp_dir, cpu_req=2):
         self.target_norm = [-8.6, 1.10]
-        self.dock = chem.DockVina_smi(tmp_dir) #, cpu_req=cpu_req)
+        self.dock = chem.DockVina_smi(tmp_dir, cpu_req=cpu_req) #, cpu_req=cpu_req)
 
     def eval(self, mol, norm=False):
         s = "None"
         try:
-            s = Chem.MolToSmiles(mol)
+            s = Chem.MolToSmiles(mol.mol)
+            print("docking {}".format(s))
             _, r, _ = self.dock.dock(s)
         except Exception as e: # Sometimes the prediction fails
             print('exception for', s, e)
@@ -153,9 +170,8 @@ class Proxy:
         stop_event = threading.Event()
         best_model = self.proxy
         best_test_loss = 1000
-        opt = torch.optim.Adam(self.proxy.parameters(), self.args.learning_rate, betas=(self.args.opt_beta, 0.999),
+        opt = torch.optim.Adam(self.proxy.parameters(), self.args.proxy_learning_rate, betas=(self.args.proxy_opt_beta, 0.999),
                                 weight_decay=self.args.proxy_weight_decay)
-
         debug_no_threads = False
         mbsize = self.args.mbsize
 
@@ -171,7 +187,6 @@ class Proxy:
 
         train_losses = []
         test_losses = []
-        test_infos = []
         time_start = time.time()
         time_last_check = time.time()
 
@@ -235,10 +250,6 @@ class Proxy:
                     print('test loss:', test_loss)
                     print('test took:', time.time() - t0)
                     test_losses.append(test_loss)
-                    # save_stuff()
-                if early_stop_tol <= 0 and False:
-                    print("Early stopping")
-                    break
         
         stop_everything()
         self.proxy = deepcopy(best_model)
@@ -247,7 +258,8 @@ class Proxy:
 
     def __call__(self, m):
         m = self.mdp.mols2batch([self.mdp.mol2repr(m)])
-        return self.proxy(m, do_stems=False)[1].item()
+        samples = np.array([self.proxy(m, do_stems=False)[1].item() for i in range(25)])
+        return np.mean(samples) + self.args.kappa * np.std(samples)
 
 
 def make_model(args, mdp, is_proxy=False):
@@ -264,11 +276,11 @@ def make_model(args, mdp, is_proxy=False):
                                        mdp_cfg=mdp,
                                        version='v4')
     elif repr_type == 'atom_graph':
-        model = model_atom.MolAC_GCN(nhid=args.nemb,
+        model = model_atom.MolAC_GCN(nhid=nemb,
                                      nvec=0,
                                      num_out_per_stem=mdp.num_blocks,
                                      num_out_per_mol=1,
-                                     num_conv_steps=args.num_conv_steps,
+                                     num_conv_steps=num_conv_steps,
                                      version=model_version, 
                                      dropout_rate=args.proxy_dropout)
     elif repr_type == 'morgan_fingerprint':
@@ -293,7 +305,9 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
         exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
         os.makedirs(exp_dir, exist_ok=True)
 
-
+    model = model.double()
+    proxy.proxy = proxy.proxy.double()
+    # import pdb; pdb.set_trace()
     dataset.set_sampling_model(model, proxy, sample_prob=args.sample_prob)
 
     def save_stuff():
@@ -316,11 +330,15 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
 
 
     opt = torch.optim.Adam(model.parameters(), args.learning_rate, weight_decay=args.weight_decay,
-                           betas=(args.opt_beta, args.opt_beta2))
+                           betas=(args.opt_beta, args.opt_beta2),
+                           eps=args.opt_epsilon)
+    #opt = torch.optim.SGD(model.parameters(), args.learning_rate)
 
-    tf = lambda x: torch.tensor(x, device=device).double()
+    tf = lambda x: torch.tensor(x, device=device).to(torch.float64 if args.floatX else torch.float32)
+    tint = lambda x: torch.tensor(x, device=device).long()
 
     mbsize = args.mbsize
+    ar = torch.arange(mbsize)
 
     if not debug_no_threads:
         sampler = dataset.start_samplers(8, mbsize)
@@ -339,8 +357,13 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
     time_start = time.time()
     time_last_check = time.time()
 
+    loginf = 1000 # to prevent nans
     log_reg_c = args.log_reg_c
     clip_loss = tf([args.clip_loss])
+    balanced_loss = args.balanced_loss
+    do_nblocks_reg = False
+    max_blocks = args.max_blocks
+    leaf_coef = args.leaf_coef
 
     for i in range(num_steps):
         if not debug_no_threads:
@@ -349,9 +372,10 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
                 if thread.failed:
                     stop_everything()
                     pdb.post_mortem(thread.exception.__traceback__)
-            p, pb, a, r, s, d = r
+                    return
+            p, pb, a, r, s, d, mols = r
         else:
-            p, pb, a, r, s, d = dataset.sample2batch(dataset.sample(mbsize))
+            p, pb, a, r, s, d, mols = dataset.sample2batch(dataset.sample(mbsize))
         # Since we sampled 'mbsize' trajectories, we're going to get
         # roughly mbsize * H (H is variable) transitions
         ntransitions = r.shape[0]
@@ -374,28 +398,41 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
         # include reward and done multiplier, then take the log
         # we're guarenteed that r > 0 iff d = 1, so the log always works
         outflow_plus_r = torch.log(log_reg_c + r + exp_outflow * (1-d))
-        losses = _losses = (inflow - outflow_plus_r).pow(2)
+        if do_nblocks_reg:
+            losses = _losses = ((inflow - outflow_plus_r) / (s.nblocks * max_blocks)).pow(2)
+        else:
+            losses = _losses = (inflow - outflow_plus_r).pow(2)
         if clip_loss > 0:
             ld = losses.detach()
             losses = losses / ld * torch.minimum(ld, clip_loss)
 
         term_loss = (losses * d).sum() / (d.sum() + 1e-20)
         flow_loss = (losses * (1-d)).sum() / ((1-d).sum() + 1e-20)
-        loss = term_loss + flow_loss
+        if balanced_loss:
+            loss = term_loss * leaf_coef + flow_loss
+        else:
+            loss = losses.mean()
         opt.zero_grad()
-        loss.backward()
+        loss.backward(retain_graph=(not i % 50))
 
         _term_loss = (_losses * d).sum() / (d.sum() + 1e-20)
         _flow_loss = (_losses * (1-d)).sum() / ((1-d).sum() + 1e-20)
         last_losses.append((loss.item(), term_loss.item(), flow_loss.item()))
         train_losses.append((loss.item(), _term_loss.item(), _flow_loss.item(),
                              term_loss.item(), flow_loss.item()))
-        train_infos.append((_term_loss.data.cpu().numpy(),
-                            _flow_loss.data.cpu().numpy(),
-                            exp_inflow.data.cpu().numpy(),
-                            exp_outflow.data.cpu().numpy(),
-                            r.data.cpu().numpy(),
-                            ))
+        if not i % 50:
+            train_infos.append((
+                _term_loss.data.cpu().numpy(),
+                _flow_loss.data.cpu().numpy(),
+                exp_inflow.data.cpu().numpy(),
+                exp_outflow.data.cpu().numpy(),
+                r.data.cpu().numpy(),
+                mols[1],
+                [i.pow(2).sum().item() for i in model.parameters()],
+                torch.autograd.grad(loss, qsa_p, retain_graph=True)[0].data.cpu().numpy(),
+                torch.autograd.grad(loss, stem_out_s, retain_graph=True)[0].data.cpu().numpy(),
+                torch.autograd.grad(loss, stem_out_p, retain_graph=True)[0].data.cpu().numpy(),
+            ))
         if args.clip_grad > 0:
             torch.nn.utils.clip_grad_value_(model.parameters(),
                                            args.clip_grad)
@@ -409,6 +446,8 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
         if not i % 100:
             last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
             print(i, last_losses)
+            #print(torch.logsumexp(stem_out_p[0], 0).item(),
+            #      outflow_plus_r[0].item(), inflow[0].item(), a[0])
             print('time:', time.time() - time_last_check)
             time_last_check = time.time()
             last_losses = []
@@ -419,31 +458,75 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
     stop_everything()
     if do_save:
         save_stuff()
-    return model, dataset, test_infos
+    return model, dataset, {'train_losses': train_losses,
+                            'test_losses': test_losses,
+                            'test_infos': test_infos,
+                            'train_infos': train_infos}
 
 
 def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, docker):
-    generator_dataset.set_sampling_model(model, docker, sample_prob=args.sample_prob)
-    sampler = generator_dataset.start_samplers(8, args.num_samples)
-    sampled_mols = sampler()
+    # generator_dataset.set_sampling_model(model, docker, sample_prob=args.sample_prob)
+    # sampler = generator_dataset.start_samplers(8, args.num_samples)
+    print("Sampling")
+    # sampled_mols = sampler()
+    # generator_dataset.stop_samplers_and_join()
+    # import pdb; pdb.set_trace()
+    mdp = generator_dataset.mdp
+    nblocks = mdp.num_blocks
+    sampled_mols = []
+    while len(sampled_mols) < args.num_samples:
+        mol = BlockMoleculeDataExtended()
+        for i in range(args.max_blocks):
+            s = mdp.mols2batch([mdp.mol2repr(mol)])
+            stem_o, mol_o = model(s)
+            logits = torch.cat([stem_o.flatten(), mol_o.flatten()])
+            if i < args.min_blocks:
+                logits[-1] = -20
+            cat = Categorical(logits=logits)
+            act = cat.sample().item()
+            if act == logits.shape[0] - 1:
+                break
+            else:
+                act = (act % nblocks, act // nblocks)
+                mol = mdp.add_block_to(mol, block_idx=act[0], stem_idx=act[1])
+            if not len(mol.stems):
+                break
+        if mol.mol is None:
+            # print('skip', mol.blockidxs, mol.jbonds)
+            continue
+        # print('here')
+        score = docker.eval(mol, norm=False)
+        mol.reward = proxy_dataset.r2r(score)
+        # mol.smiles = s
+        print(mol.smiles, mol.reward)
+        sampled_mols.append(mol)
+    
+    print("Computing distances")
     dists =[]
     for m1, m2 in zip(sampled_mols, sampled_mols[1:] + sampled_mols[:1]):
         dist = DataStructs.FingerprintSimilarity(Chem.RDKFingerprint(m1.mol), Chem.RDKFingerprint(m2.mol))
         dists.append(dist)
-    
+    print("Get batch rewards")
     rewards = []
     for m in sampled_mols:
         rewards.append(m.reward)
+    print("Add to dataset")
     proxy_dataset.add_samples(sampled_mols)
-    return proxy_dataset, {'dists': dists, 'rewards': rewards }
+    return proxy_dataset, {
+        'dists': dists, 'rewards': rewards, 'reward_mean': np.mean(rewards), 'reward_max': np.max(rewards),
+        'dists_mean': np.mean(dists), 'dists_sum': np.sum(dists)
+    }
 
 
 def main(args):
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
+    proxy_repr_type = args.proxy_repr_type
+    repr_type = args.repr_type
 
     docker = Docker(tmp_dir, cpu_req=args.cpu_req)
-
+    args.repr_type = proxy_repr_type
+    args.replay_mode = "dataset"
     proxy_dataset = ProxyDataset(args, bpath, device, floatX=torch.float)
     proxy_dataset.load_h5("/scratch/mjain/dock_db_1619111711tp_2021_04_22_13h.h5", args, num_examples=args.num_init_examples)
 
@@ -456,24 +539,50 @@ def main(args):
 
     proxy = Proxy(args, bpath, device)    
     mdp = proxy_dataset.mdp
-    
+    train_metrics = []
+    metrics = []
     proxy.train(proxy_dataset)
 
     for i in range(args.num_outer_loop_iters):
         print(f"Starting step: {i}")
         # Initialize model and dataset for training generator
-        model = make_model(args, mdp)
-        model.to(torch.double)
-        model.to(device)
+        args.sample_prob = 1
+        args.repr_type = repr_type
+        args.replay_mode = "online"
         gen_model_dataset = GenModelDataset(args, bpath, device)
+        model = make_model(args, gen_model_dataset.mdp)
         
+        if args.floatX == 'float64':
+            model = model.double()
+        model.to(device)
         # train model with with proxy
         print(f"Training model: {i}")
         model, gen_model_dataset, training_metrics = train_generative_model(args, model, proxy, gen_model_dataset, do_save=False)
 
+        print(f"Sampling mols: {i}")
         # sample molecule batch for generator and update dataset with docking scores for sampled batch
-        proxy_dataset, batch_metrics = sample_and_update_dataset(model, proxy_dataset, gen_model_dataset, docker)
-        
+        _proxy_dataset, batch_metrics = sample_and_update_dataset(args, model, proxy_dataset, gen_model_dataset, docker)
+        print(f"Batch Metrics: dists_mean: {batch_metrics['dists_mean']}, dists_sum: {batch_metrics['dists_sum']}, reward_mean: {batch_metrics['reward_mean']}, reward_max: {batch_metrics['reward_max']}")
+        args.sample_prob = 0
+        args.repr_type = proxy_repr_type
+        args.replay_mode = "dataset"
+        train_metrics.append(training_metrics)
+        metrics.append(batch_metrics)
+
+        proxy_dataset = ProxyDataset(args, bpath, device, floatX=torch.float)
+        proxy_dataset.train_mols.extend(_proxy_dataset.train_mols)
+        proxy_dataset.test_mols.extend(_proxy_dataset.test_mols)
+
+        proxy = Proxy(args, bpath, device)    
+        mdp = proxy_dataset.mdp
+
+        pickle.dump({'train_metrics': train_metrics,
+                     'batch_metrics': metrics,
+                     'all_mols': [mol.smiles for mol in proxy_dataset.train_mols],
+                     'args': args},
+                    gzip.open(f'{exp_dir}/info.pkl.gz', 'wb'))
+
+        print(f"Updating proxy: {i}")
         # update proxy with new data
         proxy.train(proxy_dataset)
     
