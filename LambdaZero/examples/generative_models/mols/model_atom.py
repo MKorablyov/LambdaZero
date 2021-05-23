@@ -59,14 +59,14 @@ class MPNNet_v2(nn.Module):
         if self.version < 4:
             net = nn.Sequential(nn.Linear(4, 128), self.act, nn.Linear(128, dim * dim))
             self.conv = NNConv(dim, dim, net, aggr='mean')
-        elif self.version == 4:
+        elif self.version == 4 or self.version == 6:
             self.conv = gnn.TransformerConv(dim, dim, edge_dim=4)
         else:
             self.convs = nn.Sequential(*[gnn.TransformerConv(dim, dim, edge_dim=4)
                                          for i in range(num_conv_steps)])
 
-        if self.version >= 6:
-            self.g_conv = gnn.TransformerConv(dim, dim, heads=4)
+        #if self.version >= 6:
+        #    self.g_conv = gnn.TransformerConv(dim, dim, heads=4)
 
         if self.version < 3:
             self.gru = nn.GRU(dim, dim)
@@ -110,7 +110,7 @@ class MPNNet_v2(nn.Module):
                 out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
                 h = F.dropout(h, training=do_dropout, p=self.dropout_rate)
                 out = out.squeeze(0)
-        elif self.version == 4:
+        elif self.version == 4 or self.version == 6:
             for i in range(self.num_conv_steps):
                 out = self.act(self.conv(out, data.edge_index, data.edge_attr))
         else:
@@ -126,10 +126,10 @@ class MPNNet_v2(nn.Module):
                 torch.tensor(data.__slices__['x'], device=out.device)[data.stems_batch]
                 + data.stems)
             stem_atom_out = out[stem_batch_idx]
-            if self.version >= 6:
-                per_stem_out = self.g_conv(stem)
-                import pdb; pdb.set_trace()
-            elif self.version >= 4:
+            #if self.version >= 6:
+            #    per_stem_out = self.g_conv(stem)
+            #    import pdb; pdb.set_trace()
+            if self.version >= 4:
                 stem_atom_out = torch.cat([stem_atom_out, global_out[data.stems_batch]], 1)
                 per_stem_out = self.stem2out(stem_atom_out)
             else:
@@ -145,18 +145,26 @@ class MPNNet_v2(nn.Module):
             global_out = self.set2set(out, data.batch)
             global_out = F.dropout(global_out, training=do_dropout, p=self.dropout_rate)
         per_mol_out = self.lin3(global_out) # per mol scalar outputs
+
+        if hasattr(data, 'nblocks'):
+            per_stem_out = per_stem_out * data.nblocks[data.stems_batch].unsqueeze(1)
+            per_mol_out = per_mol_out * data.nblocks.unsqueeze(1)
+            if do_bonds:
+                per_bond_out = per_bond_out * data.nblocks[data.bonds_batch]
+
         if do_bonds:
             return per_stem_out, per_mol_out, per_bond_out
         return per_stem_out, per_mol_out
 
 
 class MolAC_GCN(nn.Module):
-    def __init__(self, nhid, nvec, num_out_per_stem, num_out_per_mol, num_conv_steps, version, dropout_rate):
+    def __init__(self, nhid, nvec, num_out_per_stem, num_out_per_mol, num_conv_steps, version, dropout_rate, do_stem_mask=True, do_nblocks=False):
         nn.Module.__init__(self)
         self.training_steps = 0
-
+        # atomfeats + stem_mask + atom one hot + nblocks
+        num_feat = (14 + int(do_stem_mask) + len(atomic_numbers) + int(do_nblocks))
         self.mpnn = MPNNet_v2(
-            num_feat=14 + 1 + len(atomic_numbers),
+            num_feat=num_feat,
             num_vec=nvec,
             dim=nhid,
             num_out_per_mol=num_out_per_mol,
@@ -172,8 +180,8 @@ class MolAC_GCN(nn.Module):
         return mol_e / Z, stem_e / Z[s.stems_batch, None]
 
     def action_negloglikelihood(self, s, a, g, stem_o, mol_o):
-        stem_e = torch.exp(stem_o - 2)
-        mol_e = torch.exp(mol_o[:, 0] - 2)
+        stem_e = torch.exp(stem_o)
+        mol_e = torch.exp(mol_o[:, 0])
         Z = gnn.global_add_pool(stem_e, s.stems_batch).sum(1) + mol_e
         mol_lsm = torch.log(mol_e / Z)
         stem_lsm = torch.log(stem_e / Z[s.stems_batch, None])
@@ -194,8 +202,8 @@ class MolAC_GCN(nn.Module):
     def sum_output(self, s, stem_o, mol_o):
         return gnn.global_add_pool(stem_o, s.stems_batch).sum(1) + mol_o
 
-    def forward(self, graph, vec=None, do_stems=True, do_bonds=False):
-        return self.mpnn(graph, vec, do_stems=do_stems, do_bonds=do_bonds)
+    def forward(self, graph, vec=None, do_stems=True, do_bonds=False, k=None):
+        return self.mpnn(graph, vec, do_stems=do_stems, do_bonds=do_bonds, k=k)
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
@@ -205,7 +213,7 @@ class MolAC_GCN(nn.Module):
     def _restore(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
-def mol2graph(mol, mdp, floatX=torch.float, bonds=False):
+def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
     rdmol = mol.mol
     if rdmol is None:
         g = Data(x=torch.zeros((1, 14 + len(atomic_numbers))),
@@ -221,7 +229,13 @@ def mol2graph(mol, mdp, floatX=torch.float, bonds=False):
     stem_mask = torch.zeros((g.x.shape[0], 1))
     stem_mask[torch.tensor(stems).long()] = 1
     g.stems = torch.tensor(stems).long()
-    g.x = torch.cat([g.x, stem_mask], 1).to(floatX)
+    if nblocks:
+        nblocks = (torch.ones((g.x.shape[0], 1,)).to(floatX) *
+                   ((1 + mdp._cue_max_blocks - len(mol.blockidxs)) / mdp._cue_max_blocks))
+        g.x = torch.cat([g.x, stem_mask, nblocks], 1).to(floatX)
+        g.nblocks = nblocks[0] * mdp._cue_max_blocks
+    else:
+        g.x = torch.cat([g.x, stem_mask], 1).to(floatX)
     g.edge_attr = g.edge_attr.to(floatX)
     if bonds:
         if len(mol.jbonds):
