@@ -430,7 +430,7 @@ class DockVina_smi:
         self.outpath = outpath
         self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
         self.mgltools_bin = os.path.join(mgltools_dir, "bin")
-        self.prepare_ligand4 = os.path.join(mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
+        self.prepare_ligand4 = os.path.join(self.mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
         self.vina_bin = os.path.join(vina_dir, "bin/vina")
         self.rec_file = os.path.join(docksetup_dir, rec_file)
         self.bindsite = bindsite
@@ -504,7 +504,7 @@ class DockVina_smi:
         mol2_file = self.mol2_file(mol_name)
         pdbqt_file = self.pdbqt_file(mol_name)
 
-        with open(smi_file) as fp:
+        with open(smi_file, "w") as fp:
             fp.write(smi)
 
         mol = Chem.MolFromSmiles(smi)
@@ -518,7 +518,7 @@ class DockVina_smi:
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
         os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
-        os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
+        os.system(f"{self.mgltools_bin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
         return sdf_file, mol2_file, pdbqt_file
 
     def smi_file(self, mol_name):
