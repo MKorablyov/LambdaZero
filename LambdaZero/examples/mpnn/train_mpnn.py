@@ -1,6 +1,5 @@
 import os
 import sys
-import os.path as osp
 import torch
 
 import ray
@@ -26,11 +25,11 @@ DEFAULT_CONFIG = {
     "trainer_config": {
         "target": "dockscore",
         "target_norm": [-8.6, 1.1],
-        "dataset_split_path": osp.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+        "dataset_split_path": os.path.join(datasets_dir, "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
         "batch_size": 32,  # 25
         "dataset": LambdaZero.inputs.BrutalDock,
         "dataset_config": {
-            "root": osp.join(datasets_dir, "brutal_dock/seh"),
+            "root": os.path.join(datasets_dir, "brutal_dock/seh"),
             "props": ["dockscore"],
             "transform": transform,
             "file_names": ["Zinc20_docked_neg_randperm_3k"],
