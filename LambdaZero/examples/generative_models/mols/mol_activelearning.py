@@ -68,11 +68,11 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--proxy_learning_rate", default=2.5e-4, help="Learning rate", type=float)
 parser.add_argument("--proxy_dropout", default=0.1, help="MC Dropout in Proxy", type=float)
-parser.add_argument("--proxy_weight_decay", default=1e-5, help="Weight Decay in Proxy", type=float)
+parser.add_argument("--proxy_weight_decay", default=1e-6, help="Weight Decay in Proxy", type=float)
 parser.add_argument("--proxy_mbsize", default=64, help="Minibatch size", type=int)
 parser.add_argument("--proxy_opt_beta", default=0.9, type=float)
 parser.add_argument("--proxy_nemb", default=64, help="#hidden", type=int)
-parser.add_argument("--proxy_num_iterations", default=50000, type=int)
+parser.add_argument("--proxy_num_iterations", default=20000, type=int)
 parser.add_argument("--num_init_examples", default=25000, type=int)
 parser.add_argument("--num_outer_loop_iters", default=25, type=int)
 parser.add_argument("--num_samples", default=100, type=int)
@@ -258,8 +258,7 @@ class Proxy:
 
     def __call__(self, m):
         m = self.mdp.mols2batch([self.mdp.mol2repr(m)])
-        samples = np.array([self.proxy(m, do_stems=False)[1].item() for i in range(25)])
-        return np.mean(samples) + self.args.kappa * np.std(samples)
+        return self.proxy(m, do_stems=False)[1].item()
 
 
 def make_model(args, mdp, is_proxy=False):
@@ -523,13 +522,18 @@ def main(args):
     device = torch.device('cuda')
     proxy_repr_type = args.proxy_repr_type
     repr_type = args.repr_type
+    reward_exp = args.reward_exp
+    reward_norm = args.reward_norm
 
     docker = Docker(tmp_dir, cpu_req=args.cpu_req)
     args.repr_type = proxy_repr_type
     args.replay_mode = "dataset"
+    args.reward_exp = 1
+    args.reward_norm = 1
     proxy_dataset = ProxyDataset(args, bpath, device, floatX=torch.float)
     proxy_dataset.load_h5("/scratch/mjain/dock_db_1619111711tp_2021_04_22_13h.h5", args, num_examples=args.num_init_examples)
-
+    rew_max = np.max(proxy_dataset.rews)
+    print(np.max(proxy_dataset.rews))
     exp_dir = f'{args.save_path}/proxy_{args.array}_{args.run}/'
     os.makedirs(exp_dir, exist_ok=True)
 
@@ -548,6 +552,8 @@ def main(args):
         # Initialize model and dataset for training generator
         args.sample_prob = 1
         args.repr_type = repr_type
+        args.reward_exp = reward_exp
+        args.reward_norm = reward_norm
         args.replay_mode = "online"
         gen_model_dataset = GenModelDataset(args, bpath, device)
         model = make_model(args, gen_model_dataset.mdp)
@@ -563,9 +569,13 @@ def main(args):
         # sample molecule batch for generator and update dataset with docking scores for sampled batch
         _proxy_dataset, batch_metrics = sample_and_update_dataset(args, model, proxy_dataset, gen_model_dataset, docker)
         print(f"Batch Metrics: dists_mean: {batch_metrics['dists_mean']}, dists_sum: {batch_metrics['dists_sum']}, reward_mean: {batch_metrics['reward_mean']}, reward_max: {batch_metrics['reward_max']}")
+        
         args.sample_prob = 0
         args.repr_type = proxy_repr_type
         args.replay_mode = "dataset"
+        args.reward_exp = 1
+        args.reward_norm = 1
+        
         train_metrics.append(training_metrics)
         metrics.append(batch_metrics)
 
@@ -579,6 +589,7 @@ def main(args):
         pickle.dump({'train_metrics': train_metrics,
                      'batch_metrics': metrics,
                      'all_mols': [mol.smiles for mol in proxy_dataset.train_mols],
+                     'rew_max': rew_max,
                      'args': args},
                     gzip.open(f'{exp_dir}/info.pkl.gz', 'wb'))
 
