@@ -190,7 +190,7 @@ class _SimDockLet:
         s = Chem.MolToSmiles(mol[1].mol)
         print("starting", s)
         try:
-            _, r, _ = self.dock.dock(s)
+            r = self.dock.dock(s)[1]
         except Exception as e:  # Sometimes the prediction fails
             print('exception for', s, e)
             r = 0
@@ -503,5 +503,3 @@ class BayesianRewardActor():
         self.update_with_seen(idx)
         print('Bayesian Reward Actor: Retrained')
         self.batches += 1
-
-
