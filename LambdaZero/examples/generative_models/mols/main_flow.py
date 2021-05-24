@@ -57,18 +57,18 @@ import mol_mdp_ext
 importlib.reload(mol_mdp_ext)
 #importlib.reload(chem_op)
 
-datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-if 'SLURM_TMPDIR' in os.environ:
-    print("Syncing locally")
-    tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
+# datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+# if 'SLURM_TMPDIR' in os.environ:
+#     print("Syncing locally")
+#     tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
 
-    os.system(f"rsync -az {programs_dir} {tmp_dir}")
-    os.system(f"rsync -az {datasets_dir} {tmp_dir}")
-    programs_dir = f"{tmp_dir}/Programs"
-    datasets_dir = f"{tmp_dir}/Datasets"
-    print("Done syncing")
-else:
-    tmp_dir = "/tmp/lambdazero"
+#     os.system(f"rsync -az {programs_dir} {tmp_dir}")
+#     os.system(f"rsync -az {datasets_dir} {tmp_dir}")
+#     programs_dir = f"{tmp_dir}/Programs"
+#     datasets_dir = f"{tmp_dir}/Datasets"
+#     print("Done syncing")
+# else:
+tmp_dir = "/tmp/lambdazero"
 
 os.makedirs(tmp_dir, exist_ok=True)
 

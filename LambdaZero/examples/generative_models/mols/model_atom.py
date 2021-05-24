@@ -6,6 +6,8 @@ Code for an atom-based graph representation and architecture
 
 
 import warnings
+
+from pandas.io.pytables import dropna_doc
 warnings.filterwarnings('ignore')
 import sys
 import time
@@ -38,13 +40,14 @@ class MPNNet_v2(nn.Module):
     def __init__(self, num_feat=14, num_vec=3, dim=64,
                  num_out_per_mol=1, num_out_per_stem=105,
                  num_out_per_bond=1,
-                 num_conv_steps=12, version='v1'):
+                 num_conv_steps=12, version='v1', dropout_rate=None):
         super().__init__()
         self.lin0 = nn.Linear(num_feat + num_vec, dim)
         self.num_ops = num_out_per_stem
         self.num_opm = num_out_per_mol
         self.num_conv_steps = num_conv_steps
         self.version = int(version[1:])
+        self.dropout_rate = dropout_rate
         print('v:', self.version)
         assert 1<= self.version <= 6
 
@@ -91,18 +94,21 @@ class MPNNet_v2(nn.Module):
 
 
 
-    def forward(self, data, vec_data=None, do_stems=True, do_bonds=False, k=None):
+    def forward(self, data, vec_data=None, do_stems=True, do_bonds=False, k=None, do_dropout=False):
         if self.version == 1:
             batch_vec = vec_data[data.batch]
             out = self.act(self.lin0(torch.cat([data.x, batch_vec], 1)))
         elif self.version > 1:
             out = self.act(self.lin0(data.x))
         h = out.unsqueeze(0)
+        h = F.dropout(h, training=do_dropout, p=self.dropout_rate)
 
         if self.version < 4:
             for i in range(self.num_conv_steps):
                 m = self.act(self.conv(out, data.edge_index, data.edge_attr))
+                m = F.dropout(m, training=do_dropout, p=self.dropout_rate)
                 out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
+                h = F.dropout(h, training=do_dropout, p=self.dropout_rate)
                 out = out.squeeze(0)
         elif self.version == 4 or self.version == 6:
             for i in range(self.num_conv_steps):
@@ -137,6 +143,7 @@ class MPNNet_v2(nn.Module):
 
         if self.version < 3:
             global_out = self.set2set(out, data.batch)
+            global_out = F.dropout(global_out, training=do_dropout, p=self.dropout_rate)
         per_mol_out = self.lin3(global_out) # per mol scalar outputs
 
         if hasattr(data, 'nblocks'):
@@ -151,8 +158,7 @@ class MPNNet_v2(nn.Module):
 
 
 class MolAC_GCN(nn.Module):
-    def __init__(self, nhid, nvec, num_out_per_stem, num_out_per_mol, num_conv_steps, version,
-                 do_stem_mask=True, do_nblocks=False):
+    def __init__(self, nhid, nvec, num_out_per_stem, num_out_per_mol, num_conv_steps, version, dropout_rate, do_stem_mask=True, do_nblocks=False):
         nn.Module.__init__(self)
         self.training_steps = 0
         # atomfeats + stem_mask + atom one hot + nblocks
@@ -164,7 +170,8 @@ class MolAC_GCN(nn.Module):
             num_out_per_mol=num_out_per_mol,
             num_out_per_stem=num_out_per_stem,
             num_conv_steps=num_conv_steps,
-            version=version)
+            version=version,
+            dropout_rate=dropout_rate)
 
     def out_to_policy(self, s, stem_o, mol_o):
         stem_e = torch.exp(stem_o)
@@ -195,8 +202,8 @@ class MolAC_GCN(nn.Module):
     def sum_output(self, s, stem_o, mol_o):
         return gnn.global_add_pool(stem_o, s.stems_batch).sum(1) + mol_o
 
-    def forward(self, graph, vec=None, do_stems=True, do_bonds=False, k=None):
-        return self.mpnn(graph, vec, do_stems=do_stems, do_bonds=do_bonds, k=k)
+    def forward(self, graph, vec=None, do_stems=True, do_bonds=False, k=None, do_dropout=False):
+        return self.mpnn(graph, vec, do_stems=do_stems, do_bonds=do_bonds, k=k, do_dropout=do_dropout)
 
     def _save(self, checkpoint_dir):
         checkpoint_path = os.path.join(checkpoint_dir, "model.pth")
@@ -209,6 +216,7 @@ class MolAC_GCN(nn.Module):
 def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
     rdmol = mol.mol
     if rdmol is None:
+        print(len(atomic_numbers))
         g = Data(x=torch.zeros((1, 14 + len(atomic_numbers))),
                  edge_attr=torch.zeros((0, 4)),
                  edge_index=torch.zeros((0, 2)).long())

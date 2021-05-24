@@ -281,143 +281,143 @@ class MPNNetDropSmall(nn.Module):
         out = self.lin2(embed)
         return out
 
-        
-class MPNNetDropLRGA(nn.Module):
-    """
-    A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
-    """
-    def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=64):
-        super(MPNNetDropLRGA, self).__init__()
-        self.drop_last = drop_last
-        self.drop_data = drop_data
-        self.drop_weights = drop_weights
-        self.drop_prob = drop_prob
-        self.lin0 = nn.Linear(num_feat, dim)
-
-        h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
-        self.conv = NNConv(dim, dim, h, aggr='mean')
-        self.lrga = nn.ModuleList([LowRankAttention(30, 14, drop_prob),
-                     LowRankAttention(30, 14, drop_prob),
-                     LowRankAttention(30, 14, drop_prob)])
-        self.lrga_lin = nn.ModuleList([nn.Linear(60 + dim, dim),
-                                       nn.Linear(60 + dim, dim),
-                                       nn.Linear(60 + dim, dim)])
-
-        self.gru = nn.GRU(dim+60, dim)
-        self.set2set = Set2Set(dim, processing_steps=3)
-        self.lin1 = nn.Linear(2 * dim, dim)
-        self.lin2 = nn.Linear(dim, 1)
-
-    def get_embed(self, data, do_dropout):
-        if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
-        out = F.relu(self.lin0(data.x))
-        h = out.unsqueeze(0)
-        if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
-
-        for i in range(3):
-            local_feat = F.relu(self.conv(out, data.edge_index, data.edge_attr))
-            if self.drop_weights: local_feat = F.dropout(local_feat, training=do_dropout, p=self.drop_prob)
-            #with torch.no_grad():
-            global_feat = 0* self.lrga[i](data.x)
-            m = torch.cat([local_feat, global_feat], axis=1)
-            #m = F.relu(self.lrga_lin[i](feat))
-            #print("mean var", local_feat.mean(), local_feat.var(), global_feat.mean(), global_feat.var(),)
-
-            out, h = self.gru(m.unsqueeze(0), h)
-            if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
-            out = out.squeeze(0)
-
-        out = self.set2set(out, data.batch)
-        if self.drop_weights: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
-        out = F.relu(self.lin1(out))
-        if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
-        return out
-
-    def forward(self, data, do_dropout):
-        embed = self.get_embed(data, do_dropout)
-        out = self.lin2(embed)
-        return out.view(-1)
-
-
-class GraphIsomorphismNet(nn.Module):
-    def __init__(self,
-                 node_feat: int = 14,
-                 edge_feat: int = 4,
-                 gin_layers: int = 2,
-                 gin_size: int = 128,
-                 gin_mlp_hidden: int = 128,
-                 gin_hidden: int = 128,
-                 linear_hidden: int = 128,
-                 out_size: int = 1
-                 ):
-        """
-        graph isomorphism network with a GRU / set2set pooling
-        Args:
-            node_feat (int, optional): number of input node features. Defaults to 14.
-            edge_feat (int, optional): number of input edge features. Defaults to 4.
-            gin_layers (int, optional): number of GIN layers. Defaults to 2.
-            gin_size (int, optional): size of GCN embedding size. Defaults to 128.
-            gin_mlp_hidden (int, optional): size of hidden layer in GIN MLP. Defaults to 128.
-            gin_hidden (int, optional): output size of GIN. Defaults to 128.
-            linear_hidden (int, optional): hidden size in the output fully-connected network. Defaults to 128.
-            out_size (int, optional): output size. Defaults to 1.
-        """
-        super(GraphIsomorphismNet, self).__init__()
-
-        self.node_lin0 = nn.Linear(node_feat, gin_size)
-        self.edge_lin0 = nn.Linear(edge_feat, gin_size)
-
-        gin_mlps = [nn.Sequential(
-            nn.Linear(gin_size, gin_mlp_hidden),
-            nn.ReLU(),
-            nn.Linear(gin_mlp_hidden, gin_hidden))]
-
-        for _ in range(gin_layers - 1):
-            gin_mlps.append(nn.Sequential(
-                nn.Linear(gin_hidden, gin_mlp_hidden),
-                nn.ReLU(),
-                nn.Linear(gin_mlp_hidden)))
-
-        self.graphconv = nn.ModuleList([GINEConv(gmlp, train_eps=True) for gmlp in gin_mlps])
-
-        # update edge features for each layer
-        edge_mlps = [nn.Sequential(
-            nn.Linear(gin_size, gin_mlp_hidden),
-            nn.ReLU(),
-            nn.Linear(gin_mlp_hidden, gin_hidden))]
-
-        for _ in range(gin_layers - 1):
-            edge_mlps.append(nn.Sequential(
-                nn.Linear(gin_hidden, gin_mlp_hidden),
-                nn.ReLU(),
-                nn.Linear(gin_mlp_hidden, gin_hidden)))
-
-        self.edge_mlps = nn.ModuleList(edge_mlps)
-
-        self.gru = nn.GRU(gin_hidden, gin_hidden)
-
-        self.set2set = Set2Set(gin_hidden, processing_steps=3)
-
-        self.fully_connected = nn.Sequential(
-            nn.Linear(2 * gin_hidden, linear_hidden),
-            nn.ReLU(),
-            nn.Linear(linear_hidden, out_size)
-        )
-
-    def forward(self, data):
-        node_out = self.node_lin0(data.x)
-        edge_out = self.edge_lin0(data.edge_attr)
-
-        # graph convolutions
-        h = node_out.unsqueeze(0)
-        for gin, edge_update in zip(self.graphconv, self.edge_mlps):
-            m = gin(node_out, data.edge_index, edge_out)
-            node_out, h = self.gru(m.unsqueeze(0), h)
-            node_out = node_out.squeeze(0)
-            edge_out = edge_update(edge_out)
-
-        # pooling with set2set
-        node_out = self.set2set2(node_out, data.batch)
-        # fully-connected layer for output
-        out = self.fully_connected(node_out)
-        return out.view(-1)
+#
+# class MPNNetDropLRGA(nn.Module):
+#     """
+#     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
+#     """
+#     def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=64):
+#         super(MPNNetDropLRGA, self).__init__()
+#         self.drop_last = drop_last
+#         self.drop_data = drop_data
+#         self.drop_weights = drop_weights
+#         self.drop_prob = drop_prob
+#         self.lin0 = nn.Linear(num_feat, dim)
+#
+#         h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
+#         self.conv = NNConv(dim, dim, h, aggr='mean')
+#         self.lrga = nn.ModuleList([LowRankAttention(30, 14, drop_prob),
+#                      LowRankAttention(30, 14, drop_prob),
+#                      LowRankAttention(30, 14, drop_prob)])
+#         self.lrga_lin = nn.ModuleList([nn.Linear(60 + dim, dim),
+#                                        nn.Linear(60 + dim, dim),
+#                                        nn.Linear(60 + dim, dim)])
+#
+#         self.gru = nn.GRU(dim+60, dim)
+#         self.set2set = Set2Set(dim, processing_steps=3)
+#         self.lin1 = nn.Linear(2 * dim, dim)
+#         self.lin2 = nn.Linear(dim, 1)
+#
+#     def get_embed(self, data, do_dropout):
+#         if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
+#         out = F.relu(self.lin0(data.x))
+#         h = out.unsqueeze(0)
+#         if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+#
+#         for i in range(3):
+#             local_feat = F.relu(self.conv(out, data.edge_index, data.edge_attr))
+#             if self.drop_weights: local_feat = F.dropout(local_feat, training=do_dropout, p=self.drop_prob)
+#             #with torch.no_grad():
+#             global_feat = 0* self.lrga[i](data.x)
+#             m = torch.cat([local_feat, global_feat], axis=1)
+#             #m = F.relu(self.lrga_lin[i](feat))
+#             #print("mean var", local_feat.mean(), local_feat.var(), global_feat.mean(), global_feat.var(),)
+#
+#             out, h = self.gru(m.unsqueeze(0), h)
+#             if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
+#             out = out.squeeze(0)
+#
+#         out = self.set2set(out, data.batch)
+#         if self.drop_weights: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+#         out = F.relu(self.lin1(out))
+#         if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
+#         return out
+#
+#     def forward(self, data, do_dropout):
+#         embed = self.get_embed(data, do_dropout)
+#         out = self.lin2(embed)
+#         return out.view(-1)
+#
+#
+# class GraphIsomorphismNet(nn.Module):
+#     def __init__(self,
+#                  node_feat: int = 14,
+#                  edge_feat: int = 4,
+#                  gin_layers: int = 2,
+#                  gin_size: int = 128,
+#                  gin_mlp_hidden: int = 128,
+#                  gin_hidden: int = 128,
+#                  linear_hidden: int = 128,
+#                  out_size: int = 1
+#                  ):
+#         """
+#         graph isomorphism network with a GRU / set2set pooling
+#         Args:
+#             node_feat (int, optional): number of input node features. Defaults to 14.
+#             edge_feat (int, optional): number of input edge features. Defaults to 4.
+#             gin_layers (int, optional): number of GIN layers. Defaults to 2.
+#             gin_size (int, optional): size of GCN embedding size. Defaults to 128.
+#             gin_mlp_hidden (int, optional): size of hidden layer in GIN MLP. Defaults to 128.
+#             gin_hidden (int, optional): output size of GIN. Defaults to 128.
+#             linear_hidden (int, optional): hidden size in the output fully-connected network. Defaults to 128.
+#             out_size (int, optional): output size. Defaults to 1.
+#         """
+#         super(GraphIsomorphismNet, self).__init__()
+#
+#         self.node_lin0 = nn.Linear(node_feat, gin_size)
+#         self.edge_lin0 = nn.Linear(edge_feat, gin_size)
+#
+#         gin_mlps = [nn.Sequential(
+#             nn.Linear(gin_size, gin_mlp_hidden),
+#             nn.ReLU(),
+#             nn.Linear(gin_mlp_hidden, gin_hidden))]
+#
+#         for _ in range(gin_layers - 1):
+#             gin_mlps.append(nn.Sequential(
+#                 nn.Linear(gin_hidden, gin_mlp_hidden),
+#                 nn.ReLU(),
+#                 nn.Linear(gin_mlp_hidden)))
+#
+#         self.graphconv = nn.ModuleList([GINEConv(gmlp, train_eps=True) for gmlp in gin_mlps])
+#
+#         # update edge features for each layer
+#         edge_mlps = [nn.Sequential(
+#             nn.Linear(gin_size, gin_mlp_hidden),
+#             nn.ReLU(),
+#             nn.Linear(gin_mlp_hidden, gin_hidden))]
+#
+#         for _ in range(gin_layers - 1):
+#             edge_mlps.append(nn.Sequential(
+#                 nn.Linear(gin_hidden, gin_mlp_hidden),
+#                 nn.ReLU(),
+#                 nn.Linear(gin_mlp_hidden, gin_hidden)))
+#
+#         self.edge_mlps = nn.ModuleList(edge_mlps)
+#
+#         self.gru = nn.GRU(gin_hidden, gin_hidden)
+#
+#         self.set2set = Set2Set(gin_hidden, processing_steps=3)
+#
+#         self.fully_connected = nn.Sequential(
+#             nn.Linear(2 * gin_hidden, linear_hidden),
+#             nn.ReLU(),
+#             nn.Linear(linear_hidden, out_size)
+#         )
+#
+#     def forward(self, data):
+#         node_out = self.node_lin0(data.x)
+#         edge_out = self.edge_lin0(data.edge_attr)
+#
+#         # graph convolutions
+#         h = node_out.unsqueeze(0)
+#         for gin, edge_update in zip(self.graphconv, self.edge_mlps):
+#             m = gin(node_out, data.edge_index, edge_out)
+#             node_out, h = self.gru(m.unsqueeze(0), h)
+#             node_out = node_out.squeeze(0)
+#             edge_out = edge_update(edge_out)
+#
+#         # pooling with set2set
+#         node_out = self.set2set2(node_out, data.batch)
+#         # fully-connected layer for output
+#         out = self.fully_connected(node_out)
+#         return out.view(-1)
