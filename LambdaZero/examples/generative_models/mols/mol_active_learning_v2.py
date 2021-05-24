@@ -69,8 +69,8 @@ parser.add_argument("--proxy_weight_decay", default=1e-5, help="Weight Decay in 
 parser.add_argument("--proxy_mbsize", default=64, help="Minibatch size", type=int)
 parser.add_argument("--proxy_opt_beta", default=0.9, type=float)
 parser.add_argument("--proxy_nemb", default=64, help="#hidden", type=int)
-parser.add_argument("--proxy_num_iterations", default=2000, type=int) # fixme [maksym] 50000
-parser.add_argument("--num_init_examples", default=2000, type=int) # fixme [maksym] 25000
+parser.add_argument("--proxy_num_iterations", default=1000, type=int) # fixme [maksym] 50000
+parser.add_argument("--num_init_examples", default=4000, type=int) # fixme [maksym] 25000
 parser.add_argument("--num_outer_loop_iters", default=25, type=int)
 parser.add_argument("--num_samples", default=100, type=int)
 parser.add_argument("--proxy_num_conv_steps", default=6, type=int) # [ maksym] made 6 from 12
@@ -90,8 +90,8 @@ parser.add_argument("--opt_epsilon", default=1e-8, type=float)
 parser.add_argument("--kappa", default=0.1, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
-parser.add_argument("--max_blocks", default=8, type=int)
-parser.add_argument("--num_iterations", default=2000, type=int) # fixme [maksym] 30000
+parser.add_argument("--max_blocks", default=6, type=int)
+parser.add_argument("--num_iterations", default=100, type=int) # fixme [maksym] 30000
 parser.add_argument("--num_conv_steps", default=6, type=int) # maksym: do 6
 parser.add_argument("--log_reg_c", default=(0.1 / 8) ** 4, type=float)
 parser.add_argument("--reward_exp", default=10, type=float)
@@ -135,13 +135,13 @@ class Docker:
     def eval(self, mol, norm=False):
         s = "None"
 
-        try:
-            s = Chem.MolToSmiles(mol.mol)
-            print("docking {}".format(s))
-            _, r, _ = self.dock.dock(s)
-        except Exception as e:  # Sometimes the prediction fails
-            print('exception for', s, e)
-            r = 0
+        # try:
+        #     s = Chem.MolToSmiles(mol.mol)
+        #     print("docking {}".format(s))
+        #     _, r, _ = self.dock.dock(s)
+        # except Exception as e:  # Sometimes the prediction fails
+        #     print('exception for', s, e)
+        #     r = 0
         r = 0
 
         if not norm:
