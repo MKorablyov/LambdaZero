@@ -416,20 +416,96 @@ class Dock_smi:
         return gridscore, coord
 
 
-class GenMolFile:
-    def __init__(self, outpath, mgltools, mglbin):
+class DockVina_smi:
+    def __init__(self,
+                 outpath,
+                 mgltools_dir=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
+                 vina_dir=os.path.join(programs_dir, "vina"),
+                 docksetup_dir=os.path.join(datasets_dir, "seh/4jnc"),
+                 rec_file="4jnc.nohet.aligned.pdbqt",
+                 bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
+                 dock_pars="",
+                 cleanup=True,
+                 mode="score_only"):
         self.outpath = outpath
+        self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
+        self.mgltools_bin = os.path.join(mgltools_dir, "bin")
         self.prepare_ligand4 = os.path.join(mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
-        self.mglbin = mglbin
+        self.vina_bin = os.path.join(vina_dir, "bin/vina")
+        self.rec_file = os.path.join(docksetup_dir, rec_file)
+        self.bindsite = bindsite
+        self.dock_pars = dock_pars
+        self.cleanup = cleanup
 
-        os.makedirs(os.path.join(outpath, "sdf"), exist_ok=True)
-        os.makedirs(os.path.join(outpath, "mol2"), exist_ok=True)
-        os.makedirs(os.path.join(outpath, "pdbqt"), exist_ok=True)
+        assert mode in ["score_only", "best_conf", "all_conf"]
+        self.mode = mode
 
-    def __call__(self, smi, mol_name, num_conf):
-        sdf_file = os.path.join(self.outpath, "sdf", f"{mol_name}.sdf")
-        mol2_file = os.path.join(self.outpath, "mol2", f"{mol_name}.mol2")
-        pdbqt_file = os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt")
+        # prepare skeleton for dock vina command (ligand and out remain to be filled upon each particular call)
+        self.dock_cmd = "{} --receptor {} " \
+                        "--center_x {} --center_y {} --center_z {} " \
+                        "--size_x {} --size_y {} --size_z {} "
+        self.dock_cmd = self.dock_cmd.format(self.vina_bin, self.rec_file, *self.bindsite)
+        self.dock_cmd += "--ligand {} --out {} "
+        self.dock_cmd += self.dock_pars
+
+        # prepare directory structure
+        os.makedirs(os.path.join(self.outpath, "smi"), exist_ok=True)
+        os.makedirs(os.path.join(self.outpath, "sdf"), exist_ok=True)
+        os.makedirs(os.path.join(self.outpath, "mol2"), exist_ok=True)
+        os.makedirs(os.path.join(self.outpath, "pdbqt"), exist_ok=True)
+        os.makedirs(os.path.join(self.outpath, "docked"), exist_ok=True)
+
+    def dock(self, smi, mol_name=None, molgen_conf=20):
+        mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+
+        input_sdf_file = self.sdf_file(mol_name)
+        input_pdbqt_file = self.pdbqt_file(mol_name)
+        docked_pdb_file = self.docked_pdb_file(mol_name)
+
+        # generate input files
+        self.gen_mol_files(smi, mol_name, molgen_conf)
+
+        # complete docking query
+        dock_cmd = self.dock_cmd.format(input_pdbqt_file, docked_pdb_file)
+
+        # dock
+        cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
+        cl.wait()
+
+        # parse energy and (optionally) coordinates
+        mol_name, dockscore, original_pos, docked_pos = self.parse(mol_name)
+
+        if self.cleanup:
+            self._cleanup(mol_name)
+
+        return mol_name, dockscore, original_pos, docked_pos
+
+    def parse(self, mol_name):
+        input_sdf_file = self.sdf_file(mol_name)
+        input_pdbqt_file = self.pdbqt_file(mol_name)
+        docked_pdb_file = self.docked_pdb_file(mol_name)
+
+        original_pos = None
+        docked_pos = None
+
+        dockscore, docked_pos = DockVina_smi._parse_docked_pdb(docked_pdb_file, self.mode)
+        if self.mode in ["best_conf", "all_conf"]:
+            original_pos = DockVina_smi._parse_pos_sdf(input_sdf_file)
+            permuted_original_pos = DockVina_smi._parse_pos_pdbqt(input_pdbqt_file)
+            # fix docked_pos ordering
+            order = DockVina_smi._get_atoms_reordering(original_pos, permuted_original_pos)
+            docked_pos = docked_pos[..., order, :]
+
+        return mol_name, dockscore, original_pos, docked_pos
+
+    def gen_mol_files(self, smi, mol_name, num_conf):
+        smi_file = self.smi_file(mol_name)
+        sdf_file = self.sdf_file(mol_name)
+        mol2_file = self.mol2_file(mol_name)
+        pdbqt_file = self.pdbqt_file(mol_name)
+
+        with open(smi_file) as fp:
+            fp.write(smi)
 
         mol = Chem.MolFromSmiles(smi)
         Chem.SanitizeMol(mol)
@@ -443,79 +519,82 @@ class GenMolFile:
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
         os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
         os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
-        return pdbqt_file
+        return sdf_file, mol2_file, pdbqt_file
 
+    def smi_file(self, mol_name):
+        return os.path.join(self.outpath, "smi", f"{mol_name}.smi")
 
-class DockVina_smi:
-    def __init__(self,
-                 outpath,
-                 mgltools_dir=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
-                 vina_dir=os.path.join(programs_dir, "vina"),
-                 docksetup_dir=os.path.join(datasets_dir, "seh/4jnc"),
-                 rec_file="4jnc.nohet.aligned.pdbqt",
-                 bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
-                 dock_pars="",
-                 cleanup=True):
+    def sdf_file(self, mol_name):
+        return os.path.join(self.outpath, "sdf", f"{mol_name}.sdf")
 
-        self.outpath = outpath
-        self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
-        self.mgltools_bin = os.path.join(mgltools_dir, "bin")
-        self.vina_bin = os.path.join(vina_dir, "bin/vina")
-        self.rec_file = os.path.join(docksetup_dir, rec_file)
-        self.bindsite = bindsite
-        self.dock_pars = dock_pars
-        self.cleanup = cleanup
+    def mol2_file(self, mol_name):
+        return os.path.join(self.outpath, "mol2", f"{mol_name}.mol2")
 
-        self.gen_molfile = GenMolFile(self.outpath, self.mgltools, self.mgltools_bin)
-        # make vina command
-        self.dock_cmd = "{} --receptor {} " \
-                        "--center_x {} --center_y {} --center_z {} " \
-                        "--size_x {} --size_y {} --size_z {} "
-        self.dock_cmd = self.dock_cmd.format(self.vina_bin, self.rec_file, *self.bindsite)
-        self.dock_cmd += " --ligand {} --out {}"
+    def pdbqt_file(self, mol_name):
+        return os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt")
 
-        os.makedirs(os.path.join(self.outpath, "docked"), exist_ok=True)
+    def docked_pdb_file(self, mol_name):
+        return os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
 
-    def dock(self, smi, mol_name=None, molgen_conf=20):
-        mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
-        docked_file = os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
-        input_file = self.gen_molfile(smi, mol_name, molgen_conf)
-        # complete docking query
-        dock_cmd = self.dock_cmd.format(input_file, docked_file)
-        dock_cmd = dock_cmd + " " + self.dock_pars
+    def _cleanup(self, mol_name):
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.smi_file(mol_name))
+            os.remove(self.sdf_file(mol_name))
+            os.remove(self.mol2_file(mol_name))
+            os.remove(self.pdbqt_file(mol_name))
+            os.remove(self.docked_pdb_file(mol_name))
 
-        # dock
-        cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
-        cl.wait()
-        # parse energy
-        with open(docked_file) as f:
-            docked_pdb = f.readlines()
-        if docked_pdb[1].startswith("REMARK VINA RESULT"):
-            dockscore = float(docked_pdb[1].split()[3])
+    @staticmethod
+    def _parse_pos_sdf(path):
+        mol = Chem.SDMolSupplier(path)[0]
+        conf = mol.GetConformer()
+        pos = conf.GetPositions()
+        return pos
+
+    @staticmethod
+    def _parse_pos_pdbqt(path):
+        with open(path) as f:
+            data = [line for line in f if line.startswith("ATOM")]
+        # number of entries in line is unstable, but counting from the back appears to works
+        pos = np.array([line.split()[-7:-4] for line in data], dtype=np.float32)
+        return pos
+
+    @staticmethod
+    def _get_atoms_reordering(sdf_pos, pdbqt_pos):
+        order = np.argmin(np.abs(sdf_pos.reshape((1, -1, 3)) - pdbqt_pos.reshape((-1, 1, 3))).sum(axis=2), axis=0)
+        return order
+
+    @staticmethod
+    def _parse_docked_pdb(path, mode):
+        assert mode in ["score_only", "best_conf", "all_conf"]
+
+        with open(path) as f:
+            data = f.readlines()
+
+        indices = [idx for idx, line in enumerate(data) if line.startswith("MODEL") or line.startswith("ENDMDL")]
+        indices = np.array(indices, dtype=np.int64).reshape(-1, 2)
+
+        if mode == "score_only":
+            start, end = indices[0]
+            data_sub = data[start:end]
+            energies = float(data_sub[1].split()[3])
+            pos = None
         else:
-            raise Exception("Can't parse docking energy")
-        # parse coordinates
-        # TODO: fix order
-        coord = []
-        endmodel_idx = 0
-        for idx, line in enumerate(docked_pdb):
-            if line.startswith("ENDMDL"):
-                endmodel_idx = idx
-                break
+            if mode == "best_conf":
+                indices = indices[[0]]
 
-        docked_pdb_model_1 = docked_pdb[:endmodel_idx]  # take only the model corresponding to the best energy
-        docked_pdb_model_1_atoms = [line for line in docked_pdb_model_1 if line.startswith("ATOM")
-                                    and line.split()[2][0] != 'H']  # ignore hydrogen
-        coord.append([line.split()[-7:-4] for line in docked_pdb_model_1_atoms])
-        coord = np.array(coord, dtype=np.float32)
+            energies = []
+            pos = []
+            for start, end in indices:
+                data_sub = data[start:end]
+                energies.append(float(data_sub[1].split()[3]))
+                data_sub_atoms = [line for line in data_sub if line.startswith("ATOM")]
+                pos.append([line.split()[-7:-4] for line in data_sub_atoms])
 
-        if self.cleanup:
-            with contextlib.suppress(FileNotFoundError):
-                os.remove(os.path.join(self.outpath, "sdf", f"{mol_name}.sdf"))
-                os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
-                os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
-                os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
-        return mol_name, dockscore, coord
+            energies = np.array(energies, dtype=np.float32)
+            pos = np.array(pos, dtype=np.float32)
+
+        return energies, pos
 
 
 class ScaffoldSplit:
@@ -694,8 +773,8 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
 
     # convert atmfeat to pandas
     if panda_fmt:
-        atmfeat_pd = pd.DataFrame(index=range(natm), columns=[
-            "type_idx", "atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3", "num_hs"])
+        atmfeat_pd = pd.DataFrame(index=range(natm),
+                                  columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3", "num_hs"])
         atmfeat_pd['type_idx'] = atmfeat[:, :ntypes+1]
         atmfeat_pd['atomic_number'] = atmfeat[:, ntypes+1]
         atmfeat_pd['acceptor'] = atmfeat[:, ntypes+2]
