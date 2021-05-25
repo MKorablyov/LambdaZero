@@ -60,17 +60,17 @@ importlib.reload(mol_mdp_ext)
 #importlib.reload(chem_op)
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-if 'SLURM_TMPDIR' in os.environ:
-    print("Syncing locally")
-    tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
+# if 'SLURM_TMPDIR' in os.environ:
+    # print("Syncing locally")
+tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
 
-    os.system(f"rsync -az {programs_dir} {tmp_dir}")
-    os.system(f"rsync -az {datasets_dir} {tmp_dir}")
-    programs_dir = f"{tmp_dir}/Programs"
-    datasets_dir = f"{tmp_dir}/Datasets"
-    print("Done syncing")
-else:
-    tmp_dir = "/tmp/lambdazero"
+#     os.system(f"rsync -az {programs_dir} {tmp_dir}")
+#     os.system(f"rsync -az {datasets_dir} {tmp_dir}")
+#     programs_dir = f"{tmp_dir}/Programs"
+#     datasets_dir = f"{tmp_dir}/Datasets"
+#     print("Done syncing")
+# else:
+#     tmp_dir = "/tmp/lambdazero"
 
 os.makedirs(tmp_dir, exist_ok=True)
 
@@ -120,8 +120,8 @@ class SplitCategorical:
         split = a < self.n
         log_one_half = -0.693147
         return (log_one_half + # We need to multiply the prob by 0.5, so add log(0.5) to logprob
-                self.cats[0].log_prob(torch.minimum(a, torch.tensor(self.n-1))) * split +
-                self.cats[1].log_prob(torch.maximum(a - self.n, torch.tensor(0))) * (~split))
+                self.cats[0].log_prob(torch.minimum(a, torch.tensor(self.n-1).to(a.device))) * split +
+                self.cats[1].log_prob(torch.maximum(a - self.n, torch.tensor(0).to(a.device))) * (~split))
 
     def entropy(self):
         return Categorical(probs=torch.cat([self.cats[0].probs, self.cats[1].probs],-1) * 0.5).entropy()
@@ -151,6 +151,7 @@ class Dataset:
         self.max_blocks = args.max_blocks
         self.floatX = torch.double
         self.mdp.floatX = self.floatX
+        self.args = args
         #######
         # This is the "result", here a list of (reward, BlockMolDataExt) tuples
         self.sampled_mols = []
@@ -162,7 +163,7 @@ class Dataset:
         self.proxy_reward = proxy_reward
         print("Starting buffer")
         self.mol_buffer = [(m, self._get_reward(m))
-                           for i in tqdm(range(args.buffer_size))
+                           for i in tqdm(range(self.args.buffer_size))
                            for m in [self.mdp.add_block_to(BlockMoleculeDataExtended(),
                                                            i % self.mdp.num_blocks)]]
 
