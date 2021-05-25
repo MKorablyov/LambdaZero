@@ -635,4 +635,4 @@ if __name__ == '__main__':
 
     for k, v in configs[args.run].items(): setattr(args, k, v)
     print("args",args)
-
+    main(args)
