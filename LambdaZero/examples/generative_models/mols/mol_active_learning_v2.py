@@ -69,10 +69,10 @@ parser.add_argument("--proxy_weight_decay", default=1e-5, help="Weight Decay in 
 parser.add_argument("--proxy_mbsize", default=64, help="Minibatch size", type=int)
 parser.add_argument("--proxy_opt_beta", default=0.9, type=float)
 parser.add_argument("--proxy_nemb", default=64, help="#hidden", type=int)
-parser.add_argument("--proxy_num_iterations", default=1000, type=int) # fixme [maksym] 50000
-parser.add_argument("--num_init_examples", default=4000, type=int) # fixme [maksym] 25000
+parser.add_argument("--proxy_num_iterations", default=25000, type=int) # fixme [maksym] 50000
+parser.add_argument("--num_init_examples", default=1024, type=int) # fixme [maksym] 25000
 parser.add_argument("--num_outer_loop_iters", default=25, type=int)
-parser.add_argument("--num_samples", default=100, type=int)
+parser.add_argument("--num_samples", default=256, type=int)
 parser.add_argument("--proxy_num_conv_steps", default=6, type=int) # [ maksym] made 6 from 12
 parser.add_argument("--proxy_repr_type", default='atom_graph')
 parser.add_argument("--proxy_model_version", default='v2')
@@ -91,7 +91,7 @@ parser.add_argument("--kappa", default=0.1, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
 parser.add_argument("--max_blocks", default=6, type=int)
-parser.add_argument("--num_iterations", default=100, type=int) # fixme [maksym] 30000
+parser.add_argument("--num_iterations", default=25000, type=int) # fixme [maksym] 30000
 parser.add_argument("--num_conv_steps", default=6, type=int) # maksym: do 6
 parser.add_argument("--log_reg_c", default=(0.1 / 8) ** 4, type=float)
 parser.add_argument("--reward_exp", default=10, type=float)
@@ -120,7 +120,7 @@ class ProxyDataset(_ProxyDataset):
             self.train_mols.append(m)
 
     def r2r(self, dockscore=None, normscore=None):
-        print("normscore in r2r", normscore, "dockscore", dockscore)
+        #print("normscore in r2r", normscore, "dockscore", dockscore)
         if dockscore is not None:
             normscore = 4-(min(0, dockscore)-self.target_norm[0])/self.target_norm[1]
         normscore = max(self.R_min, normscore)
@@ -135,14 +135,13 @@ class Docker:
     def eval(self, mol, norm=False):
         s = "None"
 
-        # try:
-        #     s = Chem.MolToSmiles(mol.mol)
-        #     print("docking {}".format(s))
-        #     _, r, _ = self.dock.dock(s)
-        # except Exception as e:  # Sometimes the prediction fails
-        #     print('exception for', s, e)
-        #     r = 0
-        r = 0
+        try:
+            s = Chem.MolToSmiles(mol.mol)
+            print("docking {}".format(s))
+            _, r, _ = self.dock.dock(s)
+        except Exception as e:  # Sometimes the prediction fails
+            print('exception for', s, e)
+            r = 0
 
         if not norm:
             return r
@@ -214,6 +213,7 @@ class Proxy:
                 s, r = r
             else:
                 p, pb, a, r, s, d = dataset.sample2batch(dataset.sample(mbsize))
+
 
             # state outputs
             stem_out_s, mol_out_s = self.proxy(s, None, do_stems=False)
@@ -549,6 +549,17 @@ def main(args):
     metrics = []
     proxy.train(proxy_dataset)
 
+    # fixme [ maksym] in Moksh's version GM was retrained all the time; I keep updating same model here
+    # maybe it would be rational to add some noise to the weights
+    args.sample_prob = 1
+    args.repr_type = repr_type
+    args.replay_mode = "online"
+    gen_model_dataset = GenModelDataset(args, bpath, device)
+    model = make_model(args, gen_model_dataset.mdp)
+    if args.floatX == 'float64':
+        model = model.double()
+    model.to(device)
+
     for i in range(args.num_outer_loop_iters):
         print(f"Starting step: {i}")
         # Initialize model and dataset for training generator
@@ -556,15 +567,12 @@ def main(args):
         args.repr_type = repr_type
         args.replay_mode = "online"
         gen_model_dataset = GenModelDataset(args, bpath, device)
-        model = make_model(args, gen_model_dataset.mdp)
 
-        if args.floatX == 'float64':
-            model = model.double()
-        model.to(device)
+
         # train generative model with with proxy
         print(f"Training model: {i}")
-        model, gen_model_dataset, training_metrics = train_generative_model(original_args, model, proxy, gen_model_dataset,
-                                                                            do_save=False)
+        model, gen_model_dataset, training_metrics = train_generative_model(original_args, model, proxy,
+                                                                            gen_model_dataset, do_save=False)
 
         print(f"Sampling mols: {i}")
         # sample molecule batch for generator and update dataset with docking scores for sampled batch
