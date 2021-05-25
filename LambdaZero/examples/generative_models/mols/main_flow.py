@@ -633,8 +633,8 @@ if __name__ == '__main__':
       for k,v in hps.items():
         setattr(args, k, v)
       exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
-      if os.path.exists(exp_dir):
-        continue
+      #if os.path.exists(exp_dir):
+      #  continue
       print(hps)
       main(args)
   elif args.array:

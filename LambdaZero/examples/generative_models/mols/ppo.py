@@ -84,7 +84,7 @@ parser.add_argument("--opt_beta2", default=0.99, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
 parser.add_argument("--max_blocks", default=8, type=int)
-parser.add_argument("--num_iterations", default=400, type=int)
+parser.add_argument("--num_iterations", default=4000, type=int)
 parser.add_argument("--num_conv_steps", default=6, type=int)
 parser.add_argument("--log_reg_c", default=1e-2, type=float)
 parser.add_argument("--reward_exp", default=4, type=float)
@@ -335,8 +335,6 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
             last_losses.append((loss.item(), value_loss.item(), entropy.item()))
             train_losses.append((loss.item(), value_loss.item(), entropy.item()))
 
-
-
         if not i % 10:
             last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
             print(i, last_losses, G.mean().item())
@@ -392,10 +390,15 @@ def array_may_18(args):
         {**base, 'learning_rate': 1e-4, 'ppo_clip': 0.1, 'ppo_entropy_coef': 1e-3},
         {**base, 'learning_rate': 1e-4, 'opt_beta2': 0.999},
         {**base, 'learning_rate': 3e-4},
-        {**base, 'learning_rate': 5e-5},
+        {**base, 'learning_rate': 5e-5}, # good
         {**base, 'learning_rate': 1e-4},
         {**base, 'learning_rate': 1e-4, 'reward_exp': 1, 'reward_norm': 1},
         {**base, 'learning_rate': 2e-4},
+        # 9
+        {**base, 'learning_rate': 2e-4,
+         'repr_type': 'block_graph', 'include_nblocks': False, 'model_version': 'v4',
+         'reward_exp': 4, 'opt_beta2': 0.999},
+        # 10
     ]
     return all_hps
 
