@@ -607,4 +607,32 @@ def main(args):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+
+    if len(sys.argv) >= 2:
+        config_idx = sys.argv[1]
+    else:
+        config_idx = 4
+
+    configs = [{"run": 0},
+               {"run": 1,"num_init_examples": 512, "num_samples": 256},
+               {"run": 2, "num_init_examples": 2048, "num_samples": 256},
+               {"run": 4, "num_init_examples": 8192, "num_samples": 256},
+
+               {"run": 5, "reward_exp": 4},
+               {"run": 6, "num_init_examples": 512, "num_samples": 256, "reward_exp": 4},
+               {"run": 7, "num_init_examples": 2048, "num_samples": 256, "reward_exp": 4},
+               {"run": 9, "num_init_examples": 8192, "num_samples": 256, "reward_exp": 4},
+
+               {"run": 5, "reward_exp": 2},
+               {"run": 6, "num_init_examples": 512, "num_samples": 256, "reward_exp": 2},
+               {"run": 7, "num_init_examples": 2048, "num_samples": 256, "reward_exp": 2},
+               {"run": 9, "num_init_examples": 8192, "num_samples": 256, "reward_exp": 2},
+               ]
+
+    for k, v in configs[config_idx].items(): setattr(args, k, v)
+
+
+    print(args)
+    time.sleep(100)
+
     main(args)
