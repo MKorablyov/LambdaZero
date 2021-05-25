@@ -42,9 +42,9 @@ if __name__ == "__main__":
     if len(sys.argv) >= 2:
         since_sec = int(sys.argv[1])
     else:
-        since_sec = 60000000
+        since_sec = 600000000
     #while True: in practice it seems syncing recurrently would make wandb to
-    sync_wandb(osp.join(summaries_dir,"rlbo41"),since_sec)
+    sync_wandb(osp.join(summaries_dir,"rlboMay25"),since_sec)
     # todo: in order to sync recurrently I think the right way would
     print("synced all runs sleeping", 0.5 * since_sec)
     #time.sleep(0.5 * since_sec)
