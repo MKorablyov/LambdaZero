@@ -441,7 +441,7 @@ class GenMolFile:
         # choose minimum energy conformer
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
-        os.system(f"{self.mglbin}/obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
+        os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
         os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
         return pdbqt_file
 
