@@ -616,17 +616,17 @@ if __name__ == '__main__':
     configs = [{"run": 0},
                {"run": 1,"num_init_examples": 512, "num_samples": 256},
                {"run": 2, "num_init_examples": 2048, "num_samples": 256},
-               {"run": 4, "num_init_examples": 8192, "num_samples": 256},
+               {"run": 3, "num_init_examples": 8192, "num_samples": 256},
 
-               {"run": 5, "reward_exp": 4},
-               {"run": 6, "num_init_examples": 512, "num_samples": 256, "reward_exp": 4},
-               {"run": 7, "num_init_examples": 2048, "num_samples": 256, "reward_exp": 4},
-               {"run": 9, "num_init_examples": 8192, "num_samples": 256, "reward_exp": 4},
+               {"run": 4, "reward_exp": 4},
+               {"run": 5, "num_init_examples": 512, "num_samples": 256, "reward_exp": 4},
+               {"run": 6, "num_init_examples": 2048, "num_samples": 256, "reward_exp": 4},
+               {"run": 7, "num_init_examples": 8192, "num_samples": 256, "reward_exp": 4},
 
-               {"run": 5, "reward_exp": 2},
-               {"run": 6, "num_init_examples": 512, "num_samples": 256, "reward_exp": 2},
-               {"run": 7, "num_init_examples": 2048, "num_samples": 256, "reward_exp": 2},
-               {"run": 9, "num_init_examples": 8192, "num_samples": 256, "reward_exp": 2},
+               {"run": 8, "reward_exp": 2},
+               {"run": 9, "num_init_examples": 512, "num_samples": 256, "reward_exp": 2},
+               {"run": 10, "num_init_examples": 2048, "num_samples": 256, "reward_exp": 2},
+               {"run": 11, "num_init_examples": 8192, "num_samples": 256, "reward_exp": 2},
                ]
 
     for k, v in configs[config_idx].items(): setattr(args, k, v)

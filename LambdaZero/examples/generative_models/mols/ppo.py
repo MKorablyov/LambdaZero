@@ -335,8 +335,6 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
             last_losses.append((loss.item(), value_loss.item(), entropy.item()))
             train_losses.append((loss.item(), value_loss.item(), entropy.item()))
 
-
-
         if not i % 10:
             last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
             print(i, last_losses, G.mean().item())
