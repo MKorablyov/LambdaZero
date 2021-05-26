@@ -133,7 +133,7 @@ class Dataset(_Dataset):
         split_bool = np.zeros(len(df), dtype=np.bool)
         split_bool[test_idxs] = True
         print("slit test", sum(split_bool), len(split_bool), "num examples", num_examples)
-
+        self.rews = []
         for i in tqdm(range(len(df)), disable=not args.progress):
             m = BlockMoleculeDataExtended()
             for c in range(1, len(columns)):
@@ -143,6 +143,7 @@ class Dataset(_Dataset):
                 continue
             # TODO: compute proper reward with QED & all
             m.reward = self.r2r(dockscore=m.dockscore)
+            self.rews.append(m.reward)
             m.numblocks = len(m.blocks)
             if split_bool[i]:
                 self.test_mols.append(m)
