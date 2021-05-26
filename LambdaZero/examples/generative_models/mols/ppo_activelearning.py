@@ -42,10 +42,12 @@ from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, 
 from LambdaZero.utils import get_external_dirs
 
 from mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
+import concurrent.futures
 
 import model_atom, model_block, model_fingerprint
 from train_proxy import Dataset as _ProxyDataset
-from main_flow import Dataset as GenModelDataset
+from ppo import PPODataset as GenModelDataset
+from mars import SplitCategorical
 
 import importlib
 importlib.reload(model_atom)
@@ -72,7 +74,7 @@ parser.add_argument("--proxy_weight_decay", default=1e-6, help="Weight Decay in 
 parser.add_argument("--proxy_mbsize", default=64, help="Minibatch size", type=int)
 parser.add_argument("--proxy_opt_beta", default=0.9, type=float)
 parser.add_argument("--proxy_nemb", default=64, help="#hidden", type=int)
-parser.add_argument("--proxy_num_iterations", default=20000, type=int)
+parser.add_argument("--proxy_num_iterations", default=2, type=int)
 parser.add_argument("--num_init_examples", default=25000, type=int)
 parser.add_argument("--num_outer_loop_iters", default=25, type=int)
 parser.add_argument("--num_samples", default=100, type=int)
@@ -82,27 +84,29 @@ parser.add_argument("--proxy_model_version", default='v2')
 parser.add_argument("--save_path", default='results/')
 parser.add_argument("--cpu_req", default=8)
 parser.add_argument("--progress", action='store_true')
-parser.add_argument("--include_nblocks", default=False)
+parser.add_argument("--include_nblocks", action='store_true')
 
 # gen_model
-parser.add_argument("--learning_rate", default=5e-4, help="Learning rate", type=float)
-parser.add_argument("--mbsize", default=4, help="Minibatch size", type=int)
+parser.add_argument("--learning_rate", default=5e-5, help="Learning rate", type=float)
+parser.add_argument("--mbsize", default=16, help="Minibatch size", type=int)
 parser.add_argument("--opt_beta", default=0.9, type=float)
 parser.add_argument("--opt_beta2", default=0.999, type=float)
 parser.add_argument("--opt_epsilon", default=1e-8, type=float)
 parser.add_argument("--kappa", default=0.1, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
-parser.add_argument("--max_blocks", default=6, type=int)
-parser.add_argument("--num_iterations", default=30000, type=int)
-parser.add_argument("--num_conv_steps", default=10, type=int)
-parser.add_argument("--log_reg_c", default=(0.1/8)**4, type=float)
-parser.add_argument("--reward_exp", default=8, type=float)
+parser.add_argument("--max_blocks", default=8, type=int)
+parser.add_argument("--num_iterations", default=4000, type=int)
+parser.add_argument("--num_conv_steps", default=6, type=int)
+parser.add_argument("--log_reg_c", default=1e-2, type=float)
+parser.add_argument("--reward_exp", default=4, type=float)
 parser.add_argument("--reward_norm", default=8, type=float)
 parser.add_argument("--R_min", default=0.1, type=float)
 parser.add_argument("--sample_prob", default=1, type=float)
 parser.add_argument("--clip_grad", default=0, type=float)
 parser.add_argument("--clip_loss", default=0, type=float)
+parser.add_argument("--buffer_size", default=5000, type=int)
+parser.add_argument("--num_sgd_steps", default=25, type=int)
 parser.add_argument("--random_action_prob", default=0.05, type=float)
 parser.add_argument("--leaf_coef", default=10, type=float)
 parser.add_argument("--replay_mode", default='online', type=str)
@@ -116,6 +120,11 @@ parser.add_argument("--run", default=0, help="run", type=int)
 parser.add_argument("--balanced_loss", default=True)
 parser.add_argument("--floatX", default='float64')
 
+parser.add_argument("--ppo_clip", default=0.2, type=float)
+parser.add_argument("--ppo_entropy_coef", default=1e-4, type=float)
+parser.add_argument("--ppo_num_samples_per_step", default=256, type=float)
+parser.add_argument("--ppo_num_epochs_per_step", default=32, type=float)
+
 
 class ProxyDataset(_ProxyDataset):
     def add_samples(self, samples):
@@ -126,7 +135,7 @@ class ProxyDataset(_ProxyDataset):
 class Docker:
     def __init__(self, tmp_dir, cpu_req=2):
         self.target_norm = [-8.6, 1.10]
-        self.dock = chem.DockVina_smi(tmp_dir) #, cpu_req=cpu_req) #, cpu_req=cpu_req)
+        self.dock = chem.DockVina_smi(tmp_dir) #, cpu_req=cpu_req)
 
     def eval(self, mol, norm=False):
         s = "None"
@@ -270,7 +279,7 @@ def make_model(args, mdp, is_proxy=False):
         model = model_block.GraphAgent(nemb=nemb,
                                        nvec=0,
                                        out_per_stem=mdp.num_blocks,
-                                       out_per_mol=1,
+                                       out_per_mol=2,
                                        num_conv_steps=num_conv_steps,
                                        mdp_cfg=mdp,
                                        version='v4')
@@ -295,7 +304,8 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
 
     if num_steps is None:
         num_steps = args.num_iterations + 1
-
+    model = model.double()
+    proxy.proxy = proxy.proxy.double()
     tau = args.bootstrap_tau
     if args.bootstrap_tau > 0:
         target_model = deepcopy(model)
@@ -304,9 +314,7 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
         exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
         os.makedirs(exp_dir, exist_ok=True)
 
-    model = model.double()
-    proxy.proxy = proxy.proxy.double()
-    # import pdb; pdb.set_trace()
+
     dataset.set_sampling_model(model, proxy, sample_prob=args.sample_prob)
 
     def save_stuff():
@@ -329,18 +337,15 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
 
 
     opt = torch.optim.Adam(model.parameters(), args.learning_rate, weight_decay=args.weight_decay,
-                           betas=(args.opt_beta, args.opt_beta2),
-                           eps=args.opt_epsilon)
+                           betas=(args.opt_beta, args.opt_beta2))
     #opt = torch.optim.SGD(model.parameters(), args.learning_rate)
 
-    tf = lambda x: torch.tensor(x, device=device).to(torch.float64 if args.floatX else torch.float32)
+    #tf = lambda x: torch.tensor(x, device=device).float()
+    tf = lambda x: torch.tensor(x, device=device).to(args.floatX)
     tint = lambda x: torch.tensor(x, device=device).long()
 
     mbsize = args.mbsize
     ar = torch.arange(mbsize)
-
-    if not debug_no_threads:
-        sampler = dataset.start_samplers(8, mbsize)
 
     last_losses = []
 
@@ -359,109 +364,68 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
     loginf = 1000 # to prevent nans
     log_reg_c = args.log_reg_c
     clip_loss = tf([args.clip_loss])
-    balanced_loss = args.balanced_loss
-    do_nblocks_reg = False
-    max_blocks = args.max_blocks
-    leaf_coef = args.leaf_coef
+    clip_param = args.ppo_clip
+    entropy_coef = args.ppo_entropy_coef
 
     for i in range(num_steps):
-        if not debug_no_threads:
-            r = sampler()
-            for thread in dataset.sampler_threads:
-                if thread.failed:
-                    stop_everything()
-                    pdb.post_mortem(thread.exception.__traceback__)
-                    return
-            p, pb, a, r, s, d, mols = r
-        else:
-            p, pb, a, r, s, d, mols = dataset.sample2batch(dataset.sample(mbsize))
-        # Since we sampled 'mbsize' trajectories, we're going to get
-        # roughly mbsize * H (H is variable) transitions
-        ntransitions = r.shape[0]
-        # state outputs
-        if tau > 0:
-            with torch.no_grad():
-                stem_out_s, mol_out_s = target_model(s, None)
-        else:
-            stem_out_s, mol_out_s = model(s, None)
-        # parents of the state outputs
-        stem_out_p, mol_out_p = model(p, None)
-        # index parents by their corresponding actions
-        qsa_p = model.index_output_by_action(p, stem_out_p, mol_out_p[:, 0], a)
-        # then sum the parents' contribution, this is the inflow
-        exp_inflow = (torch.zeros((ntransitions,), device=device, dtype=dataset.floatX)
-                      .index_add_(0, pb, torch.exp(qsa_p))) # pb is the parents' batch index
-        inflow = torch.log(exp_inflow + log_reg_c)
-        # sum the state's Q(s,a), this is the outflow
-        exp_outflow = model.sum_output(s, torch.exp(stem_out_s), torch.exp(mol_out_s[:, 0]))
-        # include reward and done multiplier, then take the log
-        # we're guarenteed that r > 0 iff d = 1, so the log always works
-        outflow_plus_r = torch.log(log_reg_c + r + exp_outflow * (1-d))
-        if do_nblocks_reg:
-            losses = _losses = ((inflow - outflow_plus_r) / (s.nblocks * max_blocks)).pow(2)
-        else:
-            losses = _losses = (inflow - outflow_plus_r).pow(2)
-        if clip_loss > 0:
-            ld = losses.detach()
-            losses = losses / ld * torch.minimum(ld, clip_loss)
+        samples = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(dataset._get_sample_model)
+                       for i in range(args.ppo_num_samples_per_step)]
+            for future in tqdm(concurrent.futures.as_completed(futures), leave=False):
+                samples += future.result()
+        for j in range(args.ppo_num_epochs_per_step):
+            idxs = dataset.train_rng.randint(0, len(samples), args.mbsize)
+            mb = [samples[i] for i in idxs]
+            s, a, r, d, lp, v, G, A = dataset.sample2batch(zip(*mb))
 
-        term_loss = (losses * d).sum() / (d.sum() + 1e-20)
-        flow_loss = (losses * (1-d)).sum() / ((1-d).sum() + 1e-20)
-        if balanced_loss:
-            loss = term_loss * leaf_coef + flow_loss
-        else:
-            loss = losses.mean()
-        opt.zero_grad()
-        loss.backward(retain_graph=(not i % 50))
+            s_o, m_o = model(s)
+            new_logprob = -model.action_negloglikelihood(s, a, 0, s_o, m_o)
+            values = m_o[:, 1]
+            ratio = torch.exp(new_logprob - lp)
 
-        _term_loss = (_losses * d).sum() / (d.sum() + 1e-20)
-        _flow_loss = (_losses * (1-d)).sum() / ((1-d).sum() + 1e-20)
-        last_losses.append((loss.item(), term_loss.item(), flow_loss.item()))
-        train_losses.append((loss.item(), _term_loss.item(), _flow_loss.item(),
-                             term_loss.item(), flow_loss.item()))
-        if not i % 50:
-            train_infos.append((
-                _term_loss.data.cpu().numpy(),
-                _flow_loss.data.cpu().numpy(),
-                exp_inflow.data.cpu().numpy(),
-                exp_outflow.data.cpu().numpy(),
-                r.data.cpu().numpy(),
-                mols[1],
-                [i.pow(2).sum().item() for i in model.parameters()],
-                torch.autograd.grad(loss, qsa_p, retain_graph=True)[0].data.cpu().numpy(),
-                torch.autograd.grad(loss, stem_out_s, retain_graph=True)[0].data.cpu().numpy(),
-                torch.autograd.grad(loss, stem_out_p, retain_graph=True)[0].data.cpu().numpy(),
-            ))
-        if args.clip_grad > 0:
-            torch.nn.utils.clip_grad_value_(model.parameters(),
-                                           args.clip_grad)
-        opt.step()
-        model.training_steps = i + 1
-        if tau > 0:
-            for _a,b in zip(model.parameters(), target_model.parameters()):
-                b.data.mul_(1-tau).add_(tau*_a)
+            surr1 = ratio * A
+            surr2 = torch.clamp(ratio, 1.0 - clip_param,
+                                1.0 + clip_param) * A
+            action_loss = -torch.min(surr1, surr2).mean()
+            value_loss = 0.5 * (G - values).pow(2).mean()
+            m_p, s_p = model.out_to_policy(s, s_o, m_o)
+            p = torch.zeros_like(m_p).index_add_(0, s.stems_batch, (s_p * torch.log(s_p)).sum(1))
+            p = p + m_p * torch.log(m_p)
+            entropy = -p.mean()
+            loss = action_loss + value_loss - entropy * entropy_coef
+            opt.zero_grad()
+            loss.backward()
+            if args.clip_grad > 0:
+                torch.nn.utils.clip_grad_value_(model.parameters(),
+                                                args.clip_grad)
+            opt.step()
+
+            last_losses.append((loss.item(), value_loss.item(), entropy.item()))
+            train_losses.append((loss.item(), value_loss.item(), entropy.item()))
 
 
-        if not i % 100:
+
+        if not i % 10:
             last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
-            print(i, last_losses)
-            #print(torch.logsumexp(stem_out_p[0], 0).item(),
-            #      outflow_plus_r[0].item(), inflow[0].item(), a[0])
+            print(i, last_losses, G.mean().item())
             print('time:', time.time() - time_last_check)
             time_last_check = time.time()
             last_losses = []
 
-            if not i % 1000 and do_save:
-                save_stuff()
+        if not i % 25 and do_save:
+            save_stuff()
 
     stop_everything()
     if do_save:
         save_stuff()
-    return model, dataset, {'train_losses': train_losses,
-                            'test_losses': test_losses,
-                            'test_infos': test_infos,
-                            'train_infos': train_infos}
-
+    return model, dataset, {
+        'train_losses': train_losses,
+        'test_losses': test_losses,
+        'test_infos': test_infos,
+        'time_start': time_start,
+        'time_now': time.time()
+    }
 
 def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, docker):
     # generator_dataset.set_sampling_model(model, docker, sample_prob=args.sample_prob)
@@ -498,7 +462,6 @@ def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, doc
         # print('here')
         score = docker.eval(mol, norm=False)
         mol.reward = proxy_dataset.r2r(score)
-        # mol.smiles = s
         smis.append(mol.smiles)
         rews.append(mol.reward)
         print(mol.smiles, mol.reward)
@@ -528,8 +491,10 @@ def main(args):
     repr_type = args.repr_type
     reward_exp = args.reward_exp
     reward_norm = args.reward_norm
+    
     rews = []
     smis = []
+
     docker = Docker(tmp_dir, cpu_req=args.cpu_req)
     args.repr_type = proxy_repr_type
     args.replay_mode = "dataset"
@@ -537,17 +502,17 @@ def main(args):
     args.reward_norm = 1
     proxy_dataset = ProxyDataset(args, bpath, device, floatX=torch.float)
     proxy_dataset.load_h5("/scratch/mjain/dock_db_1619111711tp_2021_04_22_13h.h5", args, num_examples=args.num_init_examples)
+    rew_max = np.max(proxy_dataset.rews)
     rews.append(proxy_dataset.rews)
     smis.append([mol.smiles() for mol in proxy_dataset.train_mols])
-    rew_max = np.max(proxy_dataset.rews)
     print(np.max(proxy_dataset.rews))
-    exp_dir = f'{args.save_path}/proxy_{args.array}_{args.run}/'
+    exp_dir = f'{args.save_path}/ppo{args.array}_{args.run}/'
     os.makedirs(exp_dir, exist_ok=True)
 
     print(len(proxy_dataset.train_mols), 'train mols')
     print(len(proxy_dataset.test_mols), 'test mols')
     print(args)
-    # import pdb;pdb.set_trace()
+
     proxy = Proxy(args, bpath, device)    
     mdp = proxy_dataset.mdp
     train_metrics = []
@@ -567,6 +532,11 @@ def main(args):
         
         if args.floatX == 'float64':
             model = model.double()
+
+        if args.floatX == 'float32':
+            args.floatX = torch.float
+        else:
+            args.floatX = torch.double
         model.to(device)
         # train model with with proxy
         print(f"Training model: {i}")

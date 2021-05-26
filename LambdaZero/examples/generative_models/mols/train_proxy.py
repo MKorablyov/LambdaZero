@@ -133,7 +133,7 @@ class Dataset(_Dataset):
         split_bool = np.zeros(len(df), dtype=np.bool)
         split_bool[test_idxs] = True
         print("slit test", sum(split_bool), len(split_bool), "num examples", num_examples)
-
+        self.rews = []
         for i in tqdm(range(len(df)), disable=not args.progress):
             m = BlockMoleculeDataExtended()
             for c in range(1, len(columns)):
