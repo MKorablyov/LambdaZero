@@ -134,8 +134,6 @@ print("good/bad dockrewards mae", good_dockrewards_mae, bad_dockrewards_mae)
 # print("dock energy:", energy)
 
 
-
-
 # ray remote function
 # @ray.remote
 # def func(args):

@@ -1,11 +1,13 @@
-import time
+import time, os.path as osp
 import numpy as np
 import ray
 from rdkit import Chem
 from rdkit.Chem import QED
 from LambdaZero.chem import DockVina_smi
+import LambdaZero.contrib.functional
 from LambdaZero.models import ChempropWrapper_v1
-
+import LambdaZero.utils
+datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 @ray.remote(num_gpus=0)
 class DockingEstimator(DockVina_smi):
@@ -20,45 +22,45 @@ class DockingEstimator(DockVina_smi):
         return dockscore
 
 class DockingOracle:
-    def __init__(self, num_threads, dockVina_config, mean, std, logger):
+    def __init__(self, num_threads, dockVina_config, mean, std, act_y, logger):
         self.num_threads = num_threads
         # create actor pool
         self.actors = [DockingEstimator.remote(dockVina_config) for i in range(self.num_threads)]
         self.pool = ray.util.ActorPool(self.actors)
         self.mean = mean
         self.std = std
+        self.act_y = act_y
         self.logger = logger
 
     def __call__(self, data):
         smiles = [d["smiles"] for d in data]
         dockscores = list(self.pool.map(lambda actor, smi: actor.eval.remote(smi), smiles))
-        print("dockscores in oracle", dockscores)
-
-        self.logger.log.remote({
-            "docking_oracle/raw_dockscore_max": np.max(dockscores),
-            "docking_oracle/raw_dockscore_mean": np.mean(dockscores),
-            "docking_oracle/raw_dockscore_min": np.min(dockscores)})
-
         dockscores_ = []
+        num_failures = 0
         for d in dockscores:
             if d == None:
-                dockscores_.append(self.mean) # mean from Zinc on failures
-            elif d > self.mean + 3*self.std:
-                dockscores_.append(self.mean + 3*self.std) # cap at 3 stds at worst
-                # docking could result in steric clashes with huge positive energies; in order to prevent failures in
-                # the MPNN due to especially large values, I am capping how bad the molecule could be
-                # prevent fitting to these bad molecules much
+                dockscores_.append(self.mean) # mean on failures
+                num_failures+=1
             else:
                 dockscores_.append(d)
-        dockscores = [(self.mean -d) / self.std for d in dockscores_] # this normalizes and flips dockscore
+        dockscores = [(self.mean-d) / self.std for d in dockscores_] # this normalizes and flips dockscore
+        dockscores = self.act_y(dockscores)
         self.logger.log.remote({
+            "docking_oracle/failure_probability": num_failures/float(len(dockscores)),
             "docking_oracle/norm_dockscore_min": np.min(dockscores),
             "docking_oracle/norm_dockscore_mean": np.mean(dockscores),
             "docking_oracle/norm_dockscore_max": np.max(dockscores)})
         return dockscores
 
 
-@ray.remote
+config_DockingOracle_v1 = {"num_threads":8,
+                           "dockVina_config": {"outpath": osp.join(summaries_dir, "docking")},
+                           "mean":-8.6, "std": 1.1, "act_y":LambdaZero.contrib.functional.elu2,
+                           }
+
+
+
+@ray.remote(num_cpus=0)
 class QEDEstimator:
     def __init__(self):
         pass
@@ -84,7 +86,7 @@ class QEDOracle:
         return qeds
 
 
-@ray.remote(num_gpus=0.05)
+@ray.remote(num_gpus=0.05, num_cpus=0)
 class ChempropWrapper_v2(ChempropWrapper_v1):
     def eval(self, m):
         return ChempropWrapper_v1.__call__(self, m)

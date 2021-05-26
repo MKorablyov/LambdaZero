@@ -18,9 +18,9 @@ from torch.distributions.categorical import Categorical
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/low_floor_ppo_1.pkl.gz', type=str)
-parser.add_argument("--learning_rate", default=2.5e-5, help="Learning rate", type=float)
-parser.add_argument("--method", default='ppo', type=str)
+parser.add_argument("--save_path", default='results/low_floor_flow_0.pkl.gz', type=str)
+parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
+parser.add_argument("--method", default='flownet', type=str)
 parser.add_argument("--opt", default='adam', type=str)
 parser.add_argument("--adam_beta1", default=0.9, type=float)
 parser.add_argument("--adam_beta2", default=0.999, type=float)
@@ -30,23 +30,28 @@ parser.add_argument("--mbsize", default=16, help="Minibatch size", type=int)
 parser.add_argument("--bufsize", default=16, help="MCMC buffer size", type=int)
 parser.add_argument("--train_to_sample_ratio", default=1, type=float)
 parser.add_argument("--horizon", default=8, type=int)
-parser.add_argument("--ndim", default=4, type=int)
+parser.add_argument("--ndim", default=2, type=int)
 parser.add_argument("--n_hid", default=256, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
-parser.add_argument("--n_train_steps", default=300, type=int)
+parser.add_argument("--n_train_steps", default=30000, type=int)
 parser.add_argument("--num_empirical_loss", default=200000, type=int,
                     help="Number of samples used to compute the empirical distribution loss")
-parser.add_argument('--func', default='corners_floor_B')
+
+parser.add_argument('--func', default='corners')
 
 parser.add_argument("--replay_strategy", default='none', type=str) # top_k none
 parser.add_argument("--replay_sample_size", default=2, type=int)
 parser.add_argument("--replay_buf_size", default=100, type=float)
 
+# PPO
 parser.add_argument("--ppo_num_epochs", default=32, type=int) # number of SGD steps per epoch
 parser.add_argument("--ppo_epoch_size", default=16, type=int) # number of sampled minibatches per epoch
 parser.add_argument("--ppo_clip", default=0.2, type=float)
 parser.add_argument("--ppo_entropy_coef", default=1e-1, type=float)
 parser.add_argument("--clip_grad_norm", default=0., type=float)
+
+# SAC
+parser.add_argument("--sac_alpha", default=5e-1, type=float)
 
 
 # This is alpha in the note, smooths the learned distribution into a uniform exploratory one
@@ -233,11 +238,11 @@ class GridEnv:
         print(all_int_obs.shape, a.shape, u.shape, v1.shape, v2.shape)
         return all_int_obs, traj_rewards, all_xs, compute_all_probs
 
-def make_mlp(l, act=nn.LeakyReLU()):
+def make_mlp(l, act=nn.LeakyReLU(), tail=[]):
     """makes an MLP with no top layer activation"""
-    return nn.Sequential(*sum(
+    return nn.Sequential(*(sum(
         [[nn.Linear(i, o)] + ([act] if n < len(l)-2 else [])
-        for n, (i, o) in enumerate(zip(l, l[1:]))], []))
+         for n, (i, o) in enumerate(zip(l, l[1:]))], []) + tail))
 
 
 class ReplayBuffer:
@@ -560,6 +565,80 @@ class RandomTrajAgent:
     def learn_from(self, it, batch):
         return None
 
+class SACAgent:
+    def __init__(self, args, envs):
+        self.pol = make_mlp([args.horizon * args.ndim] +
+                            [args.n_hid] * args.n_layers +
+                            [args.ndim+1],
+                            tail=[nn.Softmax(1)]) # +1 for stop
+        self.Q_1 = make_mlp([args.horizon * args.ndim] +
+                            [args.n_hid] * args.n_layers +
+                            [args.ndim+1])
+        self.Q_2 = make_mlp([args.horizon * args.ndim] +
+                            [args.n_hid] * args.n_layers +
+                            [args.ndim+1])
+        self.Q_t1 = make_mlp([args.horizon * args.ndim] +
+                            [args.n_hid] * args.n_layers +
+                            [args.ndim+1])
+        self.Q_t2 = make_mlp([args.horizon * args.ndim] +
+                            [args.n_hid] * args.n_layers +
+                            [args.ndim+1])
+        self.envs = envs
+        self.mbsize = args.mbsize
+        self.tau = args.bootstrap_tau
+        self.alpha = torch.tensor([args.sac_alpha], requires_grad=True)
+        self.alpha_target = args.sac_alpha
+
+    def parameters(self):
+        return list(self.pol.parameters())+list(self.Q_1.parameters())+list(self.Q_2.parameters()) + [self.alpha]
+
+    def sample_many(self, mbsize, all_visited):
+        batch = []
+        s = tf([i.reset()[0] for i in self.envs])
+        done = [False] * mbsize
+        trajs = defaultdict(list)
+        while not all(done):
+            with torch.no_grad():
+                pol = Categorical(probs=self.pol(s))
+                acts = pol.sample()
+            step = [i.step(a) for i,a in zip([e for d, e in zip(done, self.envs) if not d], acts)]
+            c = count(0)
+            m = {j:next(c) for j in range(mbsize) if not done[j]}
+            for si, a, (sp, r, d, _), (traj_idx, _) in zip(s, acts, step, sorted(m.items())):
+                trajs[traj_idx].append([si[None,:]] + [tf([i]) for i in (a, r, sp, d)])
+            done = [bool(d or step[m[i]][2]) for i, d in enumerate(done)]
+            s = tf([i[0] for i in step if not i[2]])
+            for (_, r, d, sp) in step:
+                if d: all_visited.append(tuple(sp))
+        return sum(trajs.values(), [])
+
+    def learn_from(self, it, batch):
+        s, a, r, sp, d = [torch.cat(i, 0) for i in zip(*batch)]
+        ar = torch.arange(s.shape[0])
+        a = a.long()
+        d = d.unsqueeze(1)
+        q1 = self.Q_1(s)
+        q1a = q1[ar, a]
+        q2 = self.Q_2(s)
+        q2a = q2[ar, a]
+        ps = self.pol(s)
+        with torch.no_grad():
+            qt1 = self.Q_t1(sp)
+            qt2 = self.Q_t2(sp)
+            psp = self.pol(sp)
+        vsp1 = ((1 - d) * psp * (qt1 - self.alpha * torch.log(psp))).sum(1)
+        vsp2 = ((1 - d) * psp * (qt2 - self.alpha * torch.log(psp))).sum(1)
+        J_Q = (0.5 * (q1a - r - vsp1).pow(2) + 0.5 * (q2a - r - vsp2).pow(2)).mean()
+        minq = torch.min(q1, q2).detach()
+        J_pi = (ps * (self.alpha * torch.log(ps) - minq)).sum(1).mean()
+        J_alpha = (ps.detach() * (-self.alpha * torch.log(ps.detach()) + self.alpha_target)).sum(1).mean()
+
+        if not it % 100:
+            print(ps[0].data, ps[-1].data, (ps * torch.log(ps)).sum(1).mean())
+        for A,B in [(self.Q_1, self.Q_t1), (self.Q_2, self.Q_t2)]:
+            for a,b in zip(A.parameters(), B.parameters()):
+                b.data.mul_(1-self.tau).add_(self.tau*a)
+        return J_Q + J_pi + J_alpha, J_Q, J_pi, J_alpha, self.alpha
 
 def make_opt(params, args):
     params = list(params)
@@ -616,6 +695,8 @@ def main(args):
         agent = MHAgent(args, envs)
     elif args.method == 'ppo':
         agent = PPOAgent(args, envs)
+    elif args.method == 'sac':
+        agent = SACAgent(args, envs)
     elif args.method == 'random_traj':
         agent = RandomTrajAgent(args, envs)
 
@@ -655,14 +736,15 @@ def main(args):
                 k1, kl = empirical_distrib_losses[-1]
                 print('empirical L1 distance', k1, 'KL', kl)
                 if len(all_losses):
-                    print(*[f'{np.mean([i[j] for i in all_losses[-100:]]):.3f}'
+                    print(*[f'{np.mean([i[j] for i in all_losses[-100:]]):.5f}'
                             for j in range(len(all_losses[0]))])
 
     root = os.path.split(args.save_path)[0]
     os.makedirs(root, exist_ok=True)
     pickle.dump(
         {'losses': np.float32(all_losses),
-         'model': agent.model.to('cpu') if agent.model else None,
+         #'model': agent.model.to('cpu') if agent.model else None,
+         'params': [i.data.to('cpu').numpy() for i in agent.parameters()],
          'visited': np.int8(all_visited),
          'emp_dist_loss': empirical_distrib_losses,
          'true_d': env.true_density()[0],
