@@ -359,7 +359,7 @@ def make_model(args, mdp, out_per_mol=1):
                                      num_conv_steps=args.num_conv_steps,
                                      version=args.model_version,
                                      do_nblocks=(hasattr(args,'include_nblocks')
-                                                 and args.include_nblocks))
+                                                 and args.include_nblocks), dropout_rate=0.1)
     elif args.repr_type == 'morgan_fingerprint':
         raise ValueError('reimplement me')
         model = model_fingerprint.MFP_MLP(args.nemb, 3, mdp.num_blocks, 1)
@@ -555,6 +555,7 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
 
 
 def main(args):
+
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
 
