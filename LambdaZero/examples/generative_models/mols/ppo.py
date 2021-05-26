@@ -61,17 +61,16 @@ importlib.reload(main_flow)
 #importlib.reload(chem_op)
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-# if 'SLURM_TMPDIR' in os.environ:
-#     print("Syncing locally")
-tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
-
-#     os.system(f"rsync -az {programs_dir} {tmp_dir}")
-#     os.system(f"rsync -az {datasets_dir} {tmp_dir}")
-#     programs_dir = f"{tmp_dir}/Programs"
-#     datasets_dir = f"{tmp_dir}/Datasets"
-#     print("Done syncing")
-# else:
-#     tmp_dir = "/tmp/lambdazero"
+if 'SLURM_TMPDIR' in os.environ:
+    print("Syncing locally")
+    tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
+    os.system(f"rsync -az {programs_dir} {tmp_dir}")
+    os.system(f"rsync -az {datasets_dir} {tmp_dir}")
+    programs_dir = f"{tmp_dir}/Programs"
+    datasets_dir = f"{tmp_dir}/Datasets"
+    print("Done syncing")
+else:
+    tmp_dir = "/tmp/lambdazero"
 
 os.makedirs(tmp_dir, exist_ok=True)
 
@@ -128,6 +127,7 @@ class PPODataset(Dataset):
             s = self.mdp.mols2batch([self.mdp.mol2repr(m)])
             with torch.no_grad():
                 s_o, m_o = self.sampling_model(s)
+
             v = m_o[0, 1]
             logits = torch.cat([m_o[0,0].reshape(1), s_o.reshape(-1)])
             cat = torch.distributions.Categorical(
@@ -180,8 +180,6 @@ class PPODataset(Dataset):
         #if score < self.R_min:
         #    score = self.R_min
         #return score
-
-
 
 
     def start_samplers(self, n, mbsize):

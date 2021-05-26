@@ -113,6 +113,7 @@ parser.add_argument("--run", default=1, help="run", type=int)
 parser.add_argument("--balanced_loss", default=True)
 parser.add_argument("--floatX", default='float64')
 
+from ray.rllib.agents.ppo import PPOTrainer
 
 class ProxyDataset(_ProxyDataset):
     def add_samples(self, samples):
@@ -606,12 +607,15 @@ def main(args):
 
 
 if __name__ == '__main__':
+    print(sys.argv)
     args = parser.parse_args()
 
-    if len(sys.argv) >= 2:
-        config_idx = sys.argv[1]
-    else:
-        config_idx = 4
+    #print("parsed args")
+    #if len(sys.argv) >= 2:
+    #    run = sys.argv[1]
+    #    #print("config idx", config_idx)
+    #else:
+    #    run = 0
 
     configs = [{"run": 0},
                {"run": 1,"num_init_examples": 512, "num_samples": 256},
@@ -629,10 +633,6 @@ if __name__ == '__main__':
                {"run": 11, "num_init_examples": 8192, "num_samples": 256, "reward_exp": 2},
                ]
 
-    for k, v in configs[config_idx].items(): setattr(args, k, v)
-
-
-    print(args)
-    time.sleep(100)
-
+    for k, v in configs[args.run].items(): setattr(args, k, v)
+    print("args",args)
     main(args)
