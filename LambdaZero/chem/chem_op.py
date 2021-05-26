@@ -441,7 +441,7 @@ class GenMolFile:
         # choose minimum energy conformer
         mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
-        os.system(f"{self.mglbin}/obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
+        os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
         os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
         return pdbqt_file
 
@@ -455,93 +455,67 @@ class DockVina_smi:
                  rec_file="4jnc.nohet.aligned.pdbqt",
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
-                 cpu_req=None,cleanup=True):
+                 cleanup=True):
 
         self.outpath = outpath
         self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
+        self.mgltools_bin = os.path.join(mgltools_dir, "bin")
         self.vina_bin = os.path.join(vina_dir, "bin/vina")
         self.rec_file = os.path.join(docksetup_dir, rec_file)
         self.bindsite = bindsite
         self.dock_pars = dock_pars
         self.cleanup = cleanup
-        self.cpu_req = "" if cpu_req is None else "--cpu {}".format(cpu_req)
 
-        self.gen_molfile = GenMolFile(self.outpath, self.mgltools,
-                                      os.path.join(mgltools_dir, 'bin'))
+        self.gen_molfile = GenMolFile(self.outpath, self.mgltools, self.mgltools_bin)
         # make vina command
         self.dock_cmd = "{} --receptor {} " \
                         "--center_x {} --center_y {} --center_z {} " \
-                        "--size_x {} --size_y {} --size_z {} {}"
-        self.dock_cmd = self.dock_cmd.format(self.vina_bin, self.rec_file, *self.bindsite, self.cpu_req)
+                        "--size_x {} --size_y {} --size_z {} "
+        self.dock_cmd = self.dock_cmd.format(self.vina_bin, self.rec_file, *self.bindsite)
         self.dock_cmd += " --ligand {} --out {}"
 
         os.makedirs(os.path.join(self.outpath, "docked"), exist_ok=True)
 
     def dock(self, smi, mol_name=None, molgen_conf=20):
         mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
-        dockscore = float('nan')
-        coord = None
-        try:
-            docked_file = os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
-            input_file = self.gen_molfile(smi, mol_name, molgen_conf)
-            # complete docking query
-            dock_cmd = self.dock_cmd.format(input_file, docked_file)
-            dock_cmd = dock_cmd + " " + self.dock_pars
-            # dock
-            cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
-            cl.wait(timeout=60*5)
-            # parse energy
-            with open(docked_file) as f:
-                docked_pdb = f.readlines()
-            if docked_pdb[1].startswith("REMARK VINA RESULT"):
-                dockscore = float(docked_pdb[1].split()[3])
-            else:
-                raise Exception("Can't parse docking energy")
-            # parse coordinates
-            # TODO: fix order
-            coord = []
-            endmodel_idx = 0
-            for idx, line in enumerate(docked_pdb):
-                if line.startswith("ENDMDL"):
-                    endmodel_idx = idx
-                    break
+        docked_file = os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
+        input_file = self.gen_molfile(smi, mol_name, molgen_conf)
+        # complete docking query
+        dock_cmd = self.dock_cmd.format(input_file, docked_file)
+        dock_cmd = dock_cmd + " " + self.dock_pars
 
-            docked_pdb_model_1 = docked_pdb[:endmodel_idx]  # take only the model corresponding to the best energy
-            docked_pdb_model_1_atoms = [line for line in docked_pdb_model_1 if line.startswith("ATOM") and line.split()[2][0] != 'H']  # ignore hydrogen
-            coord.append([line.split()[-7:-4] for line in docked_pdb_model_1_atoms])
-            coord = np.array(coord, dtype=np.float32)
+        # dock
+        cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
+        cl.wait()
+        # parse energy
+        with open(docked_file) as f:
+            docked_pdb = f.readlines()
+        if docked_pdb[1].startswith("REMARK VINA RESULT"):
+            dockscore = float(docked_pdb[1].split()[3])
+        else:
+            raise Exception("Can't parse docking energy")
+        # parse coordinates
+        # TODO: fix order
+        coord = []
+        endmodel_idx = 0
+        for idx, line in enumerate(docked_pdb):
+            if line.startswith("ENDMDL"):
+                endmodel_idx = idx
+                break
 
-        finally:
-            if self.cleanup:
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(self.outpath, "sdf", f"{mol_name}.sdf"))
+        docked_pdb_model_1 = docked_pdb[:endmodel_idx]  # take only the model corresponding to the best energy
+        docked_pdb_model_1_atoms = [line for line in docked_pdb_model_1 if line.startswith("ATOM")
+                                    and line.split()[2][0] != 'H']  # ignore hydrogen
+        coord.append([line.split()[-7:-4] for line in docked_pdb_model_1_atoms])
+        coord = np.array(coord, dtype=np.float32)
 
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
-
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
-
-                with contextlib.suppress(FileNotFoundError):
-                    os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
-
+        if self.cleanup:
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(os.path.join(self.outpath, "sdf", f"{mol_name}.sdf"))
+                os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
+                os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
+                os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
         return mol_name, dockscore, coord
-
-    def __del__(self):
-        if self.cleanup and False: # Removing directories while other
-                                   # processes are running
-                                   # DockVina_smi can cause problems
-            with contextlib.suppress(FileNotFoundError):
-                os.rmdir(os.path.join(self.outpath, "sdf"))
-
-            with contextlib.suppress(FileNotFoundError):
-                os.rmdir(os.path.join(self.outpath, "mol2"))
-
-            with contextlib.suppress(FileNotFoundError):
-                os.rmdir(os.path.join(self.outpath, "pdbqt"))
-
-            with contextlib.suppress(FileNotFoundError):
-                os.rmdir(os.path.join(self.outpath, "docked"))
 
 
 class ScaffoldSplit:
@@ -592,7 +566,7 @@ class FPEmbedding_v2:
         self.stem_fp_len = stem_fp_len
         self.stem_fp_radiis = stem_fp_radiis
 
-    def __call__(self, molecule, non_empty=False):
+    def __call__(self, molecule):
         mol = molecule.mol
         mol_fp = get_fp(mol, self.mol_fp_len, self.mol_fp_radiis)
 
@@ -606,16 +580,12 @@ class FPEmbedding_v2:
 
         if len(stem_fps) > 0:
             stem_fps = np.stack(stem_fps, 0)
-        elif non_empty:
-            stem_fps = np.zeros(shape=[1, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
         else:
-            stem_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
+            stem_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)], dtype=np.float32)
         if len(jbond_fps) > 0:
             jbond_fps = np.stack(jbond_fps, 0)
-        elif non_empty:
-            jbond_fps = np.zeros(shape=[1, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
         else:
-            jbond_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)],dtype=np.float32)
+            jbond_fps = np.empty(shape=[0, self.stem_fp_len * len(self.stem_fp_radiis)], dtype=np.float32)
         return mol_fp, stem_fps, jbond_fps
 
 
@@ -664,7 +634,7 @@ def onehot(arr, num_classes, dtype=np.int):
 _mpnn_feat_cache = [None]
 
 
-def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_features=True):
+def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_features=False):
     atomtypes = {'H': 0, 'C': 1, 'N': 2, 'O': 3, 'F': 4}
     bondtypes = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
 
@@ -725,8 +695,7 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
     # convert atmfeat to pandas
     if panda_fmt:
         atmfeat_pd = pd.DataFrame(index=range(natm), columns=[
-            "type_idx", "atomic_number", "acceptor", "donor", "aromatic",
-            "sp", "sp2", "sp3", "num_hs"])
+            "type_idx", "atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3", "num_hs"])
         atmfeat_pd['type_idx'] = atmfeat[:, :ntypes+1]
         atmfeat_pd['atomic_number'] = atmfeat[:, ntypes+1]
         atmfeat_pd['acceptor'] = atmfeat[:, ntypes+2]

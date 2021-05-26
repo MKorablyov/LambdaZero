@@ -15,6 +15,10 @@ class BlockMoleculeDataExtended(BlockMoleculeData):
     def mol(self):
         return chem.mol_from_frag(jun_bonds=self.jbonds, frags=self.blocks)[0]
 
+    @property
+    def smiles(self):
+        return Chem.MolToSmiles(self.mol)
+
     def copy(self): # shallow copy
         o = BlockMoleculeDataExtended()
         o.blockidxs = list(self.blockidxs)
