@@ -397,10 +397,25 @@ def array_may_18(args):
         {**base, 'learning_rate': 1e-4, 'reward_exp': 1, 'reward_norm': 1},
         {**base, 'learning_rate': 2e-4},
         # 9
-        {**base, 'learning_rate': 2e-4,
+        {**base, 'learning_rate': 1e-4,
          'repr_type': 'block_graph', 'include_nblocks': False, 'model_version': 'v4',
-         'reward_exp': 4, 'opt_beta2': 0.999},
+         'reward_exp': 4, 'opt_beta2': 0.999, 'ppo_entropy_coef': 1e-6,
+         'num_conv_steps': 10},
         # 10
+        {**base, 'learning_rate': 5e-5}, # good
+        # entropy coefs
+        {**base, 'learning_rate': 1e-4,
+         'repr_type': 'block_graph', 'include_nblocks': False, 'model_version': 'v4',
+         'reward_exp': 4, 'opt_beta2': 0.999, 'ppo_entropy_coef': 1e-5,
+         'num_conv_steps': 10},
+        {**base, 'learning_rate': 1e-4,
+         'repr_type': 'block_graph', 'include_nblocks': False, 'model_version': 'v4',
+         'reward_exp': 4, 'opt_beta2': 0.999, 'ppo_entropy_coef': 1e-4,
+         'num_conv_steps': 10},
+        {**base, 'learning_rate': 1e-4,
+         'repr_type': 'block_graph', 'include_nblocks': False, 'model_version': 'v4',
+         'reward_exp': 4, 'opt_beta2': 0.999, 'ppo_entropy_coef': 1e-6,
+         'num_conv_steps': 10},
     ]
     return all_hps
 

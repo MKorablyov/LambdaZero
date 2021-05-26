@@ -158,7 +158,7 @@ class MPNNet_v2(nn.Module):
 
 
 class MolAC_GCN(nn.Module):
-    def __init__(self, nhid, nvec, num_out_per_stem, num_out_per_mol, num_conv_steps, version, dropout_rate, do_stem_mask=True, do_nblocks=False):
+    def __init__(self, nhid, nvec, num_out_per_stem, num_out_per_mol, num_conv_steps, version, dropout_rate=0, do_stem_mask=True, do_nblocks=False):
         nn.Module.__init__(self)
         self.training_steps = 0
         # atomfeats + stem_mask + atom one hot + nblocks
@@ -216,7 +216,6 @@ class MolAC_GCN(nn.Module):
 def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
     rdmol = mol.mol
     if rdmol is None:
-        print(len(atomic_numbers))
         g = Data(x=torch.zeros((1, 14 + len(atomic_numbers))),
                  edge_attr=torch.zeros((0, 4)),
                  edge_index=torch.zeros((0, 2)).long())

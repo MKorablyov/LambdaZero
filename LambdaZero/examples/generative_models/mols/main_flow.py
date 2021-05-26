@@ -57,7 +57,6 @@ import mol_mdp_ext
 importlib.reload(mol_mdp_ext)
 #importlib.reload(chem_op)
 
-# datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 # if 'SLURM_TMPDIR' in os.environ:
 #     print("Syncing locally")
 #     tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
@@ -107,6 +106,9 @@ parser.add_argument("--progress", default='yes')
 parser.add_argument("--floatX", default='float64')
 parser.add_argument("--include_nblocks", default=True)
 parser.add_argument("--balanced_loss", default=True)
+# If True this basically implements Buesing et al's TreeSample Q,
+# samples uniformly from it though, no MTCS involved
+parser.add_argument("--do_wrong_thing", default=False)
 
 
 
@@ -145,6 +147,7 @@ class Dataset:
         self.reward_norm = get('reward_norm', 1)
         self.random_action_prob = get('random_action_prob', 0)
         self.R_min = get('R_min', 1e-8)
+        self.do_wrong_thing = get('do_wrong_thing', False)
 
         self.online_mols = []
         self.max_online_mols = 1000
@@ -220,32 +223,47 @@ class Dataset:
             else:
                 action = max(0, action-1)
                 action = (action % self.mdp.num_blocks, action // self.mdp.num_blocks)
+                m_old = m
                 m = self.mdp.add_block_to(m, *action)
                 if len(m.blocks) and not len(m.stems) or t == max_blocks - 1:
                     # can't add anything more to this mol so let's make it
                     # terminal. Note that this node's parent isn't just m,
                     # because this is a sink for all parent transitions
                     r = self._get_reward(m)
-                    samples.append((*zip(*self.mdp.parents(m)), r, m, 1))
+                    if self.do_wrong_thing:
+                        samples.append(((m_old,), (action,), r, m, 1))
+                    else:
+                        samples.append((*zip(*self.mdp.parents(m)), r, m, 1))
                     break
                 else:
-                    samples.append((*zip(*self.mdp.parents(m)), 0, m, 0))
+                    if self.do_wrong_thing:
+                        samples.append(((m_old,), (action,), 0, m, 0))
+                    else:
+                        samples.append((*zip(*self.mdp.parents(m)), 0, m, 0))
         p = self.mdp.mols2batch([self.mdp.mol2repr(i) for i in samples[-1][0]])
         qp = self.sampling_model(p, None)
         qsa_p = self.sampling_model.index_output_by_action(
             p, qp[0], qp[1][:, 0],
             torch.tensor(samples[-1][1], device=self._device).long())
-        self.sampled_mols.append((r, m, trajectory_stats, torch.logsumexp(qsa_p.flatten(), 0).item()))
-        if self.replay_mode == 'online':
+        inflow = torch.logsumexp(qsa_p.flatten(), 0).item()
+        self.sampled_mols.append((r, m, trajectory_stats, inflow))
+        if self.replay_mode == 'online' or self.replay_mode == 'prioritized':
             m.reward = r
-            self._add_mol_to_online(r + self.train_rng.normal() * 0.5, m)
+            self._add_mol_to_online(r, m, inflow)
         return samples
 
-    def _add_mol_to_online(self, r, m):
-        if len(self.online_mols) < self.max_online_mols or r > self.online_mols[0][0]:
-            self.online_mols.append((r, m))
-        if len(self.online_mols) > self.max_online_mols:
-            self.online_mols = sorted(self.online_mols)[max(int(0.05 * self.max_online_mols), 1):]
+    def _add_mol_to_online(self, r, m, inflow):
+        if self.replay_mode == 'online':
+            r = r + self.train_rng.normal() * 0.01
+            if len(self.online_mols) < self.max_online_mols or r > self.online_mols[0][0]:
+                self.online_mols.append((r, m))
+            if len(self.online_mols) > self.max_online_mols:
+                self.online_mols = sorted(self.online_mols)[max(int(0.05 * self.max_online_mols), 1):]
+        elif self.replay_mode == 'prioritized':
+            self.online_mols.append((abs(inflow - np.log(r)), m))
+            if len(self.online_mols) > self.max_online_mols * 1.1:
+                self.online_mols = self.online_mols[-self.max_online_mols:]
+
 
     def _get_reward(self, m):
         rdmol = m.mol
@@ -260,9 +278,17 @@ class Dataset:
         if self.replay_mode == 'dataset':
             eidx = self.train_rng.randint(0, len(self.train_mols), n)
             samples = sum((self._get(i, self.train_mols) for i in eidx), [])
-        if self.replay_mode == 'online':
+        elif self.replay_mode == 'online':
             eidx = self.train_rng.randint(0, max(1,len(self.online_mols)), n)
             samples = sum((self._get(i, self.online_mols) for i in eidx), [])
+        elif self.replay_mode == 'prioritized':
+            if not len(self.online_mols):
+                # _get will sample from the model
+                samples = sum((self._get(0, self.online_mols) for i in range(n)), [])
+            else:
+                prio = np.float32([i[0] for i in self.online_mols])
+                eidx = self.train_rng.choice(len(self.online_mols), n, False, prio/prio.sum())
+                samples = sum((self._get(i, self.online_mols) for i in eidx), [])
         return zip(*samples)
 
     def sample2batch(self, mb):
@@ -555,6 +581,7 @@ def train_model_with_proxy(args, model, proxy, dataset, num_steps=None, do_save=
 
 
 def main(args):
+    datasets_dir, programs_dir, summaries_dir = get_external_dirs()
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
 
