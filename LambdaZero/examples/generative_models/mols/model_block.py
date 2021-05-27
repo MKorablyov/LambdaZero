@@ -95,11 +95,11 @@ class GraphAgent(nn.Module):
     def action_negloglikelihood(self, s, a, g, stem_o, mol_o):
         mol_p, stem_p = self.out_to_policy(s, stem_o, mol_o)
         #print(Z.shape, Z.min().item(), Z.mean().item(), Z.max().item())
-        mol_lsm = torch.log(mol_p + 1e-8)
-        stem_lsm = torch.log(stem_p + 1e-8)
+        mol_lsm = torch.log(mol_p + 1e-20)
+        stem_lsm = torch.log(stem_p + 1e-20)
         #print(mol_lsm.shape, mol_lsm.min().item(), mol_lsm.mean().item(), mol_lsm.max().item())
         #print(stem_lsm.shape, stem_lsm.min().item(), stem_lsm.mean().item(), stem_lsm.max().item(), '--')
-        return self.index_output_by_action(s, stem_lsm, mol_lsm, a)
+        return -self.index_output_by_action(s, stem_lsm, mol_lsm, a)
 
     def index_output_by_action(self, s, stem_o, mol_o, a):
         stem_slices = torch.tensor(s.__slices__['stems'][:-1], dtype=torch.long, device=stem_o.device)

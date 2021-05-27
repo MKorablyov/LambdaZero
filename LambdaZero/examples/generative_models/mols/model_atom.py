@@ -216,7 +216,6 @@ class MolAC_GCN(nn.Module):
 def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
     rdmol = mol.mol
     if rdmol is None:
-        print(len(atomic_numbers))
         g = Data(x=torch.zeros((1, 14 + len(atomic_numbers))),
                  edge_attr=torch.zeros((0, 4)),
                  edge_index=torch.zeros((0, 2)).long())
