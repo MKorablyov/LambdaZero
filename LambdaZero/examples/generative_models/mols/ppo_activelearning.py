@@ -40,7 +40,7 @@ from LambdaZero.environments.molMDP import BlockMoleculeData, MolMDP
 from LambdaZero.environments.block_mol_v3 import DEFAULT_CONFIG as env_v3_cfg, BlockMolEnv_v3
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
 from LambdaZero.utils import get_external_dirs
-
+import ray
 from mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
 import concurrent.futures
 
@@ -95,15 +95,15 @@ parser.add_argument("--opt_epsilon", default=1e-8, type=float)
 parser.add_argument("--kappa", default=0.1, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
-parser.add_argument("--max_blocks", default=8, type=int)
-parser.add_argument("--num_iterations", default=4000, type=int)
+parser.add_argument("--max_blocks", default=7, type=int)
+parser.add_argument("--num_iterations", default=2500, type=int)
 parser.add_argument("--num_conv_steps", default=6, type=int)
 parser.add_argument("--log_reg_c", default=1e-2, type=float)
-parser.add_argument("--reward_exp", default=4, type=float)
+parser.add_argument("--reward_exp", default=3, type=float)
 parser.add_argument("--reward_norm", default=8, type=float)
 parser.add_argument("--R_min", default=0.1, type=float)
 parser.add_argument("--sample_prob", default=1, type=float)
-parser.add_argument("--clip_grad", default=0, type=float)
+parser.add_argument("--clip_grad", default=5, type=float)
 parser.add_argument("--clip_loss", default=0, type=float)
 parser.add_argument("--buffer_size", default=5000, type=int)
 parser.add_argument("--num_sgd_steps", default=25, type=int)
@@ -111,7 +111,7 @@ parser.add_argument("--random_action_prob", default=0.05, type=float)
 parser.add_argument("--leaf_coef", default=10, type=float)
 parser.add_argument("--replay_mode", default='online', type=str)
 parser.add_argument("--bootstrap_tau", default=0, type=float)
-parser.add_argument("--weight_decay", default=0, type=float)
+parser.add_argument("--weight_decay", default=1e-5, type=float)
 parser.add_argument("--array", default='')
 parser.add_argument("--repr_type", default='block_graph')
 parser.add_argument("--model_version", default='v4')
@@ -120,8 +120,8 @@ parser.add_argument("--run", default=0, help="run", type=int)
 parser.add_argument("--balanced_loss", default=True)
 parser.add_argument("--floatX", default='float64')
 
-parser.add_argument("--ppo_clip", default=0.2, type=float)
-parser.add_argument("--ppo_entropy_coef", default=1e-4, type=float)
+parser.add_argument("--ppo_clip", default=0.05, type=float)
+parser.add_argument("--ppo_entropy_coef", default=1e-3, type=float)
 parser.add_argument("--ppo_num_samples_per_step", default=256, type=float)
 parser.add_argument("--ppo_num_epochs_per_step", default=32, type=float)
 
@@ -427,7 +427,35 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
         'time_now': time.time()
     }
 
-def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, docker):
+@ray.remote
+class _SimDockLet:
+    def __init__(self, tmp_dir):
+        # self.dock = LambdaZero.chem.Dock_smi(tmp_dir,
+        #                           osp.join(programs_dir, 'chimera'),
+        #                           osp.join(programs_dir, 'dock6'),
+        #                           osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
+        #                           gas_charge=True)
+        # print(programs_dir, "mgltools_x86_64Linux2_1.5.6")
+        self.dock = LambdaZero.chem.DockVina_smi(tmp_dir)
+        self.target_norm = [-8.6, 1.10]
+        # self.attribute = attribute
+
+    def eval(self, mol, norm=False):
+        s = "None"
+        try:
+            s = Chem.MolToSmiles(mol.mol)
+            print("docking {}".format(s))
+            _, r, _ = self.dock.dock(s)
+        except Exception as e: # Sometimes the prediction fails
+            print('exception for', s, e)
+            r = 0
+        if not norm:
+            return r
+        reward = -(r-self.target_norm[0])/self.target_norm[1]
+        return reward
+
+
+def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, dock_pool):
     # generator_dataset.set_sampling_model(model, docker, sample_prob=args.sample_prob)
     # sampler = generator_dataset.start_samplers(8, args.num_samples)
     print("Sampling")
@@ -439,6 +467,7 @@ def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, doc
     sampled_mols = []
     rews = []
     smis = []
+    t=0
     while len(sampled_mols) < args.num_samples:
         mol = BlockMoleculeDataExtended()
         for i in range(args.max_blocks):
@@ -460,13 +489,23 @@ def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, doc
             # print('skip', mol.blockidxs, mol.jbonds)
             continue
         # print('here')
-        score = docker.eval(mol, norm=False)
-        mol.reward = proxy_dataset.r2r(score)
+        # t0=time.time()
+        # score = docker.eval(mol, norm=False)
+        # t += (time.time() - t0)
+        # mol.reward = proxy_dataset.r2r(score)
         smis.append(mol.smiles)
-        rews.append(mol.reward)
-        print(mol.smiles, mol.reward)
+        # rews.append(mol.reward)
+        # print(mol.smiles, mol.reward)
         sampled_mols.append(mol)
+    # print('Docking sim seq done in {}'.format(t))
     
+    t0 = time.time()
+    rews = list(dock_pool.map(lambda a, m: a.eval.remote(m), sampled_mols))
+    t1 = time.time()
+    print('Docking sim done in {}'.format(t1-t0))
+    for i in range(len(sampled_mols)):
+        sampled_mols[i].reward = rews[i]
+
     print("Computing distances")
     dists =[]
     for m1, m2 in zip(sampled_mols, sampled_mols[1:] + sampled_mols[:1]):
@@ -485,6 +524,7 @@ def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, doc
 
 
 def main(args):
+    ray.init()
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
     proxy_repr_type = args.proxy_repr_type
@@ -495,7 +535,9 @@ def main(args):
     rews = []
     smis = []
 
-    docker = Docker(tmp_dir, cpu_req=args.cpu_req)
+    actors = [_SimDockLet.remote(tmp_dir)
+                    for i in range(10)]
+    pool = ray.util.ActorPool(actors)
     args.repr_type = proxy_repr_type
     args.replay_mode = "dataset"
     args.reward_exp = 1
@@ -506,7 +548,7 @@ def main(args):
     rews.append(proxy_dataset.rews)
     smis.append([mol.smiles for mol in proxy_dataset.train_mols])
     print(np.max(proxy_dataset.rews))
-    exp_dir = f'{args.save_path}/ppo{args.array}_{args.run}/'
+    exp_dir = f'{args.save_path}/ppo_{args.num_init_examples}_{args.array}_{args.run}/'
     os.makedirs(exp_dir, exist_ok=True)
 
     print(len(proxy_dataset.train_mols), 'train mols')
@@ -544,7 +586,7 @@ def main(args):
 
         print(f"Sampling mols: {i}")
         # sample molecule batch for generator and update dataset with docking scores for sampled batch
-        _proxy_dataset, r, s, batch_metrics = sample_and_update_dataset(args, model, proxy_dataset, gen_model_dataset, docker)
+        _proxy_dataset, r, s, batch_metrics = sample_and_update_dataset(args, model, proxy_dataset, gen_model_dataset, pool)
         print(f"Batch Metrics: dists_mean: {batch_metrics['dists_mean']}, dists_sum: {batch_metrics['dists_sum']}, reward_mean: {batch_metrics['reward_mean']}, reward_max: {batch_metrics['reward_max']}")
         rews.append(r)
         smis.append(s)
@@ -575,6 +617,7 @@ def main(args):
         print(f"Updating proxy: {i}")
         # update proxy with new data
         proxy.train(proxy_dataset)
+    ray.shutdown()
     
 
 if __name__ == '__main__':
