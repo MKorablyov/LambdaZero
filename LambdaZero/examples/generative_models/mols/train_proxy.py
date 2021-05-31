@@ -143,11 +143,11 @@ class Dataset(_Dataset):
                 continue
             # TODO: compute proper reward with QED & all
             m.reward = self.r2r(dockscore=m.dockscore)
-            self.rews.append(m.reward)
             m.numblocks = len(m.blocks)
             if split_bool[i]:
                 self.test_mols.append(m)
             else:
+                self.rews.append(m.reward)
                 self.train_mols.append(m)
                 self.train_mols_map[df.iloc[i].name] = m
             if len(self.train_mols) >= num_examples:
