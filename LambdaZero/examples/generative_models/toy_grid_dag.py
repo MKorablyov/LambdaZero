@@ -18,27 +18,34 @@ from torch.distributions.categorical import Categorical
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--save_path", default='results/low_floor_flow_0.pkl.gz', type=str)
-parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
+parser.add_argument("--save_path", default='results/flow_insp_0.pkl.gz', type=str)
+parser.add_argument("--device", default='cpu', type=str)
+parser.add_argument("--progress", action='store_true')
+
+#
 parser.add_argument("--method", default='flownet', type=str)
+parser.add_argument("--learning_rate", default=1e-4, help="Learning rate", type=float)
 parser.add_argument("--opt", default='adam', type=str)
 parser.add_argument("--adam_beta1", default=0.9, type=float)
 parser.add_argument("--adam_beta2", default=0.999, type=float)
 parser.add_argument("--momentum", default=0.9, type=float)
-parser.add_argument("--bootstrap_tau", default=0.1, type=float)
 parser.add_argument("--mbsize", default=16, help="Minibatch size", type=int)
-parser.add_argument("--bufsize", default=16, help="MCMC buffer size", type=int)
 parser.add_argument("--train_to_sample_ratio", default=1, type=float)
-parser.add_argument("--horizon", default=8, type=int)
-parser.add_argument("--ndim", default=2, type=int)
 parser.add_argument("--n_hid", default=256, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
-parser.add_argument("--n_train_steps", default=30000, type=int)
+parser.add_argument("--n_train_steps", default=20000, type=int)
 parser.add_argument("--num_empirical_loss", default=200000, type=int,
                     help="Number of samples used to compute the empirical distribution loss")
-
+# Env
 parser.add_argument('--func', default='corners')
+parser.add_argument("--horizon", default=8, type=int)
+parser.add_argument("--ndim", default=2, type=int)
 
+# MCMC
+parser.add_argument("--bufsize", default=16, help="MCMC buffer size", type=int)
+
+# Flownet
+parser.add_argument("--bootstrap_tau", default=0., type=float)
 parser.add_argument("--replay_strategy", default='none', type=str) # top_k none
 parser.add_argument("--replay_sample_size", default=2, type=int)
 parser.add_argument("--replay_buf_size", default=100, type=float)
@@ -51,15 +58,9 @@ parser.add_argument("--ppo_entropy_coef", default=1e-1, type=float)
 parser.add_argument("--clip_grad_norm", default=0., type=float)
 
 # SAC
-parser.add_argument("--sac_alpha", default=5e-1, type=float)
+parser.add_argument("--sac_alpha", default=0.98*np.log(1/3), type=float)
 
 
-# This is alpha in the note, smooths the learned distribution into a uniform exploratory one
-#parser.add_argument("--uniform_sample_prob", default=0.00, type=float)
-#parser.add_argument("--do_is_queue", action='store_true')
-#parser.add_argument("--queue_thresh", default=10, type=float)
-parser.add_argument("--device", default='cpu', type=str)
-parser.add_argument("--progress", action='store_true')
 
 
 _dev = [torch.device('cpu')]
@@ -179,6 +180,7 @@ class GridEnv:
         return self._true_density
 
     def all_possible_states(self):
+        """Compute quantities for debugging and analysis"""
         # all possible action sequences
         def step_fast(a, s):
             s = s + 0
@@ -571,7 +573,7 @@ class SACAgent:
         self.pol = make_mlp([args.horizon * args.ndim] +
                             [args.n_hid] * args.n_layers +
                             [args.ndim+1],
-                            tail=[nn.Softmax(1)]) # +1 for stop
+                            tail=[nn.Softmax(1)])
         self.Q_1 = make_mlp([args.horizon * args.ndim] +
                             [args.n_hid] * args.n_layers +
                             [args.ndim+1])
