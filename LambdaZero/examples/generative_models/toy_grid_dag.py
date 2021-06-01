@@ -131,6 +131,11 @@ class GridEnv:
                 parents += [self.obs(sp)]
                 actions += [i]
         return parents, actions
+    
+    def compute_rewards(self, x):
+        if hasattr(self.func, 'many'):
+            return self.func.many(x)
+        return self.func(x) # [self.func(i) for i in x]
 
     def step(self, a, s=None):
         if self.allow_backward:
@@ -173,7 +178,7 @@ class GridEnv:
                                for s in all_int_states])
         all_xs = (np.float32(all_int_states) / (self.horizon-1) *
                   (self.xspace[-1] - self.xspace[0]) + self.xspace[0])
-        traj_rewards = self.func(all_xs)[state_mask]
+        traj_rewards = self.compute_rewards(all_xs)[state_mask]
         self._true_density = (traj_rewards / traj_rewards.sum(),
                               list(map(tuple,all_int_states[state_mask])),
                               traj_rewards)

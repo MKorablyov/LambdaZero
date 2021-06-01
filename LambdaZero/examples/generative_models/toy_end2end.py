@@ -103,13 +103,13 @@ def get_network_output(args, network, inputs, mean_std=False):
     if not mean_std:
         outputs = []
         for batch in dataloader:
-            outputs.append(network(batch[0]))
+            outputs.append(network(batch[0].to(dev)))
         return torch.cat(outputs, dim=0)
     else:
         mean = []
         std = []
         for batch in dataloader:
-            out = network(batch[0])
+            out = network(batch[0].to(dev))
             mean.append(out.mean.cpu())
             std.append(torch.sqrt(out.variance).cpu())
         return torch.cat(mean, dim=0), torch.cat(std, dim=0)
@@ -119,10 +119,10 @@ def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r,
     # Sample data from trained policy, given dataset.
     # Currently only naively samples data and adds to dataset, but should ideally also
     # have a diversity constraint based on existing dataset
-    true_density = tf(true_r / true_r.sum())
+    true_density = tfc(true_r / true_r.sum())
     with torch.no_grad():
-        pi_a_s = torch.softmax(get_network_output(args, policy, tf(all_inputs)), 1)
-        estimated_density = compute_p_of_x(pi_a_s)
+        pi_a_s = torch.softmax(get_network_output(args, policy, tfc(all_inputs)), 1)
+        estimated_density = compute_p_of_x(pi_a_s).cpu()
     plot_densities(args, np.array(all_end_states), true_density.cpu().numpy(), estimated_density.cpu().numpy(), path=os.path.join(exp_path, f"est_dens-{it}.png"))
     # L1 distance
     k1 = abs(estimated_density - true_density).mean().item()
@@ -136,17 +136,17 @@ def generate_batch(args, policy, dataset, it, exp_path, env, all_inputs, true_r,
         sampled_y.append(r)
     x, y = dataset
 
-    plot_fn(path=os.path.join(exp_path, f"aq-{it}.png"), all_x=tf(all_end_states), all_y=tf(true_r),
+    plot_fn(path=os.path.join(exp_path, f"aq-{it}.png"), all_x=tfc(all_end_states), all_y=tfc(true_r), 
             train_x=x, train_y=y, batch_x=sampled_x, batch_y=sampled_y, title=f"Points acquired at step {it}")
-    x = torch.cat([x, tf(sampled_x)])
-    y = torch.cat([y, tf(sampled_y)])
+    x = torch.cat([x, tfc(sampled_x)])
+    y = torch.cat([y, tfc(sampled_y)])
     return (x, y), (k1, kl)
 
 
 def update_proxy(args, data):
     # Train proxy(GP) on collected data
     train_x, train_y = data
-    model = SingleTaskGP(train_x, train_y.unsqueeze(-1),
+    model = SingleTaskGP(train_x.to(dev), train_y.unsqueeze(-1).to(dev), 
                          covar_module=gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=0.5, lengthscale_prior=gpytorch.priors.GammaPrior(0.5, 2.5))))
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
@@ -412,17 +412,17 @@ def plot_fn(path, **kwargs):
 
     if "train_x" in kwargs.keys():
         train_x, train_y = kwargs['train_x'], kwargs['train_y']
-        train_x, train_y = train_x.cpu(), train_y.cpu()
+        # train_x, train_y = train_x.cpu(), train_y.cpu()
         ax.plot(train_x.numpy(), train_y.numpy(), 'k*', label='training points')
-        train_x, train_y = train_x.to(dev), train_y.to(dev)
+        # train_x, train_y = train_x.to(dev), train_y.to(dev)
     if "batch_x" in kwargs.keys():
         batch_x, batch_y = kwargs['batch_x'], kwargs['batch_y']
         ax.plot(batch_x, batch_y, 'ro', label='acquired points')
     if "all_x" in kwargs.keys():
         all_x, all_y =  kwargs["all_x"], kwargs["all_y"]
-        all_x, all_y = all_x.cpu(), all_y.cpu()
+        # all_x, all_y = all_x.cpu(), all_y.cpu()
         ax.plot(all_x.numpy(), all_y.numpy(), '--', label='true_fn')
-        all_x, all_y = all_x.to(dev), all_y.to(dev)
+        # all_x, all_y = all_x.to(dev), all_y.to(dev)
     ax.set_title(kwargs["title"])
     ax.legend()
     plt.savefig(path)
@@ -446,23 +446,23 @@ def plot_model(path, **kwargs):
 
     if "all_x" in kwargs.keys():
         all_x, all_y =  kwargs["all_x"], kwargs["all_y"]
-        all_x, all_y = all_x.cpu(), all_y.cpu()
+        # all_x, all_y = all_x.cpu(), all_y.cpu()
         ax.plot(all_x.numpy(), all_y.numpy(), '--', label='true_fn')
-        all_x, all_y = all_x.to(dev), all_y.to(dev)
+        # all_x, all_y = all_x.to(dev), all_y.to(dev)
     if "train_x" in kwargs.keys():
         train_x, train_y = kwargs['train_x'], kwargs['train_y']
-        train_x, train_y = train_x.cpu(), train_y.cpu()
+        # train_x, train_y = train_x.cpu(), train_y.cpu()
         ax.plot(train_x.numpy(), train_y.numpy(), 'k*', label='training points')
-        train_x, train_y = train_x.to(dev), train_y.to(dev)
+        # train_x, train_y = train_x.to(dev), train_y.to(dev)
     if "model" in kwargs.keys():
         model = kwargs["model"]
         mean, std = get_network_output(args, model, all_x, mean_std=True)
-        all_x = all_x.cpu()
+        # all_x = all_x.cpu()
         with torch.no_grad():
             lower, upper = mean + std, mean - std
             ax.plot(all_x.numpy(), mean.numpy(), 'b', label='Mean')
             ax.fill_between(all_x.numpy(), lower.numpy(), upper.numpy(), alpha=0.5, label='Confidence')
-        all_x = all_x.to(dev)
+        # all_x = all_x.to(dev)
     ax.set_title(kwargs["title"])
     ax.legend()
     plt.savefig(path)
