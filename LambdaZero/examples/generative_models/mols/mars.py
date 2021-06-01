@@ -60,17 +60,17 @@ importlib.reload(mol_mdp_ext)
 #importlib.reload(chem_op)
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-if 'SLURM_TMPDIR' in os.environ:
-    print("Syncing locally")
-    tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
+# if 'SLURM_TMPDIR' in os.environ:
+    # print("Syncing locally")
+tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
 
-    os.system(f"rsync -az {programs_dir} {tmp_dir}")
-    os.system(f"rsync -az {datasets_dir} {tmp_dir}")
-    programs_dir = f"{tmp_dir}/Programs"
-    datasets_dir = f"{tmp_dir}/Datasets"
-    print("Done syncing")
-else:
-    tmp_dir = "/tmp/lambdazero"
+#     os.system(f"rsync -az {programs_dir} {tmp_dir}")
+#     os.system(f"rsync -az {datasets_dir} {tmp_dir}")
+#     programs_dir = f"{tmp_dir}/Programs"
+#     datasets_dir = f"{tmp_dir}/Datasets"
+#     print("Done syncing")
+# else:
+#     tmp_dir = "/tmp/lambdazero"
 
 os.makedirs(tmp_dir, exist_ok=True)
 
@@ -83,6 +83,7 @@ parser.add_argument("--nemb", default=32, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=3, type=int)
 parser.add_argument("--max_blocks", default=10, type=int)
 parser.add_argument("--num_iterations", default=200, type=int)
+parser.add_argument("--max_generated_mols", default=1e6, type=int)
 parser.add_argument("--num_conv_steps", default=12, type=int)
 parser.add_argument("--log_reg_c", default=0, type=float)
 parser.add_argument("--reward_exp", default=4, type=float)
@@ -94,10 +95,11 @@ parser.add_argument("--num_sgd_steps", default=25, type=int)
 parser.add_argument("--bootstrap_tau", default=0, type=float)
 parser.add_argument("--array", default='')
 parser.add_argument("--repr_type", default='atom_graph')
+parser.add_argument("--floatX", default='float64')
 parser.add_argument("--model_version", default='v5')
 parser.add_argument("--run", default=0, help="run", type=int)
 #parser.add_argument("--save_path", default='/miniscratch/bengioe/LambdaZero/imitation_learning/')
-parser.add_argument("--save_path", default='results/')
+parser.add_argument("--save_path", default='results/mars/')
 parser.add_argument("--proxy_path", default='results/proxy__6/')
 parser.add_argument("--print_array_length", default=False, action='store_true')
 parser.add_argument("--progress", default='yes')
@@ -120,8 +122,8 @@ class SplitCategorical:
         split = a < self.n
         log_one_half = -0.693147
         return (log_one_half + # We need to multiply the prob by 0.5, so add log(0.5) to logprob
-                self.cats[0].log_prob(torch.minimum(a, torch.tensor(self.n-1))) * split +
-                self.cats[1].log_prob(torch.maximum(a - self.n, torch.tensor(0))) * (~split))
+                self.cats[0].log_prob(torch.minimum(a, torch.tensor(self.n-1).to(a.device))) * split +
+                self.cats[1].log_prob(torch.maximum(a - self.n, torch.tensor(0).to(a.device))) * (~split))
 
     def entropy(self):
         return Categorical(probs=torch.cat([self.cats[0].probs, self.cats[1].probs],-1) * 0.5).entropy()
@@ -131,7 +133,7 @@ class SplitCategorical:
 
 class Dataset:
 
-    def __init__(self, args, bpath, device, repr_type):
+    def __init__(self, args, bpath, device, repr_type, floatX=torch.double):
         self.test_split_rng = np.random.RandomState(142857)
         self.train_rng = np.random.RandomState(int(time.time()))
         self.train_mols = []
@@ -140,6 +142,8 @@ class Dataset:
         self.mdp = MolMDPExtended(bpath)
         self.mdp.post_init(device, repr_type, include_bonds=True)
         self.mdp.build_translation_table()
+        self.floatX = floatX
+        self.mdp.floatX = self.floatX
         self._device = device
         self.seen_molecules = set()
         self.stop_event = threading.Event()
@@ -151,6 +155,7 @@ class Dataset:
         self.max_blocks = args.max_blocks
         self.floatX = torch.double
         self.mdp.floatX = self.floatX
+        self.args = args
         #######
         # This is the "result", here a list of (reward, BlockMolDataExt) tuples
         self.sampled_mols = []
@@ -162,7 +167,7 @@ class Dataset:
         self.proxy_reward = proxy_reward
         print("Starting buffer")
         self.mol_buffer = [(m, self._get_reward(m))
-                           for i in tqdm(range(args.buffer_size))
+                           for i in tqdm(range(self.args.buffer_size))
                            for m in [self.mdp.add_block_to(BlockMoleculeDataExtended(),
                                                            i % self.mdp.num_blocks)]]
 
@@ -272,8 +277,15 @@ _stop = [None]
 def main(args):
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
+    if args.floatX == 'float32':
+        args.floatX = torch.float
+    else:
+        args.floatX = torch.double
+    #tf = lambda x: torch.tensor(x, device=device).float()
+    tf = lambda x: torch.tensor(x, device=device).to(args.floatX)
+    tint = lambda x: torch.tensor(x, device=device).long()
 
-    dataset = Dataset(args, bpath, device, args.repr_type)
+    dataset = Dataset(args, bpath, device, args.repr_type, floatX=args.floatX)
 
     exp_dir = f'{args.save_path}/{args.array}_{args.run}/'
     os.makedirs(exp_dir, exist_ok=True)
@@ -296,9 +308,6 @@ def main(args):
                            betas=(args.opt_beta, 0.99))
     #opt = torch.optim.SGD(model.parameters(), args.learning_rate)
 
-    #tf = lambda x: torch.tensor(x, device=device).float()
-    tf = lambda x: torch.tensor(x, device=device).double()
-    tint = lambda x: torch.tensor(x, device=device).long()
 
     mbsize = args.mbsize
     ar = torch.arange(mbsize)
@@ -309,7 +318,6 @@ def main(args):
     def stop_everything():
         stop_event.set()
         print('joining')
-        dataset.stop_samplers_and_join()
     _stop[0] = stop_everything
 
     def save_stuff():
@@ -374,6 +382,8 @@ def main(args):
             time_last_check = time.time()
             last_losses = []
             save_stuff()
+        if len(dataset.sampled_mols) >= args.max_generated_mols:
+            break
 
     stop_everything()
     save_stuff()
@@ -392,6 +402,7 @@ def array_may_17(args):
         {**base, 'mbsize': 32, 'buffer_size': 5000, 'num_sgd_steps': 25, 'max_blocks': 10},
         {**base, 'mbsize': 32, 'buffer_size': 5000, 'num_sgd_steps': 25},
         {**base, 'mbsize': 32, 'buffer_size': 5000, 'num_sgd_steps': 25, 'reward_exp': 4},
+        {**base, 'mbsize': 32, 'buffer_size': 5000, 'num_sgd_steps': 25, 'reward_exp': 8},
     ]
     return all_hps
 

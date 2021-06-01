@@ -13,6 +13,8 @@ class GraphAgent(nn.Module):
 
     def __init__(self, nemb, nvec, out_per_stem, out_per_mol, num_conv_steps, mdp_cfg, version='v1'):
         super().__init__()
+        print(version)
+        if version == 'v5': version = 'v4'
         self.version = version
         self.embeddings = nn.ModuleList([
             nn.Embedding(mdp_cfg.num_true_blocks + 1, nemb),
@@ -93,11 +95,11 @@ class GraphAgent(nn.Module):
     def action_negloglikelihood(self, s, a, g, stem_o, mol_o):
         mol_p, stem_p = self.out_to_policy(s, stem_o, mol_o)
         #print(Z.shape, Z.min().item(), Z.mean().item(), Z.max().item())
-        mol_lsm = torch.log(mol_p + 1e-5)
-        stem_lsm = torch.log(stem_p + 1e-5)
+        mol_lsm = torch.log(mol_p + 1e-20)
+        stem_lsm = torch.log(stem_p + 1e-20)
         #print(mol_lsm.shape, mol_lsm.min().item(), mol_lsm.mean().item(), mol_lsm.max().item())
         #print(stem_lsm.shape, stem_lsm.min().item(), stem_lsm.mean().item(), stem_lsm.max().item(), '--')
-        return self.index_output_by_action(self, s, stem_lsm, mol_lsm, a)
+        return -self.index_output_by_action(s, stem_lsm, mol_lsm, a)
 
     def index_output_by_action(self, s, stem_o, mol_o, a):
         stem_slices = torch.tensor(s.__slices__['stems'][:-1], dtype=torch.long, device=stem_o.device)
@@ -109,7 +111,7 @@ class GraphAgent(nn.Module):
     def sum_output(self, s, stem_o, mol_o):
         return gnn.global_add_pool(stem_o, s.stems_batch).sum(1) + mol_o
 
-def mol2graph(mol, mdp):
+def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
     f = lambda x: torch.tensor(x, dtype=torch.long, device=mdp.device)
     if len(mol.blockidxs) == 0:
         data = Data(# There's an extra block embedding for the empty molecule
@@ -141,6 +143,7 @@ def mol2graph(mol, mdp):
                 stems=f(mol.stems) if len(mol.stems) else f([(0,0)]),
                 stemtypes=f(stemtypes) if len(mol.stems) else f([mdp.num_stem_types]))
     data.to(mdp.device)
+    assert not bonds and not nblocks
     #print(data)
     return data
 

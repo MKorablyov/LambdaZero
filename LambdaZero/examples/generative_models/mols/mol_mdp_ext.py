@@ -15,6 +15,10 @@ class BlockMoleculeDataExtended(BlockMoleculeData):
     def mol(self):
         return chem.mol_from_frag(jun_bonds=self.jbonds, frags=self.blocks)[0]
 
+    @property
+    def smiles(self):
+        return Chem.MolToSmiles(self.mol)
+
     def copy(self): # shallow copy
         o = BlockMoleculeDataExtended()
         o.blockidxs = list(self.blockidxs)
@@ -190,7 +194,7 @@ class MolMDPExtended(MolMDP):
         return None
 
 
-    def post_init(self, device, repr_type, include_bonds=False):
+    def post_init(self, device, repr_type, include_bonds=False, include_nblocks=False):
         self.device = device
         self.repr_type = repr_type
         #self.max_bond_atmidx = max([max(i) for i in self.block_rs])
@@ -202,6 +206,7 @@ class MolMDPExtended(MolMDP):
         self.num_stem_types = self.stem_type_offset[-1]
         self.true_blockidx = [self.true_block_set.index(i) for i in self.block_smi]
         self.num_true_blocks = len(self.true_block_set)
+        self.include_nblocks = include_nblocks
         self.include_bonds = include_bonds
         #print(self.max_num_atm, self.num_stem_types)
         self.molcache = {}
@@ -223,7 +228,9 @@ class MolMDPExtended(MolMDP):
         if self.repr_type == 'block_graph':
             r = model_block.mol2graph(mol, self, self.floatX)
         elif self.repr_type == 'atom_graph':
-            r = model_atom.mol2graph(mol, self, self.floatX, bonds=self.include_bonds)
+            r = model_atom.mol2graph(mol, self, self.floatX,
+                                     bonds=self.include_bonds,
+                                     nblocks=self.include_nblocks)
         elif self.repr_type == 'morgan_fingerprint':
             r = model_fingerprint.mol2fp(mol, self, self.floatX)
         #self.molcache[molhash] = r
