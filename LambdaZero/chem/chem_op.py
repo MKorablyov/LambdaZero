@@ -538,11 +538,19 @@ class DockVina_smi:
         return os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
 
     def _cleanup(self, mol_name):
+        # https://docs.python.org/3/library/contextlib.html
+        # contextlib.suppress
+        # Return a context manager that suppresses any of the specified exceptions if they are raised in the body of a with statement
+        # and then resumes execution with the first statement following the end of the with statement.
         with contextlib.suppress(FileNotFoundError):
             os.remove(self.smi_file(mol_name))
+        with contextlib.suppress(FileNotFoundError):
             os.remove(self.sdf_file(mol_name))
+        with contextlib.suppress(FileNotFoundError):
             os.remove(self.mol2_file(mol_name))
+        with contextlib.suppress(FileNotFoundError):
             os.remove(self.pdbqt_file(mol_name))
+        with contextlib.suppress(FileNotFoundError):
             os.remove(self.docked_pdb_file(mol_name))
 
     @staticmethod
