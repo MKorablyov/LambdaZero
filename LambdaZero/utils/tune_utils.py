@@ -158,8 +158,9 @@ class Trainer(tune.Trainable):
         train_set = config["train_dataset"]["class"](**config["train_dataset"]["config"])
         train_idx_path = config["train_dataset"].get('idx_path', default=None)
         if train_idx_path is not None:
-            train_idx = np.load(train_idx_path)
-            train_set = Subset(train_set, train_idx.tolist())  # TODO: check if numpy array works as well, and whether self. needed
+            # Subset does NOT accept numpy array - raises error on type check - hence *.tolist()
+            train_idx = np.load(train_idx_path).tolist()
+            train_set = Subset(train_set, train_idx)
 
         train_dataloader = DataLoader(train_set, shuffle=True, batch_size=train_batch_size)
         self.train_entity = (train_alias, train_dataloader, train_metrics)
@@ -174,8 +175,8 @@ class Trainer(tune.Trainable):
             val_set = val_entity_definition["class"](**val_entity_definition["config"])
             val_idx_path = val_entity_definition.get('idx_path', default=None)
             if val_idx_path is not None:
-                val_idx = np.load(val_idx_path)
-                val_set = Subset(val_set, val_idx.tolist())  # TODO: here too
+                val_idx = np.load(val_idx_path).tolist()
+                val_set = Subset(val_set, val_idx)
             val_dataloader = DataLoader(val_set, batch_size=val_batch_size)
             val_entities.append((val_alias, val_dataloader, val_metrics))
         self.val_entities = val_entities
@@ -247,6 +248,79 @@ class Trainer(tune.Trainable):
     def load_checkpoint(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
+
+explicit_config = {
+    "trainer": Trainer,
+    "trainer_config": {
+        "dtype": torch.float64,
+        "device": torch.device('cuda:0'),
+        "train_dataset": {
+            "alias": 'QM9',
+            "batch_size": 16,
+            "loss_function": None,
+            "target": 'y',
+            "metrics": None,
+            "scaling": {
+                "class": StandardScaler,
+                "config": {
+                    "mean": 2.68,
+                    "std": 1.5
+                }
+            },
+            "class": None,
+            "config": None,
+            "idx_path": None
+        },
+        "validation_datasets": [
+            {
+                "alias": None,
+                "batch_size": None,
+                "metrics": None,
+                "idx_path": None,
+                "class": None,
+                "config": None
+            },
+{
+                "alias": None,
+                "batch_size": None,
+                "metrics": None,
+                "idx_path": None,
+                "class": None,
+                "config": None
+            }
+        ],
+        "model": {
+            "class": None,
+            "config": None
+        },
+        "optimizer": {
+            "class": None,
+            "config": None
+        },
+        "scheduler": {
+            "class": None,
+            "config": None,
+            "trigger": 'epoch',
+            "target": None
+        },
+        "train_epoch": train,
+        "eval_epoch": eval,
+    },
+
+    "summaries_dir": summaries_dir,
+    "memory": 8 * 10 ** 9,  # 20 * 10 ** 9,
+
+    "stop": {"training_iteration": 120},
+    "resources_per_trial": {
+        "cpu": 1,
+        "gpu": 1.0
+    },
+    "keep_checkpoint_num": 2,
+    "checkpoint_score_attr": "train_loss",
+    "num_samples": 1,
+    "checkpoint_at_end": False,
+    "checkpoint_freq": 100000,  # 1;  0 is a default in tune.run
+}
 
 
 class BasicRegressor(tune.Trainable):
