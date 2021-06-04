@@ -455,30 +455,33 @@ class DockVina_smi:
         os.makedirs(os.path.join(self.outpath, "pdbqt"), exist_ok=True)
         os.makedirs(os.path.join(self.outpath, "docked"), exist_ok=True)
 
-    def dock(self, smi, mol_name=None, molgen_conf=20):
-        mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
+    def dock(self, smi, mol_name=None, molgen_conf=20, docking_timeout=60*5):
+        try:
+            mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
 
-        input_sdf_file = self.sdf_file(mol_name)
-        input_pdbqt_file = self.pdbqt_file(mol_name)
-        docked_pdb_file = self.docked_pdb_file(mol_name)
+            # input_sdf_file = self.sdf_file(mol_name)
+            input_pdbqt_file = self.pdbqt_file(mol_name)
+            docked_pdb_file = self.docked_pdb_file(mol_name)
 
-        # generate input files
-        self.gen_mol_files(smi, mol_name, molgen_conf)
+            # generate input files
+            self.gen_mol_files(smi, mol_name, molgen_conf)
 
-        # complete docking query
-        dock_cmd = self.dock_cmd.format(input_pdbqt_file, docked_pdb_file)
+            # complete docking query
+            dock_cmd = self.dock_cmd.format(input_pdbqt_file, docked_pdb_file)
 
-        # dock
-        cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
-        cl.wait()
+            # dock
+            cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
+            cl.wait(timeout=docking_timeout)
 
-        # parse energy and (optionally) coordinates
-        mol_name, dockscore, original_pos, docked_pos = self.parse(mol_name)
+            # parse energy and (optionally) coordinates
+            mol_name, dockscores, original_pos, docked_pos = self.parse(mol_name)
+        finally:
+            # https://docs.python.org/3/tutorial/errors.html
+            # If the exception is not handled by an except clause, the exception is re-raised after the finally clause has been executed.
+            if self.cleanup:
+                self._cleanup(mol_name)
 
-        if self.cleanup:
-            self._cleanup(mol_name)
-
-        return mol_name, dockscore, original_pos, docked_pos
+        return mol_name, dockscores, original_pos, docked_pos
 
     def parse(self, mol_name):
         input_sdf_file = self.sdf_file(mol_name)
@@ -486,9 +489,7 @@ class DockVina_smi:
         docked_pdb_file = self.docked_pdb_file(mol_name)
 
         original_pos = None
-        docked_pos = None
-
-        dockscore, docked_pos = DockVina_smi._parse_docked_pdb(docked_pdb_file, self.mode)
+        dockscores, docked_pos = DockVina_smi._parse_docked_pdb(docked_pdb_file, self.mode)
         if self.mode in ["best_conf", "all_conf"]:
             original_pos = DockVina_smi._parse_pos_sdf(input_sdf_file)
             permuted_original_pos = DockVina_smi._parse_pos_pdbqt(input_pdbqt_file)
@@ -496,7 +497,7 @@ class DockVina_smi:
             order = DockVina_smi._get_atoms_reordering(original_pos, permuted_original_pos)
             docked_pos = docked_pos[..., order, :]
 
-        return mol_name, dockscore, original_pos, docked_pos
+        return mol_name, dockscores, original_pos, docked_pos
 
     def gen_mol_files(self, smi, mol_name, num_conf):
         smi_file = self.smi_file(mol_name)
