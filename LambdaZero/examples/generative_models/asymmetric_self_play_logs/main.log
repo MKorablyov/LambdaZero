@@ -1,0 +1,1200 @@
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:30,509 | PPO objective after epoch 1: 13.75578498840332
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:30,509 | Value loss (MSE loss) after epoch 1: 805301.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:30,509 | Behavioral cloning loss (Bob loss) after epoch 1: 1.1007252931594849
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:30,572 | PPO objective after epoch 2: 15.081079483032227
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:30,572 | Value loss (MSE loss) after epoch 2: 1047005.1875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:30,572 | Behavioral cloning loss (Bob loss) after epoch 2: 1.07361900806427
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:30,634 | PPO objective after epoch 3: 147.80023193359375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:30,634 | Value loss (MSE loss) after epoch 3: 210690560.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:30,634 | Behavioral cloning loss (Bob loss) after epoch 3: 1.0499317646026611
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:30,694 | PPO objective after epoch 4: 9.927611351013184
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:30,694 | Value loss (MSE loss) after epoch 4: 506841.03125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:30,694 | Behavioral cloning loss (Bob loss) after epoch 4: 1.0791467428207397
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:30,757 | PPO objective after epoch 5: 36609.85546875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:30,757 | Value loss (MSE loss) after epoch 5: 8550768705536.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:30,757 | Behavioral cloning loss (Bob loss) after epoch 5: 1.0768935680389404
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:30,819 | PPO objective after epoch 6: 31.15035629272461
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:30,819 | Value loss (MSE loss) after epoch 6: 3062664.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:30,820 | Behavioral cloning loss (Bob loss) after epoch 6: 1.075257658958435
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:30,886 | PPO objective after epoch 7: 12.052774429321289
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:30,886 | Value loss (MSE loss) after epoch 7: 1033891.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:30,887 | Behavioral cloning loss (Bob loss) after epoch 7: 1.0582033395767212
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:30,956 | PPO objective after epoch 8: 225.80621337890625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:30,956 | Value loss (MSE loss) after epoch 8: 565712832.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:30,956 | Behavioral cloning loss (Bob loss) after epoch 8: 1.0797526836395264
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,018 | PPO objective after epoch 9: 30.151405334472656
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,018 | Value loss (MSE loss) after epoch 9: 6728264.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,018 | Behavioral cloning loss (Bob loss) after epoch 9: 1.0656408071517944
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,078 | PPO objective after epoch 10: 9.779144287109375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,078 | Value loss (MSE loss) after epoch 10: 509441.09375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,078 | Behavioral cloning loss (Bob loss) after epoch 10: 1.0576245784759521
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,152 | PPO objective after epoch 11: 16.205093383789062
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,152 | Value loss (MSE loss) after epoch 11: 572512.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,152 | Behavioral cloning loss (Bob loss) after epoch 11: 1.032004475593567
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,236 | PPO objective after epoch 12: 140.50730895996094
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,236 | Value loss (MSE loss) after epoch 12: 168569424.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,236 | Behavioral cloning loss (Bob loss) after epoch 12: 1.0588018894195557
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,320 | PPO objective after epoch 13: 33.981422424316406
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,321 | Value loss (MSE loss) after epoch 13: 8982157.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,321 | Behavioral cloning loss (Bob loss) after epoch 13: 1.0676984786987305
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,389 | PPO objective after epoch 14: 2567.05712890625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,389 | Value loss (MSE loss) after epoch 14: 48466771968.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,389 | Behavioral cloning loss (Bob loss) after epoch 14: 1.0189837217330933
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,453 | PPO objective after epoch 15: 888.1299438476562
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,453 | Value loss (MSE loss) after epoch 15: 885103936.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,454 | Behavioral cloning loss (Bob loss) after epoch 15: 1.0403237342834473
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,518 | PPO objective after epoch 16: 10.613048553466797
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,518 | Value loss (MSE loss) after epoch 16: 557821.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,518 | Behavioral cloning loss (Bob loss) after epoch 16: 1.0431283712387085
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,583 | PPO objective after epoch 17: 3398.24853515625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,583 | Value loss (MSE loss) after epoch 17: 107865726976.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,583 | Behavioral cloning loss (Bob loss) after epoch 17: 1.087171196937561
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,643 | PPO objective after epoch 18: 6.111140251159668
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,643 | Value loss (MSE loss) after epoch 18: 111797.6328125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,643 | Behavioral cloning loss (Bob loss) after epoch 18: 1.0376158952713013
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,719 | PPO objective after epoch 19: 2519.519287109375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,719 | Value loss (MSE loss) after epoch 19: 33791133696.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,720 | Behavioral cloning loss (Bob loss) after epoch 19: 1.071243405342102
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,779 | PPO objective after epoch 20: 132.30397033691406
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,780 | Value loss (MSE loss) after epoch 20: 30036422.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,780 | Behavioral cloning loss (Bob loss) after epoch 20: 1.0530112981796265
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,850 | PPO objective after epoch 21: 23.166406631469727
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,850 | Value loss (MSE loss) after epoch 21: 3407764.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,851 | Behavioral cloning loss (Bob loss) after epoch 21: 1.051959753036499
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,913 | PPO objective after epoch 22: 156.8411102294922
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,913 | Value loss (MSE loss) after epoch 22: 115916680.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,914 | Behavioral cloning loss (Bob loss) after epoch 22: 1.052643060684204
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:31,985 | PPO objective after epoch 23: 28.438674926757812
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:31,985 | Value loss (MSE loss) after epoch 23: 2555347.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:31,985 | Behavioral cloning loss (Bob loss) after epoch 23: 1.0466556549072266
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,043 | PPO objective after epoch 24: 6.323144435882568
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,043 | Value loss (MSE loss) after epoch 24: 118720.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,043 | Behavioral cloning loss (Bob loss) after epoch 24: 0.9989109039306641
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,117 | PPO objective after epoch 25: 43.20661163330078
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,117 | Value loss (MSE loss) after epoch 25: 6234344.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,118 | Behavioral cloning loss (Bob loss) after epoch 25: 1.0660271644592285
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,176 | PPO objective after epoch 26: 6.835992813110352
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,176 | Value loss (MSE loss) after epoch 26: 144674.375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,177 | Behavioral cloning loss (Bob loss) after epoch 26: 0.9917340874671936
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,247 | PPO objective after epoch 27: 40.086517333984375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,247 | Value loss (MSE loss) after epoch 27: 14619280.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,247 | Behavioral cloning loss (Bob loss) after epoch 27: 1.0804994106292725
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,306 | PPO objective after epoch 28: 9.49460220336914
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,306 | Value loss (MSE loss) after epoch 28: 455837.8125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,306 | Behavioral cloning loss (Bob loss) after epoch 28: 0.9929828643798828
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,378 | PPO objective after epoch 29: 21.431528091430664
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,378 | Value loss (MSE loss) after epoch 29: 1033387.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,378 | Behavioral cloning loss (Bob loss) after epoch 29: 1.0652508735656738
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,443 | PPO objective after epoch 30: 11.522079467773438
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,443 | Value loss (MSE loss) after epoch 30: 509523.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,444 | Behavioral cloning loss (Bob loss) after epoch 30: 1.0421396493911743
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,506 | PPO objective after epoch 31: 23.969526290893555
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,506 | Value loss (MSE loss) after epoch 31: 3329660.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,506 | Behavioral cloning loss (Bob loss) after epoch 31: 1.070380449295044
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,576 | PPO objective after epoch 32: 1917.530029296875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,577 | Value loss (MSE loss) after epoch 32: 40592384000.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,577 | Behavioral cloning loss (Bob loss) after epoch 32: 1.0837000608444214
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,639 | PPO objective after epoch 33: 12.200821876525879
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,639 | Value loss (MSE loss) after epoch 33: 682463.5625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,639 | Behavioral cloning loss (Bob loss) after epoch 33: 1.0632963180541992
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,700 | PPO objective after epoch 34: 10.003205299377441
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,700 | Value loss (MSE loss) after epoch 34: 373649.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,700 | Behavioral cloning loss (Bob loss) after epoch 34: 0.9589218497276306
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,763 | PPO objective after epoch 35: 34.90047836303711
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,763 | Value loss (MSE loss) after epoch 35: 8152540.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,763 | Behavioral cloning loss (Bob loss) after epoch 35: 1.0687817335128784
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,830 | PPO objective after epoch 36: 467.8899841308594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,830 | Value loss (MSE loss) after epoch 36: 1816605824.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,830 | Behavioral cloning loss (Bob loss) after epoch 36: 1.0564570426940918
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,887 | PPO objective after epoch 37: 30.76929473876953
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,887 | Value loss (MSE loss) after epoch 37: 4142858.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,887 | Behavioral cloning loss (Bob loss) after epoch 37: 0.9809387922286987
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:32,952 | PPO objective after epoch 38: 4.385653972625732
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:32,952 | Value loss (MSE loss) after epoch 38: 44429.96875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:32,952 | Behavioral cloning loss (Bob loss) after epoch 38: 1.0174928903579712
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,022 | PPO objective after epoch 39: 6.0119099617004395
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,022 | Value loss (MSE loss) after epoch 39: 133394.5625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,022 | Behavioral cloning loss (Bob loss) after epoch 39: 1.0512502193450928
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,078 | PPO objective after epoch 40: 6.175241470336914
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,078 | Value loss (MSE loss) after epoch 40: 90760.9609375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,078 | Behavioral cloning loss (Bob loss) after epoch 40: 0.9687775373458862
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,146 | PPO objective after epoch 41: 45.889610290527344
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,146 | Value loss (MSE loss) after epoch 41: 12237669.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,146 | Behavioral cloning loss (Bob loss) after epoch 41: 1.0370078086853027
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,210 | PPO objective after epoch 42: 40.14725112915039
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,210 | Value loss (MSE loss) after epoch 42: 5653799.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,210 | Behavioral cloning loss (Bob loss) after epoch 42: 1.0712593793869019
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,279 | PPO objective after epoch 43: 87.4655990600586
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,279 | Value loss (MSE loss) after epoch 43: 39517384.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,279 | Behavioral cloning loss (Bob loss) after epoch 43: 1.0890424251556396
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,341 | PPO objective after epoch 44: 4.875100612640381
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,342 | Value loss (MSE loss) after epoch 44: 88917.6875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,342 | Behavioral cloning loss (Bob loss) after epoch 44: 1.0500901937484741
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,405 | PPO objective after epoch 45: 5.84051513671875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,405 | Value loss (MSE loss) after epoch 45: 80800.265625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,405 | Behavioral cloning loss (Bob loss) after epoch 45: 1.0035679340362549
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,468 | PPO objective after epoch 46: 6.306583404541016
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,468 | Value loss (MSE loss) after epoch 46: 143889.984375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,468 | Behavioral cloning loss (Bob loss) after epoch 46: 1.0499675273895264
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,530 | PPO objective after epoch 47: 22.356624603271484
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,531 | Value loss (MSE loss) after epoch 47: 1535935.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,531 | Behavioral cloning loss (Bob loss) after epoch 47: 1.0270508527755737
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,590 | PPO objective after epoch 48: 227.820556640625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,590 | Value loss (MSE loss) after epoch 48: 334399872.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,591 | Behavioral cloning loss (Bob loss) after epoch 48: 0.9994352459907532
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,657 | PPO objective after epoch 49: 51.63237380981445
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,657 | Value loss (MSE loss) after epoch 49: 2484493.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,657 | Behavioral cloning loss (Bob loss) after epoch 49: 1.0244649648666382
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,722 | PPO objective after epoch 50: 30.720190048217773
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,722 | Value loss (MSE loss) after epoch 50: 5580226.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,722 | Behavioral cloning loss (Bob loss) after epoch 50: 1.0726317167282104
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,784 | PPO objective after epoch 51: 635.6630859375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,784 | Value loss (MSE loss) after epoch 51: 3198676736.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,784 | Behavioral cloning loss (Bob loss) after epoch 51: 1.0158705711364746
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,844 | PPO objective after epoch 52: 9.125572204589844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,844 | Value loss (MSE loss) after epoch 52: 352315.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,844 | Behavioral cloning loss (Bob loss) after epoch 52: 1.0483553409576416
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,906 | PPO objective after epoch 53: 8.161702156066895
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,906 | Value loss (MSE loss) after epoch 53: 101833.28125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,907 | Behavioral cloning loss (Bob loss) after epoch 53: 0.8227735161781311
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:33,978 | PPO objective after epoch 54: 17.34394073486328
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:33,978 | Value loss (MSE loss) after epoch 54: 608581.8125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:33,978 | Behavioral cloning loss (Bob loss) after epoch 54: 1.0799483060836792
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,040 | PPO objective after epoch 55: 103.7986831665039
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,040 | Value loss (MSE loss) after epoch 55: 63550420.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,040 | Behavioral cloning loss (Bob loss) after epoch 55: 1.040886402130127
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,104 | PPO objective after epoch 56: 827001.25
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,104 | Value loss (MSE loss) after epoch 56: 3343050608738304.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,104 | Behavioral cloning loss (Bob loss) after epoch 56: 1.0484483242034912
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,163 | PPO objective after epoch 57: 9.412795066833496
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,163 | Value loss (MSE loss) after epoch 57: 419086.09375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,163 | Behavioral cloning loss (Bob loss) after epoch 57: 1.0093016624450684
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,225 | PPO objective after epoch 58: 27.96729278564453
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,225 | Value loss (MSE loss) after epoch 58: 1988498.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,225 | Behavioral cloning loss (Bob loss) after epoch 58: 0.9781328439712524
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,285 | PPO objective after epoch 59: 37.276405334472656
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,285 | Value loss (MSE loss) after epoch 59: 4196711.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,285 | Behavioral cloning loss (Bob loss) after epoch 59: 0.9591535329818726
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,344 | PPO objective after epoch 60: 8.910789489746094
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,344 | Value loss (MSE loss) after epoch 60: 119815.515625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,344 | Behavioral cloning loss (Bob loss) after epoch 60: 0.9865641593933105
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,408 | PPO objective after epoch 61: 8.214272499084473
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,409 | Value loss (MSE loss) after epoch 61: 194488.859375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,409 | Behavioral cloning loss (Bob loss) after epoch 61: 1.0112260580062866
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,473 | PPO objective after epoch 62: 6.6072001457214355
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,473 | Value loss (MSE loss) after epoch 62: 109494.4609375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,473 | Behavioral cloning loss (Bob loss) after epoch 62: 0.972611129283905
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,531 | PPO objective after epoch 63: 6.882434844970703
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,532 | Value loss (MSE loss) after epoch 63: 164972.21875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,532 | Behavioral cloning loss (Bob loss) after epoch 63: 1.0239145755767822
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,600 | PPO objective after epoch 64: 24.708656311035156
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,600 | Value loss (MSE loss) after epoch 64: 1096972.125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,600 | Behavioral cloning loss (Bob loss) after epoch 64: 0.9637346267700195
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,657 | PPO objective after epoch 65: 5.048189640045166
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,657 | Value loss (MSE loss) after epoch 65: 67587.5546875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,657 | Behavioral cloning loss (Bob loss) after epoch 65: 0.9755710363388062
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,718 | PPO objective after epoch 66: 20.64665985107422
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,718 | Value loss (MSE loss) after epoch 66: 1000057.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,718 | Behavioral cloning loss (Bob loss) after epoch 66: 0.9345580339431763
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,779 | PPO objective after epoch 67: 68.41650390625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,779 | Value loss (MSE loss) after epoch 67: 3667753.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,779 | Behavioral cloning loss (Bob loss) after epoch 67: 0.9170641303062439
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,842 | PPO objective after epoch 68: 92.54776763916016
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,842 | Value loss (MSE loss) after epoch 68: 52150524.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,843 | Behavioral cloning loss (Bob loss) after epoch 68: 1.0029726028442383
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,899 | PPO objective after epoch 69: 12.691205978393555
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,899 | Value loss (MSE loss) after epoch 69: 528585.8125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,899 | Behavioral cloning loss (Bob loss) after epoch 69: 0.9353620409965515
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:34,967 | PPO objective after epoch 70: 91.84867858886719
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:34,968 | Value loss (MSE loss) after epoch 70: 17227858.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:34,968 | Behavioral cloning loss (Bob loss) after epoch 70: 1.0029057264328003
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,023 | PPO objective after epoch 71: 4.591585159301758
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,023 | Value loss (MSE loss) after epoch 71: 38486.3203125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,023 | Behavioral cloning loss (Bob loss) after epoch 71: 0.9145738482475281
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,087 | PPO objective after epoch 72: 4830.0185546875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,087 | Value loss (MSE loss) after epoch 72: 60871544832.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,087 | Behavioral cloning loss (Bob loss) after epoch 72: 1.003991723060608
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,156 | PPO objective after epoch 73: 49.69256591796875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,156 | Value loss (MSE loss) after epoch 73: 2679808.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,156 | Behavioral cloning loss (Bob loss) after epoch 73: 0.9375342130661011
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,214 | PPO objective after epoch 74: 7.503456115722656
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,214 | Value loss (MSE loss) after epoch 74: 127378.4609375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,214 | Behavioral cloning loss (Bob loss) after epoch 74: 0.9711854457855225
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,280 | PPO objective after epoch 75: 24.679170608520508
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,280 | Value loss (MSE loss) after epoch 75: 2199622.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,280 | Behavioral cloning loss (Bob loss) after epoch 75: 1.0149732828140259
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,340 | PPO objective after epoch 76: 5.885396480560303
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,340 | Value loss (MSE loss) after epoch 76: 81101.4296875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,341 | Behavioral cloning loss (Bob loss) after epoch 76: 0.9245923161506653
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,396 | PPO objective after epoch 77: 12.309039115905762
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,396 | Value loss (MSE loss) after epoch 77: 191908.5625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,397 | Behavioral cloning loss (Bob loss) after epoch 77: 0.9581101536750793
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,459 | PPO objective after epoch 78: 7.079119682312012
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,459 | Value loss (MSE loss) after epoch 78: 74144.296875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,459 | Behavioral cloning loss (Bob loss) after epoch 78: 0.9718042016029358
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,521 | PPO objective after epoch 79: 6.253639221191406
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,521 | Value loss (MSE loss) after epoch 79: 158185.21875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,521 | Behavioral cloning loss (Bob loss) after epoch 79: 0.9879910945892334
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,579 | PPO objective after epoch 80: 5.250241279602051
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,579 | Value loss (MSE loss) after epoch 80: 117443.734375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,579 | Behavioral cloning loss (Bob loss) after epoch 80: 0.9947978258132935
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,645 | PPO objective after epoch 81: 14.062321662902832
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,645 | Value loss (MSE loss) after epoch 81: 199354.71875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,645 | Behavioral cloning loss (Bob loss) after epoch 81: 0.9419788122177124
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,713 | PPO objective after epoch 82: 12.49875259399414
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,713 | Value loss (MSE loss) after epoch 82: 145407.0625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,714 | Behavioral cloning loss (Bob loss) after epoch 82: 0.8390672206878662
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,787 | PPO objective after epoch 83: 498.3939208984375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,787 | Value loss (MSE loss) after epoch 83: 570800576.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,787 | Behavioral cloning loss (Bob loss) after epoch 83: 1.023226261138916
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,846 | PPO objective after epoch 84: 844.9213256835938
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,846 | Value loss (MSE loss) after epoch 84: 1949915136.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,846 | Behavioral cloning loss (Bob loss) after epoch 84: 0.9685120582580566
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,906 | PPO objective after epoch 85: 8.744898796081543
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,906 | Value loss (MSE loss) after epoch 85: 162421.328125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,906 | Behavioral cloning loss (Bob loss) after epoch 85: 0.9470717310905457
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:35,964 | PPO objective after epoch 86: 17.207069396972656
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:35,964 | Value loss (MSE loss) after epoch 86: 1350242.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:35,964 | Behavioral cloning loss (Bob loss) after epoch 86: 0.9971905946731567
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,026 | PPO objective after epoch 87: 149.75083923339844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,026 | Value loss (MSE loss) after epoch 87: 60068248.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,026 | Behavioral cloning loss (Bob loss) after epoch 87: 0.9133912920951843
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,086 | PPO objective after epoch 88: 14.875381469726562
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,086 | Value loss (MSE loss) after epoch 88: 299174.21875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,086 | Behavioral cloning loss (Bob loss) after epoch 88: 0.9927641153335571
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,141 | PPO objective after epoch 89: 4.821527481079102
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,141 | Value loss (MSE loss) after epoch 89: 37564.421875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,141 | Behavioral cloning loss (Bob loss) after epoch 89: 0.8973210453987122
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,223 | PPO objective after epoch 90: 5.471969127655029
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,224 | Value loss (MSE loss) after epoch 90: 63639.87109375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,224 | Behavioral cloning loss (Bob loss) after epoch 90: 0.9323545694351196
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,298 | PPO objective after epoch 91: 13.111868858337402
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,298 | Value loss (MSE loss) after epoch 91: 506717.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,299 | Behavioral cloning loss (Bob loss) after epoch 91: 1.0698275566101074
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,358 | PPO objective after epoch 92: 9.090298652648926
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,358 | Value loss (MSE loss) after epoch 92: 133274.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,358 | Behavioral cloning loss (Bob loss) after epoch 92: 0.9127374291419983
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,414 | PPO objective after epoch 93: 4.622873306274414
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,414 | Value loss (MSE loss) after epoch 93: 61376.5703125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,414 | Behavioral cloning loss (Bob loss) after epoch 93: 0.9165273904800415
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,476 | PPO objective after epoch 94: 4.025276184082031
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,477 | Value loss (MSE loss) after epoch 94: 33307.10546875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,477 | Behavioral cloning loss (Bob loss) after epoch 94: 0.8943390250205994
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,532 | PPO objective after epoch 95: 3.6789164543151855
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,532 | Value loss (MSE loss) after epoch 95: 19142.923828125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,532 | Behavioral cloning loss (Bob loss) after epoch 95: 0.7879783511161804
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,592 | PPO objective after epoch 96: 34.6065673828125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,592 | Value loss (MSE loss) after epoch 96: 6311368.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,592 | Behavioral cloning loss (Bob loss) after epoch 96: 1.0020145177841187
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,651 | PPO objective after epoch 97: 541.16845703125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,651 | Value loss (MSE loss) after epoch 97: 1059234304.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,651 | Behavioral cloning loss (Bob loss) after epoch 97: 1.0015463829040527
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,715 | PPO objective after epoch 98: 12.95917797088623
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,716 | Value loss (MSE loss) after epoch 98: 488788.46875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,716 | Behavioral cloning loss (Bob loss) after epoch 98: 0.9984768629074097
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,778 | PPO objective after epoch 99: 15.90630054473877
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,778 | Value loss (MSE loss) after epoch 99: 729169.5625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,778 | Behavioral cloning loss (Bob loss) after epoch 99: 1.0196402072906494
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 16:50:36,835 | PPO objective after epoch 100: 42.4797248840332
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 16:50:36,835 | Value loss (MSE loss) after epoch 100: 5619175.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 16:50:36,835 | Behavioral cloning loss (Bob loss) after epoch 100: 0.9672940969467163
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:08,530 | PPO objective after epoch 1: 317.6963195800781
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:08,531 | Value loss (MSE loss) after epoch 1: 668742016.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:08,531 | Behavioral cloning loss (Bob loss) after epoch 1: 1.067132830619812
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:08,677 | PPO objective after epoch 2: 96.84093475341797
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:08,677 | Value loss (MSE loss) after epoch 2: 31470242.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:08,677 | Behavioral cloning loss (Bob loss) after epoch 2: 1.0564415454864502
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:08,819 | PPO objective after epoch 3: 101082.421875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:08,819 | Value loss (MSE loss) after epoch 3: 23817122480128.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:08,820 | Behavioral cloning loss (Bob loss) after epoch 3: 1.0396169424057007
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:08,975 | PPO objective after epoch 4: 325707.625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:08,975 | Value loss (MSE loss) after epoch 4: 956553440002048.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:08,975 | Behavioral cloning loss (Bob loss) after epoch 4: 1.0696860551834106
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:09,124 | PPO objective after epoch 5: 23.162498474121094
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:09,124 | Value loss (MSE loss) after epoch 5: 2595308.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:09,124 | Behavioral cloning loss (Bob loss) after epoch 5: 0.9729438424110413
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:09,297 | PPO objective after epoch 6: 96.07821655273438
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:09,297 | Value loss (MSE loss) after epoch 6: 69663032.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:09,297 | Behavioral cloning loss (Bob loss) after epoch 6: 1.033246636390686
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:09,439 | PPO objective after epoch 7: 89.6297378540039
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:09,439 | Value loss (MSE loss) after epoch 7: 58840160.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:09,439 | Behavioral cloning loss (Bob loss) after epoch 7: 1.056241750717163
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:09,589 | PPO objective after epoch 8: 27.7080078125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:09,589 | Value loss (MSE loss) after epoch 8: 1287025.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:09,590 | Behavioral cloning loss (Bob loss) after epoch 8: 1.0781853199005127
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:09,732 | PPO objective after epoch 9: 13.134037017822266
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:09,732 | Value loss (MSE loss) after epoch 9: 787018.6875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:09,733 | Behavioral cloning loss (Bob loss) after epoch 9: 1.0558832883834839
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:09,874 | PPO objective after epoch 10: 19.963363647460938
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:09,874 | Value loss (MSE loss) after epoch 10: 2225639.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:09,874 | Behavioral cloning loss (Bob loss) after epoch 10: 1.0369839668273926
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:10,020 | PPO objective after epoch 11: 26.977792739868164
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:10,020 | Value loss (MSE loss) after epoch 11: 3144879.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:10,020 | Behavioral cloning loss (Bob loss) after epoch 11: 0.9281915426254272
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:10,167 | PPO objective after epoch 12: 27.06464958190918
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:10,167 | Value loss (MSE loss) after epoch 12: 2387690.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:10,167 | Behavioral cloning loss (Bob loss) after epoch 12: 1.0148729085922241
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:10,315 | PPO objective after epoch 13: 12.59177017211914
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:10,315 | Value loss (MSE loss) after epoch 13: 649216.8125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:10,315 | Behavioral cloning loss (Bob loss) after epoch 13: 1.0583434104919434
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:10,461 | PPO objective after epoch 14: 895.7057495117188
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:10,461 | Value loss (MSE loss) after epoch 14: 8668579840.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:10,461 | Behavioral cloning loss (Bob loss) after epoch 14: 1.0443350076675415
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:10,604 | PPO objective after epoch 15: 23.01824188232422
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:10,605 | Value loss (MSE loss) after epoch 15: 4145011.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:10,605 | Behavioral cloning loss (Bob loss) after epoch 15: 1.03607976436615
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:10,762 | PPO objective after epoch 16: 755.7701416015625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:10,762 | Value loss (MSE loss) after epoch 16: 4687571968.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:10,762 | Behavioral cloning loss (Bob loss) after epoch 16: 1.0898109674453735
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:10,914 | PPO objective after epoch 17: 4206.04443359375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:10,914 | Value loss (MSE loss) after epoch 17: 198622117888.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:10,914 | Behavioral cloning loss (Bob loss) after epoch 17: 1.0717782974243164
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:11,069 | PPO objective after epoch 18: 21.547550201416016
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:11,069 | Value loss (MSE loss) after epoch 18: 2101885.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:11,069 | Behavioral cloning loss (Bob loss) after epoch 18: 1.0706758499145508
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:11,219 | PPO objective after epoch 19: 66.02718353271484
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:11,220 | Value loss (MSE loss) after epoch 19: 24648674.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:11,220 | Behavioral cloning loss (Bob loss) after epoch 19: 1.0692144632339478
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:11,367 | PPO objective after epoch 20: 104.7938461303711
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:11,367 | Value loss (MSE loss) after epoch 20: 47831996.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:11,367 | Behavioral cloning loss (Bob loss) after epoch 20: 1.0513155460357666
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:11,517 | PPO objective after epoch 21: 36.24817657470703
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:11,517 | Value loss (MSE loss) after epoch 21: 7265119.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:11,517 | Behavioral cloning loss (Bob loss) after epoch 21: 1.065016508102417
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:11,677 | PPO objective after epoch 22: 2494.60302734375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:11,677 | Value loss (MSE loss) after epoch 22: 32899416064.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:11,678 | Behavioral cloning loss (Bob loss) after epoch 22: 1.049306035041809
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:11,823 | PPO objective after epoch 23: 3.814844846725464
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:11,823 | Value loss (MSE loss) after epoch 23: 59155.4140625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:11,823 | Behavioral cloning loss (Bob loss) after epoch 23: 1.0063217878341675
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:11,965 | PPO objective after epoch 24: 28.3961181640625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:11,965 | Value loss (MSE loss) after epoch 24: 1002929.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:11,966 | Behavioral cloning loss (Bob loss) after epoch 24: 0.987250566482544
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:12,113 | PPO objective after epoch 25: 91.32427215576172
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:12,114 | Value loss (MSE loss) after epoch 25: 41999136.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:12,114 | Behavioral cloning loss (Bob loss) after epoch 25: 1.0409409999847412
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:12,267 | PPO objective after epoch 26: 21.731666564941406
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:12,267 | Value loss (MSE loss) after epoch 26: 4313293.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:12,267 | Behavioral cloning loss (Bob loss) after epoch 26: 1.0800424814224243
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:12,406 | PPO objective after epoch 27: 5.4374680519104
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:12,406 | Value loss (MSE loss) after epoch 27: 95510.6171875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:12,407 | Behavioral cloning loss (Bob loss) after epoch 27: 0.9615951180458069
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:12,550 | PPO objective after epoch 28: 3531.013671875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:12,550 | Value loss (MSE loss) after epoch 28: 57334022144.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:12,550 | Behavioral cloning loss (Bob loss) after epoch 28: 1.026717185974121
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:12,697 | PPO objective after epoch 29: 582.5247802734375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:12,697 | Value loss (MSE loss) after epoch 29: 2413391872.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:12,698 | Behavioral cloning loss (Bob loss) after epoch 29: 1.067598581314087
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:12,838 | PPO objective after epoch 30: 76.93315124511719
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:12,838 | Value loss (MSE loss) after epoch 30: 12956907.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:12,838 | Behavioral cloning loss (Bob loss) after epoch 30: 1.0147866010665894
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:12,989 | PPO objective after epoch 31: 497.8427429199219
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:12,990 | Value loss (MSE loss) after epoch 31: 2092094464.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:12,990 | Behavioral cloning loss (Bob loss) after epoch 31: 1.0692025423049927
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:13,133 | PPO objective after epoch 32: 6.194960594177246
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:13,133 | Value loss (MSE loss) after epoch 32: 135100.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:13,133 | Behavioral cloning loss (Bob loss) after epoch 32: 1.0563864707946777
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:13,283 | PPO objective after epoch 33: 136.60104370117188
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:13,283 | Value loss (MSE loss) after epoch 33: 116080568.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:13,283 | Behavioral cloning loss (Bob loss) after epoch 33: 1.0555617809295654
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:13,429 | PPO objective after epoch 34: 257.5548400878906
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:13,429 | Value loss (MSE loss) after epoch 34: 259512704.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:13,429 | Behavioral cloning loss (Bob loss) after epoch 34: 1.0286649465560913
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:13,571 | PPO objective after epoch 35: 23.216222763061523
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:13,571 | Value loss (MSE loss) after epoch 35: 2369983.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:13,571 | Behavioral cloning loss (Bob loss) after epoch 35: 1.0220297574996948
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:13,711 | PPO objective after epoch 36: 34.916404724121094
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:13,711 | Value loss (MSE loss) after epoch 36: 7269255.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:13,711 | Behavioral cloning loss (Bob loss) after epoch 36: 0.983302891254425
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:13,865 | PPO objective after epoch 37: 33.453765869140625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:13,865 | Value loss (MSE loss) after epoch 37: 7556418.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:13,865 | Behavioral cloning loss (Bob loss) after epoch 37: 1.0623586177825928
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:14,020 | PPO objective after epoch 38: 158.20660400390625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:14,020 | Value loss (MSE loss) after epoch 38: 52786504.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:14,020 | Behavioral cloning loss (Bob loss) after epoch 38: 1.051112174987793
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:14,164 | PPO objective after epoch 39: 5326.27685546875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:14,164 | Value loss (MSE loss) after epoch 39: 80218218496.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:14,164 | Behavioral cloning loss (Bob loss) after epoch 39: 0.9934143424034119
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:14,310 | PPO objective after epoch 40: 1696.96142578125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:14,311 | Value loss (MSE loss) after epoch 40: 34022060032.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:14,311 | Behavioral cloning loss (Bob loss) after epoch 40: 1.0380542278289795
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:14,461 | PPO objective after epoch 41: 9.395814895629883
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:14,461 | Value loss (MSE loss) after epoch 41: 234550.09375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:14,462 | Behavioral cloning loss (Bob loss) after epoch 41: 1.016770839691162
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:14,607 | PPO objective after epoch 42: 49.265323638916016
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:14,607 | Value loss (MSE loss) after epoch 42: 11072562.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:14,607 | Behavioral cloning loss (Bob loss) after epoch 42: 1.0459413528442383
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:14,759 | PPO objective after epoch 43: 2779.836669921875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:14,759 | Value loss (MSE loss) after epoch 43: 15455529984.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:14,759 | Behavioral cloning loss (Bob loss) after epoch 43: 1.0686702728271484
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:14,903 | PPO objective after epoch 44: 25.21633529663086
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:14,903 | Value loss (MSE loss) after epoch 44: 1023202.375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:14,903 | Behavioral cloning loss (Bob loss) after epoch 44: 0.9869055151939392
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:15,056 | PPO objective after epoch 45: 87.62142181396484
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:15,056 | Value loss (MSE loss) after epoch 45: 26563154.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:15,056 | Behavioral cloning loss (Bob loss) after epoch 45: 1.0026260614395142
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:15,209 | PPO objective after epoch 46: 3.9291489124298096
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:15,209 | Value loss (MSE loss) after epoch 46: 60117.7421875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:15,209 | Behavioral cloning loss (Bob loss) after epoch 46: 1.0021220445632935
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:15,363 | PPO objective after epoch 47: 55.96342468261719
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:15,363 | Value loss (MSE loss) after epoch 47: 21146812.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:15,363 | Behavioral cloning loss (Bob loss) after epoch 47: 1.0708606243133545
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:15,515 | PPO objective after epoch 48: 99342.03125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:15,515 | Value loss (MSE loss) after epoch 48: 61282476621824.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:15,515 | Behavioral cloning loss (Bob loss) after epoch 48: 1.0663384199142456
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:15,664 | PPO objective after epoch 49: 9.337715148925781
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:15,665 | Value loss (MSE loss) after epoch 49: 419445.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:15,665 | Behavioral cloning loss (Bob loss) after epoch 49: 1.043086290359497
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:15,805 | PPO objective after epoch 50: 1120.8646240234375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:15,805 | Value loss (MSE loss) after epoch 50: 4414045696.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:15,805 | Behavioral cloning loss (Bob loss) after epoch 50: 1.01649010181427
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:15,952 | PPO objective after epoch 51: 15222.7216796875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:15,952 | Value loss (MSE loss) after epoch 51: 1165708230656.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:15,952 | Behavioral cloning loss (Bob loss) after epoch 51: 1.0554643869400024
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:16,098 | PPO objective after epoch 52: 7.198922157287598
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:16,098 | Value loss (MSE loss) after epoch 52: 129368.953125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:16,098 | Behavioral cloning loss (Bob loss) after epoch 52: 0.9994078278541565
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:16,244 | PPO objective after epoch 53: 5.9279890060424805
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:16,244 | Value loss (MSE loss) after epoch 53: 120599.296875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:16,245 | Behavioral cloning loss (Bob loss) after epoch 53: 1.0238769054412842
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:16,386 | PPO objective after epoch 54: 15.214812278747559
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:16,387 | Value loss (MSE loss) after epoch 54: 466221.375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:16,387 | Behavioral cloning loss (Bob loss) after epoch 54: 1.0184056758880615
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:16,523 | PPO objective after epoch 55: 36.73411560058594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:16,523 | Value loss (MSE loss) after epoch 55: 7733028.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:16,523 | Behavioral cloning loss (Bob loss) after epoch 55: 0.9516283869743347
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:16,668 | PPO objective after epoch 56: 20.523277282714844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:16,668 | Value loss (MSE loss) after epoch 56: 2770502.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:16,668 | Behavioral cloning loss (Bob loss) after epoch 56: 1.0285606384277344
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:16,815 | PPO objective after epoch 57: 36973.265625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:16,815 | Value loss (MSE loss) after epoch 57: 12310176333824.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:16,815 | Behavioral cloning loss (Bob loss) after epoch 57: 1.047534704208374
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:16,962 | PPO objective after epoch 58: 463.5216369628906
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:16,962 | Value loss (MSE loss) after epoch 58: 1196719104.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:16,962 | Behavioral cloning loss (Bob loss) after epoch 58: 1.0740315914154053
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:17,119 | PPO objective after epoch 59: 529.18310546875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:17,119 | Value loss (MSE loss) after epoch 59: 2069109888.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:17,119 | Behavioral cloning loss (Bob loss) after epoch 59: 1.031940221786499
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:17,263 | PPO objective after epoch 60: 13.902676582336426
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:17,263 | Value loss (MSE loss) after epoch 60: 437361.65625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:17,263 | Behavioral cloning loss (Bob loss) after epoch 60: 1.0137810707092285
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:17,414 | PPO objective after epoch 61: 22.92264175415039
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:17,414 | Value loss (MSE loss) after epoch 61: 2733953.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:17,415 | Behavioral cloning loss (Bob loss) after epoch 61: 1.022836685180664
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:17,566 | PPO objective after epoch 62: 18.092491149902344
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:17,566 | Value loss (MSE loss) after epoch 62: 752734.9375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:17,566 | Behavioral cloning loss (Bob loss) after epoch 62: 1.0052212476730347
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:17,713 | PPO objective after epoch 63: 316.37579345703125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:17,713 | Value loss (MSE loss) after epoch 63: 365177600.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:17,713 | Behavioral cloning loss (Bob loss) after epoch 63: 1.0596296787261963
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:17,854 | PPO objective after epoch 64: 20.51961898803711
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:17,854 | Value loss (MSE loss) after epoch 64: 2402615.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:17,854 | Behavioral cloning loss (Bob loss) after epoch 64: 1.0204452276229858
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:17,994 | PPO objective after epoch 65: 86.89290618896484
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:17,994 | Value loss (MSE loss) after epoch 65: 52690892.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:17,994 | Behavioral cloning loss (Bob loss) after epoch 65: 1.0036624670028687
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:18,150 | PPO objective after epoch 66: 300.0105285644531
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:18,151 | Value loss (MSE loss) after epoch 66: 500232224.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:18,151 | Behavioral cloning loss (Bob loss) after epoch 66: 1.0852986574172974
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:18,287 | PPO objective after epoch 67: 5.384320259094238
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:18,287 | Value loss (MSE loss) after epoch 67: 62955.3671875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:18,287 | Behavioral cloning loss (Bob loss) after epoch 67: 0.9901508688926697
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:18,430 | PPO objective after epoch 68: 8.19240665435791
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:18,431 | Value loss (MSE loss) after epoch 68: 258322.21875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:18,431 | Behavioral cloning loss (Bob loss) after epoch 68: 1.0304030179977417
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:18,569 | PPO objective after epoch 69: 45.92498016357422
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:18,569 | Value loss (MSE loss) after epoch 69: 8752807.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:18,569 | Behavioral cloning loss (Bob loss) after epoch 69: 0.9676504135131836
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:18,711 | PPO objective after epoch 70: 43.54060745239258
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:18,711 | Value loss (MSE loss) after epoch 70: 10465828.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:18,711 | Behavioral cloning loss (Bob loss) after epoch 70: 1.0383912324905396
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:18,856 | PPO objective after epoch 71: 12.463218688964844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:18,857 | Value loss (MSE loss) after epoch 71: 273261.03125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:18,857 | Behavioral cloning loss (Bob loss) after epoch 71: 1.0307796001434326
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:19,006 | PPO objective after epoch 72: 263.9225769042969
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:19,006 | Value loss (MSE loss) after epoch 72: 793382784.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:19,007 | Behavioral cloning loss (Bob loss) after epoch 72: 1.0670816898345947
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:19,151 | PPO objective after epoch 73: 239.9944305419922
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:19,151 | Value loss (MSE loss) after epoch 73: 379125216.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:19,151 | Behavioral cloning loss (Bob loss) after epoch 73: 1.0270136594772339
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:19,302 | PPO objective after epoch 74: 30.825143814086914
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:19,302 | Value loss (MSE loss) after epoch 74: 3342136.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:19,302 | Behavioral cloning loss (Bob loss) after epoch 74: 1.0628758668899536
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:19,443 | PPO objective after epoch 75: 10.612014770507812
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:19,443 | Value loss (MSE loss) after epoch 75: 526671.375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:19,443 | Behavioral cloning loss (Bob loss) after epoch 75: 1.0028337240219116
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:19,583 | PPO objective after epoch 76: 12.375531196594238
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:19,583 | Value loss (MSE loss) after epoch 76: 633857.5625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:19,583 | Behavioral cloning loss (Bob loss) after epoch 76: 1.033555030822754
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:19,722 | PPO objective after epoch 77: 6.175352573394775
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:19,722 | Value loss (MSE loss) after epoch 77: 109698.3828125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:19,722 | Behavioral cloning loss (Bob loss) after epoch 77: 0.98416668176651
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:19,863 | PPO objective after epoch 78: 5.977529048919678
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:19,863 | Value loss (MSE loss) after epoch 78: 91112.59375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:19,863 | Behavioral cloning loss (Bob loss) after epoch 78: 0.9406889081001282
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:20,009 | PPO objective after epoch 79: 210.02513122558594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:20,009 | Value loss (MSE loss) after epoch 79: 435084192.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:20,009 | Behavioral cloning loss (Bob loss) after epoch 79: 1.0489672422409058
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:20,155 | PPO objective after epoch 80: 12.157090187072754
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:20,155 | Value loss (MSE loss) after epoch 80: 647843.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:20,155 | Behavioral cloning loss (Bob loss) after epoch 80: 1.0206743478775024
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:20,298 | PPO objective after epoch 81: 47.364768981933594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:20,298 | Value loss (MSE loss) after epoch 81: 14885987.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:20,298 | Behavioral cloning loss (Bob loss) after epoch 81: 1.0579853057861328
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:20,440 | PPO objective after epoch 82: 6.514873504638672
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:20,440 | Value loss (MSE loss) after epoch 82: 172198.109375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:20,440 | Behavioral cloning loss (Bob loss) after epoch 82: 0.9706863164901733
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:20,585 | PPO objective after epoch 83: 35.298118591308594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:20,585 | Value loss (MSE loss) after epoch 83: 5476358.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:20,585 | Behavioral cloning loss (Bob loss) after epoch 83: 1.039954662322998
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:20,733 | PPO objective after epoch 84: 28134.255859375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:20,733 | Value loss (MSE loss) after epoch 84: 9314448179200.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:20,733 | Behavioral cloning loss (Bob loss) after epoch 84: 1.0237544775009155
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:20,875 | PPO objective after epoch 85: 90.37667083740234
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:20,875 | Value loss (MSE loss) after epoch 85: 60621700.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:20,876 | Behavioral cloning loss (Bob loss) after epoch 85: 1.0582058429718018
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:21,012 | PPO objective after epoch 86: 29.131004333496094
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:21,013 | Value loss (MSE loss) after epoch 86: 2482497.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:21,013 | Behavioral cloning loss (Bob loss) after epoch 86: 0.901667058467865
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:21,149 | PPO objective after epoch 87: 33.0898551940918
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:21,149 | Value loss (MSE loss) after epoch 87: 4563180.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:21,149 | Behavioral cloning loss (Bob loss) after epoch 87: 0.9318386316299438
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:21,298 | PPO objective after epoch 88: 24109.4375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:21,298 | Value loss (MSE loss) after epoch 88: 2129087561728.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:21,298 | Behavioral cloning loss (Bob loss) after epoch 88: 1.0566974878311157
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:21,440 | PPO objective after epoch 89: 305.4102783203125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:21,440 | Value loss (MSE loss) after epoch 89: 699148480.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:21,440 | Behavioral cloning loss (Bob loss) after epoch 89: 1.0218323469161987
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:21,588 | PPO objective after epoch 90: 32.93019485473633
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:21,588 | Value loss (MSE loss) after epoch 90: 8781782.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:21,588 | Behavioral cloning loss (Bob loss) after epoch 90: 1.0517302751541138
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:21,728 | PPO objective after epoch 91: 4.622037410736084
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:21,729 | Value loss (MSE loss) after epoch 91: 47480.7578125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:21,729 | Behavioral cloning loss (Bob loss) after epoch 91: 0.8999741077423096
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:21,870 | PPO objective after epoch 92: 221.0285186767578
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:21,871 | Value loss (MSE loss) after epoch 92: 39919396.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:21,871 | Behavioral cloning loss (Bob loss) after epoch 92: 0.9716439843177795
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:22,026 | PPO objective after epoch 93: 8.937313079833984
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:22,026 | Value loss (MSE loss) after epoch 93: 474875.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:22,026 | Behavioral cloning loss (Bob loss) after epoch 93: 1.057059645652771
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:22,173 | PPO objective after epoch 94: 40.64750289916992
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:22,173 | Value loss (MSE loss) after epoch 94: 11830490.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:22,173 | Behavioral cloning loss (Bob loss) after epoch 94: 1.0507529973983765
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:22,313 | PPO objective after epoch 95: 33.66999435424805
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:22,313 | Value loss (MSE loss) after epoch 95: 1328655.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:22,313 | Behavioral cloning loss (Bob loss) after epoch 95: 1.021044135093689
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:22,454 | PPO objective after epoch 96: 46.5932731628418
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:22,454 | Value loss (MSE loss) after epoch 96: 12427227.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:22,455 | Behavioral cloning loss (Bob loss) after epoch 96: 1.0038254261016846
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:22,593 | PPO objective after epoch 97: 8.165864944458008
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:22,593 | Value loss (MSE loss) after epoch 97: 213388.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:22,593 | Behavioral cloning loss (Bob loss) after epoch 97: 0.9976381659507751
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:22,736 | PPO objective after epoch 98: 228.72349548339844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:22,736 | Value loss (MSE loss) after epoch 98: 329476864.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:22,736 | Behavioral cloning loss (Bob loss) after epoch 98: 1.0664801597595215
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:22,874 | PPO objective after epoch 99: 8.64430046081543
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:22,874 | Value loss (MSE loss) after epoch 99: 169781.96875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:22,874 | Behavioral cloning loss (Bob loss) after epoch 99: 0.9902186989784241
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:12:23,014 | PPO objective after epoch 100: 9.160041809082031
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:12:23,014 | Value loss (MSE loss) after epoch 100: 376411.0625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:12:23,014 | Behavioral cloning loss (Bob loss) after epoch 100: 1.0003392696380615
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:23,208 | PPO objective after epoch 1: 81512.390625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:23,208 | Value loss (MSE loss) after epoch 1: 36937847013376.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:23,208 | Behavioral cloning loss (Bob loss) after epoch 1: 1.063219666481018
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:23,372 | PPO objective after epoch 2: 776.30517578125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:23,372 | Value loss (MSE loss) after epoch 2: 9395681280.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:23,372 | Behavioral cloning loss (Bob loss) after epoch 2: 1.0603206157684326
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:23,524 | PPO objective after epoch 3: 146.16307067871094
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:23,524 | Value loss (MSE loss) after epoch 3: 52399844.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:23,524 | Behavioral cloning loss (Bob loss) after epoch 3: 1.0339086055755615
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:23,678 | PPO objective after epoch 4: 369.47088623046875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:23,679 | Value loss (MSE loss) after epoch 4: 850478656.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:23,679 | Behavioral cloning loss (Bob loss) after epoch 4: 1.085670828819275
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:23,879 | PPO objective after epoch 5: 3239.09326171875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:23,879 | Value loss (MSE loss) after epoch 5: 104478392320.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:23,879 | Behavioral cloning loss (Bob loss) after epoch 5: 1.0891294479370117
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:24,038 | PPO objective after epoch 6: 90.3906021118164
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:24,038 | Value loss (MSE loss) after epoch 6: 45994656.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:24,039 | Behavioral cloning loss (Bob loss) after epoch 6: 1.0720499753952026
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:24,182 | PPO objective after epoch 7: 20.46467399597168
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:24,182 | Value loss (MSE loss) after epoch 7: 4797139.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:24,183 | Behavioral cloning loss (Bob loss) after epoch 7: 1.0837846994400024
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:24,327 | PPO objective after epoch 8: 218.03013610839844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:24,327 | Value loss (MSE loss) after epoch 8: 161201232.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:24,327 | Behavioral cloning loss (Bob loss) after epoch 8: 1.0388822555541992
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:24,492 | PPO objective after epoch 9: 77.51847839355469
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:24,492 | Value loss (MSE loss) after epoch 9: 65460780.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:24,493 | Behavioral cloning loss (Bob loss) after epoch 9: 1.096265435218811
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:24,656 | PPO objective after epoch 10: 12.654881477355957
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:24,656 | Value loss (MSE loss) after epoch 10: 2617985.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:24,656 | Behavioral cloning loss (Bob loss) after epoch 10: 1.0778433084487915
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:24,804 | PPO objective after epoch 11: 122.34244537353516
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:24,804 | Value loss (MSE loss) after epoch 11: 88504088.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:24,805 | Behavioral cloning loss (Bob loss) after epoch 11: 1.0698102712631226
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:24,963 | PPO objective after epoch 12: 147.47317504882812
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:24,964 | Value loss (MSE loss) after epoch 12: 131576536.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:24,964 | Behavioral cloning loss (Bob loss) after epoch 12: 1.0821831226348877
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:25,122 | PPO objective after epoch 13: 485.17626953125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:25,122 | Value loss (MSE loss) after epoch 13: 1159339904.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:25,122 | Behavioral cloning loss (Bob loss) after epoch 13: 1.0669697523117065
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:25,292 | PPO objective after epoch 14: 231.26048278808594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:25,292 | Value loss (MSE loss) after epoch 14: 600884928.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:25,292 | Behavioral cloning loss (Bob loss) after epoch 14: 1.0911298990249634
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:25,445 | PPO objective after epoch 15: 2274.4853515625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:25,445 | Value loss (MSE loss) after epoch 15: 41969422336.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:25,445 | Behavioral cloning loss (Bob loss) after epoch 15: 1.0723044872283936
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:25,612 | PPO objective after epoch 16: 520.8914184570312
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:25,612 | Value loss (MSE loss) after epoch 16: 2566474752.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:25,612 | Behavioral cloning loss (Bob loss) after epoch 16: 1.062549114227295
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:25,775 | PPO objective after epoch 17: 4.138002872467041
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:25,775 | Value loss (MSE loss) after epoch 17: 101826.40625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:25,775 | Behavioral cloning loss (Bob loss) after epoch 17: 1.0513091087341309
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:25,939 | PPO objective after epoch 18: 42.41694259643555
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:25,939 | Value loss (MSE loss) after epoch 18: 6093394.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:25,939 | Behavioral cloning loss (Bob loss) after epoch 18: 1.0063576698303223
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:26,096 | PPO objective after epoch 19: 151.68666076660156
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:26,097 | Value loss (MSE loss) after epoch 19: 287594624.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:26,097 | Behavioral cloning loss (Bob loss) after epoch 19: 1.0428504943847656
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:26,250 | PPO objective after epoch 20: 128.02110290527344
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:26,250 | Value loss (MSE loss) after epoch 20: 148969872.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:26,251 | Behavioral cloning loss (Bob loss) after epoch 20: 1.0881778001785278
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:26,407 | PPO objective after epoch 21: 173.51751708984375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:26,407 | Value loss (MSE loss) after epoch 21: 195191680.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:26,407 | Behavioral cloning loss (Bob loss) after epoch 21: 1.0685949325561523
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:26,593 | PPO objective after epoch 22: 45.73686599731445
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:26,593 | Value loss (MSE loss) after epoch 22: 29332326.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:26,593 | Behavioral cloning loss (Bob loss) after epoch 22: 1.0825533866882324
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:26,751 | PPO objective after epoch 23: 9039.7490234375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:26,751 | Value loss (MSE loss) after epoch 23: 678206636032.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:26,751 | Behavioral cloning loss (Bob loss) after epoch 23: 1.0953139066696167
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:26,908 | PPO objective after epoch 24: 292.9628601074219
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:26,908 | Value loss (MSE loss) after epoch 24: 282839040.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:26,909 | Behavioral cloning loss (Bob loss) after epoch 24: 1.0884305238723755
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:27,083 | PPO objective after epoch 25: 159.63267517089844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:27,083 | Value loss (MSE loss) after epoch 25: 294601152.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:27,083 | Behavioral cloning loss (Bob loss) after epoch 25: 1.0786395072937012
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:27,243 | PPO objective after epoch 26: 46.962158203125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:27,249 | Value loss (MSE loss) after epoch 26: 18163962.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:27,250 | Behavioral cloning loss (Bob loss) after epoch 26: 1.0855504274368286
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:27,418 | PPO objective after epoch 27: 5.138272285461426
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:27,418 | Value loss (MSE loss) after epoch 27: 157004.921875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:27,418 | Behavioral cloning loss (Bob loss) after epoch 27: 1.042946219444275
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:27,576 | PPO objective after epoch 28: 22387.64453125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:27,576 | Value loss (MSE loss) after epoch 28: 10519203282944.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:27,576 | Behavioral cloning loss (Bob loss) after epoch 28: 1.0765314102172852
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:27,729 | PPO objective after epoch 29: 1167.6297607421875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:27,729 | Value loss (MSE loss) after epoch 29: 15119071232.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:27,729 | Behavioral cloning loss (Bob loss) after epoch 29: 1.0906264781951904
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:27,883 | PPO objective after epoch 30: 410.1245422363281
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:27,883 | Value loss (MSE loss) after epoch 30: 1060346112.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:27,883 | Behavioral cloning loss (Bob loss) after epoch 30: 1.0859215259552002
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:28,032 | PPO objective after epoch 31: 40.24259948730469
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:28,032 | Value loss (MSE loss) after epoch 31: 5624155.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:28,033 | Behavioral cloning loss (Bob loss) after epoch 31: 1.0648590326309204
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:28,179 | PPO objective after epoch 32: 254.67848205566406
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:28,180 | Value loss (MSE loss) after epoch 32: 671832896.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:28,180 | Behavioral cloning loss (Bob loss) after epoch 32: 1.0884274244308472
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:28,331 | PPO objective after epoch 33: 133.71766662597656
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:28,331 | Value loss (MSE loss) after epoch 33: 126312664.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:28,331 | Behavioral cloning loss (Bob loss) after epoch 33: 1.0657095909118652
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:28,490 | PPO objective after epoch 34: 469.3045959472656
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:28,490 | Value loss (MSE loss) after epoch 34: 3167614208.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:28,490 | Behavioral cloning loss (Bob loss) after epoch 34: 1.089178442955017
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:28,639 | PPO objective after epoch 35: 624.6160278320312
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:28,639 | Value loss (MSE loss) after epoch 35: 3961852672.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:28,640 | Behavioral cloning loss (Bob loss) after epoch 35: 1.0737178325653076
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:28,804 | PPO objective after epoch 36: 3690.5546875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:28,804 | Value loss (MSE loss) after epoch 36: 190623776768.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:28,804 | Behavioral cloning loss (Bob loss) after epoch 36: 1.0914933681488037
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:28,970 | PPO objective after epoch 37: 6698.296875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:28,970 | Value loss (MSE loss) after epoch 37: 877326499840.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:28,970 | Behavioral cloning loss (Bob loss) after epoch 37: 1.0644878149032593
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:29,131 | PPO objective after epoch 38: 105.79299926757812
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:29,131 | Value loss (MSE loss) after epoch 38: 104956968.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:29,131 | Behavioral cloning loss (Bob loss) after epoch 38: 1.0901658535003662
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:29,290 | PPO objective after epoch 39: 26.793621063232422
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:29,290 | Value loss (MSE loss) after epoch 39: 9257371.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:29,290 | Behavioral cloning loss (Bob loss) after epoch 39: 1.0864944458007812
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:29,443 | PPO objective after epoch 40: 918.3917236328125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:29,443 | Value loss (MSE loss) after epoch 40: 11574648832.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:29,443 | Behavioral cloning loss (Bob loss) after epoch 40: 1.0858104228973389
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:29,610 | PPO objective after epoch 41: 2390.2783203125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:29,610 | Value loss (MSE loss) after epoch 41: 140860882944.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:29,610 | Behavioral cloning loss (Bob loss) after epoch 41: 1.0878629684448242
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:29,767 | PPO objective after epoch 42: 4.7183661460876465
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:29,767 | Value loss (MSE loss) after epoch 42: 142857.296875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:29,767 | Behavioral cloning loss (Bob loss) after epoch 42: 1.0933176279067993
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:29,959 | PPO objective after epoch 43: 216.48983764648438
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:29,959 | Value loss (MSE loss) after epoch 43: 435440160.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:29,960 | Behavioral cloning loss (Bob loss) after epoch 43: 1.0600184202194214
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:30,115 | PPO objective after epoch 44: 29.446334838867188
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:30,115 | Value loss (MSE loss) after epoch 44: 5880470.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:30,115 | Behavioral cloning loss (Bob loss) after epoch 44: 1.0893844366073608
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:30,266 | PPO objective after epoch 45: 207.1011505126953
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:30,266 | Value loss (MSE loss) after epoch 45: 319738112.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:30,266 | Behavioral cloning loss (Bob loss) after epoch 45: 1.0925705432891846
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:30,428 | PPO objective after epoch 46: 135.9521942138672
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:30,428 | Value loss (MSE loss) after epoch 46: 163271136.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:30,429 | Behavioral cloning loss (Bob loss) after epoch 46: 1.0945974588394165
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:30,581 | PPO objective after epoch 47: 4.350776672363281
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:30,581 | Value loss (MSE loss) after epoch 47: 101458.8046875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:30,582 | Behavioral cloning loss (Bob loss) after epoch 47: 1.0789499282836914
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:30,732 | PPO objective after epoch 48: 25.41196632385254
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:30,733 | Value loss (MSE loss) after epoch 48: 4399148.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:30,733 | Behavioral cloning loss (Bob loss) after epoch 48: 1.0546538829803467
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:30,894 | PPO objective after epoch 49: 6256.9677734375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:30,894 | Value loss (MSE loss) after epoch 49: 566913204224.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:30,894 | Behavioral cloning loss (Bob loss) after epoch 49: 1.098351240158081
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:31,046 | PPO objective after epoch 50: 47210.55859375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:31,046 | Value loss (MSE loss) after epoch 50: 8357826002944.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:31,047 | Behavioral cloning loss (Bob loss) after epoch 50: 1.078935980796814
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:31,207 | PPO objective after epoch 51: 176.2047576904297
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:31,207 | Value loss (MSE loss) after epoch 51: 299172128.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:31,207 | Behavioral cloning loss (Bob loss) after epoch 51: 1.0976769924163818
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:31,355 | PPO objective after epoch 52: 96.1670150756836
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:31,355 | Value loss (MSE loss) after epoch 52: 80003280.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:31,355 | Behavioral cloning loss (Bob loss) after epoch 52: 1.0681817531585693
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:31,504 | PPO objective after epoch 53: 507.4044189453125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:31,504 | Value loss (MSE loss) after epoch 53: 1748662400.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:31,504 | Behavioral cloning loss (Bob loss) after epoch 53: 1.0758649110794067
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:31,654 | PPO objective after epoch 54: 43.12501525878906
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:31,654 | Value loss (MSE loss) after epoch 54: 16070174.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:31,655 | Behavioral cloning loss (Bob loss) after epoch 54: 1.0902951955795288
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:31,825 | PPO objective after epoch 55: 1609.530517578125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:31,825 | Value loss (MSE loss) after epoch 55: 42596761600.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:31,825 | Behavioral cloning loss (Bob loss) after epoch 55: 1.083601713180542
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:31,980 | PPO objective after epoch 56: 64.71701049804688
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:31,980 | Value loss (MSE loss) after epoch 56: 41713828.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:31,980 | Behavioral cloning loss (Bob loss) after epoch 56: 1.0727722644805908
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:32,122 | PPO objective after epoch 57: 18.615753173828125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:32,122 | Value loss (MSE loss) after epoch 57: 1774923.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:32,122 | Behavioral cloning loss (Bob loss) after epoch 57: 1.0698211193084717
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:32,278 | PPO objective after epoch 58: 561.5159912109375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:32,278 | Value loss (MSE loss) after epoch 58: 3565625088.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:32,278 | Behavioral cloning loss (Bob loss) after epoch 58: 1.0924081802368164
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:32,431 | PPO objective after epoch 59: 13.123679161071777
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:32,431 | Value loss (MSE loss) after epoch 59: 1469190.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:32,431 | Behavioral cloning loss (Bob loss) after epoch 59: 1.072396993637085
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:32,585 | PPO objective after epoch 60: 752.4996337890625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:32,585 | Value loss (MSE loss) after epoch 60: 3400765952.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:32,585 | Behavioral cloning loss (Bob loss) after epoch 60: 1.067673683166504
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:32,729 | PPO objective after epoch 61: 44.402000427246094
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:32,729 | Value loss (MSE loss) after epoch 61: 9514441.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:32,729 | Behavioral cloning loss (Bob loss) after epoch 61: 1.0699695348739624
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:32,882 | PPO objective after epoch 62: 19.814617156982422
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:32,882 | Value loss (MSE loss) after epoch 62: 3873631.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:32,882 | Behavioral cloning loss (Bob loss) after epoch 62: 1.0731545686721802
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:33,035 | PPO objective after epoch 63: 170.28489685058594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:33,035 | Value loss (MSE loss) after epoch 63: 157278816.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:33,035 | Behavioral cloning loss (Bob loss) after epoch 63: 1.0948114395141602
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:33,176 | PPO objective after epoch 64: 21.176910400390625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:33,177 | Value loss (MSE loss) after epoch 64: 640600.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:33,177 | Behavioral cloning loss (Bob loss) after epoch 64: 1.048915982246399
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:33,318 | PPO objective after epoch 65: 68.19679260253906
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:33,319 | Value loss (MSE loss) after epoch 65: 31782286.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:33,319 | Behavioral cloning loss (Bob loss) after epoch 65: 1.0173546075820923
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:33,464 | PPO objective after epoch 66: 11262.9248046875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:33,465 | Value loss (MSE loss) after epoch 66: 1209915408384.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:33,465 | Behavioral cloning loss (Bob loss) after epoch 66: 1.0706230401992798
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:33,627 | PPO objective after epoch 67: 8.490437507629395
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:33,627 | Value loss (MSE loss) after epoch 67: 374518.96875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:33,627 | Behavioral cloning loss (Bob loss) after epoch 67: 1.0296857357025146
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:33,792 | PPO objective after epoch 68: 740043.5
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:33,792 | Value loss (MSE loss) after epoch 68: 8525622825451520.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:33,792 | Behavioral cloning loss (Bob loss) after epoch 68: 1.0986945629119873
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:33,941 | PPO objective after epoch 69: 13.668993949890137
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:33,942 | Value loss (MSE loss) after epoch 69: 993596.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:33,942 | Behavioral cloning loss (Bob loss) after epoch 69: 1.0813342332839966
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:34,089 | PPO objective after epoch 70: 47.922828674316406
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:34,089 | Value loss (MSE loss) after epoch 70: 7535643.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:34,089 | Behavioral cloning loss (Bob loss) after epoch 70: 1.0533722639083862
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:34,235 | PPO objective after epoch 71: 36.15020751953125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:34,235 | Value loss (MSE loss) after epoch 71: 3451031.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:34,235 | Behavioral cloning loss (Bob loss) after epoch 71: 1.0663719177246094
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:34,390 | PPO objective after epoch 72: 1645.443603515625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:34,390 | Value loss (MSE loss) after epoch 72: 7872997376.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:34,390 | Behavioral cloning loss (Bob loss) after epoch 72: 1.0736559629440308
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:34,536 | PPO objective after epoch 73: 3.1706254482269287
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:34,536 | Value loss (MSE loss) after epoch 73: 42661.2734375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:34,536 | Behavioral cloning loss (Bob loss) after epoch 73: 1.0618523359298706
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:34,687 | PPO objective after epoch 74: 630.0061645507812
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:34,688 | Value loss (MSE loss) after epoch 74: 656478592.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:34,688 | Behavioral cloning loss (Bob loss) after epoch 74: 1.093017578125
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:34,828 | PPO objective after epoch 75: 8.91059398651123
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:34,828 | Value loss (MSE loss) after epoch 75: 349110.03125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:34,828 | Behavioral cloning loss (Bob loss) after epoch 75: 1.0397520065307617
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:34,973 | PPO objective after epoch 76: 11.95650577545166
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:34,973 | Value loss (MSE loss) after epoch 76: 789838.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:34,973 | Behavioral cloning loss (Bob loss) after epoch 76: 1.0639395713806152
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:35,124 | PPO objective after epoch 77: 7.307611465454102
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:35,124 | Value loss (MSE loss) after epoch 77: 344279.09375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:35,124 | Behavioral cloning loss (Bob loss) after epoch 77: 1.0615102052688599
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:35,286 | PPO objective after epoch 78: 6891.5224609375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:35,286 | Value loss (MSE loss) after epoch 78: 284992929792.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:35,286 | Behavioral cloning loss (Bob loss) after epoch 78: 1.098658800125122
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:35,436 | PPO objective after epoch 79: 3546250.5
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:35,436 | Value loss (MSE loss) after epoch 79: 9.348836415347098e+16
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:35,436 | Behavioral cloning loss (Bob loss) after epoch 79: 1.0826220512390137
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:35,590 | PPO objective after epoch 80: 187.26795959472656
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:35,590 | Value loss (MSE loss) after epoch 80: 493102048.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:35,591 | Behavioral cloning loss (Bob loss) after epoch 80: 1.080909252166748
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:35,737 | PPO objective after epoch 81: 21.586057662963867
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:35,738 | Value loss (MSE loss) after epoch 81: 1934744.125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:35,738 | Behavioral cloning loss (Bob loss) after epoch 81: 1.0501905679702759
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:35,887 | PPO objective after epoch 82: 28.074142456054688
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:35,887 | Value loss (MSE loss) after epoch 82: 4583933.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:35,888 | Behavioral cloning loss (Bob loss) after epoch 82: 1.0750739574432373
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:36,026 | PPO objective after epoch 83: 16.093143463134766
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:36,026 | Value loss (MSE loss) after epoch 83: 1293649.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:36,026 | Behavioral cloning loss (Bob loss) after epoch 83: 1.0384351015090942
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:36,170 | PPO objective after epoch 84: 776.1292724609375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:36,170 | Value loss (MSE loss) after epoch 84: 1673458304.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:36,171 | Behavioral cloning loss (Bob loss) after epoch 84: 1.0476922988891602
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:36,320 | PPO objective after epoch 85: 255.45477294921875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:36,321 | Value loss (MSE loss) after epoch 85: 328860896.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:36,321 | Behavioral cloning loss (Bob loss) after epoch 85: 1.0718704462051392
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:36,474 | PPO objective after epoch 86: 540.5404052734375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:36,474 | Value loss (MSE loss) after epoch 86: 662134336.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:36,474 | Behavioral cloning loss (Bob loss) after epoch 86: 1.0997390747070312
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:36,613 | PPO objective after epoch 87: 11.605681419372559
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:36,613 | Value loss (MSE loss) after epoch 87: 923290.1875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:36,614 | Behavioral cloning loss (Bob loss) after epoch 87: 1.0446650981903076
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:36,763 | PPO objective after epoch 88: 41.9129524230957
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:36,763 | Value loss (MSE loss) after epoch 88: 9523296.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:36,764 | Behavioral cloning loss (Bob loss) after epoch 88: 1.0592046976089478
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:36,908 | PPO objective after epoch 89: 85.22757720947266
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:36,909 | Value loss (MSE loss) after epoch 89: 57809616.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:36,909 | Behavioral cloning loss (Bob loss) after epoch 89: 1.0315282344818115
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:37,051 | PPO objective after epoch 90: 5.724215984344482
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:37,051 | Value loss (MSE loss) after epoch 90: 82508.9375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:37,052 | Behavioral cloning loss (Bob loss) after epoch 90: 1.0008169412612915
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:37,195 | PPO objective after epoch 91: 162.65359497070312
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:37,195 | Value loss (MSE loss) after epoch 91: 142357152.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:37,195 | Behavioral cloning loss (Bob loss) after epoch 91: 1.052225947380066
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:37,340 | PPO objective after epoch 92: 16.705854415893555
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:37,340 | Value loss (MSE loss) after epoch 92: 1405100.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:37,340 | Behavioral cloning loss (Bob loss) after epoch 92: 1.0661003589630127
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:37,478 | PPO objective after epoch 93: 4.738833427429199
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:37,478 | Value loss (MSE loss) after epoch 93: 67509.296875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:37,478 | Behavioral cloning loss (Bob loss) after epoch 93: 0.9968653917312622
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:37,621 | PPO objective after epoch 94: 16.287090301513672
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:37,621 | Value loss (MSE loss) after epoch 94: 2103156.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:37,621 | Behavioral cloning loss (Bob loss) after epoch 94: 1.0232516527175903
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:37,761 | PPO objective after epoch 95: 25.86724090576172
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:37,761 | Value loss (MSE loss) after epoch 95: 3667302.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:37,762 | Behavioral cloning loss (Bob loss) after epoch 95: 1.0436335802078247
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:37,913 | PPO objective after epoch 96: 19.089954376220703
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:37,913 | Value loss (MSE loss) after epoch 96: 1231292.125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:37,913 | Behavioral cloning loss (Bob loss) after epoch 96: 1.0711630582809448
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:38,058 | PPO objective after epoch 97: 9.138938903808594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:38,058 | Value loss (MSE loss) after epoch 97: 280865.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:38,058 | Behavioral cloning loss (Bob loss) after epoch 97: 1.0486798286437988
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:38,201 | PPO objective after epoch 98: 47180.64453125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:38,201 | Value loss (MSE loss) after epoch 98: 16433924800512.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:38,201 | Behavioral cloning loss (Bob loss) after epoch 98: 1.0595645904541016
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:38,339 | PPO objective after epoch 99: 6.10672664642334
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:38,339 | Value loss (MSE loss) after epoch 99: 147809.34375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:38,339 | Behavioral cloning loss (Bob loss) after epoch 99: 0.9695940017700195
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:14:38,476 | PPO objective after epoch 100: 2.265791654586792
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:14:38,476 | Value loss (MSE loss) after epoch 100: 17371.873046875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:14:38,476 | Behavioral cloning loss (Bob loss) after epoch 100: 0.9858789443969727
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:16,645 | PPO objective after epoch 1: 135.43760681152344
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:16,645 | Value loss (MSE loss) after epoch 1: 343654848.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:16,645 | Behavioral cloning loss (Bob loss) after epoch 1: 1.0748685598373413
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:16,815 | PPO objective after epoch 2: 2208.895751953125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:16,815 | Value loss (MSE loss) after epoch 2: 11755784192.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:16,815 | Behavioral cloning loss (Bob loss) after epoch 2: 1.0864205360412598
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:16,973 | PPO objective after epoch 3: 71.5261001586914
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:16,973 | Value loss (MSE loss) after epoch 3: 56419604.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:16,973 | Behavioral cloning loss (Bob loss) after epoch 3: 1.0773040056228638
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:17,134 | PPO objective after epoch 4: 1734.078369140625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:17,134 | Value loss (MSE loss) after epoch 4: 44404805632.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:17,135 | Behavioral cloning loss (Bob loss) after epoch 4: 1.0898680686950684
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:17,316 | PPO objective after epoch 5: 23.289709091186523
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:17,316 | Value loss (MSE loss) after epoch 5: 2745196.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:17,316 | Behavioral cloning loss (Bob loss) after epoch 5: 1.0557563304901123
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:17,468 | PPO objective after epoch 6: 144.1024627685547
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:17,468 | Value loss (MSE loss) after epoch 6: 111424744.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:17,468 | Behavioral cloning loss (Bob loss) after epoch 6: 1.066671371459961
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:17,616 | PPO objective after epoch 7: 384.21051025390625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:17,616 | Value loss (MSE loss) after epoch 7: 699684352.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:17,616 | Behavioral cloning loss (Bob loss) after epoch 7: 1.0681862831115723
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:17,767 | PPO objective after epoch 8: 23.963897705078125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:17,767 | Value loss (MSE loss) after epoch 8: 4927679.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:17,767 | Behavioral cloning loss (Bob loss) after epoch 8: 1.0613949298858643
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:17,910 | PPO objective after epoch 9: 12.150381088256836
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:17,910 | Value loss (MSE loss) after epoch 9: 627847.0625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:17,910 | Behavioral cloning loss (Bob loss) after epoch 9: 1.0410953760147095
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:18,063 | PPO objective after epoch 10: 1607.7589111328125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:18,063 | Value loss (MSE loss) after epoch 10: 23876245504.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:18,063 | Behavioral cloning loss (Bob loss) after epoch 10: 1.0694774389266968
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:18,231 | PPO objective after epoch 11: 28.090879440307617
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:18,231 | Value loss (MSE loss) after epoch 11: 9250078.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:18,231 | Behavioral cloning loss (Bob loss) after epoch 11: 1.0697695016860962
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:18,380 | PPO objective after epoch 12: 23.527013778686523
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:18,380 | Value loss (MSE loss) after epoch 12: 1422788.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:18,380 | Behavioral cloning loss (Bob loss) after epoch 12: 1.038702368736267
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:18,536 | PPO objective after epoch 13: 135.8810272216797
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:18,536 | Value loss (MSE loss) after epoch 13: 213371728.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:18,536 | Behavioral cloning loss (Bob loss) after epoch 13: 1.0791304111480713
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:18,690 | PPO objective after epoch 14: 168.63304138183594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:18,690 | Value loss (MSE loss) after epoch 14: 352735680.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:18,690 | Behavioral cloning loss (Bob loss) after epoch 14: 1.0826144218444824
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:18,846 | PPO objective after epoch 15: 7.09263277053833
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:18,846 | Value loss (MSE loss) after epoch 15: 303283.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:18,846 | Behavioral cloning loss (Bob loss) after epoch 15: 1.0840458869934082
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:19,001 | PPO objective after epoch 16: 12.845606803894043
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:19,001 | Value loss (MSE loss) after epoch 16: 453222.6875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:19,001 | Behavioral cloning loss (Bob loss) after epoch 16: 1.0796388387680054
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:19,145 | PPO objective after epoch 17: 55.628849029541016
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:19,146 | Value loss (MSE loss) after epoch 17: 2728478.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:19,146 | Behavioral cloning loss (Bob loss) after epoch 17: 1.0391207933425903
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:19,302 | PPO objective after epoch 18: 922.421630859375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:19,302 | Value loss (MSE loss) after epoch 18: 3997547776.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:19,302 | Behavioral cloning loss (Bob loss) after epoch 18: 1.0818732976913452
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:19,447 | PPO objective after epoch 19: 9.006918907165527
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:19,447 | Value loss (MSE loss) after epoch 19: 434015.15625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:19,447 | Behavioral cloning loss (Bob loss) after epoch 19: 1.0596967935562134
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:19,597 | PPO objective after epoch 20: 115.54551696777344
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:19,597 | Value loss (MSE loss) after epoch 20: 139709984.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:19,597 | Behavioral cloning loss (Bob loss) after epoch 20: 1.069701910018921
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:19,747 | PPO objective after epoch 21: 2.6682963371276855
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:19,747 | Value loss (MSE loss) after epoch 21: 36392.16015625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:19,747 | Behavioral cloning loss (Bob loss) after epoch 21: 1.0260050296783447
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:19,913 | PPO objective after epoch 22: 47.56208038330078
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:19,913 | Value loss (MSE loss) after epoch 22: 7543389.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:19,914 | Behavioral cloning loss (Bob loss) after epoch 22: 1.0694613456726074
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:20,080 | PPO objective after epoch 23: 11318.318359375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:20,080 | Value loss (MSE loss) after epoch 23: 1995452186624.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:20,080 | Behavioral cloning loss (Bob loss) after epoch 23: 1.0457051992416382
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:20,238 | PPO objective after epoch 24: 176.2545166015625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:20,239 | Value loss (MSE loss) after epoch 24: 148282928.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:20,239 | Behavioral cloning loss (Bob loss) after epoch 24: 1.0123867988586426
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:20,405 | PPO objective after epoch 25: 140.92645263671875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:20,405 | Value loss (MSE loss) after epoch 25: 136842944.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:20,405 | Behavioral cloning loss (Bob loss) after epoch 25: 1.0499498844146729
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:20,562 | PPO objective after epoch 26: 8.59146499633789
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:20,562 | Value loss (MSE loss) after epoch 26: 537990.3125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:20,562 | Behavioral cloning loss (Bob loss) after epoch 26: 1.034858226776123
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:20,723 | PPO objective after epoch 27: 41.91435623168945
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:20,723 | Value loss (MSE loss) after epoch 27: 18555712.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:20,724 | Behavioral cloning loss (Bob loss) after epoch 27: 1.0529232025146484
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:20,864 | PPO objective after epoch 28: 14.09382438659668
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:20,865 | Value loss (MSE loss) after epoch 28: 442796.15625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:20,865 | Behavioral cloning loss (Bob loss) after epoch 28: 0.9627032279968262
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:21,011 | PPO objective after epoch 29: 21.59535026550293
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:21,011 | Value loss (MSE loss) after epoch 29: 2524676.25
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:21,011 | Behavioral cloning loss (Bob loss) after epoch 29: 1.0396709442138672
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:21,163 | PPO objective after epoch 30: 1896.2161865234375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:21,163 | Value loss (MSE loss) after epoch 30: 6910929920.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:21,163 | Behavioral cloning loss (Bob loss) after epoch 30: 1.0813037157058716
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:21,312 | PPO objective after epoch 31: 11.86355209350586
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:21,312 | Value loss (MSE loss) after epoch 31: 546774.375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:21,312 | Behavioral cloning loss (Bob loss) after epoch 31: 1.0624990463256836
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:21,459 | PPO objective after epoch 32: 299.5099182128906
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:21,459 | Value loss (MSE loss) after epoch 32: 547480384.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:21,459 | Behavioral cloning loss (Bob loss) after epoch 32: 1.0592405796051025
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:21,604 | PPO objective after epoch 33: 2209.34130859375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:21,604 | Value loss (MSE loss) after epoch 33: 30306971648.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:21,604 | Behavioral cloning loss (Bob loss) after epoch 33: 1.057263970375061
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:21,751 | PPO objective after epoch 34: 2390.313720703125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:21,751 | Value loss (MSE loss) after epoch 34: 29291229184.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:21,751 | Behavioral cloning loss (Bob loss) after epoch 34: 1.0572350025177002
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:21,898 | PPO objective after epoch 35: 266.4031066894531
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:21,898 | Value loss (MSE loss) after epoch 35: 778003776.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:21,898 | Behavioral cloning loss (Bob loss) after epoch 35: 1.029693841934204
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:22,043 | PPO objective after epoch 36: 73.8705825805664
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:22,043 | Value loss (MSE loss) after epoch 36: 22987086.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:22,043 | Behavioral cloning loss (Bob loss) after epoch 36: 1.048888921737671
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:22,184 | PPO objective after epoch 37: 12.928888320922852
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:22,184 | Value loss (MSE loss) after epoch 37: 592125.3125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:22,184 | Behavioral cloning loss (Bob loss) after epoch 37: 0.9737827181816101
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:22,337 | PPO objective after epoch 38: 11.19657039642334
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:22,337 | Value loss (MSE loss) after epoch 38: 761265.5625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:22,337 | Behavioral cloning loss (Bob loss) after epoch 38: 1.08689284324646
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:22,483 | PPO objective after epoch 39: 38.176513671875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:22,483 | Value loss (MSE loss) after epoch 39: 8905752.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:22,483 | Behavioral cloning loss (Bob loss) after epoch 39: 1.0295706987380981
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:22,633 | PPO objective after epoch 40: 12.231709480285645
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:22,633 | Value loss (MSE loss) after epoch 40: 399435.8125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:22,633 | Behavioral cloning loss (Bob loss) after epoch 40: 1.027508020401001
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:22,786 | PPO objective after epoch 41: 72.26190185546875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:22,786 | Value loss (MSE loss) after epoch 41: 27834774.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:22,786 | Behavioral cloning loss (Bob loss) after epoch 41: 1.0480846166610718
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:22,935 | PPO objective after epoch 42: 431.8103942871094
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:22,935 | Value loss (MSE loss) after epoch 42: 1654344576.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:22,935 | Behavioral cloning loss (Bob loss) after epoch 42: 1.0770273208618164
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:23,078 | PPO objective after epoch 43: 23.203683853149414
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:23,078 | Value loss (MSE loss) after epoch 43: 1318426.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:23,079 | Behavioral cloning loss (Bob loss) after epoch 43: 1.0175418853759766
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:23,224 | PPO objective after epoch 44: 7.29205846786499
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:23,224 | Value loss (MSE loss) after epoch 44: 234856.96875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:23,224 | Behavioral cloning loss (Bob loss) after epoch 44: 1.0460294485092163
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:23,373 | PPO objective after epoch 45: 1600.113525390625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:23,374 | Value loss (MSE loss) after epoch 45: 20455194624.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:23,374 | Behavioral cloning loss (Bob loss) after epoch 45: 1.0469334125518799
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:23,518 | PPO objective after epoch 46: 6.602055549621582
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:23,518 | Value loss (MSE loss) after epoch 46: 190884.65625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:23,519 | Behavioral cloning loss (Bob loss) after epoch 46: 0.9965984225273132
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:23,665 | PPO objective after epoch 47: 24.005353927612305
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:23,665 | Value loss (MSE loss) after epoch 47: 2544053.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:23,665 | Behavioral cloning loss (Bob loss) after epoch 47: 1.038923978805542
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:23,818 | PPO objective after epoch 48: 634.9883422851562
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:23,818 | Value loss (MSE loss) after epoch 48: 2257091072.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:23,819 | Behavioral cloning loss (Bob loss) after epoch 48: 1.0188544988632202
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:23,967 | PPO objective after epoch 49: 1267.5628662109375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:23,967 | Value loss (MSE loss) after epoch 49: 8755621888.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:23,968 | Behavioral cloning loss (Bob loss) after epoch 49: 1.0455493927001953
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:24,117 | PPO objective after epoch 50: 3.4652864933013916
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:24,117 | Value loss (MSE loss) after epoch 50: 65628.7734375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:24,117 | Behavioral cloning loss (Bob loss) after epoch 50: 1.0554465055465698
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:24,255 | PPO objective after epoch 51: 4.903652191162109
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:24,256 | Value loss (MSE loss) after epoch 51: 72112.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:24,256 | Behavioral cloning loss (Bob loss) after epoch 51: 0.966729998588562
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:24,398 | PPO objective after epoch 52: 219.327392578125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:24,398 | Value loss (MSE loss) after epoch 52: 132781640.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:24,398 | Behavioral cloning loss (Bob loss) after epoch 52: 1.0006904602050781
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:24,544 | PPO objective after epoch 53: 12.307104110717773
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:24,544 | Value loss (MSE loss) after epoch 53: 1180271.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:24,544 | Behavioral cloning loss (Bob loss) after epoch 53: 1.0482531785964966
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:24,685 | PPO objective after epoch 54: 7.078988552093506
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:24,685 | Value loss (MSE loss) after epoch 54: 150625.46875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:24,686 | Behavioral cloning loss (Bob loss) after epoch 54: 0.9785798788070679
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:24,835 | PPO objective after epoch 55: 33.777381896972656
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:24,835 | Value loss (MSE loss) after epoch 55: 8440602.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:24,835 | Behavioral cloning loss (Bob loss) after epoch 55: 0.9817889928817749
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:24,991 | PPO objective after epoch 56: 9.504612922668457
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:24,991 | Value loss (MSE loss) after epoch 56: 413511.28125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:24,992 | Behavioral cloning loss (Bob loss) after epoch 56: 1.0018540620803833
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:25,128 | PPO objective after epoch 57: 27.76687240600586
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:25,129 | Value loss (MSE loss) after epoch 57: 3311945.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:25,129 | Behavioral cloning loss (Bob loss) after epoch 57: 0.9403077960014343
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:25,268 | PPO objective after epoch 58: 2.5904135704040527
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:25,268 | Value loss (MSE loss) after epoch 58: 24199.48046875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:25,268 | Behavioral cloning loss (Bob loss) after epoch 58: 0.9677966833114624
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:25,409 | PPO objective after epoch 59: 83.02661895751953
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:25,409 | Value loss (MSE loss) after epoch 59: 31287164.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:25,409 | Behavioral cloning loss (Bob loss) after epoch 59: 1.0125093460083008
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:25,559 | PPO objective after epoch 60: 531.4840698242188
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:25,559 | Value loss (MSE loss) after epoch 60: 2207491584.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:25,559 | Behavioral cloning loss (Bob loss) after epoch 60: 1.0560038089752197
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:25,698 | PPO objective after epoch 61: 4.192452907562256
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:25,698 | Value loss (MSE loss) after epoch 61: 71780.8359375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:25,698 | Behavioral cloning loss (Bob loss) after epoch 61: 1.007354974746704
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:25,841 | PPO objective after epoch 62: 19.389230728149414
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:25,842 | Value loss (MSE loss) after epoch 62: 1915148.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:25,842 | Behavioral cloning loss (Bob loss) after epoch 62: 1.0235447883605957
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:25,985 | PPO objective after epoch 63: 12.137643814086914
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:25,985 | Value loss (MSE loss) after epoch 63: 826734.125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:25,985 | Behavioral cloning loss (Bob loss) after epoch 63: 1.0228266716003418
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:26,130 | PPO objective after epoch 64: 7.224310874938965
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:26,130 | Value loss (MSE loss) after epoch 64: 123229.3046875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:26,130 | Behavioral cloning loss (Bob loss) after epoch 64: 1.031825065612793
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:26,273 | PPO objective after epoch 65: 55.05543518066406
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:26,273 | Value loss (MSE loss) after epoch 65: 15743742.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:26,273 | Behavioral cloning loss (Bob loss) after epoch 65: 1.0063425302505493
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:26,416 | PPO objective after epoch 66: 49.968082427978516
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:26,416 | Value loss (MSE loss) after epoch 66: 12440709.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:26,416 | Behavioral cloning loss (Bob loss) after epoch 66: 1.0113592147827148
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:26,553 | PPO objective after epoch 67: 284.52069091796875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:26,553 | Value loss (MSE loss) after epoch 67: 385993952.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:26,554 | Behavioral cloning loss (Bob loss) after epoch 67: 0.9882972240447998
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:26,693 | PPO objective after epoch 68: 262.81463623046875
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:26,694 | Value loss (MSE loss) after epoch 68: 163027184.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:26,694 | Behavioral cloning loss (Bob loss) after epoch 68: 1.0140576362609863
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:26,833 | PPO objective after epoch 69: 20.30156898498535
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:26,833 | Value loss (MSE loss) after epoch 69: 1171106.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:26,833 | Behavioral cloning loss (Bob loss) after epoch 69: 1.0300875902175903
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:26,968 | PPO objective after epoch 70: 4.642819881439209
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:26,968 | Value loss (MSE loss) after epoch 70: 48674.94921875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:26,968 | Behavioral cloning loss (Bob loss) after epoch 70: 0.8386658430099487
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:27,106 | PPO objective after epoch 71: 30.383838653564453
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:27,106 | Value loss (MSE loss) after epoch 71: 3411745.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:27,107 | Behavioral cloning loss (Bob loss) after epoch 71: 0.9097152352333069
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:27,254 | PPO objective after epoch 72: 1938.6832275390625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:27,254 | Value loss (MSE loss) after epoch 72: 26009200640.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:27,254 | Behavioral cloning loss (Bob loss) after epoch 72: 1.0175913572311401
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:27,393 | PPO objective after epoch 73: 20.105363845825195
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:27,393 | Value loss (MSE loss) after epoch 73: 1872578.625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:27,393 | Behavioral cloning loss (Bob loss) after epoch 73: 1.026137113571167
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:27,535 | PPO objective after epoch 74: 51.03458786010742
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:27,535 | Value loss (MSE loss) after epoch 74: 15216837.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:27,535 | Behavioral cloning loss (Bob loss) after epoch 74: 1.0156899690628052
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:27,671 | PPO objective after epoch 75: 7.378308296203613
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:27,672 | Value loss (MSE loss) after epoch 75: 194476.71875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:27,672 | Behavioral cloning loss (Bob loss) after epoch 75: 0.919633686542511
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:27,810 | PPO objective after epoch 76: 75.50286102294922
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:27,810 | Value loss (MSE loss) after epoch 76: 31326526.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:27,811 | Behavioral cloning loss (Bob loss) after epoch 76: 0.9758452773094177
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:27,946 | PPO objective after epoch 77: 19.694908142089844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:27,946 | Value loss (MSE loss) after epoch 77: 1091180.125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:27,946 | Behavioral cloning loss (Bob loss) after epoch 77: 0.964881956577301
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:28,085 | PPO objective after epoch 78: 371.65557861328125
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:28,085 | Value loss (MSE loss) after epoch 78: 380015808.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:28,085 | Behavioral cloning loss (Bob loss) after epoch 78: 0.9979019165039062
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:28,218 | PPO objective after epoch 79: 6.566276550292969
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:28,218 | Value loss (MSE loss) after epoch 79: 95319.1171875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:28,219 | Behavioral cloning loss (Bob loss) after epoch 79: 0.8509795665740967
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:28,364 | PPO objective after epoch 80: 396.88909912109375
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:28,364 | Value loss (MSE loss) after epoch 80: 585294592.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:28,364 | Behavioral cloning loss (Bob loss) after epoch 80: 1.036158561706543
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:28,509 | PPO objective after epoch 81: 122.1103744506836
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:28,509 | Value loss (MSE loss) after epoch 81: 145925600.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:28,509 | Behavioral cloning loss (Bob loss) after epoch 81: 1.0383131504058838
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:28,656 | PPO objective after epoch 82: 21.94420623779297
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:28,656 | Value loss (MSE loss) after epoch 82: 2847494.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:28,656 | Behavioral cloning loss (Bob loss) after epoch 82: 1.0179098844528198
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:28,793 | PPO objective after epoch 83: 9.331788063049316
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:28,793 | Value loss (MSE loss) after epoch 83: 338844.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:28,793 | Behavioral cloning loss (Bob loss) after epoch 83: 0.974187433719635
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:28,935 | PPO objective after epoch 84: 189.21400451660156
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:28,935 | Value loss (MSE loss) after epoch 84: 131172400.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:28,935 | Behavioral cloning loss (Bob loss) after epoch 84: 0.9193894267082214
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:29,075 | PPO objective after epoch 85: 118.38743591308594
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:29,075 | Value loss (MSE loss) after epoch 85: 125251944.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:29,075 | Behavioral cloning loss (Bob loss) after epoch 85: 1.00360107421875
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:29,214 | PPO objective after epoch 86: 10.47390079498291
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:29,214 | Value loss (MSE loss) after epoch 86: 577831.875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:29,214 | Behavioral cloning loss (Bob loss) after epoch 86: 1.0306651592254639
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:29,352 | PPO objective after epoch 87: 6.671149253845215
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:29,352 | Value loss (MSE loss) after epoch 87: 119508.84375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:29,352 | Behavioral cloning loss (Bob loss) after epoch 87: 0.9560529589653015
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:29,493 | PPO objective after epoch 88: 12.6608304977417
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:29,493 | Value loss (MSE loss) after epoch 88: 349958.96875
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:29,493 | Behavioral cloning loss (Bob loss) after epoch 88: 1.0428427457809448
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:29,635 | PPO objective after epoch 89: 7.8224968910217285
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:29,636 | Value loss (MSE loss) after epoch 89: 156590.828125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:29,636 | Behavioral cloning loss (Bob loss) after epoch 89: 1.037888765335083
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:29,776 | PPO objective after epoch 90: 606.1201782226562
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:29,776 | Value loss (MSE loss) after epoch 90: 2479530752.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:29,776 | Behavioral cloning loss (Bob loss) after epoch 90: 1.0330556631088257
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:29,952 | PPO objective after epoch 91: 2.857225179672241
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:29,953 | Value loss (MSE loss) after epoch 91: 18731.462890625
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:29,953 | Behavioral cloning loss (Bob loss) after epoch 91: 0.9447699785232544
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:30,088 | PPO objective after epoch 92: 13.484359741210938
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:30,088 | Value loss (MSE loss) after epoch 92: 664682.125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:30,089 | Behavioral cloning loss (Bob loss) after epoch 92: 0.8846672177314758
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:30,227 | PPO objective after epoch 93: 19.38890266418457
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:30,227 | Value loss (MSE loss) after epoch 93: 1670666.5
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:30,227 | Behavioral cloning loss (Bob loss) after epoch 93: 0.948113203048706
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:30,369 | PPO objective after epoch 94: 10.78359603881836
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:30,370 | Value loss (MSE loss) after epoch 94: 579961.375
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:30,370 | Behavioral cloning loss (Bob loss) after epoch 94: 1.0534489154815674
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:30,508 | PPO objective after epoch 95: 8.50722599029541
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:30,508 | Value loss (MSE loss) after epoch 95: 259221.03125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:30,508 | Behavioral cloning loss (Bob loss) after epoch 95: 1.0034795999526978
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:30,654 | PPO objective after epoch 96: 100.3237075805664
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:30,654 | Value loss (MSE loss) after epoch 96: 53292760.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:30,655 | Behavioral cloning loss (Bob loss) after epoch 96: 1.0576292276382446
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:30,800 | PPO objective after epoch 97: 13.997987747192383
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:30,800 | Value loss (MSE loss) after epoch 97: 793332.75
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:30,800 | Behavioral cloning loss (Bob loss) after epoch 97: 1.0003787279129028
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:30,949 | PPO objective after epoch 98: 10.895421028137207
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:30,949 | Value loss (MSE loss) after epoch 98: 323028.8125
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:30,949 | Behavioral cloning loss (Bob loss) after epoch 98: 1.0334640741348267
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:31,090 | PPO objective after epoch 99: 176.74664306640625
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:31,090 | Value loss (MSE loss) after epoch 99: 27929042.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:31,090 | Behavioral cloning loss (Bob loss) after epoch 99: 0.9826884865760803
+asymmetric_self_play_training.py | [line:162] | 2021-06-08 17:16:31,236 | PPO objective after epoch 100: 21.872642517089844
+asymmetric_self_play_training.py | [line:164] | 2021-06-08 17:16:31,237 | Value loss (MSE loss) after epoch 100: 2710113.0
+asymmetric_self_play_training.py | [line:175] | 2021-06-08 17:16:31,237 | Behavioral cloning loss (Bob loss) after epoch 100: 1.055816888809204
