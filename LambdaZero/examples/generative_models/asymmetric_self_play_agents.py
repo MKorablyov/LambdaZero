@@ -278,10 +278,11 @@ class GFlowNetAlice(nn.Module):
 
         next_q_values = self.q_network(next_states)
         outflow_qs = []
-        rewards = rewards[1:]  # only care about s' rewardss
+        rewards = rewards[1:]  # only care about s' rewards
         for i in range(len(next_actions)):
             # same thing, but for Q values for (s', a')
-            outflow_qs.append(torch.exp(next_q_values[i][next_actions[i]]))
+            outflow_qs.append(
+                rewards + torch.exp(next_q_values[i][next_actions[i]]))
 
         s_prime = sum(outflow_qs)
         outflow = torch.log(self.c_reg + s_prime)
