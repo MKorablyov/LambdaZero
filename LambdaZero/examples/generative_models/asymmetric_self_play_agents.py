@@ -206,6 +206,94 @@ class NewAlice(nn.Module):
         return -1 * objective.detach().item()
 
 
+class GFlowNetAlice(nn.Module):
+    def __init__(self, env, q_hidden_layer_sizes=[32, 32], q_lr=1e-4, eps=0.01, c_reg=1e-10):
+        self.env = env
+        state_dim = env.reset().shape[0]
+        # print(state_dim)
+        action_dim = 3
+
+        self.eps = eps
+        self.c_reg = c_reg
+
+        # ====== Policy network construction ======
+        q_network_layers = [
+            nn.Linear(state_dim, q_hidden_layer_sizes[0]), nn.ReLU()]
+
+        for i in range(len(q_hidden_layer_sizes) - 1):
+            q_network_layers.append(
+                nn.Linear(q_hidden_layer_sizes[i], q_hidden_layer_sizes[i + 1]))
+            q_network_layers.append(nn.ReLU())
+
+        q_network_layers.append(nn.Linear(q_hidden_layer_sizes[-1], action_dim))
+
+        self.q_network = nn.Sequential(*q_network_layers)
+        self.q_optimizer = optim.Adam(self.q_network.parameters(), lr=q_lr)
+
+    def collect_trajectory(self):
+        ob = torch.tensor(self.env.reset()).float()
+        trajectory = []
+        # move until full trajectory is collected (up until horizon)
+        done = False
+        while not done:
+            with torch.no_grad():
+                q_values = self.q_network(ob)
+
+                # epsilon greedy policy here
+                if np.random.uniform() < self.eps:
+                    # random action taken
+                    a = torch.tensor(np.random.randint(0, q_values.shape))
+                else:
+                    a = torch.argmax(q_values)
+
+                next_ob, r, done, _ = self.env.step(a)
+                next_ob = torch.tensor([next_ob]).float()
+                trajectory.append((ob, a, r, next_ob))
+                ob = next_ob
+
+        return trajectory
+
+    def update(self, trajectory):
+        states = [t[0] for t in trajectory]
+        actions = [t[1] for t in trajectory]
+        rewards = [t[2] for t in trajectory]
+        next_states = [t[3] for t in trajectory]
+
+        states = torch.stack(states, dim=0)
+        actions = torch.stack(actions, dim=0)
+        rewards = torch.tensor(rewards).float()
+        next_states = torch.stack(next_states, dim=0)
+
+        q_values = self.q_network(states)
+
+        inflow_qs = []
+        for i in range(len(actions)):
+            # takes the Q value of the particular action that was there
+            inflow_qs.append(torch.exp(q_values[i][actions[i]]))
+
+        s = sum(inflow_qs)
+        inflow = torch.log(self.c_reg + s)
+
+        next_actions = actions[1:]
+
+        next_q_values = self.q_network(next_states)
+        outflow_qs = []
+        rewards = rewards[1:]  # only care about s' rewardss
+        for i in range(len(next_actions)):
+            # same thing, but for Q values for (s', a')
+            outflow_qs.append(torch.exp(next_q_values[i][next_actions[i]]))
+
+        s_prime = sum(outflow_qs)
+        outflow = torch.log(self.c_reg + s_prime)
+
+        loss = nn.MSELoss(inflow, outflow)
+
+        loss.backward()
+        self.q_optimizer.step()
+
+        return loss.detach().item()
+
+
 '''
 Bob agent in the ASP framework. Essentially a behavioral cloning policy that works to imitate the trajectories laid out by Alice (which progressively leads to higher and higher reward)
 '''
