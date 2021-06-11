@@ -491,7 +491,7 @@ class DockVina_smi:
         original_pos = None
         dockscores, docked_pos = DockVina_smi._parse_docked_pdb(docked_pdb_file, self.mode)
         if self.mode in ["best_conf", "all_conf"]:
-            original_pos = DockVina_smi._parse_pos_sdf(input_sdf_file)
+            original_pos = DockVina_smi._parse_free_pos(input_sdf_file)
             permuted_original_pos = DockVina_smi._parse_pos_pdbqt(input_pdbqt_file)
             # fix docked_pos ordering
             order = DockVina_smi._get_atoms_reordering(original_pos, permuted_original_pos)
@@ -554,7 +554,7 @@ class DockVina_smi:
             os.remove(self.docked_pdb_file(mol_name))
 
     @staticmethod
-    def _parse_pos_sdf(path):
+    def _parse_free_pos(path):
         mol = Chem.SDMolSupplier(path)[0]
         conf = mol.GetConformer()
         pos = conf.GetPositions()
