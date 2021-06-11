@@ -495,10 +495,10 @@ class DockVina_smi:
         docked_pdb_file = self.docked_pdb_file.format(mol_name)
 
         original_pos = None
-        dockscores, docked_pos = DockVina_smi._parse_docked_pdb(docked_pdb_file, self.mode)
+        dockscores, docked_pos = DockVina_smi._parse_docked_energy_pos(docked_pdb_file, self.mode)
         if self.mode in ["best_conf", "all_conf"]:
             original_pos = DockVina_smi._parse_free_pos(input_sdf_file)
-            permuted_original_pos = DockVina_smi._parse_pos_pdbqt(input_pdbqt_file)
+            permuted_original_pos = DockVina_smi._parse_permuted_free_pos(input_pdbqt_file)
             # fix docked_pos ordering
             order = DockVina_smi._get_atoms_reordering(original_pos, permuted_original_pos)
             docked_pos = docked_pos[..., order, :]
@@ -546,13 +546,17 @@ class DockVina_smi:
 
     @staticmethod
     def _parse_free_pos(path):
+        # TODO: doc
+        """Parse sdf file that contains 3D positions of atoms in order matching smiles"""
         mol = Chem.SDMolSupplier(path)[0]
         conf = mol.GetConformer()
         pos = conf.GetPositions()
         return pos
 
     @staticmethod
-    def _parse_pos_pdbqt(path):
+    def _parse_permuted_free_pos(path):
+        # TODO: doc
+        """Parse pdbqt file that contains 3D positions of atoms in mixed order compared to sdf file """
         with open(path) as f:
             data = [line for line in f if line.startswith("ATOM")]
         # number of entries in line is unstable, but counting from the back appears to works
@@ -565,7 +569,9 @@ class DockVina_smi:
         return order
 
     @staticmethod
-    def _parse_docked_pdb(path, mode):
+    def _parse_docked_energy_pos(path, mode):
+        # TODO: doc
+        """Parse pdb file with docking results. """
         assert mode in ["score_only", "best_conf", "all_conf"]
 
         with open(path) as f:
