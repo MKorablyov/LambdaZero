@@ -5,11 +5,13 @@ import gym
 from . import model_atom
 from . import model_test_multihead
 from . import model_egnn
+from . import model_extra
 
 MODELS = {
     "MPNNet_v2": model_atom.MPNNet_v2,
     "MPNNetMultihead": model_test_multihead.MPNNetMultihead,
     "EGNNetRLBO": model_egnn.EGNNetRLBO,
+    "MPNNextra": model_extra.MPNNextra,
 }
 
 

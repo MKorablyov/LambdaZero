@@ -132,8 +132,8 @@ class EGNNetRLBO(ModelBase):
         if dim > feats_dim:
             # First feature projection
             self.feat_proj = nn.Sequential(nn.Linear(feats_dim, dim))
-            for param in self.feat_proj.parameters():
-                param.requires_grad = False
+            # for param in self.feat_proj.parameters():
+            #     param.requires_grad = False
 
             feats_dim = dim
             self.do_feat_proj = True
