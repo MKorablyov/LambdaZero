@@ -1,0 +1,2 @@
+dataset:
+  weighted_sampler: [True, False]

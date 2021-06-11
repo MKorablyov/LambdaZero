@@ -1,0 +1,80 @@
+main:
+  seed: 0 # type=int, default=0 - Leave 0 - seed will be chosen depending on run_id
+  use_gpu: true
+
+  frames: 2.e+6 # Number of frames of training (procs number of frames / step are processed)
+
+  log_interval: 1 # Number of training steps between two logs (default: 1)")
+  save_interval: 10 # Number of training steps between two saves
+  plot: false # log & plot into Wandb
+  plot_x_axis: "frames"  # x axis source for plotting logs (e.g. vs update step)
+  stats_window_size: 64   #
+  save_best: fasle # Save separately best model
+  save_all: fasle # Save separate model for each save_interval
+
+env_cfg:  # Example of envs cfg -
+  env: BlockMolEnvGraph-v1 # Env name
+  procs: 4 # Number of parallel environments to run
+  actual_procs: 4 # Actual number of CPU threads to distribute the environments
+  wrapper:  #  List of wrappers - applied in reverse order
+  env_args:
+    random_steps: 3
+    max_steps: 1
+    allow_removal: True
+    seed_cnt: 50
+    pre_saved_graph: False
+
+eval_env_cfg:  # Example of envs cfg -
+  env: BlockMolEnvGraph-v1 # Env name
+  eval_mode: True
+  env_args:
+    env_seed: [13, 14, 15]
+
+algo: ppo
+log_interval: 1
+save_interval: 10000
+eval_interval: 1
+eval_episodes: 32
+eval_eps: 0.05
+repeat_eval_eps: 1
+eval_determinitistic: False
+log_monitor: False
+
+num_env_steps: 10.0e+6
+no_cuda: False
+offset: 0
+use_wandb: false
+name: ""
+cuda_deterministic: False
+
+num_steps: 16
+ppo_epoch: 4
+num_mini_batch: 4
+
+use_linear_lr_decay: true
+lr: 2.5e-4
+eps: 1.0e-05
+alpha: 0.99
+gamma: 0.99
+use_gae: True
+gae_lambda: 0.95
+entropy_coef: 0.01
+value_loss_coef: 0.5
+max_grad_norm: 0.5
+clip_param: 0.1
+
+use_proper_time_limits: False
+
+policy:
+  sample_best: False
+
+model:
+  name: MPNNet_v2 # MPNNet_v2 # MPNNetMultihead
+  recurrent: False
+  hidden_size: 512
+  use_init: True
+
+gail: False
+gail_batch_size: 128
+gail_epoch: 5
+

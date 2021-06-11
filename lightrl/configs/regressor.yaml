@@ -1,0 +1,37 @@
+cuda: True
+seed: 0
+project_name: lzreg
+use_wandb: True
+eval_freq: 1 # TODO 10
+
+optim:
+  optim: RAdam # RAdam # RAdam #RAdam
+  optim_args:
+    lr: 5.e-4 #0.001 # 2.5e-4 # 1.e-3
+#    momentum: 0.9
+  #    betas: [0.9, 0.999]
+  lr_sheduler: ReduceLROnPlateau
+  train_epochs: 1000
+  batch_size: 96 # TODO 32
+  batch_gradient: 1 # TODO 32
+  epoch_size: 4000000
+  classification: &classification False
+
+dataset:
+  num_workers: 12
+  max_mol: 1000 # TODO 0
+  train_split: [0.8, 0.2]
+  seed_split: 123
+  transform_complete: True # TODO True
+  eval_quant: [0.01, 0.09, 0.20] # actual: eval_quant + [1-sum(eval_quant)*2] + eval_quant[::-1]
+  weighted_sampler: True # If classification, than it will be equal from the two classes
+  weighted_sampler_cbins: 100 # The less, the more values are groupped in same bing. same prob sampling for bins of 1.
+  clip_stds: # [0, 0]  # Min / max stds away from mean
+  positive_quantile: 0.1 # In case of classification we consider top (positive_quantile*100)% scores
+  target_norm: [-8.6, 1.1]
+  classification: *classification
+
+model:
+  name: MPNNet # TriangSag # MPNNet # MPNNet_v2 # MPNNet
+  num_feat: 14
+  classification: *classification

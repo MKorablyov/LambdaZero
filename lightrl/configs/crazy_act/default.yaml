@@ -1,0 +1,30 @@
+cuda: True
+seed: 0
+project_name: predact
+use_wandb: True
+classification: True
+
+dataset_filename: "proxy136k.npy"
+dataset_test_filename:  "eval_env_data.npy"
+exclude_test: True
+dataset_cfg:
+  dataset_filter_candidates: True
+  dataset_score_candidates: False
+  binning_decimal: 1
+  qed_th: 0.3
+  synth_th: 4.
+
+seed_split: 123
+train_split: 0.8
+
+batch_size: 256
+num_epochs: 1000
+eval_freq: 5
+log_freq: 1
+lr: 0.00025
+
+
+model:
+  name: MPNNet # SGC # TriangSag # MPNNet # MPNNet_v2 # MPNNet
+  num_feat: 14
+  num_out: 2
