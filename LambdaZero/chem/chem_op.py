@@ -455,13 +455,19 @@ class DockVina_smi:
         os.makedirs(os.path.join(self.outpath, "pdbqt"), exist_ok=True)
         os.makedirs(os.path.join(self.outpath, "docked"), exist_ok=True)
 
+        # prepare filepath templates
+        self.smi_file = os.path.join(self.outpath, "smi", "{}.smi")
+        self.sdf_file = os.path.join(self.outpath, "sdf", "{}.sdf")
+        self.mol2_file = os.path.join(self.outpath, "mol2", "{}.mol2")
+        self.pdbqt_file = os.path.join(self.outpath, "pdbqt", "{}.pdbqt")
+        self.docked_pdb_file = os.path.join(self.outpath, "docked", "{}.pdb")
+
     def dock(self, smi, mol_name=None, molgen_conf=20, docking_timeout=60*5):
         try:
             mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
 
-            # input_sdf_file = self.sdf_file(mol_name)
-            input_pdbqt_file = self.pdbqt_file(mol_name)
-            docked_pdb_file = self.docked_pdb_file(mol_name)
+            input_pdbqt_file = self.pdbqt_file.format(mol_name)
+            docked_pdb_file = self.docked_pdb_file.format(mol_name)
 
             # generate input files
             self.gen_mol_files(smi, mol_name, molgen_conf)
@@ -484,9 +490,9 @@ class DockVina_smi:
         return mol_name, dockscores, original_pos, docked_pos
 
     def parse(self, mol_name):
-        input_sdf_file = self.sdf_file(mol_name)
-        input_pdbqt_file = self.pdbqt_file(mol_name)
-        docked_pdb_file = self.docked_pdb_file(mol_name)
+        input_sdf_file = self.sdf_file.format(mol_name)
+        input_pdbqt_file = self.pdbqt_file.format(mol_name)
+        docked_pdb_file = self.docked_pdb_file.format(mol_name)
 
         original_pos = None
         dockscores, docked_pos = DockVina_smi._parse_docked_pdb(docked_pdb_file, self.mode)
@@ -500,10 +506,10 @@ class DockVina_smi:
         return mol_name, dockscores, original_pos, docked_pos
 
     def gen_mol_files(self, smi, mol_name, num_conf):
-        smi_file = self.smi_file(mol_name)
-        sdf_file = self.sdf_file(mol_name)
-        mol2_file = self.mol2_file(mol_name)
-        pdbqt_file = self.pdbqt_file(mol_name)
+        smi_file = self.smi_file.format(mol_name)
+        sdf_file = self.sdf_file.format(mol_name)
+        mol2_file = self.mol2_file.format(mol_name)
+        pdbqt_file = self.pdbqt_file.format(mol_name)
 
         with open(smi_file, "w") as fp:
             fp.write(smi)
@@ -522,36 +528,21 @@ class DockVina_smi:
         os.system(f"{self.mgltools_bin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
         return sdf_file, mol2_file, pdbqt_file
 
-    def smi_file(self, mol_name):
-        return os.path.join(self.outpath, "smi", f"{mol_name}.smi")
-
-    def sdf_file(self, mol_name):
-        return os.path.join(self.outpath, "sdf", f"{mol_name}.sdf")
-
-    def mol2_file(self, mol_name):
-        return os.path.join(self.outpath, "mol2", f"{mol_name}.mol2")
-
-    def pdbqt_file(self, mol_name):
-        return os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt")
-
-    def docked_pdb_file(self, mol_name):
-        return os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
-
     def _cleanup(self, mol_name):
         # https://docs.python.org/3/library/contextlib.html
         # contextlib.suppress
         # Return a context manager that suppresses any of the specified exceptions if they are raised in the body of a with statement
         # and then resumes execution with the first statement following the end of the with statement.
         with contextlib.suppress(FileNotFoundError):
-            os.remove(self.smi_file(mol_name))
+            os.remove(self.smi_file.format(mol_name))
         with contextlib.suppress(FileNotFoundError):
-            os.remove(self.sdf_file(mol_name))
+            os.remove(self.sdf_file.format(mol_name))
         with contextlib.suppress(FileNotFoundError):
-            os.remove(self.mol2_file(mol_name))
+            os.remove(self.mol2_file.format(mol_name))
         with contextlib.suppress(FileNotFoundError):
-            os.remove(self.pdbqt_file(mol_name))
+            os.remove(self.pdbqt_file.format(mol_name))
         with contextlib.suppress(FileNotFoundError):
-            os.remove(self.docked_pdb_file(mol_name))
+            os.remove(self.docked_pdb_file.format(mol_name))
 
     @staticmethod
     def _parse_free_pos(path):
