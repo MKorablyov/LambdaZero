@@ -427,6 +427,7 @@ class DockVina_smi:
                  rec_file="4jnc.nohet.aligned.pdbqt",
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
+                 docking_timeout=60 * 5,
                  cleanup=True):
         self.outpath = outpath
         self.n_conf = n_conf
@@ -436,6 +437,7 @@ class DockVina_smi:
         self.vina_bin = os.path.join(vina_dir, "bin/vina")
         self.rec_file = os.path.join(docksetup_dir, rec_file)
         self.bindsite = bindsite
+        self.docking_timeout = docking_timeout
         self.cleanup = cleanup
 
         # Construct dock_pars
@@ -449,7 +451,8 @@ class DockVina_smi:
             dock_pars += f" --energy_range {energy_range}"
         self.dock_pars = dock_pars
 
-        # prepare skeleton for dock vina command (ligand and out remain to be filled upon each particular call)
+        # prepare template for Autodock Vina execution command
+        # ligand and out arguments are to be filled upon each individual call for docking
         self.dock_cmd = "{} --receptor {} " \
                         "--center_x {} --center_y {} --center_z {} " \
                         "--size_x {} --size_y {} --size_z {} "
@@ -471,7 +474,7 @@ class DockVina_smi:
         self.pdbqt_file = os.path.join(self.outpath, "pdbqt", "{}.pdbqt")
         self.docked_pdb_file = os.path.join(self.outpath, "docked", "{}.pdb")
 
-    def dock(self, smi, mol_name=None, molgen_conf=20, docking_timeout=60*5):
+    def dock(self, smi, mol_name=None, molgen_conf=20):
         try:
             mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
 
@@ -481,15 +484,18 @@ class DockVina_smi:
             # generate input files
             self.gen_mol_files(smi, mol_name, molgen_conf)
 
-            # complete docking query
+            # complete docking query and dock
             dock_cmd = self.dock_cmd.format(input_pdbqt_file, docked_pdb_file)
+            dock_query = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
+            dock_query.wait(timeout=self.docking_timeout)
 
-            # dock
-            cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
-            cl.wait(timeout=docking_timeout)
-
-            # parse energy and (optionally) coordinates
+            # parse energy and coordinates
             mol_name, dockscores, original_pos, docked_pos = self.parse(mol_name)
+
+            # if docking succeeded at all, the number of obtained conformation is expected to always match the number of requested
+            # if that is not the case, output is assumed to be corrupted, thus discarded
+            if len(dockscores) != self.n_conf:
+                raise RuntimeError(f"DockVina: for {smi} the number of obtained conformations ({len(dockscores)}) mismatches the number of requested conformations ({self.n_conf})")
         finally:
             # https://docs.python.org/3/tutorial/errors.html
             # If the exception is not handled by an except clause, the exception is re-raised after the finally clause has been executed.
