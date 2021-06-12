@@ -495,10 +495,10 @@ class DockVina_smi:
         docked_pdb_file = self.docked_pdb_file.format(mol_name)
 
         original_pos = None
-        dockscores, docked_pos = DockVina_smi._parse_docked_energy_pos(docked_pdb_file, self.mode)
+        dockscores, docked_pos = DockVina_smi._parse_energy_docked_pose(docked_pdb_file, self.mode)
         if self.mode in ["best_conf", "all_conf"]:
-            original_pos = DockVina_smi._parse_free_pos(input_sdf_file)
-            permuted_original_pos = DockVina_smi._parse_permuted_free_pos(input_pdbqt_file)
+            original_pos = DockVina_smi._parse_free_pose(input_sdf_file)
+            permuted_original_pos = DockVina_smi._parse_permuted_free_pose(input_pdbqt_file)
             # fix docked_pos ordering
             order = DockVina_smi._get_atoms_reordering(original_pos, permuted_original_pos)
             docked_pos = docked_pos[..., order, :]
@@ -545,18 +545,16 @@ class DockVina_smi:
             os.remove(self.docked_pdb_file.format(mol_name))
 
     @staticmethod
-    def _parse_free_pos(path):
-        # TODO: doc
-        """Parse sdf file that contains 3D positions of atoms in order matching smiles"""
+    def _parse_free_pose(path):
+        """Parse 3D positions of atoms from (sdf) file. Order of atoms matches the order of appearance in smiles string."""
         mol = Chem.SDMolSupplier(path)[0]
         conf = mol.GetConformer()
         pos = conf.GetPositions()
         return pos
 
     @staticmethod
-    def _parse_permuted_free_pos(path):
-        # TODO: doc
-        """Parse pdbqt file that contains 3D positions of atoms in mixed order compared to sdf file """
+    def _parse_permuted_free_pose(path):
+        """Parse 3D positions of atoms from (pdbqt) file. Order of atoms is permuted compared to the order in smiles string."""
         with open(path) as f:
             data = [line for line in f if line.startswith("ATOM")]
         # number of entries in line is unstable, but counting from the back appears to works
@@ -564,14 +562,9 @@ class DockVina_smi:
         return pos
 
     @staticmethod
-    def _get_atoms_reordering(sdf_pos, pdbqt_pos):
-        order = np.argmin(np.abs(sdf_pos.reshape((1, -1, 3)) - pdbqt_pos.reshape((-1, 1, 3))).sum(axis=2), axis=0)
-        return order
-
-    @staticmethod
-    def _parse_docked_energy_pos(path, mode):
-        # TODO: doc
-        """Parse pdb file with docking results. """
+    def _parse_energy_docked_pose(path, mode):
+        """Parse docking scores and 3D positions of atoms of docked molecule from (pdb) file. Order of atoms is permuted compared to the order in smiles string.
+        Permutation is the same as for input (pdbqt) file."""
         assert mode in ["score_only", "best_conf", "all_conf"]
 
         with open(path) as f:
@@ -599,8 +592,12 @@ class DockVina_smi:
 
             energies = np.array(energies, dtype=np.float32)
             pos = np.array(pos, dtype=np.float32)
-
         return energies, pos
+
+    @staticmethod
+    def _get_atoms_reordering(sdf_pos, pdbqt_pos):
+        order = np.argmin(np.abs(sdf_pos.reshape((1, -1, 3)) - pdbqt_pos.reshape((-1, 1, 3))).sum(axis=2), axis=0)
+        return order
 
 
 class ScaffoldSplit:
