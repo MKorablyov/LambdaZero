@@ -4,6 +4,7 @@ import os
 import random
 import string
 import subprocess
+import warnings
 from collections import Counter
 
 import numpy as np
@@ -419,26 +420,34 @@ class Dock_smi:
 class DockVina_smi:
     def __init__(self,
                  outpath,
+                 n_conf=1,
                  mgltools_dir=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
                  vina_dir=os.path.join(programs_dir, "vina"),
                  docksetup_dir=os.path.join(datasets_dir, "seh/4jnc"),
                  rec_file="4jnc.nohet.aligned.pdbqt",
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
-                 cleanup=True,
-                 mode="score_only"):
+                 cleanup=True):
         self.outpath = outpath
+        self.n_conf = n_conf
         self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
         self.mgltools_bin = os.path.join(mgltools_dir, "bin")
         self.prepare_ligand4 = os.path.join(self.mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
         self.vina_bin = os.path.join(vina_dir, "bin/vina")
         self.rec_file = os.path.join(docksetup_dir, rec_file)
         self.bindsite = bindsite
-        self.dock_pars = dock_pars
         self.cleanup = cleanup
 
-        assert mode in ["score_only", "best_conf", "all_conf"]
-        self.mode = mode
+        # Construct dock_pars
+        if "num_modes" not in dock_pars:
+            dock_pars += f" --num_modes {n_conf}"
+        else:
+            raise ValueError("DockVina: do not specify --num_nodes in dock_pars! Use n_conf argument instead!")
+
+        energy_range = 100  # arbitrary sufficiently big value
+        if "energy_range" not in dock_pars:
+            dock_pars += f" --energy_range {energy_range}"
+        self.dock_pars = dock_pars
 
         # prepare skeleton for dock vina command (ligand and out remain to be filled upon each particular call)
         self.dock_cmd = "{} --receptor {} " \
@@ -494,14 +503,11 @@ class DockVina_smi:
         input_pdbqt_file = self.pdbqt_file.format(mol_name)
         docked_pdb_file = self.docked_pdb_file.format(mol_name)
 
-        original_pos = None
-        dockscores, docked_pos = DockVina_smi._parse_energy_docked_pose(docked_pdb_file, self.mode)
-        if self.mode in ["best_conf", "all_conf"]:
-            original_pos = DockVina_smi._parse_free_pose(input_sdf_file)
-            permuted_original_pos = DockVina_smi._parse_permuted_free_pose(input_pdbqt_file)
-            # fix docked_pos ordering
-            order = DockVina_smi._get_atoms_reordering(original_pos, permuted_original_pos)
-            docked_pos = docked_pos[..., order, :]
+        dockscores, docked_pos = DockVina_smi._parse_energy_and_docked_pose(docked_pdb_file)
+        original_pos = DockVina_smi._parse_free_pose(input_sdf_file)
+        permuted_original_pos = DockVina_smi._parse_permuted_free_pose(input_pdbqt_file)
+        order = DockVina_smi._get_atoms_reordering(original_pos, permuted_original_pos)
+        docked_pos = docked_pos[..., order, :]
 
         return mol_name, dockscores, original_pos, docked_pos
 
@@ -562,36 +568,25 @@ class DockVina_smi:
         return pos
 
     @staticmethod
-    def _parse_energy_docked_pose(path, mode):
+    def _parse_energy_and_docked_pose(path):
         """Parse docking scores and 3D positions of atoms of docked molecule from (pdb) file. Order of atoms is permuted compared to the order in smiles string.
         Permutation is the same as for input (pdbqt) file."""
-        assert mode in ["score_only", "best_conf", "all_conf"]
-
         with open(path) as f:
             data = f.readlines()
 
         indices = [idx for idx, line in enumerate(data) if line.startswith("MODEL") or line.startswith("ENDMDL")]
         indices = np.array(indices, dtype=np.int64).reshape(-1, 2)
 
-        if mode == "score_only":
-            start, end = indices[0]
+        energies = []
+        pos = []
+        for start, end in indices:
             data_sub = data[start:end]
-            energies = float(data_sub[1].split()[3])
-            pos = None
-        else:
-            if mode == "best_conf":
-                indices = indices[[0]]
+            energies.append(float(data_sub[1].split()[3]))
+            data_sub_atoms = [line for line in data_sub if line.startswith("ATOM")]
+            pos.append([line.split()[-7:-4] for line in data_sub_atoms])
 
-            energies = []
-            pos = []
-            for start, end in indices:
-                data_sub = data[start:end]
-                energies.append(float(data_sub[1].split()[3]))
-                data_sub_atoms = [line for line in data_sub if line.startswith("ATOM")]
-                pos.append([line.split()[-7:-4] for line in data_sub_atoms])
-
-            energies = np.array(energies, dtype=np.float32)
-            pos = np.array(pos, dtype=np.float32)
+        energies = np.array(energies, dtype=np.float32)
+        pos = np.array(pos, dtype=np.float32)
         return energies, pos
 
     @staticmethod
