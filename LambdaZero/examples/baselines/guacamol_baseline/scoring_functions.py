@@ -1,4 +1,4 @@
-import os.path as osp
+import os
 from rdkit import Chem
 from rdkit.Chem import QED
 from guacamol.scoring_function import ScoringFunctionBasedOnRdkitMol, BatchScoringFunction
@@ -9,7 +9,7 @@ import LambdaZero.utils
 from LambdaZero.environments.block_mol_graph_v1 import GraphMolObs
 from LambdaZero.environments.molMDP import BlockMoleculeData
 
-datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
+_, _, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 default_config = {
     "env_eval_config": {
@@ -19,23 +19,19 @@ default_config = {
 }
 
 config = default_config
-out_dir = osp.join(summaries_dir, "guacamol_oracle_dock_eval")
-mgltools_dir=osp.join(programs_dir, "mgltools_x86_64Linux2_1.5.6")
-vina_dir=osp.join(programs_dir, "vina")
-docksetup_dir=osp.join(datasets_dir, "seh/4jnc")
+out_dir = os.path.join(summaries_dir, "guacamol_oracle_dock_eval")
 
-class BlockMoleculeData_wrapper():
+
+class BlockMoleculeData_wrapper:
     def __init__(self, mol, smiles, graph=None):
         self.graph = graph
         self.mol = mol
         self.smiles = smiles
 
+
 class EnvEval:
     def __init__(self, config):
-        self.dock_smi = LambdaZero.chem.DockVina_smi(outpath=out_dir,
-                                                     mgltools_dir=mgltools_dir,
-                                                     vina_dir=vina_dir,
-                                                     docksetup_dir=docksetup_dir)
+        self.dock_smi = LambdaZero.chem.DockVina_smi(outpath=out_dir)
         self.dockscore_norm = config["dockscore_norm"]
         self.qed_cutoff = config["qed_cutoff"]
 
@@ -43,11 +39,11 @@ class EnvEval:
         if docking:
             try:
                 # Since synthesizability prediction varies with training dataset, we ignore it here.
-                # smi = Chem.MolToSmiles(mol) #
-                gridscore = self.dock_smi.dock(smi)[1]
+                # smi = Chem.MolToSmiles(mol)
+                gridscore = self.dock_smi.dock(smi)[1][0]
                 dock_reward = -((gridscore - self.dockscore_norm[0]) / self.dockscore_norm[1])
 
-                mol = Chem.MolFromSmiles(smi) #
+                mol = Chem.MolFromSmiles(smi)
                 qed = QED.qed(mol)
                 qed_discount = (qed - self.qed_cutoff[0]) / (self.qed_cutoff[1] - self.qed_cutoff[0])
                 qed_discount = min(max(0.0, qed_discount), 1.0)  # relu to maxout at 1
@@ -57,12 +53,11 @@ class EnvEval:
                 print('exception for', e)
                 dock_reward = None
                 reward = 0.
-            print (reward)
-            return reward # dock_reward
+            print(reward)
+            return reward  # dock_reward
 
 
 class Oracle_wrapper(BatchScoringFunction):
-
     def __init__(self, config) -> None:
         super().__init__()
 
