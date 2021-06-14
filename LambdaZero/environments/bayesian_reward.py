@@ -179,10 +179,7 @@ class _SimDockLet:
         #                           osp.join(datasets_dir, "brutal_dock/mpro_6lze/docksetup"),
         #                           gas_charge=True)
         print(programs_dir, "mgltools_x86_64Linux2_1.5.6")
-        self.dock = LambdaZero.chem.DockVina_smi(tmp_dir,
-                                                 osp.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
-                                                 osp.join(programs_dir, "vina"),
-                                                 osp.join(datasets_dir, "seh/4jnc"))
+        self.dock = LambdaZero.chem.DockVina_smi(tmp_dir)
         self.target_norm = [-8.6, 1.10]
         self.attribute = attribute
 
@@ -190,7 +187,7 @@ class _SimDockLet:
         s = Chem.MolToSmiles(mol[1].mol)
         print("starting", s)
         try:
-            r = self.dock.dock(s)[1]
+            r = self.dock.dock(s)[2][0]
         except Exception as e:  # Sometimes the prediction fails
             print('exception for', s, e)
             r = 0
