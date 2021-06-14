@@ -1,4 +1,5 @@
-import time, os.path as osp
+import time
+import os
 import numpy as np
 import ray
 from rdkit import Chem
@@ -9,6 +10,7 @@ from LambdaZero.models import ChempropWrapper_v1
 import LambdaZero.utils
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
+
 @ray.remote(num_gpus=0)
 class DockingEstimator(DockVina_smi):
     def __init__(self, dockVina_config):
@@ -16,10 +18,11 @@ class DockingEstimator(DockVina_smi):
 
     def eval(self, smiles):
         try:
-            mol_name, dockscore, coord = self.dock(smiles)
+            dockscore = self.dock(smiles)[2][0]
         except Exception as e:
             dockscore = None
         return dockscore
+
 
 class DockingOracle:
     def __init__(self, num_threads, dockVina_config, mean, std, act_y, logger):
@@ -38,12 +41,12 @@ class DockingOracle:
         dockscores_ = []
         num_failures = 0
         for d in dockscores:
-            if d == None:
-                dockscores_.append(self.mean) # mean on failures
-                num_failures+=1
+            if d is None:
+                dockscores_.append(self.mean)  # mean on failures
+                num_failures += 1
             else:
                 dockscores_.append(d)
-        dockscores = [(self.mean-d) / self.std for d in dockscores_] # this normalizes and flips dockscore
+        dockscores = [(self.mean-d) / self.std for d in dockscores_]  # this normalizes and flips dockscore
         dockscores = self.act_y(dockscores)
         self.logger.log.remote({
             "docking_oracle/failure_probability": num_failures/float(len(dockscores)),
@@ -53,11 +56,15 @@ class DockingOracle:
         return dockscores
 
 
-config_DockingOracle_v1 = {"num_threads":8,
-                           "dockVina_config": {"outpath": osp.join(summaries_dir, "docking")},
-                           "mean":-8.6, "std": 1.1, "act_y":LambdaZero.contrib.functional.elu2,
-                           }
-
+config_DockingOracle_v1 = {
+    "num_threads": 8,
+    "dockVina_config": {
+        "outpath": os.path.join(summaries_dir, "docking")
+    },
+    "mean": -8.6,
+    "std": 1.1,
+    "act_y": LambdaZero.contrib.functional.elu2,
+}
 
 
 @ray.remote(num_cpus=0)
@@ -72,6 +79,7 @@ class QEDEstimator:
         except Exception as e:
             qed = 0.0
         return qed
+
 
 class QEDOracle:
     def __init__(self, num_threads):
@@ -91,11 +99,12 @@ class ChempropWrapper_v2(ChempropWrapper_v1):
     def eval(self, m):
         return ChempropWrapper_v1.__call__(self, m)
 
+
 class SynthOracle:
     def __init__(self, synth_options, synth_config):
         self.synth_net = ChempropWrapper_v2.options(**synth_options).remote(synth_config)
 
-    def __call__(self,molecules):
+    def __call__(self, molecules):
         synths = []
         for m in molecules:
             try:
