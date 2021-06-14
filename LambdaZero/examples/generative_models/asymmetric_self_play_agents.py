@@ -238,13 +238,8 @@ class GFlowNetAlice(nn.Module):
         while not done:
             with torch.no_grad():
                 q_values = self.q_network(ob)
-
-                # epsilon greedy policy here
-                if np.random.uniform() < self.eps:
-                    # random action taken
-                    a = torch.tensor(np.random.randint(0, q_values.shape))
-                else:
-                    a = torch.argmax(q_values)
+                dist = Categorical(logits=q_values)
+                a = dist.sample()
 
                 next_ob, r, done, _ = self.env.step(a)
                 next_ob = torch.tensor([next_ob]).float()
@@ -282,7 +277,7 @@ class GFlowNetAlice(nn.Module):
         for i in range(len(next_actions)):
             # same thing, but for Q values for (s', a')
             outflow_qs.append(
-                rewards + torch.exp(next_q_values[i][next_actions[i]]))
+                rewards[i] + torch.exp(next_q_values[i][next_actions[i]]))
 
         s_prime = sum(outflow_qs)
         outflow = torch.log(self.c_reg + s_prime)
