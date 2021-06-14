@@ -439,6 +439,9 @@ class GenMolFiles:
         self.mol2_filepath = os.path.join(self.outpath, "mol2", "{}.mol2")
         self.pdbqt_filepath = os.path.join(self.outpath, "pdbqt", "{}.pdbqt")
 
+    def __call__(self, smi, mol_name):
+        return self.generate(smi, mol_name)
+
     def generate(self, smi, mol_name):
         smi_filepath = self.smi_filepath.format(mol_name)
         sdf_filepath = self.sdf_filepath.format(mol_name)
@@ -468,8 +471,27 @@ class GenMolFiles:
         os.system(f"{self.mgltools_bin}/pythonsh {self.prepare_ligand4} -l {mol2_filepath} -o {pdbqt_filepath}")
         return sdf_filepath, mol2_filepath, pdbqt_filepath
 
-    def __call__(self, smi, mol_name):
-        return self.generate(smi, mol_name)
+    @staticmethod
+    def parse_free_pose(path):
+        """Parse 3D positions of atoms from (sdf) file. Order of atoms matches the order of appearance in smiles string."""
+        mol = Chem.SDMolSupplier(path)[0]
+        conf = mol.GetConformer()
+        pose = conf.GetPositions()
+        return pose
+
+    @staticmethod
+    def parse_permuted_free_pose(path):
+        """Parse 3D positions of atoms from (pdbqt) file. Order of atoms is permuted compared to the order in smiles string."""
+        with open(path) as f:
+            data = [line for line in f if line.startswith("ATOM")]
+        # number of entries in a line is unstable, but counting from the back appears to work as intended
+        pose = np.array([line.split()[-7:-4] for line in data], dtype=np.float32)
+        return pose
+
+    @staticmethod
+    def get_atoms_reordering(sdf_pose, pdbqt_pose):
+        order = np.argmin(np.abs(sdf_pose.reshape((1, -1, 3)) - pdbqt_pose.reshape((-1, 1, 3))).sum(axis=2), axis=0)
+        return order
 
 
 class DockVina_smi:
@@ -533,7 +555,7 @@ class DockVina_smi:
             dock_query.wait(timeout=self.docking_timeout)
 
             # parse energy and coordinates
-            mol_name, dockscores, original_pose, docked_poses = self.parse(mol_name)
+            mol_name, dockscores, free_pose, docked_poses = self.parse(mol_name)
 
             # if docking succeeded at all, the number of obtained conformation is expected to always match the number of requested
             # if that is not the case, output is assumed to be corrupted, thus discarded
@@ -545,20 +567,20 @@ class DockVina_smi:
             if self.do_cleanup:
                 self._cleanup(mol_name)
 
-        return mol_name, dockscores, original_pose, docked_poses
+        return mol_name, dockscores, free_pose, docked_poses
 
     def parse(self, mol_name):
         input_sdf_filepath = self.input_mol_files.sdf_filepath.format(mol_name)
         input_pdbqt_filepath = self.input_mol_files.pdbqt_filepath.format(mol_name)
         docked_pdb_filepath = self.docked_pdb_filepath.format(mol_name)
 
-        dockscores, docked_poses = DockVina_smi._parse_energies_and_docked_poses(docked_pdb_filepath)
-        original_pose = DockVina_smi._parse_free_pose(input_sdf_filepath)
-        permuted_original_pose = DockVina_smi._parse_permuted_free_pose(input_pdbqt_filepath)
-        order = DockVina_smi._get_atoms_reordering(original_pose, permuted_original_pose)
+        dockscores, docked_poses = DockVina_smi.parse_scores_and_docked_poses(docked_pdb_filepath)
+        free_pose = self.input_mol_files.parse_free_pose(input_sdf_filepath)
+        permuted_free_pose = self.input_mol_files.parse_permuted_free_pose(input_pdbqt_filepath)
+        order = self.input_mol_files.get_atoms_reordering(free_pose, permuted_free_pose)
         docked_poses = docked_poses[..., order, :]
 
-        return mol_name, dockscores, original_pose, docked_poses
+        return mol_name, dockscores, free_pose, docked_poses
 
     def _cleanup(self, mol_name):
         # https://docs.python.org/3/library/contextlib.html
@@ -577,24 +599,7 @@ class DockVina_smi:
             os.remove(self.docked_pdb_filepath.format(mol_name))
 
     @staticmethod
-    def _parse_free_pose(path):
-        """Parse 3D positions of atoms from (sdf) file. Order of atoms matches the order of appearance in smiles string."""
-        mol = Chem.SDMolSupplier(path)[0]
-        conf = mol.GetConformer()
-        pose = conf.GetPositions()
-        return pose
-
-    @staticmethod
-    def _parse_permuted_free_pose(path):
-        """Parse 3D positions of atoms from (pdbqt) file. Order of atoms is permuted compared to the order in smiles string."""
-        with open(path) as f:
-            data = [line for line in f if line.startswith("ATOM")]
-        # number of entries in line is unstable, but counting from the back appears to works
-        pose = np.array([line.split()[-7:-4] for line in data], dtype=np.float32)
-        return pose
-
-    @staticmethod
-    def _parse_energies_and_docked_poses(path):
+    def parse_scores_and_docked_poses(path):
         """Parse docking scores and 3D positions of atoms of docked molecule from (pdb) file. Order of atoms is permuted compared to the order in smiles string.
         Permutation is the same as for input (pdbqt) file."""
         with open(path) as f:
@@ -603,22 +608,17 @@ class DockVina_smi:
         indices = [idx for idx, line in enumerate(data) if line.startswith("MODEL") or line.startswith("ENDMDL")]
         indices = np.array(indices, dtype=np.int64).reshape(-1, 2)
 
-        energies = []
+        scores = []
         poses = []
         for start, end in indices:
             data_sub = data[start:end]
-            energies.append(float(data_sub[1].split()[3]))
+            scores.append(float(data_sub[1].split()[3]))
             data_sub_atoms = [line for line in data_sub if line.startswith("ATOM")]
             poses.append([line.split()[-7:-4] for line in data_sub_atoms])
 
-        energies = np.array(energies, dtype=np.float32)
+        scores = np.array(scores, dtype=np.float32)
         poses = np.array(poses, dtype=np.float32)
-        return energies, poses
-
-    @staticmethod
-    def _get_atoms_reordering(sdf_pose, pdbqt_pose):
-        order = np.argmin(np.abs(sdf_pose.reshape((1, -1, 3)) - pdbqt_pose.reshape((-1, 1, 3))).sum(axis=2), axis=0)
-        return order
+        return scores, poses
 
 
 class ScaffoldSplit:
