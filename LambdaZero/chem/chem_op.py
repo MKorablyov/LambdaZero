@@ -418,13 +418,29 @@ class Dock_smi:
 
 
 class GenMolFiles:
+    """Generate from SMILES string files of different formats representing molecule in the free space.
+
+    Generates sdf, mol2 and pdbqt files.
+    Generation is chain-dependant:
+        1. SMILES string -> [rdkit] -> sdf
+        2. sdf -> [Open Babel] -> mol2
+        3. mol2 -> [MGLTools] -> pdbqt
+
+    Open Babel and MGLTools are external programs.
+    Open Babel should be installed in the environment and be accessible via obabel command.
+
+    Arguments:
+        outpath: directory where to store generated files
+        n_gen_conformations: number of embeddings from SMILES string to 3D space (to be used in rdkit subroutine)
+        mgltools_dir: directory with MGLTools
+    """
     def __init__(self,
                  outpath,
                  n_gen_conformations=20,
                  mgltools_dir=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6")):
         self.outpath = outpath
         self.n_gen_conformations = n_gen_conformations
-        self.mgltools_bin = os.path.join(mgltools_dir, "bin")
+        self.mgltools_bin = os.path.join(mgltools_dir, "bin", "pythonsh")
         self.prepare_ligand4 = os.path.join(mgltools_dir, "MGLToolsPckgs", "AutoDockTools", "Utilities24", "prepare_ligand4.py")
 
         # set up directory structure
@@ -439,10 +455,8 @@ class GenMolFiles:
         self.mol2_filepath = os.path.join(self.outpath, "mol2", "{}.mol2")
         self.pdbqt_filepath = os.path.join(self.outpath, "pdbqt", "{}.pdbqt")
 
-    def __call__(self, smi, mol_name):
-        return self.generate(smi, mol_name)
-
     def generate(self, smi, mol_name):
+        """Generate from SMILES string sdf, mol2 and pdbqt files"""
         smi_filepath = self.smi_filepath.format(mol_name)
         sdf_filepath = self.sdf_filepath.format(mol_name)
         mol2_filepath = self.mol2_filepath.format(mol_name)
@@ -468,7 +482,7 @@ class GenMolFiles:
         os.system(f"obabel -isdf {sdf_filepath} -omol2 -O {mol2_filepath}")
 
         # pdbqt
-        os.system(f"{self.mgltools_bin}/pythonsh {self.prepare_ligand4} -l {mol2_filepath} -o {pdbqt_filepath}")
+        os.system(f"{self.mgltools_bin} {self.prepare_ligand4} -l {mol2_filepath} -o {pdbqt_filepath}")
         return sdf_filepath, mol2_filepath, pdbqt_filepath
 
     @staticmethod
@@ -489,18 +503,50 @@ class GenMolFiles:
         return pose
 
     @staticmethod
-    def get_atoms_reordering(sdf_pose, pdbqt_pose):
-        order = np.argmin(np.abs(sdf_pose.reshape((1, -1, 3)) - pdbqt_pose.reshape((-1, 1, 3))).sum(axis=2), axis=0)
+    def get_atoms_reordering(free_pose, permuted_free_pose):
+        """Find indices (order) that satisfy: free_pose = permuted_free_pose[order]"""
+        order = np.argmin(np.abs(free_pose.reshape((1, -1, 3)) - permuted_free_pose.reshape((-1, 1, 3))).sum(axis=2), axis=0)
         return order
+
+    def cleanup(self, mol_name):
+        """Delete generated files"""
+        # https://docs.python.org/3/library/contextlib.html
+        # contextlib.suppress
+        # Return a context manager that suppresses any of the specified exceptions if they are raised in the body of a with statement
+        # and then resumes execution with the first statement following the end of the with statement.
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.smi_filepath.format(mol_name))
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.sdf_filepath.format(mol_name))
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.mol2_filepath.format(mol_name))
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.pdbqt_filepath.format(mol_name))
 
 
 class DockVina_smi:
+    """Dock SMILES string with AutoDock Vina.
+
+    AutoDock Vina expects molecule in pdbqt file as an input, and outputs pdb file with docking results.
+    Conversion from SMILES string to pdbqt file is handled by preparation pipeline encapsulated in GenMolFiles class.
+
+
+    Arguments:
+        outpath: directory where to store generated input files and files with docking results
+        n_conformations: number of requested docking conformations. When supplied 1 - return only conformation with the best docking score
+        vina_bin: path to the AutoDock Vina executable binary
+        rec_file: path to the file with receptor
+        bindsite: spatial volume of search for docking, defined by 6-numbers tuple (center, side lengths)
+        dock_pars: string of extra arguments to be passed to the docking executable
+        docking_timeout: number of seconds to wait for docking completion before terminating execution
+        do_cleanup: whether to delete files produced by preparation pipeline and docking after execution
+        **genmol_kwargs (optional): parameters to be passed to GenMolFiles class initialization
+    """
     def __init__(self,
                  outpath,
                  n_conformations=1,
-                 vina_dir=os.path.join(programs_dir, "vina"),
-                 docksetup_dir=os.path.join(datasets_dir, "seh/4jnc"),
-                 rec_file="4jnc.nohet.aligned.pdbqt",
+                 vina_bin=os.path.join(programs_dir, "vina", "bin", "vina"),
+                 rec_file=os.path.join(datasets_dir, "seh", "4jnc", "4jnc.nohet.aligned.pdbqt"),
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
                  docking_timeout=60 * 5,
@@ -508,8 +554,8 @@ class DockVina_smi:
                  **genmol_kwargs):
         self.outpath = outpath
         self.n_conformations = n_conformations
-        self.vina_bin = os.path.join(vina_dir, "bin/vina")
-        self.rec_file = os.path.join(docksetup_dir, rec_file)
+        self.vina_bin = vina_bin
+        self.rec_file = rec_file
         self.bindsite = bindsite
         self.docking_timeout = docking_timeout
         self.do_cleanup = do_cleanup
@@ -542,6 +588,18 @@ class DockVina_smi:
         self.docked_pdb_filepath = os.path.join(self.outpath, "docked", "{}.pdb")
 
     def dock(self, smi, mol_name=None):
+        """Perform docking for given SMILES strings and return docking results
+
+        Arguments:
+            smi: SMILES string
+            mol_name: shared part of the file name
+
+        Returns:
+            mol_name: string supplied as input or randomly generated if there was none
+            dockscores: list of scores obtained by docking, one per conformation
+            free_pose: 3D coordinates of atoms for a molecule in the free space
+            docked_poses: list, where each entry is 3D coordinates of atoms for a docked molecule, number of entries match number of conformations
+        """
         try:
             mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
 
@@ -555,7 +613,8 @@ class DockVina_smi:
             dock_query.wait(timeout=self.docking_timeout)
 
             # parse energy and coordinates
-            mol_name, dockscores, free_pose, docked_poses = self.parse(mol_name)
+            # underscore masks smi retrieved from the generated file, no need to overwrite smi here
+            _, mol_name, dockscores, free_pose, docked_poses = self.parse(mol_name)
 
             # if docking succeeded at all, the number of obtained conformation is expected to always match the number of requested
             # if that is not the case, output is assumed to be corrupted, thus discarded
@@ -565,38 +624,28 @@ class DockVina_smi:
             # https://docs.python.org/3/tutorial/errors.html
             # If the exception is not handled by an except clause, the exception is re-raised after the finally clause has been executed.
             if self.do_cleanup:
-                self._cleanup(mol_name)
+                self.cleanup(mol_name)
 
-        return mol_name, dockscores, free_pose, docked_poses
+        return smi, mol_name, dockscores, free_pose, docked_poses
 
+    # separated parse function is useful for recovering data should program crash unexpectedly, e.g. node failure on cluster
     def parse(self, mol_name):
+        """Parse docking scores and both 3D coordinates of atoms for a docked molecule and a molecule in the free space, from already existing files generated by docking and preparation pipeline."""
+        input_smi_filepath = self.input_mol_files.smi_filepath.format(mol_name)
         input_sdf_filepath = self.input_mol_files.sdf_filepath.format(mol_name)
         input_pdbqt_filepath = self.input_mol_files.pdbqt_filepath.format(mol_name)
         docked_pdb_filepath = self.docked_pdb_filepath.format(mol_name)
+
+        with open(input_smi_filepath, "r") as smi_file:
+            smi = smi_file.readline()
 
         dockscores, docked_poses = DockVina_smi.parse_scores_and_docked_poses(docked_pdb_filepath)
         free_pose = self.input_mol_files.parse_free_pose(input_sdf_filepath)
         permuted_free_pose = self.input_mol_files.parse_permuted_free_pose(input_pdbqt_filepath)
         order = self.input_mol_files.get_atoms_reordering(free_pose, permuted_free_pose)
-        docked_poses = docked_poses[..., order, :]
+        docked_poses = docked_poses[:, order]
 
-        return mol_name, dockscores, free_pose, docked_poses
-
-    def _cleanup(self, mol_name):
-        # https://docs.python.org/3/library/contextlib.html
-        # contextlib.suppress
-        # Return a context manager that suppresses any of the specified exceptions if they are raised in the body of a with statement
-        # and then resumes execution with the first statement following the end of the with statement.
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(self.input_mol_files.smi_filepath.format(mol_name))
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(self.input_mol_files.sdf_filepath.format(mol_name))
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(self.input_mol_files.mol2_filepath.format(mol_name))
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(self.input_mol_files.pdbqt_filepath.format(mol_name))
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(self.docked_pdb_filepath.format(mol_name))
+        return smi, mol_name, dockscores, free_pose, docked_poses
 
     @staticmethod
     def parse_scores_and_docked_poses(path):
@@ -619,6 +668,12 @@ class DockVina_smi:
         scores = np.array(scores, dtype=np.float32)
         poses = np.array(poses, dtype=np.float32)
         return scores, poses
+
+    def cleanup(self, mol_name):
+        """Delete files generated by preparation pipeline and by docking"""
+        self.input_mol_files.cleanup(mol_name)
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.docked_pdb_filepath.format(mol_name))
 
 
 class ScaffoldSplit:
