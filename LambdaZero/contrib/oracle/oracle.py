@@ -18,7 +18,7 @@ class DockingEstimator(DockVina_smi):
 
     def eval(self, smiles):
         try:
-            dockscore = self.dock(smiles)[1][0]
+            dockscore = self.dock(smiles)[2][0]
         except Exception as e:
             dockscore = None
         return dockscore

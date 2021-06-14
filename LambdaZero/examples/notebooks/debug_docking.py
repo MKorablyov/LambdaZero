@@ -11,7 +11,7 @@ dock_path = os.path.join(datasets_dir, "temp_docking")
 dock = LambdaZero.chem.DockVina_smi(dock_path)
 
 try:
-    score = dock.dock("O=C(NC12CC3CC(CC(C3)C1)C2)c1cc2nc(-c3ccco3)cc(C(F)(F)F)n2n1", mol_name="16")[1][0]
+    score = dock.dock("O=C(NC12CC3CC(CC(C3)C1)C2)c1cc2nc(-c3ccco3)cc(C(F)(F)F)n2n1", mol_name="16")[2][0]
     # O=C1C=CC(=O)C(c2cccc3cc(C(=O)NC45CC6CC(CC(C6)C4)C5)ccc23)=C1
     # "O=C(NC(=O)C1=CC(C2CCCC2)CCC1)Nc1ccc2ccccc2c1")
 except Exception as e:

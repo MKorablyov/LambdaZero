@@ -187,7 +187,7 @@ class _SimDockLet:
         s = Chem.MolToSmiles(mol[1].mol)
         print("starting", s)
         try:
-            r = self.dock.dock(s)[1][0]
+            r = self.dock.dock(s)[2][0]
         except Exception as e:  # Sometimes the prediction fails
             print('exception for', s, e)
             r = 0

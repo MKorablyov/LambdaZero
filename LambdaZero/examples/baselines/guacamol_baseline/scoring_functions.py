@@ -40,7 +40,7 @@ class EnvEval:
             try:
                 # Since synthesizability prediction varies with training dataset, we ignore it here.
                 # smi = Chem.MolToSmiles(mol)
-                gridscore = self.dock_smi.dock(smi)[1][0]
+                gridscore = self.dock_smi.dock(smi)[2][0]
                 dock_reward = -((gridscore - self.dockscore_norm[0]) / self.dockscore_norm[1])
 
                 mol = Chem.MolFromSmiles(smi)
