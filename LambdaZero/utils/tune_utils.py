@@ -1,8 +1,8 @@
 import os
 import numpy as np
 import torch
-from torch_geometric.data import DataLoader
 from torch.utils.data import Subset
+from torch_geometric.data import DataLoader
 
 from ray import tune
 
@@ -142,7 +142,7 @@ class Trainer(tune.Trainable):
     def step(self):
         train_alias, train_dataloader, train_metrics = self.train_entity
         train_scores = self.train_epoch(self.config, train_dataloader, self.model, train_metrics, self.optim, self.batch_scheduler)
-        train_scores = [(f"train_{train_alias}" + k, v) for k, v in train_scores.items()]
+        train_scores = [(f"train_{train_alias}_" + k, v) for k, v in train_scores.items()]
 
         val_scores = []
         for (val_alias, val_dataloader, val_metrics) in self.val_entities:
@@ -200,8 +200,8 @@ def train_epoch(config, dataloader, model, metrics, optimizer, scheduler):
         if scheduler is not None:
             scheduler.step()
 
-    epoch_targets = np.concatenate(epoch_targets, 0)
     epoch_preds = np.concatenate(epoch_preds, 0)
+    epoch_targets = np.concatenate(epoch_targets, 0)
 
     # missing
     epoch_targets = {train_target: epoch_targets}
@@ -239,24 +239,14 @@ def val_epoch(config, dataloader, model, metrics):
             for metric_target_name in metric_target_unique_names:
                 epoch_targets[metric_target_name].append(getattr(data, metric_target_name).detach().cpu().numpy())
             data = data.to(device)
-            epoch_preds.append(model(data))
+            batch_preds = model(data).detach().cpu().numpy()
+            epoch_preds.append(batch_preds)
+
+    epoch_preds = np.concatenate(epoch_preds, 0)
+    for metric_target_name in metric_target_unique_names:
+        epoch_targets[metric_target_name] = np.concatenate(epoch_targets[metric_target_name], 0)
 
     for (alias, metric_func, metric_target) in metrics:
         scores[alias] = metric_func(epoch_targets[metric_target], epoch_preds)
 
     return scores
-
-
-# TODO: obsolete, remove
-def construct_metrics(metrics, epoch_targets, epoch_preds):
-    epoch_targets = np.concatenate(epoch_targets, 0)
-    epoch_preds = np.concatenate(epoch_preds, 0)
-    metrics["loss"] = metrics["loss"] / epoch_targets.shape[0]
-    metrics["mae"] = np.abs(epoch_targets - epoch_preds).mean()
-    metrics["mse"] = ((epoch_targets - epoch_preds) ** 2).mean()
-
-    ranked_targets = epoch_targets[np.argsort(epoch_targets)]
-    predsranked_targets = epoch_targets[np.argsort(epoch_preds)]
-    metrics["top15_regret"] = np.median(predsranked_targets[:15]) - np.median(ranked_targets[:15])
-    metrics["top50_regret"] = np.median(predsranked_targets[:50]) - np.median(ranked_targets[:50])
-    return metrics
