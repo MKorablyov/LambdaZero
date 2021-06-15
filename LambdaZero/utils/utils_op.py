@@ -1,12 +1,11 @@
 import os
-import os.path as osp
 import configparser
 import numpy as np
 import torch
 from torch_geometric.utils import remove_self_loops
 from rdkit.Chem import AllChem
-import pickle as pk
-from copy import deepcopy
+import pickle
+
 
 def get_external_dirs():
     """Locate in the filesystem external programs/folders essential for LambdaZero execution
@@ -93,15 +92,6 @@ class Complete(object):
         data.edge_index = edge_index
         return data
 
-class Normalize:
-    def __init__(self, property, mean, std):
-        self.property, self.mean, self.std = property, mean, std
-    def __call__(self, data):
-        norm_value = (getattr(data,self.property) - self.mean) / self.std
-        setattr(data,self.property,norm_value)
-        return data
-
-
 
 def uniform_sample(data, nsamples, nbins=20, nmargin=1, bin_low=None, bin_high=None):
     data = np.asarray(data, dtype=np.float32)
@@ -137,6 +127,7 @@ def uniform_sample(data, nsamples, nbins=20, nmargin=1, bin_low=None, bin_high=N
     # idx = np.random.choice(ndata,nsamples,replace=True,p=data_probs)
     return sele_idxs
 
+
 class RunningMeanStd(object):
     def __init__(self, epsilon=1e-4, shape=()):
         self.mean = np.zeros(shape, 'float32')
@@ -171,9 +162,12 @@ class RunningMeanStd(object):
         self.var = new_var
         self.count = new_count
 
+
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
-pca_path = osp.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
+pca_path = os.path.join(datasets_dir, "brutal_dock/mpro_6lze/raw/pca.pkl")
 pca_cache = [None]
+
+
 def molecule_pca(mol):
     fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2)]
     mat = []
@@ -183,13 +177,12 @@ def molecule_pca(mol):
         mat.append(bitsvec)
     mat = np.array(mat)
 
-    pca = pk.load(open(pca_path, 'rb'))
+    pca = pickle.load(open(pca_path, 'rb'))
     scaled_data = pca.transform(mat)
     log_vals = {"PC1": scaled_data[0][0], "PC2": scaled_data[0][1]}
     return log_vals
 
 
-    
 def logP(mu, sigma, x):
     """
     Estimate log likelihood of an estimator
@@ -198,16 +191,4 @@ def logP(mu, sigma, x):
     :param x: ground truth
     :return:
     """
-    return (-np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) **2))
-
-def dataset_creator_v1(config):
-    # make dataset
-    dataset = config["dataset"](**config["dataset_config"])
-    train_idxs, val_idxs, test_idxs = np.load(config["dataset_split_path"], allow_pickle=True)
-
-    train_set = Subset(dataset, train_idxs.tolist())
-    val_set = Subset(dataset, val_idxs.tolist())
-    train_loader = DataLoader(train_set, shuffle=True, batch_size=config["b_size"])
-    val_loader = DataLoader(val_set, batch_size=config["b_size"])
-    return train_loader, val_loader
-
+    return -np.log(sigma * (2 * np.pi)**0.5) - 0.5 * (((x - mu) / sigma) ** 2)
