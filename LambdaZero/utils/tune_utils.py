@@ -217,7 +217,7 @@ def train_epoch(config, dataloader, model, metrics, optimizer, scheduler):
         epoch_targets[missing_target_name] = np.concatenate(epoch_targets_tmp, 0)
 
     for (alias, metric_func, metric_target) in metrics:
-        scores[alias] = metric_func(epoch_preds, epoch_targets[metric_target])
+        scores[alias] = metric_func(epoch_targets[metric_target], epoch_preds)
 
     return scores
 
@@ -242,7 +242,7 @@ def val_epoch(config, dataloader, model, metrics):
             epoch_preds.append(model(data))
 
     for (alias, metric_func, metric_target) in metrics:
-        scores[alias] = metric_func(epoch_preds, epoch_targets[metric_target])
+        scores[alias] = metric_func(epoch_targets[metric_target], epoch_preds)
 
     return scores
 
