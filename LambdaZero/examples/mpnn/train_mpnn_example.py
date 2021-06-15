@@ -10,6 +10,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 import ray
 from ray import tune
+from ray.tune.integration.wandb import WandbLoggerCallback
 
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.utils import Trainer, StandardScaler
@@ -40,7 +41,7 @@ def example_featurization(graph):
     return graph
 
 
-datasets_dir, _, summaries_dir = get_external_dirs()
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 COMMON_PRE_TRANSFORM = torch_geometric.transforms.Compose(
     [DockedDataset.get_best_conformation_minimal,
@@ -54,7 +55,7 @@ COMMON_METRICS = [
     ('regret_top50', regret_top50, 'y')
 ]
 
-config_name = "example"
+
 config = {
     "trainer": Trainer,
     "trainer_config": {
@@ -157,7 +158,7 @@ config = {
     "memory": 8 * 10 ** 9,
     "object_store_memory": 2.5 * 10 ** 9,
 
-    "stop": {"training_iteration": 200},
+    "stop": {"training_iteration": 100},
     "resources_per_trial": {
         "cpu": 4,
         "gpu": 1.0
@@ -166,11 +167,33 @@ config = {
     "checkpoint_score_attr": 'train_zinc_loss',
     "num_samples": 1,
     "checkpoint_at_end": False,
-    "checkpoint_freq": 25
+    "checkpoint_freq": 25,
+
+    # "config_name" is a name of the local folder where CSV, JSON, TensorBoard logs are stored
+    # roughly equivalent to "project" in wandb in the sense that one project can contain multiple runs
+    "config_name": "example",
+
+    # In ray.tune, loggers argument is deprecated, callbacks should be used instead
+    # default callbacks for CSV, JSON and Tensorboard are added internally no matter what
+    # list of callbacks supplied to the respective argument is an addition to those defaults
+    "wandb": {
+        # "project" and "api_key_file" are inputs consumed directly by WandbLoggerCallback
+        "project": 'mpnn_example',
+        "api_key_file": os.path.join(programs_dir, "wandb_key"),
+
+        # following arguments are forwarded to wandb.init:  https://docs.wandb.ai/ref/python/init - NO tinkering with environmental variables
+        # "dir" specifies output root directory. In it, results would be saved to subdirectory called wandb.
+        "dir": summaries_dir,
+        # 'offline' mode means that results logged locally, no immediate sync with wandb server
+        "mode": 'offline',
+        # "name" of the run within a "project" - displayed in wandb UI
+        "name": 'some_name'
+    }
 }
 
 
 if __name__ == "__main__":
+    # local_mode=True is set to enable debugging - remove for real runs
     ray.init(local_mode=True, _memory=config["memory"], object_store_memory=config["object_store_memory"])
 
     analysis = tune.run(config["trainer"],
@@ -181,4 +204,5 @@ if __name__ == "__main__":
                         checkpoint_at_end=config["checkpoint_at_end"],
                         local_dir=summaries_dir,
                         checkpoint_freq=config["checkpoint_freq"],
-                        name=config_name)
+                        callbacks=[WandbLoggerCallback(**config["wandb"])],
+                        name=config["config_name"])
