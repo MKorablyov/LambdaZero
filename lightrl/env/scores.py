@@ -2,23 +2,33 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import QED
 import torch
+from typing import List
+import os.path as osp
+
 from LambdaZero.models import ChempropWrapper_v1
 from chemprop.features import BatchMolGraph, MolGraph
 from torch_geometric.data import Data, Batch
 from lightrl.env.vec_env import fast_from_data_list
 from torch_geometric.utils import degree
+from argparse import Namespace
+from LambdaZero.contrib.functional import elu2
+from LambdaZero.contrib.inputs import temp_load_data_v1
+from LambdaZero.contrib.config_acquirer import oracle_config, acquirer_config
+from LambdaZero.utils import get_external_dirs
+
+datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 
 class QEDEstimator:
     def __init__(self):
         pass
 
-    def eval(self, smiles):
+    def eval(self, smiles: str):
         mol = Chem.MolFromSmiles(smiles)
         qed = QED.qed(mol)
         return qed
 
-    def __call__(self, smiles):
+    def __call__(self, smiles: List[str]):
         ret = np.array([self.eval(x) for x in smiles])
         return ret
 
@@ -61,7 +71,8 @@ class ProxyDockNetRun(torch.nn.Module):
         self._transform = transform
         self.edge_weidht = False
 
-    def forward(self, data, new_batch_graph=True, norm=True):
+    def forward(self, obs, new_batch_graph=True, norm=True):
+        data = obs["mol_graph"]
         if isinstance(data, Data):
             # Create batch (this will create new Batch so no problem overwriting the edge_index
             device = data.x.device
@@ -107,3 +118,48 @@ def load_docknet(docknetpath, device):
 
     proxy_net = ProxyDockNetRun(model, db.transform)
     return proxy_net
+
+
+class FakeRemoteLog:
+    def __init__(self):
+        self._last_log = None
+        self.log = Namespace(remote=self.remote)
+
+    def remote(self, log):
+        self._last_log = log
+
+
+class LZProxyDockNetRun(torch.nn.Module):
+    def __init__(self):
+        super(LZProxyDockNetRun, self).__init__()
+        load_seen_config = {
+            "mean": -8.6,
+            "std": 1.1,
+            "act_y": elu2,
+            "dataset_split_path": osp.join(datasets_dir,
+                                           "brutal_dock/seh/raw/split_Zinc20_docked_neg_randperm_3k.npy"),
+            "raw_path": osp.join(datasets_dir, "brutal_dock/seh/raw"),
+            "proc_path": osp.join(datasets_dir, "brutal_dock/seh/processed_rlbo"),
+            "file_names": ["Zinc20_docked_neg_randperm_3k"],
+        }
+
+        acquirer_config["model_config"]["logger"] = FakeRemoteLog()
+        model = acquirer_config["model"](**acquirer_config["model_config"])
+        train_x, train_y, val_x, val_y = temp_load_data_v1(**load_seen_config)
+        model.fit(train_x, train_y)
+        print("Loaded LZ proxy model & fitted")
+
+        self.model = model
+        self._actual_model = self.model.model
+
+    def forward(self, data, new_batch_graph=True, norm=True):
+        with torch.no_grad():
+            dockok, _ = self.model.get_mean_and_variance([data])
+
+        # TODO hacky - because was expecting proxy to have same sign as dock
+        dockok = [x * -1 for x in dockok]
+
+        if not norm:
+            raise NotImplementedError
+
+        return dockok
