@@ -99,14 +99,14 @@ DEFAULT_CONFIG = {
         "synth_th": 4.,
     },
 
-    "reward": PredockedReward,
+    "reward": "DummyReward",
     "num_blocks": None, # 105, 464
     "max_steps": 7,
     "max_blocks": 7,
     "max_atoms": 50,
     "max_branches": 20,
-    "random_steps": 2,
-    "allow_removal": False,
+    "random_steps": 3,
+    "allow_removal": True,
 
     "env_seed": 123,  # int - seed number / list[int] Same init state from seed list
     "eval_mode": False,
@@ -149,8 +149,8 @@ class BlockMolEnv_v3(gym.core.Env):
             "action_mask": Box(low=0, high=1, shape=(num_actions,)),
         })
 
-        if isinstance(config["reward"], str):
-            config["reward"] = REWARD_CLASS[config["reward"]]
+        print(f"Using reward class {config['reward']}")
+        config["reward"] = REWARD_CLASS[config["reward"]]
 
         self.reward = config["reward"](**config["reward_config"])
 
@@ -158,7 +158,7 @@ class BlockMolEnv_v3(gym.core.Env):
 
         self._prev_obs = None
 
-        worker_index = getattr(config, "worker_index", 0)
+        worker_index = proc_id  # getattr(config, "worker_index", 0)
         vector_index = getattr(config, "vector_index", 0)
         self._reset_mode = False
         self._env_rnd_state = None
@@ -263,20 +263,10 @@ class BlockMolEnv_v3(gym.core.Env):
                 print("bad molecule init: resetting MDP")
                 self.molMDP.reset()
 
-        # TODO DEBUG
-        # try:
-        #     assert self.molMDP.molecule is not None, "molecule is None"
-        #     # try if the molecule produces valid smiles string
-        #     self.molMDP.molecule.smiles
-        # except Exception as e:
-        #     print("initialized environment with invalid molecule", e)
-        #     return self.reset()
-
         self.num_steps = 0
         self._reset_mode = False
 
         obs, graph = self._make_obs()
-        obs["num_steps"] = self.num_steps
         return obs
 
     def _reset_step(self, action):
@@ -289,12 +279,15 @@ class BlockMolEnv_v3(gym.core.Env):
             block_idx = (action - self.max_blocks) % self.num_blocks
             self.molMDP.add_block(block_idx=block_idx, stem_idx=stem_idx)
 
-    def step(self, action):
+    def step(self, action: int):
+        act_smiles = self.molMDP.molecule.smiles
+
         if not self._prev_obs["action_mask"][action]:
             warnings.warn(f'illegal action: {action} - available {np.sum(self._prev_obs["action_mask"])}')
-            return self._prev_obs, 0, True, dict({"error": "bad_action", "episode": self._crt_episode})
-
-        act_smiles = self.molMDP.molecule.smiles
+            return self._prev_obs, 0, True, dict({
+                "error": "bad_action", "episode": self._crt_episode, "act_molecule": act_smiles,
+                "num_steps": self.num_steps
+            })
 
         if action == 0:
             agent_stop = True
@@ -318,7 +311,9 @@ class BlockMolEnv_v3(gym.core.Env):
 
         smiles = self.molMDP.molecule.smiles
 
-        info = {"act_molecule": act_smiles, "res_molecule": smiles, "log_vals": log_vals}
+        info = {"act_molecule": act_smiles, "res_molecule": smiles, "log_vals": log_vals,
+                "num_steps": self.num_steps,
+                "mol": self.molMDP.dump()}
         if self._crt_episode is not None:
             info["episode"] = self._crt_episode
 
@@ -350,7 +345,7 @@ class BlockMolEnv_v3(gym.core.Env):
     def _get_action_mask(self):
         mol = self.molMDP.molecule
         action_mask = np.zeros(self.max_blocks + self.max_branches * self.num_blocks, dtype=np.bool)
-        # action_mask[0] = 1  # Action terminate
+        action_mask[0] = 1  # Action terminate
         if self.allow_removal:
             action_mask[:len(mol.jbonds) + 1] = 1
 
