@@ -1,13 +1,14 @@
 from argparse import Namespace
 import yaml
 import os
-from typing import List
+from typing import List, Dict, Tuple
 import torch
 import numpy as np
 import random
 import wandb
-
+from collections import deque
 from liftoff import OptionParser, dict_to_namespace
+from lightrl.env.transforms import TransformInfoDiscounted, TransformCompose, TransformInfoOracle
 
 
 def flatten_cfg(cfg: Namespace):
@@ -131,11 +132,11 @@ def setup_loggers(args: Namespace):
 
 
 class SummaryStats:
-    def __init__(self, log_wand=False):
-        self.mem = dict()  # dict of [min, max] values
-        self.log_wand = log_wand
+    def __init__(self, log_wandb=False):
+        self.mem = dict()  # type: Dict[List[int, int]] # dict of [min, max] values
+        self.log_wand = log_wandb
 
-    def update(self, new_values: dict):
+    def update(self, new_values: dict) -> Dict:
         mem = self.mem
         update_keys = dict()
 
@@ -159,3 +160,167 @@ class SummaryStats:
                 if v[1]:
                     wandb.run.summary[f"{k}_MAX"] = mem[k][1]
         return update_keys
+
+
+def get_stats(values, name, empty_val = 0):
+    if len(values) == 0:
+        values = [empty_val]
+
+    return {
+        f"{name}_min": np.min(values),
+        f"{name}_max": np.max(values),
+        f"{name}_mean": np.mean(values),
+        f"{name}_median": np.median(values),
+        f"{name}_std": np.std(values),
+    }
+
+
+
+class LogTopStats:
+    def __init__(self,
+                 topk: int = 100,
+                 score_keys: Tuple[str] = ("proxy", "qed", "synth", "dockscore", "dscore"),
+                 order_key: str = "score",
+                 order_ascending: bool = True,
+                 unique_key: str = "res_molecule",
+                 transform_info=None):
+
+        self._topk = topk
+        self._score_keys = score_keys
+        self._order_key = order_key
+        self._seen_mol = set()
+        self._new_info = []
+        self._order_ascending = order_ascending
+        self._unique_key = unique_key
+        if transform_info is None:
+            transform_info = TransformCompose([
+                TransformInfoOracle(), TransformInfoDiscounted()
+            ])
+        self._transform_info = transform_info
+
+    def reset(self):
+        self._new_info.clear()
+
+    def collect(self, infos: List[dict]):
+        for info in infos:
+            _id = info.get(self._unique_key)
+            if _id is not None and _id not in self._seen_mol:
+                self._new_info.append(info)
+                self._seen_mol.update([_id])
+
+    def log(self):
+        logs = dict({f"top{self._topk}_count": len(self._new_info)})
+
+        if len(self._new_info) > self._topk:
+            order_scores = [x[self._order_key] for x in self._new_info]
+            sort_idx = np.argsort(order_scores)
+            topk_idx = sort_idx[-self._topk:] if self._order_ascending else sort_idx[:self._topk]
+
+            log_info = [self._new_info[x] for x in topk_idx]  # type: List[dict]
+
+            if self._transform_info is not None:
+                log_info = self._transform_info(log_info)
+
+            for k in self._score_keys:
+                scores = [x[k] for x in log_info if k in x and x[k] is not None]
+
+                if len(scores) > 0:
+                    logs.update(get_stats(scores, f"top{self._topk}_{k}"))
+                else:
+                    print(f"No top{self._topk} scores for {k}")
+
+                # Should log this, maybe for e.g. dockscore is None for some of the molecules
+                logs.update(dict({f"top{self._topk}_{k}_count": len(scores)}))
+
+            self.reset()
+
+        return logs
+
+
+class LogStatsTrain:
+    def __init__(self,
+                 r_buffer_size: int = 1000,
+                 score_keys: Tuple[str] = ("proxy", "qed", "synth"),
+                 unique_key: str = "res_molecule",
+                 score_key: str = "score"):
+        self._seen_mol = set()
+        self._episode_rewards = deque(maxlen=r_buffer_size)
+        self._update_act_fails = 0
+        self._update_ep_cnt = 0
+        self._update_step_cnt = 0
+        self._ep_no_scores = 0
+        self._update_el_len = []
+        self._new_mol_r = []
+        self._new_mol_info = []
+        self._new_mol_scores = dict({k: [] for k in score_keys})
+        self._score_keys = score_keys
+        self._unique_key = unique_key
+        self._score_key = score_key
+
+    def reset(self):
+        self._update_act_fails = 0
+        self._ep_no_scores = 0
+        self._update_ep_cnt = 0
+        self._update_step_cnt = 0
+        self._new_mol_r = list()
+        self._new_mol_info = list()
+        self._update_el_len = list()
+        self._episode_rewards = list()
+        for k, v in self._new_mol_scores.items():
+            v.clear()
+
+    def collect_new_batch(self, obs, reward, done, infos):
+        self._update_step_cnt += len(obs)
+        new_mol_info = []
+        for iobs, info in enumerate(infos):
+            if done[iobs]:
+                self._update_el_len.append(info["num_steps"])
+                self._update_ep_cnt += 1
+                self._episode_rewards.append(reward[iobs])
+                next_mol = info.get(self._unique_key, None)
+                if next_mol is None:
+                    self._update_act_fails += 1
+                elif self._score_key not in info:
+                    self._ep_no_scores += 1
+                else:
+                    if next_mol not in self._seen_mol:
+                        self._new_mol_info.append(infos[iobs])
+                        new_mol_info.append(infos[iobs])
+                        self._new_mol_r.append(reward[iobs])
+                        for k, v in self._new_mol_scores.items():
+                            v.append(infos[iobs].get(k))
+                        self._seen_mol.update([next_mol])
+        return new_mol_info
+
+    def log(self) -> Tuple[dict, List[dict]]:
+        logs = get_stats(self._episode_rewards, "ep_r", -100)
+        logs.update(get_stats(self._update_el_len, "ep_len"))
+
+        logs.update({
+            "ep_new_mol_count": len(self._new_mol_r),
+            "ep_no_score_count": self._ep_no_scores,
+            "ep_no_score_f": self._ep_no_scores / self._update_ep_cnt,
+            "ep_new_mol_f": len(self._new_mol_r) / self._update_ep_cnt,
+            "act_fails": self._update_act_fails,
+        })
+
+        # Get requested scores
+        for k, v in self._new_mol_scores.items():
+            scores = [x for x in v if x is not None]
+            if len(scores) > 0:
+                logs.update(get_stats(scores, f"new_{k}"))
+            else:
+                print(f"No scores for {k}")
+
+        new_mol_info = self._new_mol_info
+        self.reset()
+        return logs, new_mol_info
+
+
+class FakeRemoteLog:
+    def __init__(self):
+        self._last_log = None
+        self.log = Namespace(remote=self.remote)
+
+    def remote(self, log):
+        self._last_log = log
