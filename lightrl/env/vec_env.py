@@ -1,3 +1,4 @@
+import cv2
 from multiprocessing import Process, Pipe, Queue
 import multiprocessing
 import gym
@@ -7,10 +8,9 @@ import numpy as np
 import torch
 import functools
 
-from lightrl.env import gym_wrappers
 from lightrl.env.dictlist import DictList
 from torch_geometric.data import Batch
-
+from lightrl.env import gym_wrappers
 
 
 def _get_env(proc_id=0, seed=0, env_seed_offset=10000, env_name=None, env_args=None, env_wrapper=None):
@@ -152,7 +152,7 @@ def env_wrapp(w_env, env_wrappers):
 
 def get_wrappers(wrappers: List[str]):
     # Get env wrappers - must be a list of elements
-    if wrappers is None:
+    if wrappers is None or len(wrappers) == 0:
 
         env_wrapper = idem
     else:
