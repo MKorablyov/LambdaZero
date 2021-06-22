@@ -1,3 +1,4 @@
+import cv2
 import collections
 
 from torch.multiprocessing import Pool, Process, set_start_method
@@ -22,6 +23,7 @@ import torch.optim as optim
 from argparse import Namespace
 import wandb
 import csv
+from typing import List
 
 from lightrl.a2c_ppo_acktr import algo, utils
 from lightrl.a2c_ppo_acktr.algo import gail
@@ -34,6 +36,9 @@ from lightrl.policy.policy_base import Policy
 from lightrl.utils.storage import RolloutStorage
 from lightrl.evaluation import EvaluateBase
 from lightrl.utils.utils import set_seed
+from lightrl.utils.utils import LogTopStats, LogStatsTrain, SummaryStats
+from lightrl.env.oracle import InterogateOracle
+from multiprocessing import Process, Pipe, Queue
 
 from LambdaZero.utils import get_external_dirs
 
@@ -76,7 +81,7 @@ class TimeStats:
 
 
 def preprocess_args(args: Namespace):
-    args.cuda = not args.no_cuda and torch.cuda.is_available()
+    args.cuda = args.main.use_gpu and torch.cuda.is_available()
     args.device = torch.device("cuda:0" if args.cuda else "cpu")
 
     if args.main.seed == 0:
@@ -116,7 +121,7 @@ def preprocess_args(args: Namespace):
 
 def setup_loggers(args: Namespace):
     # Load loggers and setup results path
-    use_wandb = args.use_wandb
+    use_wandb = args.main.plot
 
     if use_wandb:
         experiment_name = f"{args.full_title}_{args.run_id}"
@@ -125,7 +130,7 @@ def setup_loggers(args: Namespace):
 
         os.environ['WANDB_API_KEY'] = api_key
 
-        wandb.init(project="rlbo4", name=experiment_name)
+        wandb.init(project="an_rlbo", name=experiment_name)
         wandb.config.update(dict(flatten_cfg(args)))
 
     out_dir = args.out_dir
@@ -146,33 +151,72 @@ def setup_loggers(args: Namespace):
     log_writer.writeheader()
 
 
+def log_stats_remote(conn_recv, conn_send, log_topk):
+    log_stats = LogTopStats(topk=log_topk)
+
+    while True:
+        cmd, recv = conn_recv.get()
+        if cmd == 0:
+            log_stats.collect(*recv)
+        elif cmd == 1:
+            stats = log_stats.log()
+            stats["total_num_steps"] = recv
+            conn_send.put(stats)
+
+
 def run(args):
+    print("SLURM_ARRAY_TASK_ID", os.environ.get('SLURM_ARRAY_TASK_ID', None))
+    print("SLURM_ARRAY_JOB_ID", os.environ.get('SLURM_ARRAY_JOB_ID', None))
+
     args = preprocess_args(args)
+    device = args.device
+    do_plot = args.main.plot
 
     set_seed(args.seed, args.cuda, args.cuda_deterministic)
 
-    setup_loggers(args)
-    do_plot = args.use_wandb
+    # ==============================================================================================
+    # Setup loggers
 
-    # torch.set_num_threads(1)  # TODO why?
-    device = args.device
+    setup_loggers(args)  # Wandb plot mostly and maybe writers to csv
+
+    # Log train rl stuff
+    log_train = LogStatsTrain(r_buffer_size=args.main.stats_window_size)
+
+    # Get remote calculation of logs for topk stats (because we also calculate dockscore)
+    log_stats_remote_send = Queue()
+    log_stats_remote_recv = Queue()
+    log_proc_stats = Process(
+        target=log_stats_remote,
+        args=(log_stats_remote_send, log_stats_remote_recv, args.main.log_topk)
+    )
+    log_proc_stats.start()
+
+    # This logs statistics for MIN and MAX values for everything plotted (summary for wandb)
+    log_summary = SummaryStats(log_wandb=do_plot)
 
     # ==============================================================================================
     # -- Reward
+
     from lightrl.env.scores import ParallelSynth, QEDEstimator
-    synth_net = ParallelSynth(use_cuda=not args.no_cuda)
+    synth_net = ParallelSynth(use_cuda=args.main.use_gpu)
     synth_net.to(device)
     synth_net.share_memory()
     args.env_cfg.env_args.synth_net = synth_net
     args.eval_env_cfg.env_args.synth_net = synth_net
 
     if args.proxy_dock is not None:
-        from lightrl.env.scores import load_docknet
+        if args.proxy_dock != "default":
+            from lightrl.env.scores import load_docknet
+            proxy_net = load_docknet(args.proxy_dock, device=device)
+        else:
+            from lightrl.env.scores import LZProxyDockNetRun
+            proxy_net = LZProxyDockNetRun()
+            proxy_net.to(device)
 
-        proxy_net = load_docknet(args.proxy_dock, device=device)
         proxy_net.share_memory()
         args.env_cfg.env_args.proxy_net = proxy_net
         args.eval_env_cfg.env_args.proxy_net = proxy_net
+
 
     # ==============================================================================================
 
@@ -182,7 +226,14 @@ def run(args):
     def process_obss(x):
         return pre_process_obss(x, device=device)
 
-    base_model = get_model(args.model, envs.observation_space.shape, envs.action_space)
+    from lightrl.reg_models import get_actor_model
+    from lightrl import reg_models
+
+    if args.model.name in reg_models.MODELS:
+        base_model = get_actor_model(args.model)
+    else:
+        base_model = get_model(args.model, envs.observation_space.shape, envs.action_space)
+
     actor_critic = Policy(args.policy, envs.observation_space.shape, envs.action_space, base_model)
     actor_critic.to(device)
 
@@ -239,10 +290,7 @@ def run(args):
     obs = envs.reset()
 
     rollouts._obs[0] = obs
-    run_obs = rollouts.process_obs(obs)
     rollouts.to(device)
-
-    episode_rewards = deque(maxlen=100)
 
     # DEBUG - -----------
     seed_to_smiles = dict()
@@ -253,7 +301,6 @@ def run(args):
     out_dir = args.out_dir
     data_out_dir = f"{out_dir}/train_data"
     os.mkdir(data_out_dir)
-
 
     ts_stats = Namespace(
         fwd=TimeStats(),
@@ -282,14 +329,12 @@ def run(args):
                 agent.optimizer, j, num_updates,
                 agent.optimizer.lr if args.algo == "acktr" else args.lr)
 
-        max_rs = collections.deque([-np.inf], maxlen=10)
-        max_data = collections.deque([None], maxlen=10)
         for step in range(args.num_steps):
             # Sample actions
             ts_stats.fwd.start()
             with torch.no_grad():
                 res_m = actor_critic.act(
-                    run_obs, rollouts.recurrent_hidden_states[step],
+                    rollouts.obs[step], rollouts.recurrent_hidden_states[step],
                     rollouts.masks[step])
                 value, action = res_m.value, res_m.action
                 action_log_prob, recurrent_hidden_states = res_m.action_log_probs, res_m.rnn_hxs
@@ -302,44 +347,23 @@ def run(args):
             obs, reward, done, infos = envs.step(send_act)
             ts_stats.act.end()
 
-            run_obs = rollouts.process_obs(obs)
+            new_mol_infos = log_train.collect_new_batch(obs, reward, done, infos)
 
-            # ======================================================================================
-            # post-process R
-            # smis = [x["res_molecule"] for x in infos]
-            # qed_score = qed_net(smis)
-            # synth_score = synth_net(smis)
-            # i_synth = [x["synth_score"] for x in infos]
-            # assert (np.abs(synth_score - np.array(i_synth)) < 0.00001).all(), "Diff synth"
-            # ======================================================================================
-
-            for iobs, info in enumerate(infos):
-                if done[iobs]:
-                    episode_rewards.append(reward[iobs])
-                    if reward[iobs] > min(max_rs):
-                        max_rs.append(reward[iobs])
-                        max_data.append((obs[iobs], reward[iobs], done[iobs], infos[iobs]))
-
-                # if 'episode' in info.keys():
-                #     episode_rewards.append(info['episode']['r'])
+            # Send training step new mol infos for topK log statistics
+            log_stats_remote_send.put((0, (new_mol_infos,)))
 
             ts_stats.insert.start()
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
             bad_masks = torch.FloatTensor([[0.0] if 'bad_transition' in info.keys() else [1.0]
-                 for info in infos])
+                                           for info in infos])
             reward = torch.FloatTensor(reward).unsqueeze(1)
 
             # p_obs = pre_process_obss(obs, device=device)
             rollouts.insert(obs, recurrent_hidden_states, action,
                             action_log_prob, value, reward, masks, bad_masks)
             ts_stats.insert.end()
-
-        torch.save(max_data, f"{max_data_out}/max_{j}.pt")
-
-        # save_data["ep_r"] = copy.deepcopy(episode_rewards)
-        # torch.save(save_data, f"{data_out_dir}/update_{j}")
 
         ts_stats.nextv.start()
         with torch.no_grad():
@@ -392,30 +416,37 @@ def run(args):
         #     ], os.path.join(save_path, args.env_name + ".pt"))
         #
 
-        # wandb.log({'timesteps_total': (j + 1) * args.num_processes * args.num_steps})
+        # Get training log
+        plot_vals, new_mol_infos = log_train.log()
+
         total_num_steps = (j + 1) * args.num_processes * args.num_steps
+
+        if (j + 1) % args.main.log_topk_interval == 0:
+            log_stats_remote_send.put((1, total_num_steps))
+
+        while not log_stats_remote_recv.empty():
+            log_stats = log_stats_remote_recv.get()
+            print(log_stats)
+            log_summary.update(log_stats)
+            if do_plot:
+                wandb.log(log_stats)
 
         if j % 20 == 0:
             for k, v in ts_stats.__dict__.items():
                 print(f"{k}: {v.stats():.6f}")
 
-        if j % args.log_interval == 0 and len(episode_rewards) > 1:
-            end = time.time()
-            print(
-                "Updates {}, num timesteps {}, FPS {} \n Last {} training episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"
-                    .format(j, total_num_steps,
-                            int(total_num_steps / (end - start)),
-                            len(episode_rewards), np.mean(episode_rewards),
-                            np.median(episode_rewards), np.min(episode_rewards),
-                            np.max(episode_rewards), dist_entropy, value_loss,
-                            action_loss))
-
-
-        plot_vals = dict({
+        end = time.time()
+        plot_vals.update({
+            "fps": int(total_num_steps / (end - start)),
+            "dist_entropy": dist_entropy,
+            "value_loss": value_loss,
+            "action_loss": action_loss,
             "total_num_steps": total_num_steps,
             "train_iter": j,
-            "reward_mean": np.mean(episode_rewards),
         })
+
+        if j % args.log_interval == 0:
+            print(plot_vals)
 
         if args.eval_interval != 0 and j % args.eval_interval == 0:
             scores = evaluation.evaluate(j ,total_num_steps)
@@ -423,10 +454,6 @@ def run(args):
 
         if do_plot:
             wandb.log(plot_vals)
-
-        #     obs_rms = utils.get_vec_normalize(envs).obs_rms
-        #     evaluate(actor_critic, obs_rms, args.env_name, args.seed,
-        #              args.num_processes, eval_log_dir, device)
 
 
 if __name__ == "__main__":
