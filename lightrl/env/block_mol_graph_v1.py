@@ -21,20 +21,6 @@ from rdkit.Chem import QED
 from chemprop.features import BatchMolGraph, MolGraph
 
 
-class QEDEstimator:
-    def __init__(self):
-        pass
-
-    def eval(self, smiles):
-        mol = Chem.MolFromSmiles(smiles)
-        qed = QED.qed(mol)
-        return qed
-
-    def __call__(self, smiles):
-        ret = np.array([self.eval(x) for x in smiles])
-        return ret
-
-
 datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 
 
@@ -229,8 +215,8 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
             "action_mask": Box(low=0, high=1, shape=(num_actions,)),
             # "chosen_seed": Box(low=0, high=1, shape=(num_actions,)),
         })
-        if isinstance(config["reward"], str):
-            config["reward"] = REWARD_CLASS[config["reward"]]
+        print(f"Using reward class {config['reward']}")
+        config["reward"] = REWARD_CLASS[config["reward"]]
 
         self.reward = config["reward"](**config["reward_config"])
 
@@ -238,7 +224,7 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         self._prev_obs = None
         self._mock_obs = None
 
-        worker_index = getattr(config, "worker_index", 0)
+        worker_index = proc_id  # getattr(config, "worker_index", 0)
         vector_index = getattr(config, "vector_index", 0)
         self._pre_saved_graph = getattr(config, "pre_saved_graph", False)
         self._reset_mode = False
@@ -255,12 +241,7 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         if self._pre_saved_graph:
             self._saved_graphs = torch.load(f"{datasets_dir}/mol_data.pkl")
 
-        self.qed = QEDEstimator()
-
-        self.synth = config.get("synth_net", None)
-        self.proxy_net = config.get("proxy_net", None)
-        self.qed_th = config.get("qed_th", 0.3)
-        self.synth_th = config.get("synth_th", 4.)
+        self.obs_cuda = config.get("obs_cuda", True)
 
     def _debug_step(self, action):
         try:
@@ -279,21 +260,6 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
             print(traceback.format_exc())
             super().reset()  # reset the environment
             return super().step(0)  # terminate
-
-    def step(self, action):
-        obs, reward, done, info = super().step(action)
-        mol = self.molMDP.molecule
-        mol_mol = mol.mol
-
-        reward = 0
-        if done:
-            qed_score = QED.qed(mol_mol)
-            if qed_score >= self.qed_th:
-                synth_score = self.synth([mol_mol])[0]
-                if synth_score >= self.synth_th:
-                    reward = self.proxy_net(obs["mol_graph"])[0] * -1
-
-        return obs, reward, done, info
 
     def _make_obs(self, flat=False):
         # if self._mock_obs is not None:
@@ -318,13 +284,13 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         # synth_score = 0
         # for x in graph.keys:
         #     graph[x].share_memory_()
-        graph = graph.cuda(non_blocking=True)
-
+        if self.obs_cuda:
+            graph = graph.cuda(non_blocking=True)
 
         obs = {"mol_graph": flat_graph if flat else graph,
                "action_mask": action_mask,
-               "num_steps": self.num_steps,
-               "r_steps": self.max_steps - self.num_steps + 1,
+               "rcond": 0,  # TODO should not be here
+               "r_steps": self.max_steps - self.num_steps,
                "seed": self._chosen_seed}
 
         self._prev_obs = obs
