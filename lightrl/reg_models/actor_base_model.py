@@ -3,13 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import Set2Set
 import torch
+from lightrl.models.model_base import ModelBase
 
 
-class ActorWrapper(nn.Module):
+class ActorWrapper(ModelBase):
     is_actor = True
 
     def __init__(self, model_base, cfg: Namespace):
-        super().__init__()
+        super().__init__(cfg, None, None)
 
         num_out_per_stem = getattr(cfg, "num_out_per_stem", 105)
 
@@ -20,8 +21,10 @@ class ActorWrapper(nn.Module):
         self.node2stem = nn.Sequential(nn.Linear(dim, dim), nn.LeakyReLU(inplace=True), nn.Linear(dim, num_out_per_stem))
         self.node2jbond = nn.Sequential(nn.Linear(dim, dim), nn.LeakyReLU(inplace=True), nn.Linear(dim, 1))
 
-    def forward(self, data):
-        scalar_outs, per_atom_out = self._model(data)
+    def forward(self, inputs, rnn_hxs, masks, vec_data=None):
+        data = inputs.mol_graph
+
+        scalar_outs, per_atom_out = self._model(inputs)
 
         data.stem_preds = self.node2stem(per_atom_out[data.stem_atmidx])
 
@@ -37,4 +40,4 @@ class ActorWrapper(nn.Module):
         actor_logits = torch.cat([stop_logit, break_logits, add_logits], 1)
 
         value = scalar_outs[:, :1]
-        return value, actor_logits
+        return value, actor_logits, rnn_hxs

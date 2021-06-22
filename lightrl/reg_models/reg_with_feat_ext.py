@@ -22,10 +22,13 @@ class RegBase(nn.Module):
     def per_atom_out_size(self):
         return self._per_atom_out_size
 
-    def forward(self, data):
-        feat = per_atom_out = self._feature_extractor(data)
+    def forward(self, inputs, r_steps=None):
+        data = inputs.mol_graph
+
+        feat = per_atom_out = self._feature_extractor(inputs)
 
         out = self.set2set(feat, data.batch)
+
         out = nn.functional.leaky_relu(self.lin1(out))
         out = self.lin2(out)
 
