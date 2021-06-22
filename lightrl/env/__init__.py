@@ -1,4 +1,6 @@
+import cv2
 from gym.envs.registration import registry, register, make, spec
+from lightrl.env import gym_wrappers
 
 register(
     id='BlockMolEnvGraph-v1',
