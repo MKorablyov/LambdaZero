@@ -4,7 +4,10 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 import pandas as pd
 from rdkit import Chem
+import copy
+
 from LambdaZero import chem
+
 
 class BlockMoleculeData:
     # todo: make properties fast
@@ -262,6 +265,12 @@ class MolMDP:
             if removed_stem_atom not in self.translation_table[blockid]:
                 raise ValueError('Could not translate removed stem to duplicate or symmetric block.')
             # action = (block_idx, stem_idx)
+
+            # TODO This should be fixed with the bug fix in the env
+            if self.translation_table[blockid][removed_stem_atom] != blockid:
+                # QUICK FIX: Skip if not the same blockidx (so the mol can be reconsctructed)
+                continue
+
             action = (
                 # We have to translate the block id to match the bond
                 # we broke, see build_translation_table().
@@ -334,3 +343,23 @@ class MolMDP:
                                          'has no duplicate for atom', j,
                                          'in position 0, and no symmetrical correspondance')
                     self.translation_table[blockidx][j] = symmetric_duplicate
+
+    def load(self, state: dict) -> BlockMoleculeData:
+        self.reset()
+        self.molecule.blockidxs = state["blockidxs"]  # indexes of every block
+        self.molecule.slices = state["slices"]  # atom index at which every block starts
+        self.molecule.jbonds = state["jbonds"]  # [block1, block2, bond1, bond2]
+        self.molecule.stems = state["stems"]  # [block1, bond1]
+        self.molecule.numblocks = len(self.molecule.blockidxs)
+        self.molecule.blocks = [self.block_mols[idx] for idx in self.molecule.blockidxs]  # rdkit
+        return self.molecule
+
+    def dump(self) -> dict:
+        mol_data = copy.deepcopy({
+            "blockidxs": self.molecule.blockidxs,
+            "slices": self.molecule.slices,
+            "jbonds": self.molecule.jbonds,
+            "stems": self.molecule.stems,
+            "smiles": self.molecule.smiles
+        })
+        return mol_data
