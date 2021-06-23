@@ -207,13 +207,13 @@ class NewAlice(nn.Module):
 
 
 class GFlowNetAlice(nn.Module):
-    def __init__(self, env, q_hidden_layer_sizes=[32, 32], q_lr=1e-4, eps=0.01, c_reg=1e-10):
+    def __init__(self, env, q_hidden_layer_sizes=[32, 32], q_lr=1e-4, c_reg=1e-10):
+        super(GFlowNetAlice, self).__init__()
         self.env = env
         state_dim = env.reset().shape[0]
         # print(state_dim)
         action_dim = 3
 
-        self.eps = eps
         self.c_reg = c_reg
 
         # ====== Policy network construction ======
@@ -240,15 +240,20 @@ class GFlowNetAlice(nn.Module):
                 q_values = self.q_network(ob)
                 dist = Categorical(logits=q_values)
                 a = dist.sample()
+                lp = dist.log_prob(a)
 
                 next_ob, r, done, _ = self.env.step(a)
                 next_ob = torch.tensor([next_ob]).float()
-                trajectory.append((ob, a, r, next_ob))
+                trajectory.append((ob, a, r, next_ob, lp))
                 ob = next_ob
 
-        return trajectory
+        goal = ob
+        return trajectory, goal
 
     def update(self, trajectory):
+        # print(len(trajectory))
+        # if len(trajectory) == 1:
+        #     print(trajectory)
         states = [t[0] for t in trajectory]
         actions = [t[1] for t in trajectory]
         rewards = [t[2] for t in trajectory]
@@ -266,6 +271,7 @@ class GFlowNetAlice(nn.Module):
             # takes the Q value of the particular action that was there
             inflow_qs.append(torch.exp(q_values[i][actions[i]]))
 
+        # print(inflow_qs)
         s = sum(inflow_qs)
         inflow = torch.log(self.c_reg + s)
 
@@ -273,17 +279,27 @@ class GFlowNetAlice(nn.Module):
 
         next_q_values = self.q_network(next_states)
         outflow_qs = []
-        rewards = rewards[1:]  # only care about s' rewards
+        new_rewards = rewards[1:]  # only care about s' rewards
         for i in range(len(next_actions)):
             # same thing, but for Q values for (s', a')
-            outflow_qs.append(
-                rewards[i] + torch.exp(next_q_values[i][next_actions[i]]))
+            if i != len(next_actions) - 1:
+                outflow_qs.append(
+                    new_rewards[i] + torch.exp(next_q_values[i]).sum(-1))
+            else:
+                outflow_qs.append(new_rewards[i])
 
-        s_prime = sum(outflow_qs)
+        # print(outflow_qs)
+        if len(next_actions) == 0:
+            s_prime = torch.tensor(rewards[-1])
+            # print(s_prime)
+        else:
+            s_prime = sum(outflow_qs)
         outflow = torch.log(self.c_reg + s_prime)
 
-        loss = nn.MSELoss(inflow, outflow)
+        loss_fn = nn.MSELoss()
+        loss = loss_fn(inflow, outflow)
 
+        self.q_optimizer.zero_grad()
         loss.backward()
         self.q_optimizer.step()
 
@@ -318,6 +334,8 @@ class Bob(nn.Module):
         self.policy = nn.Sequential(*policy_layers)
 
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+
+        self.grad_norm = None
 
     def collect_trajectory(self, goal_state):
         ob = torch.tensor(self.env.reset()).float()
@@ -380,5 +398,114 @@ class Bob(nn.Module):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+        self.grad_norm = torch.sqrt(
+            sum([torch.norm(param.grad) for param in self.policy.parameters()]))
+
+        return loss.detach().item()
+
+
+class GFlowNetBob(nn.Module):
+    def __init__(self, env, q_hidden_layer_sizes=[32, 32], q_lr=1e-4, c_reg=1e-10):
+        super(GFlowNetBob, self).__init__()
+        self.env = env
+        state_dim = env.reset().shape[0]
+        # print(state_dim)
+        action_dim = 3
+
+        self.c_reg = c_reg
+
+        # ====== Policy network construction ======
+        q_network_layers = [
+            nn.Linear(state_dim, q_hidden_layer_sizes[0]), nn.ReLU()]
+
+        for i in range(len(q_hidden_layer_sizes) - 1):
+            q_network_layers.append(
+                nn.Linear(q_hidden_layer_sizes[i], q_hidden_layer_sizes[i + 1]))
+            q_network_layers.append(nn.ReLU())
+
+        q_network_layers.append(nn.Linear(q_hidden_layer_sizes[-1], action_dim))
+
+        self.q_network = nn.Sequential(*q_network_layers)
+        self.q_optimizer = optim.Adam(self.q_network.parameters(), lr=q_lr)
+
+        self.grad_norm = None
+
+    def collect_trajectory(self, goal_state):
+        ob = torch.tensor(self.env.reset()).float()
+        trajectory = []
+        # move until full trajectory is collected (up until horizon)
+        done = False
+        while not done:
+            with torch.no_grad():
+                q_values = self.q_network(ob)
+                dist = Categorical(logits=q_values)
+                a = dist.sample()
+                lp = dist.log_prob(a)
+
+                next_ob, r, done, _ = self.env.step(a)
+                next_ob = torch.tensor([next_ob]).float()
+                trajectory.append((ob, a, r, next_ob, lp))
+                ob = next_ob
+
+        bob_reached = (ob == goal_state)
+        return trajectory, bob_reached
+
+    def update(self, trajectory):
+        # print(len(trajectory))
+        # if len(trajectory) == 1:
+        #     print(trajectory)
+        states = [t[0] for t in trajectory]
+        actions = [t[1] for t in trajectory]
+        rewards = [t[2] for t in trajectory]
+        next_states = [t[3] for t in trajectory]
+
+        states = torch.stack(states, dim=0)
+        actions = torch.stack(actions, dim=0)
+        rewards = torch.tensor(rewards).float()
+        next_states = torch.stack(next_states, dim=0)
+
+        q_values = self.q_network(states)
+
+        inflow_qs = []
+        for i in range(len(actions)):
+            # takes the Q value of the particular action that was there
+            inflow_qs.append(torch.exp(q_values[i][actions[i]]))
+
+        # print(inflow_qs)
+        s = sum(inflow_qs)
+        inflow = torch.log(self.c_reg + s)
+
+        next_actions = actions[1:]
+
+        next_q_values = self.q_network(next_states)
+        outflow_qs = []
+        new_rewards = rewards[1:]  # only care about s' rewards
+        for i in range(len(next_actions)):
+            # same thing, but for Q values for (s', a')
+            if i != len(next_actions) - 1:
+                outflow_qs.append(
+                    new_rewards[i] + torch.exp(next_q_values[i]).sum(-1))
+            else:
+                outflow_qs.append(new_rewards[i])
+
+        # print(outflow_qs)
+        if len(next_actions) == 0:
+            s_prime = torch.tensor(rewards[-1])
+            # print(s_prime)
+        else:
+            s_prime = sum(outflow_qs)
+        outflow = torch.log(self.c_reg + s_prime)
+
+        loss_fn = nn.MSELoss()
+        loss = loss_fn(inflow, outflow)
+
+        self.q_optimizer.zero_grad()
+        loss.backward()
+        self.q_optimizer.step()
+
+        # gradient of loss with respect to the Q network parameters--but to take the norm it's a little weird
+        self.grad_norm = torch.sqrt(sum([torch.norm(param.grad)
+                                         for param in self.q_network.parameters()]))
 
         return loss.detach().item()

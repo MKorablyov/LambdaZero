@@ -1,6 +1,5 @@
 from asymmetric_self_play_agents import *
 from toy_1d import BinaryTreeEnv
-from asymmetric_self_play_training import init_logger
 
 import argparse
 import os
@@ -8,6 +7,8 @@ import torch
 from torch.distributions import Categorical
 import numpy as np
 import scipy
+from collections import Counter
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description='testing the ASP framework')
 
@@ -86,3 +87,36 @@ position_modes = scipy.stats.mode(final_positions)
 for mode, num_times in zip(position_modes[0], position_modes[1]):
     print(f'After {args.num_trajs} rollouts, one mode position that '
           + agent_str + f' got is {mode}, which was reached {num_times} times.')
+
+print('FINAL REWARD SUMMARY')
+# all modes
+unique_rewards = np.unique(final_rewards)
+counts = Counter(final_rewards)
+for reward in unique_rewards:
+    if counts[reward] > 0:
+        print(
+            f'The {agent_str} GFlowNet received a final reward of {reward} {counts[reward]} times.')
+
+r_counts = [counts[reward] for reward in unique_rewards]
+# print(r_counts)
+
+plt.plot(unique_rewards, r_counts)
+plt.xlabel('Unique rewards')
+plt.ylabel('Reward frequency')
+plt.show()
+
+print('FINAL POSITION SUMMARY')
+unique_positions = np.unique(final_positions)
+counts = Counter(final_positions)
+for pos in unique_positions:
+    if counts[pos] > 0:
+        print(
+            f'{agent_str} got to a final position of {pos} {counts[pos]} times.')
+
+p_counts = [counts[pos] for pos in unique_positions]
+# print(r_counts)
+
+plt.plot(unique_positions, p_counts)
+plt.xlabel('Unique positions')
+plt.ylabel('Position frequency')
+plt.show()
