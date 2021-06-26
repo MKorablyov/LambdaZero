@@ -4,7 +4,6 @@ import os
 import random
 import string
 import subprocess
-import warnings
 from collections import Counter
 
 import numpy as np
@@ -479,10 +478,10 @@ class GenMolFiles:
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_filepath, 'w+'))
 
         # mol2
-        os.system(f"obabel -isdf {sdf_filepath} -omol2 -O {mol2_filepath}")
+        subprocess.run(f"obabel -isdf {sdf_filepath} -omol2 -O {mol2_filepath}", shell=True, check=True)
 
         # pdbqt
-        os.system(f"{self.mgltools_bin} {self.prepare_ligand4} -l {mol2_filepath} -o {pdbqt_filepath}")
+        subprocess.run(f"{self.mgltools_bin} {self.prepare_ligand4} -l {mol2_filepath} -o {pdbqt_filepath}", shell=True, check=True)
         return sdf_filepath, mol2_filepath, pdbqt_filepath
 
     @staticmethod
