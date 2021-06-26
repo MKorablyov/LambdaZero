@@ -4,7 +4,6 @@ import os
 import random
 import string
 import subprocess
-import warnings
 from collections import Counter
 
 import numpy as np
@@ -18,6 +17,7 @@ from rdkit.Chem import Draw
 from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.rdchem import BondType as BT
 from rdkit.Chem.rdchem import HybridizationType
+from rdkit.Chem.MolStandardize import rdMolStandardize
 
 from LambdaZero.chem.chimera_op import _add_hydrogens_and_compute_gasteiger_charges_with_chimera
 from LambdaZero.utils import get_external_dirs
@@ -29,7 +29,7 @@ import pandas as pd
 from rdkit import DataStructs
 
 import torch
-from torch_geometric.data import (Data)
+from torch_geometric.data import Data
 from torch_sparse import coalesce
 
 atomic_numbers = {"H": 1, "He": 2, "Li": 3, "Be": 4, "B": 5, "C": 6, "N": 7, "O": 8, "F": 9, "Ne": 10, "Na": 11, "Mg": 12, "Al": 13, "Si": 14,
@@ -443,6 +443,9 @@ class GenMolFiles:
         self.mgltools_bin = os.path.join(mgltools_dir, "bin", "pythonsh")
         self.prepare_ligand4 = os.path.join(mgltools_dir, "MGLToolsPckgs", "AutoDockTools", "Utilities24", "prepare_ligand4.py")
 
+        # some SMILES may include salts - salts are not properly embedded in 3D space, and should be removed first
+        self.largest_fragment_chooser = rdMolStandardize.LargestFragmentChooser()
+
         # set up directory structure
         os.makedirs(os.path.join(self.outpath, "smi"), exist_ok=True)
         os.makedirs(os.path.join(self.outpath, "sdf"), exist_ok=True)
@@ -468,6 +471,7 @@ class GenMolFiles:
 
         # sdf
         mol = Chem.MolFromSmiles(smi)
+        mol = self.largest_fragment_chooser.choose(mol)  # strip salt
         Chem.SanitizeMol(mol)
         mol_h = Chem.AddHs(mol)
         AllChem.EmbedMultipleConfs(mol_h, numConfs=self.n_gen_conformations)
@@ -479,10 +483,10 @@ class GenMolFiles:
         print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_filepath, 'w+'))
 
         # mol2
-        os.system(f"obabel -isdf {sdf_filepath} -omol2 -O {mol2_filepath}")
+        subprocess.run(f"obabel -isdf {sdf_filepath} -omol2 -O {mol2_filepath}", shell=True, check=True)
 
         # pdbqt
-        os.system(f"{self.mgltools_bin} {self.prepare_ligand4} -l {mol2_filepath} -o {pdbqt_filepath}")
+        subprocess.run(f"{self.mgltools_bin} {self.prepare_ligand4} -l {mol2_filepath} -o {pdbqt_filepath}", shell=True, check=True)
         return sdf_filepath, mol2_filepath, pdbqt_filepath
 
     @staticmethod
