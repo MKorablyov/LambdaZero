@@ -26,7 +26,7 @@ class DockedDataset(InMemoryDataset):
     def processed_dir(self):
         # extend default behaviour to go extra directory in depth
         # this allows to have multiple processed sets for the same raw file
-        return os.path.join(super().processed_dir, self.alias)
+        return os.path.join(super().processed_dir, f"{self.file_name_no_ext}_{self.alias}")
 
     @property
     def raw_file_names(self):
