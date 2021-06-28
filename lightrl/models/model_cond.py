@@ -39,6 +39,7 @@ class MPNNcond(ModelBase):
         levels = getattr(cfg, "levels", 6)
         version = getattr(cfg, "version", 'v2')
         self.max_steps = getattr(cfg, "max_steps", 10)
+        self.zero_cond = getattr(cfg, "zero_cond", False)
 
         self.lin0 = nn.Linear(num_feat + num_vec, dim)
         self.num_ops = num_out_per_stem
@@ -78,7 +79,12 @@ class MPNNcond(ModelBase):
             out = out.squeeze(0)
 
         rsteps = one_hot(inputs.r_steps[data.batch], inputs.r_steps.device, self.max_steps)
-        out = torch.cat([out, rsteps, inputs.rcond.float()[data.batch].unsqueeze(1)], dim=1)
+        rcond = inputs.rcond.float()[data.batch].unsqueeze(1)
+        if self.zero_cond:
+            rsteps.zero_()
+            rcond.zero_()
+            print("Nope")
+        out = torch.cat([out, rsteps, rcond], dim=1)
 
         # --> Change 4 Add new No ln2
         per_atom_out = F.leaky_relu(self.lin1(out))
