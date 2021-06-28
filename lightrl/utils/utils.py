@@ -183,7 +183,8 @@ class LogTopStats:
                  order_key: str = "score",
                  order_ascending: bool = True,
                  unique_key: str = "res_molecule",
-                 transform_info=None):
+                 transform_info=None,
+                 filter_candidates: dict = {"qed": 0.3, "synth": 4.}):
 
         self._topk = topk
         self._score_keys = score_keys
@@ -192,6 +193,7 @@ class LogTopStats:
         self._new_info = []
         self._order_ascending = order_ascending
         self._unique_key = unique_key
+        self._filter_candidates = filter_candidates
         if transform_info is None:
             transform_info = TransformCompose([
                 TransformInfoOracle(), TransformInfoDiscounted()
@@ -205,7 +207,14 @@ class LogTopStats:
         for info in infos:
             _id = info.get(self._unique_key)
             if _id is not None and _id not in self._seen_mol:
-                self._new_info.append(info)
+                good = True
+                for k, v in self._filter_candidates.items():
+                    if info[k] < v:
+                        good = False
+                        break
+                if good:
+                    self._new_info.append(info)
+
                 self._seen_mol.update([_id])
 
     def log(self):
@@ -242,7 +251,8 @@ class LogStatsTrain:
                  r_buffer_size: int = 1000,
                  score_keys: Tuple[str] = ("proxy", "qed", "synth"),
                  unique_key: str = "res_molecule",
-                 score_key: str = "score"):
+                 score_key: str = "score",
+                 filter_candidates: dict = {"qed": 0.3, "synth": 4.}):
         self._seen_mol = set()
         self._episode_rewards = deque(maxlen=r_buffer_size)
         self._update_act_fails = 0
@@ -256,6 +266,9 @@ class LogStatsTrain:
         self._score_keys = score_keys
         self._unique_key = unique_key
         self._score_key = score_key
+        self._filter_candidates = filter_candidates
+        for k in filter_candidates.keys():
+            assert k in score_keys, f"Must have score key for filer key: {k}"
 
     def reset(self):
         self._update_act_fails = 0
@@ -286,7 +299,6 @@ class LogStatsTrain:
                     if next_mol not in self._seen_mol:
                         self._new_mol_info.append(infos[iobs])
                         new_mol_info.append(infos[iobs])
-                        self._new_mol_r.append(reward[iobs])
                         for k, v in self._new_mol_scores.items():
                             v.append(infos[iobs].get(k))
                         self._seen_mol.update([next_mol])
@@ -297,20 +309,36 @@ class LogStatsTrain:
         logs.update(get_stats(self._update_el_len, "ep_len"))
 
         logs.update({
-            "ep_new_mol_count": len(self._new_mol_r),
             "ep_no_score_count": self._ep_no_scores,
             "ep_no_score_f": self._ep_no_scores / self._update_ep_cnt,
-            "ep_new_mol_f": len(self._new_mol_r) / self._update_ep_cnt,
             "act_fails": self._update_act_fails,
         })
 
-        # Get requested scores
-        for k, v in self._new_mol_scores.items():
-            scores = [x for x in v if x is not None]
-            if len(scores) > 0:
-                logs.update(get_stats(scores, f"new_{k}"))
-            else:
-                print(f"No scores for {k}")
+        new_mol_scores = self._new_mol_scores
+        all_mol = list(range(len(self._new_mol_info)))
+        # calculate candidates indxs
+
+        cand_mol = []
+        if len(all_mol) > 0:
+            cand_mol = set(all_mol)
+            for k, v in self._filter_candidates.items():
+                idxs = [i for i in all_mol if new_mol_scores[k][i] is not None and new_mol_scores[k][i] >= v]
+                cand_mol = cand_mol.intersection(idxs)
+            cand_mol = list(cand_mol)
+
+        for score_idxs, set_name in [[all_mol, "new_all"], [cand_mol, "new_mol"]]:
+            logs.update({
+                f"ep_{set_name}_f": len(score_idxs) / self._update_ep_cnt,
+                f"ep_{set_name}_count": len(score_idxs),
+            })
+
+            # Get requested scores
+            for k, v in new_mol_scores.items():
+                scores = [x for ix, x in enumerate(v) if x is not None and ix in score_idxs]
+                if len(scores) > 0:
+                    logs.update(get_stats(scores, f"{set_name}_{k}"))
+                else:
+                    print(f"No scores for {set_name}_{k}")
 
         new_mol_info = self._new_mol_info
         self.reset()
