@@ -5,7 +5,8 @@ from scipy.sparse.csgraph import connected_components
 import pandas as pd
 from rdkit import Chem
 import copy
-
+from collections import Counter
+import ujson
 from LambdaZero import chem
 
 
@@ -33,7 +34,7 @@ class BlockMoleculeData:
         self.blocks.append(block)
         self.slices.append(self.slices[-1] + block.GetNumAtoms())
         self.numblocks += 1
-        [self.stems.append([self.numblocks-1,r]) for r in block_r[1:]]
+        [self.stems.append([self.numblocks-1, r]) for r in block_r[1:]]
 
         if len(self.blocks)==1:
             self.stems.append([self.numblocks-1, block_r[0]])
@@ -155,6 +156,27 @@ class BlockMoleculeData:
         o.stems = list(self.stems)
         return o
 
+    def dump(self) -> dict:
+        mol_data = copy.deepcopy({
+            "blockidxs": self.blockidxs,
+            "slices": self.slices,
+            "jbonds": self.jbonds,
+            "stems": self.stems,
+            "smiles": self.smiles
+        })
+        return mol_data
+
+    def unique_id(self):
+        blocks = [Chem.MolToSmiles(x) for x in self.blocks]
+        bonds = Counter([])
+        for jbond in self.jbonds:
+            if blocks[jbond[0]] > blocks[jbond[1]]:
+                bonds.update([(blocks[jbond[1]], blocks[jbond[0]], jbond[3], jbond[2])])
+            else:
+                bonds.update([(blocks[jbond[0]], blocks[jbond[1]], jbond[2], jbond[3])])
+        return bonds
+
+
 class MolMDP:
     def __init__(self, blocks_file):
         blocks = pd.read_json(blocks_file)
@@ -219,7 +241,7 @@ class MolMDP:
         if len(mol.blockidxs) == 1:
             # If there's just a single block, then the only parent is
             # the empty block with the action that recreates that block
-            return [(BlockMoleculeData(), (mol.blockidxs[0], 0))]
+            return [(BlockMoleculeData(), (mol.blockidxs[0], 0), (None, None, None))]
 
         # Compute the how many blocks each block is connected to
         blocks_degree = defaultdict(int)
@@ -233,14 +255,17 @@ class MolMDP:
         parent_mols = []
 
         for rblockidx in blocks_degree_1:
-            new_mol = mol.copy()
+            new_mol = mol.copy() # TODO original
+            # new_mol = ujson.loads(ujson.dumps(mol))
+
             # find which bond we're removing
             removed_bonds = [(jbidx, bond) for jbidx, bond in enumerate(new_mol.jbonds)
                              if rblockidx in bond[:2]]
             assert len(removed_bonds) == 1
             rjbidx, rbond = removed_bonds[0]
+
             # Pop the bond
-            new_mol.jbonds.pop(rjbidx)
+            popped_jbond = new_mol.jbonds.pop(rjbidx)
             # Remove the block
             mask = np.ones(len(new_mol.blockidxs), dtype=np.bool)
             mask[rblockidx] = 0
@@ -252,6 +277,7 @@ class MolMDP:
             # Compute which stem the bond was using
             stem = ([reindex[rbond[0]], rbond[2]] if rblockidx == rbond[1] else
                     [reindex[rbond[1]], rbond[3]])
+
             # and add it back
             new_mol.stems = [list(i) for i in new_mol.stems] + [stem]
             # and we have a parent.
@@ -262,8 +288,25 @@ class MolMDP:
                 rbond[3] if rblockidx == rbond[1] else rbond[2])
             # the removed block's id
             blockid = mol.blockidxs[rblockidx]
+
+            what_block_bond_block = (
+                mol.blockidxs[rbond[0] if rblockidx == rbond[1] else rbond[1]], stem[1], blockid
+            )
+
+            # You shouldn't add a stem back if it is using the init connecting used by the the block
+            remaining_block_rs = self.block_rs[what_block_bond_block[0]]
+
+            if len(new_mol.blockidxs) > 1 and remaining_block_rs[0] == what_block_bond_block[1]:
+                # must not have the other bonds connected
+                continue
+
+            # if blockid in new_mol.blockidxs and remaining_block_rs[0] == what_block_bond_block[1]:
+            #     continue
+
             if removed_stem_atom not in self.translation_table[blockid]:
-                raise ValueError('Could not translate removed stem to duplicate or symmetric block.')
+                # print('Could not translate removed stem to duplicate or symmetric block.')
+                continue
+                # raise ValueError('Could not translate removed stem to duplicate or symmetric block.')
             # action = (block_idx, stem_idx)
 
             # TODO This should be fixed with the bug fix in the env
@@ -271,6 +314,7 @@ class MolMDP:
                 # QUICK FIX: Skip if not the same blockidx (so the mol can be reconsctructed)
                 continue
 
+            stem_idx = len(new_mol.stems) - 1
             action = (
                 # We have to translate the block id to match the bond
                 # we broke, see build_translation_table().
@@ -278,15 +322,17 @@ class MolMDP:
                 # The stem idx to recreate mol is the last stem,
                 # since we appended `stem` in the back of the
                 # stem list.
-                len(new_mol.stems) - 1)
-            parent_mols.append([new_mol, action])
+                stem_idx)
+            parent_mols.append([new_mol, action, what_block_bond_block])
         if not len(parent_mols) and len(mol.blocks):
+            print("Nope", mol.dump())
             # The molecule was not the empty molecule and we didn't
             # find any parents? This should not happen.
-            raise ValueError('Could not find any parents')
+            return []
+            # raise ValueError('Could not find any parents')
         return parent_mols
 
-    def build_translation_table(self):
+    def build_translation_table(self, fill_in: bool = True):
         """build a symmetry mapping for blocks. Necessary to compute parent transitions"""
         self.translation_table = {}
         for blockidx in range(len(self.block_mols)):
@@ -316,36 +362,38 @@ class MolMDP:
         # with block_rs [1,0] would be a symmetric version (both C
         # atoms are the "same").
 
-        # To test this, let's create nonsense molecules by attaching
-        # duplicate blocks to a Gold atom, and testing whether they
-        # are the same.
-        gold = Chem.MolFromSmiles('[Au]')
-        # If we find that two molecules are the same when attaching
-        # them with two different atoms, then that means the atom
-        # numbers are symmetries. We can add those to the table.
-        for blockidx in range(len(self.block_mols)):
-            for j in self.block_rs[blockidx]:
-                if j not in self.translation_table[blockidx]:
-                    symmetric_duplicate = None
-                    for atom, block_duplicate in self.translation_table[blockidx].items():
-                        molA, _ = chem.mol_from_frag(
-                            jun_bonds=[[0,1,0,j]],
-                            frags=[gold, self.block_mols[blockidx]])
-                        molB, _ = chem.mol_from_frag(
-                            jun_bonds=[[0,1,0,atom]],
-                            frags=[gold, self.block_mols[blockidx]])
-                        if (Chem.MolToSmiles(molA) == Chem.MolToSmiles(molB) or
-                            molA.HasSubstructMatch(molB)):
-                            symmetric_duplicate = block_duplicate
-                            break
-                    if symmetric_duplicate is None:
-                        raise ValueError('block', blockidx, self.block_smi[blockidx],
-                                         'has no duplicate for atom', j,
-                                         'in position 0, and no symmetrical correspondance')
-                    self.translation_table[blockidx][j] = symmetric_duplicate
+        if fill_in:
+            # To test this, let's create nonsense molecules by attaching
+            # duplicate blocks to a Gold atom, and testing whether they
+            # are the same.
+            gold = Chem.MolFromSmiles('[Au]')
+            # If we find that two molecules are the same when attaching
+            # them with two different atoms, then that means the atom
+            # numbers are symmetries. We can add those to the table.
+            for blockidx in range(len(self.block_mols)):
+                for j in self.block_rs[blockidx]:
+                    if j not in self.translation_table[blockidx]:
+                        symmetric_duplicate = None
+                        for atom, block_duplicate in self.translation_table[blockidx].items():
+                            molA, _ = chem.mol_from_frag(
+                                jun_bonds=[[0,1,0,j]],
+                                frags=[gold, self.block_mols[blockidx]])
+                            molB, _ = chem.mol_from_frag(
+                                jun_bonds=[[0,1,0,atom]],
+                                frags=[gold, self.block_mols[blockidx]])
+                            if (Chem.MolToSmiles(molA) == Chem.MolToSmiles(molB) or
+                                molA.HasSubstructMatch(molB)):
+                                symmetric_duplicate = block_duplicate
+                                break
+                        if symmetric_duplicate is None:
+                            raise ValueError('block', blockidx, self.block_smi[blockidx],
+                                             'has no duplicate for atom', j,
+                                             'in position 0, and no symmetrical correspondance')
+                        self.translation_table[blockidx][j] = symmetric_duplicate
 
     def load(self, state: dict) -> BlockMoleculeData:
         self.reset()
+        state = copy.deepcopy(state)
         self.molecule.blockidxs = state["blockidxs"]  # indexes of every block
         self.molecule.slices = state["slices"]  # atom index at which every block starts
         self.molecule.jbonds = state["jbonds"]  # [block1, block2, bond1, bond2]
@@ -363,3 +411,61 @@ class MolMDP:
             "smiles": self.molecule.smiles
         })
         return mol_data
+
+    def add_block_to(self, mol, block_idx, stem_idx=None, atmidx=None):
+        '''out-of-place version of add_block'''
+        #assert (block_idx >= 0) and (block_idx <= len(self.block_mols)), "unknown block"
+        if mol.numblocks == 0:
+            stem_idx = None
+        new_mol = mol.copy()
+        new_mol.add_block(block_idx,
+                          block=self.block_mols[block_idx],
+                          block_r=self.block_rs[block_idx],
+                          stem_idx=stem_idx, atmidx=atmidx)
+        return new_mol
+
+def test_mdp_parent():
+    import os
+    import tqdm
+
+    datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+    bpath = os.path.join(datasets_dir, "fragdb/blocks_PDB_105.json")
+    mdp = MolMDP(bpath)
+    mdp.build_translation_table()
+    rng = np.random.RandomState(142)
+    nblocks = mdp.num_blocks
+
+    # First let's test that the parent-finding method is
+    # correct. i.e. let's test that the (mol, (parent, action)) pairs
+    # are such that add_block_to(parent, action) == mol
+    for i in tqdm.tqdm(range(10000)):
+        mdp.molecule = mol = BlockMoleculeData()
+        nblocks = rng.randint(1, 10)
+        for i in range(nblocks):
+            if len(mol.blocks) and not len(mol.stems): break
+            mdp.add_block(rng.randint(nblocks), rng.randint(max(1, len(mol.stems))))
+        parents = mdp.parents(mol)
+        s = mol.smiles
+        for p, (a, b), c in parents:
+            c = mdp.add_block_to(p, a, b)
+            if c.smiles != s:
+                # SMILES might differ but this might still be the same mol
+                # we can check this way but its a bit more costly
+                assert c.mol.HasSubstructMatch(mol.mol)
+
+    # Now let's test whether we can always backtrack to the root from
+    # any molecule without any errors
+    for i in tqdm.tqdm(range(10000)):
+        mdp.molecule = mol = BlockMoleculeData()
+        nblocks = rng.randint(1, 10)
+        for i in range(nblocks):
+            if len(mol.blocks) and not len(mol.stems): break
+            mdp.add_block(rng.randint(nblocks), rng.randint(max(1, len(mol.stems))))
+        while len(mol.blocks):
+            parents = mdp.parents(mol)
+            mol = parents[rng.randint(len(parents))][0]
+
+
+if __name__ == '__main__':
+    from LambdaZero.utils import get_external_dirs
+    test_mdp_parent()
