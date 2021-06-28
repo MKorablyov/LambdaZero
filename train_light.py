@@ -350,7 +350,8 @@ def run(args):
             new_mol_infos = log_train.collect_new_batch(obs, reward, done, infos)
 
             # Send training step new mol infos for topK log statistics
-            log_stats_remote_send.put((0, (new_mol_infos,)))
+            if len(new_mol_infos) > 0:
+                log_stats_remote_send.put((0, (new_mol_infos,)))
 
             ts_stats.insert.start()
 
