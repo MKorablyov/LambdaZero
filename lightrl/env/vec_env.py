@@ -75,13 +75,15 @@ class RandStorage:
 
 # This is mostly copied from torch_geometric, but with a few checks
 # and generalities removed, as well as some speed improvements
-def fast_from_data_list(data_list, inckeys=set(['stem_atmidx','edge_index','jbond_atmidx'])):
+def fast_from_data_list(data_list,
+                        inckeys=set(['stem_atmidx','edge_index','jbond_atmidx']),
+                        ignore_keys=["smiles", "num_blocks"], addk = []):
     r"""Constructs a batch object from a python list holding
     :class:`torch_geometric.data.Data` objects.
     The assignment vector :obj:`batch` is created on the fly.
     """
 
-    keys = [x for x in data_list[0].keys if x != "smiles"]
+    keys = [x for x in data_list[0].keys if x not in ignore_keys]
 
     batch = Batch()
     batch.__data_class__ = data_list[0].__class__
@@ -113,8 +115,11 @@ def fast_from_data_list(data_list, inckeys=set(['stem_atmidx','edge_index','jbon
         batch[key] = torch.cat(batch[key], dim=cd)
 
     ret_batch = batch.contiguous()
-    if hasattr(data_list[0], "smiles"):
+    if "smiles" in addk and hasattr(data_list[0], "smiles"):
+        addk.pop(addk.index("smiles"))
         ret_batch.smiles = [x.smiles for x in data_list]
+    for k in addk:
+        ret_batch.__dict__[k] = torch.stack([x.__dict__[k] for x in data_list])
 
     return ret_batch
 
