@@ -11,6 +11,9 @@ import time
 import torch
 import copy
 from tqdm import tqdm
+from multiprocessing import Process, Pipe, Queue
+import random
+import _pickle as cPickle
 
 from LambdaZero.contrib.oracle.oracle import PreDockingDB
 from lightrl import env
@@ -19,33 +22,126 @@ from LambdaZero.utils import get_external_dirs
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
+
+def service_get_mol_graph(recv, send):
+    env = gym.make("BlockMolEnvGraph-v1", config={
+        "obs_cuda": False,
+    }, proc_id=0)
+    transform = None
+    env.molMDP.build_translation_table(fill_in=False)
+
+    while True:
+        cmd, states = recv.recv()
+        if cmd == 1:
+            args = zip(states,
+                       itertools.repeat(env.molMDP),
+                       itertools.repeat(env.graph_mol_obs),
+                       itertools.repeat(transform))
+            for arg in args:
+                ret = pool_get_mol_graph(arg)
+                # send.put(ret)
+                send.put(cPickle.dumps(ret, -1))
+        else:
+            return
+
+
+def service_sample_mol_graph(recv, send):
+    env = gym.make("BlockMolEnvGraph-v1", config={
+        "obs_cuda": False,
+    }, proc_id=0)
+    transform = None
+    env.molMDP.build_translation_table(fill_in=False)
+
+    all_states = []
+    bins = []
+    sample_weights = []
+
+    while True:
+        cmd, cmd_info = recv.recv()
+        if cmd == 1:
+            all_states += cmd_info
+            bins += [x["bin"] for x in cmd_info]
+            _nbins = np.array(bins)
+            sample_weights = 1/np.bincount(_nbins)[_nbins]
+            ids = [x["id"] for x in all_states]
+            print(f"LOADED IDS: [{min(ids)} - {max(ids)}] unique: {len(np.unique(ids))}")
+            print(f"Histogram sample_weights: {np.histogram(sample_weights, bins=10)}")
+        elif cmd == 2:
+            b_size = cmd_info
+            states = random.choices(population=all_states, weights=sample_weights, k=b_size)
+
+            args = zip(states,
+                       itertools.repeat(env.molMDP),
+                       itertools.repeat(env.graph_mol_obs),
+                       itertools.repeat(transform))
+
+            for arg in args:
+                ret = pool_get_mol_graph(arg)
+                send.put(cPickle.dumps(ret, -1))
+        else:
+            return
+
+
 def pool_get_mol_graph(largs):
     state, env_molMDP, env_graph_mol_obs, transform = largs
+    _rnd = np.random.RandomState(state["id"])
+
     mol = env_molMDP.load(state)
     graph, flat_graph = env_graph_mol_obs(mol, flatten=False)
     if transform is not None:
         graph = transform(graph)
 
+    error = False
+    try:
+        graph.smiles = mol.smiles
+    except:
+        error = True
+
+    graph.num_blocks = torch.tensor(len(mol.blockidxs))
+
     traj = []
     traj_mol = mol
-
+    # print("START", state)
     while True:
         parents = env_molMDP.parents(traj_mol)
-        parent_idx = np.random.randint(len(parents))
+        if len(parents) == 0:
+            error = True
+            break
+        parent_idx = _rnd.randint(len(parents))
         parent = list(parents[parent_idx])
         traj.append(parent)
         traj_mol = parent[0]
         numblocks = traj_mol.numblocks
         parent[0] = env_graph_mol_obs(traj_mol, flatten=False)[0]
+        parent[0].num_blocks = torch.tensor(numblocks)
+
+        try:
+            mol_smile = traj_mol.smiles
+        except:
+            error = True
+
+        if error:
+            break
+
         if numblocks <= 1:
             break
 
-    return graph, traj
+    if error:
+        return (None, None, None)
+
+    start_state = traj_mol.dump()
+    start_state["end_state"] = state
+
+    traj = traj[::-1]
+    traj.append([graph, (None, None), None])
+
+    ret_data = (traj, start_state, state["dockscore"])
+
+    return ret_data
 
 
-def load_predocked_dataset_with_children(args: Namespace):
+def load_predocked_df(args):
     # Get config
-    num_pool = getattr(args, "mol_graph_pool", 20)
     sample_size = getattr(args, "sample_size", 0)
     filter_by_score = getattr(args, "filter_candidates", False)
     with_scores = getattr(args, "with_scores", False) or filter_by_score
@@ -65,23 +161,165 @@ def load_predocked_dataset_with_children(args: Namespace):
             df = df.iloc[:sample_size]
 
     # Print some stats
-    dock_hist = list(zip(*np.histogram(df.dockscore.values, bins=100)))
+    hist_v = np.histogram(df.dockscore.values, bins=100)
+    dock_hist = list(zip(*hist_v))
     print("Dock 100 histogram\n", dock_hist)
+    bins = np.digitize(df.dockscore.values, hist_v[1])
+    df["bin"] = bins
 
     print(f"Loaded after filtering {len(df)} (/{orig_set_len}) states with {len(np.unique(df.index))} unique smiles")
 
+    df["id"] = np.arange(len(df))
+    return df
+
+
+class OnlineDataFeed:
+    def __init__(self, args: Namespace):
+        num_pool = getattr(args, "mol_graph_pool", 10)
+        self._req_batch_size = getattr(args, "online_batch_size", 4000) // num_pool
+        self._req_buffer = getattr(args, "req_buffer", 2)
+
+        df = load_predocked_df(args)
+        state_records = df.to_dict(orient='records')
+        print(f"Starting pool with {num_pool} children for {len(state_records)} records")
+
+        self._recv = recv = Queue()
+
+        bsize = int(np.ceil(len(state_records) / num_pool))
+        self.processes = processes = []
+        self.pipes = pipes = []
+        for i in range(num_pool):
+            local, remote = Pipe()
+            pipes.append(local)
+            p = Process(
+                target=service_sample_mol_graph,
+                args=(remote, recv))
+            p.start()
+
+            local.send((1, state_records[i * bsize: (i + 1) * bsize]))
+            processes.append(p)
+
+        self._traj_que = []
+        self._received_count = 0
+        self._last_req_count = 0
+        self._requested_counts = []
+
+        self._send_req()
+
+    def _send_req(self):
+        while len(self._requested_counts) < self._req_buffer:
+            for local in self.pipes:
+                local.send((2, self._req_batch_size))
+
+            self._last_req_count += self.request_size
+            self._requested_counts.append(self._last_req_count)
+
+    @property
+    def request_size(self):
+        return self._req_batch_size * len(self.pipes)
+
+    def _receive_data(self):
+        recv = self._recv
+
+        recv_cnt = 0
+        all_graph_traj = []
+
+        while not recv.empty():
+            res = recv.get()
+            res = cPickle.loads(res)
+            if res[0] is not None:
+                all_graph_traj.append(res)
+            recv_cnt += 1
+
+        self._traj_que += all_graph_traj
+        self._received_count += recv_cnt
+
+    def get_batch(self):
+        # Receive data in que
+        self._receive_data()
+
+        # Check if enough received msgs (based on batch request size
+        if self._received_count < self._requested_counts[0]:
+            return []
+
+        # Consider solved the first request in que and pop - in order to get a new batch
+        self._requested_counts.pop(0)
+
+        # Send request until buffer max size
+        self._send_req()
+
+        ret_traj = self._traj_que
+        self._traj_que = list()
+        return ret_traj
+
+    def close(self):
+        for send in self.pipes:
+            send.send((0, None))
+
+        for p in self.processes:
+            p.terminate()
+            p.join()
+
+
+def load_predocked_dataset_with_children(args: Namespace):
+    num_pool = getattr(args, "mol_graph_pool", 10)
+
+    df = load_predocked_df(args)
+    state_records = df.to_dict(orient='records')
+
+    print(f"Starting pool with {num_pool} children for {len(state_records)} records")
+
+    st = time.time()
+
+    recv = Queue()
+
+    bsize = int(np.ceil(len(state_records) / num_pool))
+    processes = []
+    pipes = []
+    for i in range(num_pool):
+        local, remote = Pipe()
+        pipes.append(local)
+        p = Process(
+            target=service_get_mol_graph,
+            args=(remote, recv))
+        p.start()
+
+        local.send((1, state_records[i*bsize: (i+1)*bsize]))
+        processes.append(p)
+
+    recv_cnt = 0
+    all_graph_traj = []
+    while recv_cnt < len(state_records):
+        res = recv.get()
+        res = cPickle.loads(res)
+        if res[0] is not None:
+            all_graph_traj.append(res)
+        recv_cnt += 1
+
+        if recv_cnt % 1000 == 0:
+            done_time = time.time() - st
+            estimated_remaining = (done_time / recv_cnt) * (len(state_records) - recv_cnt)
+            print(f"Done {recv_cnt}/{len(state_records)} in {done_time:.2f} s"
+                  f" (~remaining {estimated_remaining:.2f} s)")
+
+    print(f"FINAL DONE {len(state_records)} resulted in {len(all_graph_traj)} trajectories.")
+    all_graph_traj = [x for x in all_graph_traj if x[0] is not None]
+
+    for send in pipes:
+        send.send((0, None))
+
+    for p in processes:
+        p.terminate()
+        p.join()
+
+    """"
     # Load Env to have methods for loading molMDP from state and converting them to graphs
     env = gym.make("BlockMolEnvGraph-v1", config={
         "obs_cuda": False,
     }, proc_id=0)
     transform = None
-    env.molMDP.build_translation_table()
+    env.molMDP.build_translation_table(fill_in=False)
 
-    st = time.time()
-    all_graph_traj = []
-    state_records = df.to_dict(orient='records')
-
-    print(f"Starting pool with {num_pool} children for {len(state_records)} records")
     with torch.multiprocessing.Pool(num_pool) as p:
         bsize = 1000
         batch_idxs = range(0, len(state_records), bsize)
@@ -100,7 +338,8 @@ def load_predocked_dataset_with_children(args: Namespace):
             for x in graphs_with_traj:
                 del x
             del graphs_with_traj
-            all_graph_traj += clone_g
+            all_graph_traj += [x for x in clone_g if x[0] is not None]
+    """
 
     """
         # Serial solution In case of problems with parallel version
@@ -113,11 +352,6 @@ def load_predocked_dataset_with_children(args: Namespace):
     """
 
     print(f"Finish loading in {time.time() - st}")
-    trajectories = []
-    for (g, traj), y in zip(all_graph_traj, df.dockscore.values):
-        traj = traj[::-1]
-        traj.append([g, (None, None)])
-        trajectories.append((traj, y))
 
     # for iii, (traj, dockscore, traj_mol) in enumerate(trajectories):
     #     env.reset()
@@ -145,7 +379,7 @@ def load_predocked_dataset_with_children(args: Namespace):
     # import pdb;
     # pdb.set_trace()
 
-    return trajectories
+    return all_graph_traj
 
 
 if __name__ == "__main__":
