@@ -88,7 +88,7 @@ DEFAULT_CONFIG = {
 
     "reward_config": {
         "qed_cutoff": [0.3, 0.7],
-        "synth_cutoff": [4, 4],
+        "synth_cutoff": [0, 4],
         "synth_config": synth_config,
         "soft_stop": True,
         "exp": None,
@@ -355,3 +355,19 @@ class BlockMolEnv_v3(gym.core.Env):
             action_mask[self.max_blocks: (self.max_blocks + len(mol.stems) * self.num_blocks)] = 1
 
         return action_mask
+
+    def _reset_load(self, state):
+        self._crt_episode = None
+
+        self.num_steps = 0
+        self.molMDP.reset()
+        self.reward.reset()
+
+        self.molMDP.load(state)
+
+        action_mask = self._get_action_mask()
+        self._prev_obs = dict({"action_mask": action_mask})
+        obs, graph = self._make_obs()
+        self.num_steps = 0
+
+        return obs
