@@ -6,8 +6,8 @@ from LambdaZero.contrib.functional import elu2, satlins
 
 
 class TransformInfoOracle:
-    def __init__(self):
-        self.oracle = InterogateOracle()
+    def __init__(self, num_workers=10, send_updates_conn=None):
+        self.oracle = InterogateOracle(num_workers=num_workers, send_updates_conn=send_updates_conn)
 
     def __call__(self, infos: List[dict]):
         _match = dict({x["mol"]["smiles"]: idx for idx, x in enumerate(infos)})
@@ -46,10 +46,10 @@ class TransformInfoDiscounted:
 
         scores = scores * clip_synth * clip_qed
         for idx, info in enumerate(infos):
-            if idx in idxs:
-                info["dscore"] = scores[idx]
-            else:
-                info["dscore"] = None
+            info["dscore"] = None
+
+        for idx, score in zip(idxs, scores):
+            infos[idx]["dscore"] = score
 
         return infos
 
