@@ -188,6 +188,7 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
 
     def __init__(self, config=dict(), *args, proc_id=0, **kwargs):
         self._config = config = merge_dicts(DEFAULT_CONFIG, config)
+        self._proc_id = proc_id
         self._eval_mode = config.get("eval_mode", False)
 
         self.num_blocks = config["num_blocks"]
