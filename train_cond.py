@@ -3,7 +3,7 @@ Training a Classifier
 """
 import os
 
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 import cv2
 import copy
@@ -93,9 +93,9 @@ class StateActionReturnDataset(Dataset):
                     step = self._max_steps
 
         if self.return_done:
-            av_idxs = np.where(horizon >= self._seq_block_size)[0]
-        else:
             av_idxs = np.where(horizon >= self._seq_block_size-1)[0]
+        else:
+            av_idxs = np.where(horizon >= self._seq_block_size)[0]
 
         return data, actions, done_idxs, rtgs, timesteps, av_idxs, horizon
 
@@ -124,13 +124,14 @@ class StateActionReturnDataset(Dataset):
                 "r_steps": timestep.flatten(),
             }
             _data.append(data)
+
         return _data[0]
 
 
 class DebugDataset(StateActionReturnDataset):
     def __init__(self,
                  data, block_size, actions, done_idxs, rtgs, timesteps, max_atoms, traj_starts,
-                 max_steps=None, return_done=True, max_traj=100, unique_start=True,
+                 max_steps=None, return_done=True, max_traj=5, unique_start=True,
                  true_act=None):
 
         if block_size != 1:
@@ -158,14 +159,15 @@ class DebugDataset(StateActionReturnDataset):
         filter_idx = []
 
         for i, pend in enumerate(done_idxs):
-            if unique_start and traj_starts[i]["smiles"] in start_smi:
+            uniue_id = rtgs[pend]
+            if unique_start and uniue_id in start_smi:
                 pstart = pend + 1
                 continue
 
             filter_idx += list(range(pstart, pend+1))
             selected_done.append(len(filter_idx)-1)
 
-            start_smi.append(traj_starts[i]["smiles"])
+            start_smi.append(uniue_id)
             start_end_idxs.append([pstart, pend])
             start_end.append([data[pstart], data[pend]])
             traj_starts[i]["rtg"] = rtgs[pstart]
@@ -174,7 +176,7 @@ class DebugDataset(StateActionReturnDataset):
 
             start_traj.append(traj_starts[i])
             start_traj_rtg.append(rtgs[pstart])
-            start_smi.append(traj_starts[i]["smiles"])
+            # start_smi.append(traj_starts[i]["smiles"])
             pstart = pend + 1
             if len(start_smi) > max_traj:
                 break
@@ -183,6 +185,7 @@ class DebugDataset(StateActionReturnDataset):
 
         for lll in [actions, data, rtgs, timesteps]:
             lll[:] = [lll[x] for x in filter_idx]
+
 
         #f==========================================================================================
         self.vocab_size = max(actions) + 1
@@ -216,9 +219,12 @@ class DebugDataset(StateActionReturnDataset):
                     step = max_steps
 
         if return_done:
-            self.av_idxs = np.where(horizon >= block_size)[0]
-        else:
             self.av_idxs = np.where(horizon >= block_size-1)[0]
+        else:
+            self.av_idxs = np.where(horizon >= block_size)[0]
+
+        print("ACTIONS", self.actions)
+        print("av_idxs", self.av_idxs)
 
 
 class OnlineData(StateActionReturnDataset):
@@ -301,9 +307,9 @@ class OnlineData(StateActionReturnDataset):
 
         horizons = np.array(self.horizon)
         if self.return_done:
-            self.av_idxs = np.where(horizons >= self._seq_block_size)[0]
-        else:
             self.av_idxs = np.where(horizons >= self._seq_block_size-1)[0]
+        else:
+            self.av_idxs = np.where(horizons >= self._seq_block_size)[0]
 
 
 def collate_fn(data, device):
@@ -355,6 +361,9 @@ def train_epoch(ep, loader, model, optimizer, criterion, device, train_cfg):
         _, predicted = torch.max(y_hat.data, 1)
         hits = (predicted == data_tgt)
         correct += hits.sum().item()
+
+        if ep > 500:
+            import pdb; pdb.set_trace()
 
         # Calculate correct based on num blocks
         for x in eval_blocks:
@@ -528,7 +537,7 @@ class EvalEnv:
                 [x["rtg"] for x in init_states], [True] * len(init_states), init_states
             ))
             self._debug_state_count = len(self._eval_configs)
-            for i in range(10):
+            for i in range(5):
                 self._eval_configs += list(zip(
                     [x["rtg"] for x in init_states], [False] * len(init_states), init_states
                 ))
@@ -548,7 +557,10 @@ class EvalEnv:
 
         success = []
         debug_success = 0
-
+        stats = dict({
+            "terminate_act": 0,
+            "ep_len": 0,
+        })
         for icfg, (rtg, deterministic, init_cfg) in enumerate(eval_conf):
             random_steps = init_cfg.get("random_steps", -1)
             if random_steps != -1:
@@ -592,6 +604,9 @@ class EvalEnv:
 
                 step_cnt += 1
 
+            stats["terminate_act"] += 0 if send_act[0] == 0 else 1
+            stats["ep_len"] += step_cnt
+
             score_info = {
                 "rcond": rtg,
                 "deterministic": deterministic,
@@ -610,6 +625,9 @@ class EvalEnv:
                         debug_states[icfg % self._debug_state_count] += 1
                         if icfg < self._debug_state_count:
                             debug_success += 1
+
+        for k, v in stats.items():
+            stats[k] = v/len(eval_conf)
 
         ret_req = self.oracle.get_req()
 
@@ -648,12 +666,14 @@ class EvalEnv:
                 close_matches += 1
 
         log_info = {
+            "num_eval": len(eval_conf),
             "candidates_count": len(success),
             "candidates_f": len(success) / len(eval_conf),
             "match_count": matches,
             "match_f": matches / len(eval_conf),
             "close_match_count": close_matches,
             "close_match_f": close_matches / len(eval_conf),
+            **stats,
         }
         if len(dockscores) > 0:
             log_info.update({
@@ -732,7 +752,7 @@ def run(cfg: Namespace):
         if cfg.debug:
             train_dataset = DebugDataset(
                 obss, context_length, actions, done_idxs, rtgs, timesteps, max_atoms, traj_start_mol,
-                max_steps=None, max_traj=5000, unique_start=True,
+                max_steps=None, max_traj=1000, unique_start=True,
                 true_act=true_act
             )
         else:
@@ -774,7 +794,10 @@ def run(cfg: Namespace):
     # ==============================================================================================
     # Train
     criterion = nn.CrossEntropyLoss()
-    optimizer = RAdam(model.parameters(), lr=cfg.lr)
+    # optimizer = RAdam(model.parameters(), lr=cfg.lr)
+    optimizer = optim.Adam(model.parameters(), lr=cfg.lr)
+    # optimizer = optim.RMSprop(model.parameters(), lr=cfg.lr)
+    # optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=0.9)
 
     eval_freq = cfg.eval_freq
     log_freq = cfg.log_freq
