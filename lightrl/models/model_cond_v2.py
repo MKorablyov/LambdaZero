@@ -27,14 +27,14 @@ def one_hot(idx, device, max_cnt):
     return hot
 
 
-class MPNNcond(ModelBase):
+class MPNNcondV2(ModelBase):
     def __init__(self, cfg: Namespace, obs_shape, action_space):
         super().__init__(cfg, obs_shape, action_space)
 
         num_feat = getattr(cfg, "num_feat", 14)
         num_vec = getattr(cfg, "num_vec", 0)
         dim = getattr(cfg, "dim", 128,)
-        num_out_per_mol = getattr(cfg, "num_out", 2)
+        num_out_per_mol = getattr(cfg, "num_out_per_mol", 2)
         num_out_per_stem = getattr(cfg, "num_out_per_stem", 105)
         levels = getattr(cfg, "levels", 6)
         version = getattr(cfg, "version", 'v2')
@@ -55,8 +55,13 @@ class MPNNcond(ModelBase):
         h_size = dim + self.max_steps + 1
         self.lin1 = nn.Linear(h_size, dim * 8)
 
-        self.set2set = Set2Set(h_size, processing_steps=3)
-        self.lin3 = nn.Linear(h_size * 2, num_out_per_mol)
+        self.set2set = nn.ModuleList([
+            Set2Set(h_size, processing_steps=3) for _ in range(num_out_per_mol)
+        ])
+
+        self.lin3 = nn.ModuleList([
+            nn.Linear(h_size * 2, 1) for _ in range(num_out_per_mol)
+        ])
 
         # --> Change 3 Add new ln
         self.node2stem = nn.Sequential(nn.Linear(dim * 8, dim), nn.LeakyReLU(inplace=True), nn.Linear(dim, num_out_per_stem))
@@ -94,16 +99,17 @@ class MPNNcond(ModelBase):
         data.jbond_preds = self.node2jbond(per_atom_out[data.jbond_atmidx.flatten()])\
             .reshape((data.jbond_atmidx.shape)).mean(1)  # mean pooling of the 2 jbond atom preds
 
-        out = self.set2set(out, data.batch)
-        sout = self.lin3(out)  # per mol scalar outputs
+        out = [set2set(out, data.batch) for set2set in self.set2set]
+        sout = [lin3(x) for lin3, x in zip(self.lin3, out)] # per mol scalar outputs
+        sout = torch.cat(sout, -1)
 
-        stop_logit = sout[:, -1:]
+        stop_logit = sout[:, 1:2]
         break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
         add_logits = data.stem_preds.reshape((data.num_graphs, -1))
 
         actor_logits = torch.cat([stop_logit, break_logits, add_logits], 1)
 
-        value = sout[:, :-1]
+        value = sout[:, :1]
         return value, actor_logits, rnn_hxs
 
 

@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import NNConv, Set2Set
 from torch_geometric.data import Data, Batch
 import torch_geometric.nn as gnn
+from torch_geometric.nn import MessagePassing, Set2Set, global_add_pool
 
 from LambdaZero import chem
 from LambdaZero.chem import atomic_numbers
@@ -27,7 +28,7 @@ def one_hot(idx, device, max_cnt):
     return hot
 
 
-class MPNNcond(ModelBase):
+class MPNNcondTestSet(ModelBase):
     def __init__(self, cfg: Namespace, obs_shape, action_space):
         super().__init__(cfg, obs_shape, action_space)
 
@@ -55,8 +56,17 @@ class MPNNcond(ModelBase):
         h_size = dim + self.max_steps + 1
         self.lin1 = nn.Linear(h_size, dim * 8)
 
-        self.set2set = Set2Set(h_size, processing_steps=3)
-        self.lin3 = nn.Linear(h_size * 2, num_out_per_mol)
+        # ==========================================================================================
+        # Test heads
+        # self.set2set = Set2Set(h_size, processing_steps=3)
+        # self.lin3 = nn.Linear(h_size * 2, num_out_per_mol)
+
+        self.linh1 = nn.Linear(h_size+1, h_size)
+        self.linh2 = nn.Linear(h_size, h_size)
+        self.linh3 = nn.Linear(h_size, h_size)
+        self.linh4 = nn.Linear(h_size, num_out_per_mol)
+
+        # ==========================================================================================
 
         # --> Change 3 Add new ln
         self.node2stem = nn.Sequential(nn.Linear(dim * 8, dim), nn.LeakyReLU(inplace=True), nn.Linear(dim, num_out_per_stem))
@@ -94,8 +104,21 @@ class MPNNcond(ModelBase):
         data.jbond_preds = self.node2jbond(per_atom_out[data.jbond_atmidx.flatten()])\
             .reshape((data.jbond_atmidx.shape)).mean(1)  # mean pooling of the 2 jbond atom preds
 
-        out = self.set2set(out, data.batch)
-        sout = self.lin3(out)  # per mol scalar outputs
+        # ==========================================================================================
+        # out = self.set2set(out, data.batch)
+        # sout = self.lin3(out)  # per mol scalar outputs
+
+        _act = nn.SiLU
+
+        in_head = torch.cat([out, rcond], dim=1)
+        out = _act()(self.linh1(in_head))
+        out = self.linh2(out)
+        out = global_add_pool(out, data.batch)
+        out = _act()(self.linh3(out))
+        out = self.linh4(out)
+        sout = out
+
+        # ==========================================================================================
 
         stop_logit = sout[:, -1:]
         break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
