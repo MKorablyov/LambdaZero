@@ -34,6 +34,8 @@ from lightrl import env
 from lightrl.models import get_model
 from lightrl.policy.policy_base import Policy
 from lightrl.utils.storage import RolloutStorage
+from lightrl.utils.storage_two_v import RolloutStorage as RolloutStorageTwoV
+
 from lightrl.evaluation import EvaluateBase
 from lightrl.utils.utils import set_seed
 from lightrl.utils.utils import LogTopStats, LogStatsTrain, SummaryStats
@@ -164,6 +166,24 @@ def log_stats_remote(conn_recv, conn_send, log_topk):
             conn_send.put(stats)
 
 
+def score_memory(conn_recv, conn_send):
+    oracle = InterogateOracle(num_workers=20)
+
+    while True:
+        cmd, recv = conn_recv.get()
+        if cmd == 0:
+            proc_id, info_req = recv
+
+            # Request score
+            predocked_score = oracle.check_db([info_req])[0]
+            response = predocked_score
+
+            conn_send[proc_id].send(response)
+            del recv
+        elif cmd == 1:
+            oracle.update_pending_que(requests=recv)
+
+
 def run(args):
     print("SLURM_ARRAY_TASK_ID", os.environ.get('SLURM_ARRAY_TASK_ID', None))
     print("SLURM_ARRAY_JOB_ID", os.environ.get('SLURM_ARRAY_JOB_ID', None))
@@ -217,6 +237,30 @@ def run(args):
         args.env_cfg.env_args.proxy_net = proxy_net
         args.eval_env_cfg.env_args.proxy_net = proxy_net
 
+    # ==============================================================================================
+    # precalculated scores for the envs
+    precalculated_scores = getattr(args.env_cfg, "precalculated_scores", False)
+
+    if precalculated_scores:
+        max_send_scores = getattr(args.env_cfg, "max_send_scores", 100)
+        precalculated_max = getattr(args.env_cfg, "precalculated_max", "frequency")
+
+        score_mem_send = Queue()
+        score_mem_recv = []
+        score_mem_remote_recv = []
+        for i in range(args.env_cfg.procs):
+            local, remote = Pipe()
+            score_mem_recv.append(local)
+            score_mem_remote_recv.append(remote)
+
+        score_mem_proc = Process(
+            target=score_memory,
+            args=(score_mem_send, score_mem_recv)
+        )
+        score_mem_proc.start()
+        args.env_cfg.env_args.score_mem_conn = [score_mem_send, score_mem_remote_recv]
+
+        smiles_freq = dict()
 
     # ==============================================================================================
 
@@ -237,8 +281,10 @@ def run(args):
     actor_critic = Policy(args.policy, envs.observation_space.shape, envs.action_space, base_model)
     actor_critic.to(device)
 
-    print("Load Evaluation protocol and envs ...")
-    evaluation = EvaluateBase(actor_critic, process_obss, args.eval_env_cfg, "", device)
+    do_eval = args.eval_env_cfg.procs > 0
+    if do_eval:
+        print("Load Evaluation protocol and envs ...")
+        evaluation = EvaluateBase(actor_critic, process_obss, args.eval_env_cfg, "", device)
 
     if args.algo == 'a2c':
         agent = algo.A2C_ACKTR(
@@ -249,7 +295,8 @@ def run(args):
             eps=args.eps,
             alpha=args.alpha,
             max_grad_norm=args.max_grad_norm)
-    elif args.algo == 'ppo':
+    elif args.algo == "ppo":
+        multihead_values = False
         agent = algo.PPO(
             actor_critic,
             args.clip_param,
@@ -260,6 +307,20 @@ def run(args):
             lr=args.lr,
             eps=args.eps,
             max_grad_norm=args.max_grad_norm)
+    elif args.algo == "ppo_twov":
+        multihead_values = True
+        agent = algo.PPOTwoV(
+            actor_critic,
+            args.clip_param,
+            args.ppo_epoch,
+            args.num_mini_batch,
+            args.value_loss_coef,
+            args.entropy_coef,
+            lr=args.lr,
+            eps=args.eps,
+            max_grad_norm=args.max_grad_norm,
+            adv_coeff=getattr(args, "adv_coeff", [1, 1])
+        )
     elif args.algo == 'acktr':
         agent = algo.A2C_ACKTR(
             actor_critic, args.value_loss_coef, args.entropy_coef, acktr=True)
@@ -282,10 +343,15 @@ def run(args):
             shuffle=True,
             drop_last=drop_last)
 
-    rollouts = RolloutStorage(args.num_steps, args.num_processes,
-                              envs.observation_space.shape, envs.action_space,
-                              actor_critic.recurrent_hidden_state_size,
-                              process_obss)
+    if multihead_values:
+        _storage = RolloutStorageTwoV
+    else:
+        _storage = RolloutStorage
+
+    rollouts = _storage(args.num_steps, args.num_processes,
+                        envs.observation_space.shape, envs.action_space,
+                        actor_critic.recurrent_hidden_state_size,
+                        process_obss)
 
     obs = envs.reset()
 
@@ -294,10 +360,13 @@ def run(args):
 
     # DEBUG - -----------
     seed_to_smiles = dict()
-    for k, v in evaluation._eval_data.items():
-        seed_to_smiles[v["env_seed"][0]] = k
-    actor_critic.eval_data = evaluation._eval_data
-    actor_critic.seed_to_smiles = seed_to_smiles
+
+    if do_eval:
+        for k, v in evaluation._eval_data.items():
+            seed_to_smiles[v["env_seed"][0]] = k
+        actor_critic.eval_data = evaluation._eval_data
+        actor_critic.seed_to_smiles = seed_to_smiles
+
     out_dir = args.out_dir
     data_out_dir = f"{out_dir}/train_data"
     os.mkdir(data_out_dir)
@@ -313,20 +382,22 @@ def run(args):
     )
     # DEBUG - ----------
     # ==============================================================================================
-
     print("Start training ...")
     start = time.time()
     num_updates = int(args.num_env_steps) // args.num_steps // args.num_processes
 
     max_data_out = f"{out_dir}/max_data"
     os.mkdir(max_data_out)
+    mem = None
+    sent_logtop = 0
+    recv_logtop = 0
 
-    for j in range(num_updates):
+    for epoch in range(num_updates):
 
         if args.use_linear_lr_decay:
             # decrease learning rate linearly
             utils.update_linear_schedule(
-                agent.optimizer, j, num_updates,
+                agent.optimizer, epoch, num_updates,
                 agent.optimizer.lr if args.algo == "acktr" else args.lr)
 
         for step in range(args.num_steps):
@@ -344,14 +415,32 @@ def run(args):
 
             # Obser reward and next obs
             ts_stats.act.start()
+
             obs, reward, done, infos = envs.step(send_act)
+
             ts_stats.act.end()
 
             new_mol_infos = log_train.collect_new_batch(obs, reward, done, infos)
 
             # Send training step new mol infos for topK log statistics
             if len(new_mol_infos) > 0:
-                log_stats_remote_send.put((0, (new_mol_infos,)))
+                send_all = [x for x in infos if "score" in x]
+                log_stats_remote_send.put((0, (send_all,)))
+                # log_stats_remote_send.put((0, (new_mol_infos,)))
+
+            # Update request que so new molecules are send to be docked
+            if precalculated_scores:
+                score_mem_send.put((1, []))
+
+                # Calculate mol frequency
+                for info in infos:
+                    if "mol" in info:
+                        done_mol_smi = info["mol"]["smiles"]
+                        if info["mol"]["smiles"] in smiles_freq:
+                            smiles_freq[done_mol_smi][0] += 1
+                            smiles_freq[done_mol_smi][1].append(info.get("score", None))
+                        else:
+                            smiles_freq[done_mol_smi] = [1, [info.get("score", None)], info["mol"]]
 
             ts_stats.insert.start()
 
@@ -360,10 +449,15 @@ def run(args):
             bad_masks = torch.FloatTensor([[0.0] if 'bad_transition' in info.keys() else [1.0]
                                            for info in infos])
             reward = torch.FloatTensor(reward).unsqueeze(1)
+            _value, _reward = value, reward
+            if multihead_values:
+                reward2 = torch.FloatTensor([e.get("extra_r", 0) for e in infos]).unsqueeze(1)
+                _value = [value[:, :1], value[:, 1:]]
+                _reward = [reward, reward2]
 
             # p_obs = pre_process_obss(obs, device=device)
             rollouts.insert(obs, recurrent_hidden_states, action,
-                            action_log_prob, value, reward, masks, bad_masks)
+                            action_log_prob, _value, _reward, masks, bad_masks)
             ts_stats.insert.end()
 
         ts_stats.nextv.start()
@@ -374,11 +468,11 @@ def run(args):
         ts_stats.nextv.end()
 
         if args.gail:
-            if j >= 10:
+            if epoch >= 10:
                 envs.venv.eval()
 
             gail_epoch = args.gail_epoch
-            if j < 10:
+            if epoch < 10:
                 gail_epoch = 100  # Warm up
             for _ in range(gail_epoch):
                 discr.update(gail_train_loader, rollouts,
@@ -402,6 +496,22 @@ def run(args):
         rollouts.after_update()
         ts_stats.after_update.end()
 
+        # Send request for most freq mol in batch
+        if precalculated_scores:
+            # Order mol frequencies and send them to be calculated
+            molecules = list(smiles_freq.values())
+            if precalculated_max == "score":
+                for m in molecules:
+                    scores = [x for x in m[1] if x is not None]
+                    m[1] = max(scores) if len(scores) > 0 else -np.inf
+                molecules.sort(key=lambda x: x[1])
+            else:
+                molecules.sort(key=lambda x: x[0])
+
+            molecules = molecules[::-1]
+            score_mem_send.put((1, [x[-1] for x in molecules][:max_send_scores]))
+            smiles_freq.clear()
+
         # # save for every interval-th episode or for the last epoch
         # if (j % args.save_interval == 0
         #     or j == num_updates - 1) and args.save_dir != "":
@@ -420,10 +530,7 @@ def run(args):
         # Get training log
         plot_vals, new_mol_infos = log_train.log()
 
-        total_num_steps = (j + 1) * args.num_processes * args.num_steps
-
-        if (j + 1) % args.main.log_topk_interval == 0:
-            log_stats_remote_send.put((1, total_num_steps))
+        total_num_steps = (epoch + 1) * args.num_processes * args.num_steps
 
         while not log_stats_remote_recv.empty():
             log_stats = log_stats_remote_recv.get()
@@ -431,8 +538,16 @@ def run(args):
             log_summary.update(log_stats)
             if do_plot:
                 wandb.log(log_stats)
+            recv_logtop += 1
 
-        if j % 20 == 0:
+        if (epoch + 1) % args.main.log_topk_interval == 0:
+            if (sent_logtop - recv_logtop) < 2:
+                log_stats_remote_send.put((1, total_num_steps))
+                sent_logtop += 1
+            else:
+                print(f"NOT GOOD. Skipping log top {total_num_steps}")
+
+        if epoch % 20 == 0:
             for k, v in ts_stats.__dict__.items():
                 print(f"{k}: {v.stats():.6f}")
 
@@ -443,14 +558,14 @@ def run(args):
             "value_loss": value_loss,
             "action_loss": action_loss,
             "total_num_steps": total_num_steps,
-            "train_iter": j,
+            "train_iter": epoch,
         })
 
-        if j % args.log_interval == 0:
+        if epoch % args.log_interval == 0:
             print(plot_vals)
 
-        if args.eval_interval != 0 and j % args.eval_interval == 0:
-            scores = evaluation.evaluate(j ,total_num_steps)
+        if args.eval_interval != 0 and epoch % args.eval_interval == 0:
+            scores = evaluation.evaluate(epoch ,total_num_steps)
             plot_vals.update(scores.mean().to_dict())
 
         if do_plot:
