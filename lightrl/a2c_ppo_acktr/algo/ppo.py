@@ -68,6 +68,7 @@ class PPO():
                     value_losses_clipped = (value_pred_clipped - return_batch).pow(2)
                     value_loss = 0.5 * torch.max(value_losses, value_losses_clipped).mean()
                 else:
+                    raise NotImplementedError
                     value_loss = 0.5 * (return_batch - values).pow(2).mean()
 
                 self.optimizer.zero_grad()
