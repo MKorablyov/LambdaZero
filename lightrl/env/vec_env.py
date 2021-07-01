@@ -17,6 +17,7 @@ def _get_env(proc_id=0, seed=0, env_seed_offset=10000, env_name=None, env_args=N
     env_seed = seed + env_seed_offset * proc_id
     env = gym.make(env_name, config=env_args, proc_id=env_seed)
     env.unwrapped._env_proc_id = env_seed
+    env.unwrapped._env_true_proc_id = proc_id
 
     env = env_wrapper(env)
     env.seed(env_seed)
