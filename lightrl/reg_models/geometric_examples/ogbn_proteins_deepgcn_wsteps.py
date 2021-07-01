@@ -57,7 +57,7 @@ class DeeperGCNSteps(torch.nn.Module):
         if cond_level == 0:
             x = rsteps_rcond_conditioning(x, inputs, max_steps=self._conditioning["r_steps"])
             edge_attr = torch.cat([
-                edge_attr, torch.zeros(edge_attr.size(0), self.cond_size, device=edge_attr.device)
+                edge_attr, torch.ones(edge_attr.size(0), self.cond_size, device=edge_attr.device)
             ], dim=1)
 
         x = self.layers[0].conv(x, edge_index, edge_attr)
@@ -68,7 +68,7 @@ class DeeperGCNSteps(torch.nn.Module):
                 x = rsteps_rcond_conditioning(x, inputs, max_steps=self._conditioning["r_steps"])
                 edge_attr = torch.cat([
                     edge_attr,
-                    torch.zeros(edge_attr.size(0), self.cond_size, device=edge_attr.device)
+                    torch.ones(edge_attr.size(0), self.cond_size, device=edge_attr.device)
                 ], dim=1)
 
             x = layer(x, edge_index, edge_attr)
