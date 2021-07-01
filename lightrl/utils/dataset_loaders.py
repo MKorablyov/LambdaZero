@@ -49,6 +49,11 @@ def service_sample_mol_graph(recv, send):
     env = gym.make("BlockMolEnvGraph-v1", config={
         "obs_cuda": False,
     }, proc_id=0)
+
+    # Filter based on max_branches & num_blocks
+    max_branches = env.unwrapped.max_branches
+    num_blocks = env.unwrapped.num_blocks
+
     transform = None
     env.molMDP.build_translation_table(fill_in=False)
 
@@ -64,8 +69,8 @@ def service_sample_mol_graph(recv, send):
             _nbins = np.array(bins)
             sample_weights = 1/np.bincount(_nbins)[_nbins]
             ids = [x["id"] for x in all_states]
-            print(f"LOADED IDS: [{min(ids)} - {max(ids)}] unique: {len(np.unique(ids))}")
-            print(f"Histogram sample_weights: {np.histogram(sample_weights, bins=10)}")
+            # print(f"LOADED IDS: [{min(ids)} - {max(ids)}] unique: {len(np.unique(ids))}")
+            # print(f"Histogram sample_weights: {np.histogram(sample_weights, bins=10)}")
         elif cmd == 2:
             b_size = cmd_info
             states = random.choices(population=all_states, weights=sample_weights, k=b_size)
@@ -76,15 +81,18 @@ def service_sample_mol_graph(recv, send):
                        itertools.repeat(transform))
 
             for arg in args:
-                ret = pool_get_mol_graph(arg)
+                ret = pool_get_mol_graph(arg, max_branches=max_branches, num_blocks=num_blocks)
                 send.put(cPickle.dumps(ret, -1))
         else:
             return
 
 
-def pool_get_mol_graph(largs):
+def pool_get_mol_graph(largs, max_branches=20, num_blocks=105):
     state, env_molMDP, env_graph_mol_obs, transform = largs
     _rnd = np.random.RandomState(state["id"])
+
+    if np.any(np.array(state["blockidxs"]) >= num_blocks):
+        return (None, None, None)
 
     mol = env_molMDP.load(state)
     graph, flat_graph = env_graph_mol_obs(mol, flatten=False)
@@ -109,6 +117,11 @@ def pool_get_mol_graph(largs):
             break
         parent_idx = _rnd.randint(len(parents))
         parent = list(parents[parent_idx])
+        blockidx, stemidx = parent[1]
+        if stemidx >= max_branches:
+            error = True
+            break
+
         traj.append(parent)
         traj_mol = parent[0]
         numblocks = traj_mol.numblocks
