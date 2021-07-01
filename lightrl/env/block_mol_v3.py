@@ -100,7 +100,7 @@ DEFAULT_CONFIG = {
     },
 
     "reward": "DummyReward",
-    "num_blocks": None, # 105, 464
+    "num_blocks": 105, # 105, 464
     "max_steps": 7,
     "max_blocks": 7,
     "max_atoms": 50,
