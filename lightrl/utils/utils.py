@@ -205,7 +205,7 @@ class LogTopStats:
 
     def collect(self, infos: List[dict]):
         for info in infos:
-            _id = info.get(self._unique_key)
+            _id = info.get(self._unique_key, None)
             if _id is not None and _id not in self._seen_mol:
                 good = True
                 for k, v in self._filter_candidates.items():
@@ -214,8 +214,6 @@ class LogTopStats:
                         break
                 if good:
                     self._new_info.append(info)
-
-                self._seen_mol.update([_id])
 
     def log(self):
         logs = dict({f"top{self._topk}_count": len(self._new_info)})
@@ -226,6 +224,12 @@ class LogTopStats:
             topk_idx = sort_idx[-self._topk:] if self._order_ascending else sort_idx[:self._topk]
 
             log_info = [self._new_info[x] for x in topk_idx]  # type: List[dict]
+
+            # Add logged molecules to seen set
+            for info in log_info:
+                _id = info.get(self._unique_key, None)
+                if _id is not None and _id not in self._seen_mol:
+                    self._seen_mol.update([_id])
 
             if self._transform_info is not None:
                 log_info = self._transform_info(log_info)
