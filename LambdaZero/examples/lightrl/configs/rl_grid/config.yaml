@@ -1,0 +1,7 @@
+env_cfg:
+  wrapper: [["CountBasedReward", "ProxyCandidateRewardWithScoreMem"], ["ProxyCandidateRewardWithScoreMem"]]
+  precalculated_max: ["score", "frequency"]
+  precalculated_scores: [True]
+  env_args:
+    allow_removal: [True, False]
+algo: ["ppo"]

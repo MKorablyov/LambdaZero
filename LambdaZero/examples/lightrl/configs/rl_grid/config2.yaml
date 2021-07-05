@@ -1,0 +1,9 @@
+env_cfg:
+  wrapper: [["SeenInfo", "ProxyCandidateRewardWithScoreMem"], ["SeenLinearInfo", "ProxyCandidateRewardWithScoreMem"]]
+  precalculated_max: ["score", "frequency"]
+  precalculated_scores: [True]
+  env_args:
+    allow_removal: [True, False]
+model:
+  num_out: [3]
+algo: ["ppo_twov"]

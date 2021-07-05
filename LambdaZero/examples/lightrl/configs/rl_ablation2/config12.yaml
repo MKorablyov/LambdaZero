@@ -1,0 +1,6 @@
+model:
+  name: [DeeperGCNSteps] # MPNNextra # EGNNetRLBO #MPNNet_v2  # MPNNetMultihead
+  dim: [128]
+  cond_level: [14]
+  levels: [28]
+  dropout: [0]

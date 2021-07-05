@@ -4,6 +4,7 @@ Training a Classifier
 import os
 
 # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+from builtins import enumerate
 
 import cv2
 import copy
@@ -22,20 +23,20 @@ import sys
 import time
 import functools
 import gym
-from lightrl.policy.policy_base import Policy
+from LambdaZero.examples.lightrl.policy.policy_base import Policy
 
-from lightrl.env.vec_env import pre_process_obss
-from lightrl.env.scores import ParallelSynth, QEDEstimator
-from lightrl.env.gym_wrappers import OracleCandidateReward
+from LambdaZero.examples.lightrl.env.vec_env import pre_process_obss
+from LambdaZero.examples.lightrl.env.scores import ParallelSynth, QEDEstimator
+from LambdaZero.examples.lightrl.env.gym_wrappers import OracleCandidateReward
 
-from lightrl import env
-from lightrl.utils.utils import set_seed
-from lightrl.utils.utils import setup_loggers
-from lightrl.reg_models import get_actor_model
-from lightrl.env.vec_env import fast_from_data_list
-from lightrl.utils.utils import SummaryStats
-from lightrl.utils.radam_optimizer import RAdam
-from lightrl.env.oracle import InterogateOracle
+from LambdaZero.examples.lightrl import env
+from LambdaZero.examples.lightrl.utils.utils import set_seed
+from LambdaZero.examples.lightrl.utils.utils import setup_loggers
+from LambdaZero.examples.lightrl.reg_models import get_actor_model
+from LambdaZero.examples.lightrl.env.vec_env import fast_from_data_list
+from LambdaZero.examples.lightrl.utils.utils import SummaryStats
+from LambdaZero.examples.lightrl.utils.radam_optimizer import RAdam
+from LambdaZero.examples.lightrl.env.oracle import InterogateOracle
 
 datasets_dir, programs_dir, summaries_dir = None, None, None
 
@@ -325,10 +326,17 @@ def collate_fn(data, device):
     return _graphs, _tgt, other
 
 
-def train_epoch(ep, loader, model, optimizer, criterion, device, train_cfg):
-    model.train()
+def train_epoch(ep, loader, model, optimizer, criterion, device, train_cfg, train=True):
+    if train:
+        model.train()
+    else:
+        model.eval()
 
     cond_steps = train_cfg.cond_steps
+    eval_tgt_bins = train_cfg.eval_tgt_bins
+    weight_step = getattr(train_cfg, "weight_step", False)
+    weight_dock = getattr(train_cfg, "weight_dock", False)
+    loss_agg = getattr(torch, getattr(train_cfg, "loss_agg", "mean"))
 
     correct = 0
     total = 0
@@ -337,8 +345,15 @@ def train_epoch(ep, loader, model, optimizer, criterion, device, train_cfg):
 
     eval_blocks = list(range(1, 9))
     eval_steps = list(range(8))
-    acc_groups = dict({f"eval_step_{x}": [0, 0] for x in eval_steps})
-    acc_groups.update(dict({f"eval_blocks_{x}": [0, 0] for x in eval_blocks}))
+    acc_groups = dict({f"eval_step_{x}": [0, 0, 0] for x in eval_steps})
+    acc_groups.update(dict({f"eval_blocks_{x}": [0, 0, 0] for x in eval_blocks}))
+    eval_cond_bin_count = np.zeros(len(eval_tgt_bins)+1)
+    eval_cond_bin_correct = np.zeros(len(eval_tgt_bins)+1)
+    eval_cond_bin_bp_correct = np.zeros(len(eval_tgt_bins)+1)
+
+    all_probs = []
+
+    best_probs = 0
 
     for bidx, (data_graph, data_tgt, other) in enumerate(loader):
         r_steps, rcond = other["r_steps"], other["rcond"]
@@ -350,45 +365,103 @@ def train_epoch(ep, loader, model, optimizer, criterion, device, train_cfg):
         data_graph, data_tgt = data_graph.to(device), data_tgt.to(device)
         data_tgt = data_tgt.flatten()
         x = Namespace(mol_graph=data_graph, rcond=rcond.flatten(), r_steps=r_steps_cond.flatten())
-        optimizer.zero_grad()
+        best_prob = torch.ones_like(data_tgt.flatten()).bool()
 
-        _, y_hat, _ = model(x, None, None)
-        loss = criterion(y_hat, data_tgt)
-        loss.backward()
-        optimizer.step()
+        if train:
+            optimizer.zero_grad()
+            _, y_hat, _ = model(x, None, None)
+
+            weights = torch.ones(len(data_tgt), device=data_tgt.device)
+            if weight_step:
+                x = r_steps.detach().clone().flatten()
+                m_steps = 10
+                x = (x - 1).clip(0, m_steps).float()
+                weights = 1 - x * (1/(m_steps+1))
+            if weight_dock:
+                x = rcond.detach().clone().flatten().float() + 17
+                n_weights = 1 - x * (1/(50))
+                weights = (weights + n_weights) / 2. if weight_step else n_weights
+
+            loss = criterion(y_hat, data_tgt)
+            loss = loss_agg(loss * weights / weights.sum())
+
+            loss.backward()
+            optimizer.step()
+        else:
+            with torch.no_grad():
+                _, y_hat, _ = model(x, None, None)
+                loss = loss_agg(criterion(y_hat, data_tgt))
+
+                tgt_probs = torch.nn.functional.softmax(y_hat.data).gather(1, data_tgt.unsqueeze(1)).flatten()
+
+                # Test smaller cond
+                for offset in [-1.5, -1, 1, 1.5]:
+                    x.rcond = rcond.flatten() + offset
+                    _, other, _ = model(x, None, None)
+                    new_prob = torch.nn.functional.softmax(other.data).gather(1, data_tgt.unsqueeze(1)).flatten()
+                    best_prob = best_prob & (new_prob < tgt_probs)
+                best_probs += best_prob.sum().item()
+
         running_loss += loss.item()
 
         _, predicted = torch.max(y_hat.data, 1)
         hits = (predicted == data_tgt)
         correct += hits.sum().item()
 
-        if ep > 500:
-            import pdb; pdb.set_trace()
+        probs = torch.nn.functional.softmax(y_hat.data).gather(1, data_tgt.unsqueeze(1))
+        all_probs += probs.flatten().cpu().numpy().tolist()
 
         # Calculate correct based on num blocks
         for x in eval_blocks:
             _select = (data_graph.num_blocks == x).flatten()
             _val = hits[_select]
             acc_groups[f"eval_blocks_{x}"][0] += hits[_select].sum().item()
-            acc_groups[f"eval_blocks_{x}"][1] += len(_val)
+            acc_groups[f"eval_blocks_{x}"][2] += len(_val)
+            if not train:
+                acc_groups[f"eval_blocks_{x}"][1] += best_prob[_select].sum().item()
 
+        # Calculate correct based on step
         for x in eval_steps:
             _select = (r_steps == x).flatten()
             _val = hits[_select]
             acc_groups[f"eval_step_{x}"][0] += hits[_select].sum().item()
-            acc_groups[f"eval_step_{x}"][1] += len(_val)
+            acc_groups[f"eval_step_{x}"][2] += len(_val)
+            if not train:
+                acc_groups[f"eval_step_{x}"][1] += best_prob[_select].sum().item()
+
+        # Calculate correct based on Conditioning bin
+        cond_bins = np.digitize(rcond.flatten().data.cpu().numpy(), eval_tgt_bins)
+        np.add.at(eval_cond_bin_count, cond_bins, 1)
+        np.add.at(eval_cond_bin_correct, cond_bins, hits.flatten().cpu().numpy())
+        if not train:
+            np.add.at(eval_cond_bin_bp_correct, cond_bins, best_prob.flatten().cpu().numpy())
 
         total += data_tgt.size(0)
 
         if (bidx + 1) % 100 == 0:
             print(f"Done {bidx}")
 
+    val_s = ["<"] + [f"{x:.1f}" for x in eval_tgt_bins] + [">"]
+    for i in range(len(eval_cond_bin_correct)):
+        acc_groups[f"eval_cond_bin_{val_s[i]}:{val_s[i+1]}"] = [
+            eval_cond_bin_correct[i], eval_cond_bin_bp_correct[i], eval_cond_bin_count[i]
+        ]
+
     no_eval = []
     log_data = dict()
+    prefix = "train" if train else "test"
     for k, v in acc_groups.items():
-        if v[1] > 0:
-            log_data[f"{k}_f"] = v[0] / v[1]
-            log_data[f"{k}_count"] = v[1]
+        if v[2] > 0:
+            log_data[f"{prefix}_{k}_f"] = v[0] / v[2]
+            log_data[f"{prefix}_{k}_count"] = v[2]
+            if not train:
+                log_data[f"{prefix}_{k}_best_prob_f"] = v[1] / v[2]
+
+    log_data[f"{prefix}_tgt_prob_mean"] = np.mean(all_probs)
+    log_data[f"{prefix}_tgt_prob_std"] = np.std(all_probs)
+    log_data[f"{prefix}_tgt_prob_median"] = np.median(all_probs)
+    if not train:
+        log_data[f"{prefix}_best_probs"] = best_probs / total
 
     print(log_data)
     return correct / total, running_loss / total, log_data
@@ -721,6 +794,9 @@ def run(cfg: Namespace):
     summary_stats = SummaryStats(do_plot)
     max_steps = cfg.max_steps
     cond_steps = cfg.cond_steps
+    env_num_blocks = 105
+    env_max_blocks = 7
+    env_max_branch = 20
 
     # ==============================================================================================
     # Data
@@ -730,8 +806,47 @@ def run(cfg: Namespace):
     context_length = 1
     online_dataset_collect_freq = cfg.online_dataset_collect_freq
 
+    test_set = getattr(cfg.dataset_cfg, "test_set_size", 0) > 0
+    test_smiles = []
+    if not cfg.debug and test_set:
+        from LambdaZero.examples.lightrl.utils.dataset_loaders import load_predocked_dataset_with_children
+        test_cfg = copy.deepcopy(cfg.dataset_cfg)
+        test_cfg.dockscore_th = -14
+        test_cfg.dockscore_unique = True
+        test_cfg.dockscore_uniform_sample = True
+        test_cfg.sample_size = nsize = cfg.dataset_cfg.test_set_size
+        test_cfg.duplicate_states = nsmpl = cfg.dataset_cfg.test_set_samples
+        trajectories = load_predocked_dataset_with_children(test_cfg)
+
+        # Filter only unique trajectories
+        end_smiles = np.array([x[1]["end_state"]["smiles"] for x in trajectories])
+        unique_tr_idxs = []
+        test_smiles = np.unique(end_smiles)
+
+        # Group by end_state.smiles
+        for smi in test_smiles:
+            idxs = np.where(end_smiles == smi)[0]
+            unique_tr_act = []
+            for idx in idxs:
+                actions = [
+                    env_num_blocks * stem_idx + block_idx + env_max_blocks
+                    for block_idx, stem_idx in [x[1] for x in trajectories[idx][0][:-1]]
+                ]
+                if actions not in unique_tr_act:
+                    unique_tr_act.append(actions)
+                    unique_tr_idxs.append(idx)
+        trajectories = [trajectories[i] for i in unique_tr_idxs]
+        obss, actions, _, done_idxs, rtgs, timesteps, traj_start_mol, true_act = \
+            build_condition_dataset(trajectories, max_blocks=env_max_blocks, num_blocks=env_num_blocks)
+        max_atoms = max([x.x.size(0) for x in obss])
+        test_dataset = StateActionReturnDataset(
+            obss, context_length, actions, done_idxs, rtgs, timesteps, max_atoms,
+            max_steps=None
+        )
+
+    cfg.dataset_cfg.filter_smiles = test_smiles
     if online_dataset:
-        from lightrl.utils.dataset_loaders import OnlineDataFeed
+        from LambdaZero.examples.lightrl.utils.dataset_loaders import OnlineDataFeed
         data_feed = OnlineDataFeed(cfg.dataset_cfg)
         max_atoms = 70
         train_dataset = OnlineData(
@@ -740,10 +855,8 @@ def run(cfg: Namespace):
         )
 
     else:
-        from lightrl.utils.dataset_loaders import load_predocked_dataset_with_children
+        from LambdaZero.examples.lightrl.utils.dataset_loaders import load_predocked_dataset_with_children
         trajectories = load_predocked_dataset_with_children(cfg.dataset_cfg)
-        env_num_blocks = 105
-        env_max_blocks = 7
         obss, actions, _, done_idxs, rtgs, timesteps, traj_start_mol, true_act = \
             build_condition_dataset(trajectories, max_blocks=env_max_blocks, num_blocks=env_num_blocks)
         max_atoms = max([x.x.size(0) for x in obss])
@@ -761,19 +874,30 @@ def run(cfg: Namespace):
                 max_steps=None
             )
 
+    # ==============================================================================================
+    # Data loaders
+
     print(f"Training number of trajectories: {len(train_dataset.done_idxs)} "
           f"with {len(train_dataset)} transitions")
 
     train_loader = DataLoader(
         train_dataset, batch_size=cfg.batch_size, collate_fn=functools.partial(collate_fn, device=device), shuffle=True)
 
+    if test_set:
+        print(f"Testing on number of trajectories: {len(test_dataset.done_idxs)} "
+              f"with {len(test_dataset)} transitions")
+
+        test_loader = DataLoader(
+            test_dataset, batch_size=cfg.batch_size,
+            collate_fn=functools.partial(collate_fn, device=device), shuffle=False)
+
     # Get data statistics
 
     # ==============================================================================================
     # Load model
-    from lightrl.reg_models import get_actor_model
-    from lightrl import reg_models
-    from lightrl.models import get_model
+    from LambdaZero.examples.lightrl.reg_models import get_actor_model
+    from LambdaZero.examples.lightrl import reg_models
+    from LambdaZero.examples.lightrl.models import get_model
 
     if cfg.model.name in reg_models.MODELS:
         model = get_actor_model(cfg.model)
@@ -793,30 +917,48 @@ def run(cfg: Namespace):
 
     # ==============================================================================================
     # Train
-    criterion = nn.CrossEntropyLoss()
+    if cfg.weight_end:
+        class_weight = torch.ones(env_num_blocks * env_max_branch + env_max_blocks)
+        class_weight[0] = 1/10.
+        criterion = nn.CrossEntropyLoss(reduction='none')
+    else:
+        criterion = nn.CrossEntropyLoss(reduction='none')
+
     # optimizer = RAdam(model.parameters(), lr=cfg.lr)
     optimizer = optim.Adam(model.parameters(), lr=cfg.lr)
     # optimizer = optim.RMSprop(model.parameters(), lr=cfg.lr)
     # optimizer = optim.SGD(model.parameters(), lr=cfg.lr, momentum=0.9)
 
     eval_freq = cfg.eval_freq
+    test_freq = cfg.test_freq
     log_freq = cfg.log_freq
     training_seen = 0
     best_train_acc = 0
     best_test_acc = 0
+    eval_tgt_bins = 1.1 * np.arange(-7, 7) + -8.6
+
     for epoch in range(cfg.num_epochs):  # loop over the dataset multiple times
         acc, loss, other = train_epoch(
             epoch, train_loader, model, optimizer, criterion, device,
-            Namespace(cond_steps=cond_steps)
+            Namespace(cond_steps=cond_steps, eval_tgt_bins=eval_tgt_bins,
+                      weight_step=cfg.weight_step, weight_dock=cfg.weight_dock)
         )
 
         if (epoch + 1) % log_freq == 0:
             print(f"[T] E: {epoch} | Acc: {acc*100:.3f}% | los: {loss:.5f}")
 
         training_seen += len(train_dataset)
+        train_log = {"train_loss": loss, "train_acc": acc*100, "epoch": epoch,
+                     "training_seen": training_seen, **other}
 
-        train_log = {"train_loss": loss, "train_acc": acc*100, "epoch": epoch, "training_seen": training_seen,
-                       **other}
+        if test_set and (epoch + 1) % test_freq == 0:
+            test_acc, test_loss, test_other = train_epoch(
+                epoch, test_loader, model, optimizer, criterion, device,
+                Namespace(cond_steps=cond_steps, eval_tgt_bins=eval_tgt_bins), train=False
+            )
+            train_log.update({"test_loss": test_loss, "test_acc": test_acc * 100, **test_other})
+            print(f"[TEST] E: {epoch} | Acc: {test_acc*100:.3f}% | los: {test_loss:.5f}")
+
         summary_stats.update(train_log)
 
         wandb_log = copy.deepcopy(train_log)
@@ -873,6 +1015,6 @@ if __name__ == "__main__":
     except:
         print("already set context")
 
-    from lightrl.utils.utils import parse_opts
+    from LambdaZero.examples.lightrl.utils.utils import parse_opts
     run(parse_opts())
 

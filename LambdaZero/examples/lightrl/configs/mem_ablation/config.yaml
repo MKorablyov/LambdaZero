@@ -1,0 +1,3 @@
+env_cfg:
+  wrapper: [["ProxyCandidateRewardWithScoreMem"]]
+  precalculated_max: ["score", "frequency"]

@@ -1,0 +1,34 @@
+cuda: True
+seed: 0
+project_name: cond
+use_wandb: True
+classification: True
+max_steps: 8
+cond_steps: False
+
+dataset_cfg:
+  filter_candidates: True
+  qed_th: 0.3
+  synth_th: 4.
+  sample_size: 0
+
+env_seed: 123
+
+batch_size: 256
+train_split: 0.8
+num_epochs: 5000
+eval_freq: 5
+log_freq: 1
+lr: 0.00025
+
+
+model:
+  name: MPNNcond # SGC # TriangSag # MPNNet # MPNNet_v2 # MPNNet
+  num_feat: 14
+  num_out: 2
+  levels: 12
+
+#  conditioning: [["r_steps", 10], ["rcond", 1]]
+#  cond_level: 1
+#  dropout: 0
+#  dim: 128

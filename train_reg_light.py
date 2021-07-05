@@ -16,12 +16,12 @@ import wandb
 import os
 from torch.utils.data import Dataset
 import gym
-from lightrl import env
+from LambdaZero.examples.lightrl import env
 from torch_geometric.utils import degree
 
-from lightrl.utils.utils import set_seed
-from lightrl.env.vec_env import fast_from_data_list
-from lightrl.utils.utils import parse_opts, add_to_cfg, flatten_cfg, update_cfg
+from LambdaZero.examples.lightrl.utils.utils import set_seed
+from LambdaZero.examples.lightrl.env.vec_env import fast_from_data_list
+from LambdaZero.examples.lightrl.utils.utils import parse_opts, add_to_cfg, flatten_cfg, update_cfg
 
 import LambdaZero.models
 from LambdaZero.examples.mpnn import config
@@ -31,10 +31,10 @@ from LambdaZero.contrib.inputs import temp_load_data_v1
 from LambdaZero.contrib.functional import elu2
 from LambdaZero.environments.molMDP import BlockMoleculeData
 
-from lightrl.reg_models import get_reg_model
-from lightrl.utils.radam_optimizer import RAdam
-from lightrl.utils.utils import setup_loggers
-from lightrl.utils.utils import SummaryStats
+from LambdaZero.examples.lightrl.reg_models import get_reg_model
+from LambdaZero.examples.lightrl.utils.radam_optimizer import RAdam
+from LambdaZero.examples.lightrl.utils.utils import setup_loggers
+from LambdaZero.examples.lightrl.utils.utils import SummaryStats
 
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
@@ -349,7 +349,7 @@ def pool_get_mol_graph2(largs):
 def load_predocked_dataset(args: Namespace):
     import pandas as pd
     import gym
-    from lightrl import env
+    from LambdaZero.examples.lightrl import env
     import json
     import pandas as pd
     import numpy as np
@@ -797,7 +797,7 @@ def calc_deg(trainset):
 
 
 if __name__ == "__main__":
-    from lightrl.utils.utils import parse_opts
+    from LambdaZero.examples.lightrl.utils.utils import parse_opts
     run(parse_opts())
 
 #     graphs = load_predocked_dataset(Namespace())

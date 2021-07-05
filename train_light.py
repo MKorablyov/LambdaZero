@@ -25,21 +25,22 @@ import wandb
 import csv
 from typing import List
 
-from lightrl.a2c_ppo_acktr import algo, utils
-from lightrl.a2c_ppo_acktr.algo import gail
+from LambdaZero.examples.lightrl.a2c_ppo_acktr import algo, utils
+from LambdaZero.examples.lightrl.a2c_ppo_acktr.algo import gail
 
-from lightrl.utils.utils import parse_opts, add_to_cfg, flatten_cfg, update_cfg
-from lightrl.env.vec_env import get_envs, pre_process_obss
-from lightrl import env
-from lightrl.models import get_model
-from lightrl.policy.policy_base import Policy
-from lightrl.utils.storage import RolloutStorage
-from lightrl.utils.storage_two_v import RolloutStorage as RolloutStorageTwoV
+from LambdaZero.examples.lightrl.utils.utils import parse_opts, add_to_cfg, flatten_cfg, update_cfg
+from LambdaZero.examples.lightrl.env.vec_env import get_envs, pre_process_obss
+from LambdaZero.examples.lightrl import env
+from LambdaZero.examples.lightrl.models import get_model
+from LambdaZero.examples.lightrl.policy.policy_base import Policy
+from LambdaZero.examples.lightrl.utils.storage import RolloutStorage
+from LambdaZero.examples.lightrl.utils.storage_two_v import RolloutStorage as RolloutStorageTwoV
 
-from lightrl.evaluation import EvaluateBase
-from lightrl.utils.utils import set_seed
-from lightrl.utils.utils import LogTopStats, LogStatsTrain, SummaryStats
-from lightrl.env.oracle import InterogateOracle
+from LambdaZero.examples.lightrl.evaluation import EvaluateBase
+from LambdaZero.examples.lightrl.utils.utils import set_seed
+from LambdaZero.examples.lightrl.utils.utils import LogTopStats, LogStatsTrain, SummaryStats
+from LambdaZero.examples.lightrl.env.oracle import InterogateOracle
+
 from multiprocessing import Process, Pipe, Queue
 
 from LambdaZero.utils import get_external_dirs
@@ -217,7 +218,7 @@ def run(args):
     # ==============================================================================================
     # -- Reward
 
-    from lightrl.env.scores import ParallelSynth, QEDEstimator
+    from LambdaZero.examples.lightrl.env.scores import ParallelSynth, QEDEstimator
     synth_net = ParallelSynth(use_cuda=args.main.use_gpu)
     synth_net.to(device)
     synth_net.share_memory()
@@ -226,10 +227,10 @@ def run(args):
 
     if args.proxy_dock is not None:
         if args.proxy_dock != "default":
-            from lightrl.env.scores import load_docknet
+            from LambdaZero.examples.lightrl.env.scores import load_docknet
             proxy_net = load_docknet(args.proxy_dock, device=device)
         else:
-            from lightrl.env.scores import LZProxyDockNetRun
+            from LambdaZero.examples.lightrl.env.scores import LZProxyDockNetRun
             proxy_net = LZProxyDockNetRun()
             proxy_net.to(device)
 
@@ -270,8 +271,8 @@ def run(args):
     def process_obss(x):
         return pre_process_obss(x, device=device)
 
-    from lightrl.reg_models import get_actor_model
-    from lightrl import reg_models
+    from LambdaZero.examples.lightrl.reg_models import get_actor_model
+    from LambdaZero.examples.lightrl import reg_models
 
     if args.model.name in reg_models.MODELS:
         base_model = get_actor_model(args.model)
@@ -573,5 +574,5 @@ def run(args):
 
 
 if __name__ == "__main__":
-    from lightrl.utils.utils import parse_opts
+    from LambdaZero.examples.lightrl.utils.utils import parse_opts
     run(parse_opts())

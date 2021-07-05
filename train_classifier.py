@@ -18,12 +18,12 @@ import sys
 import time
 import functools
 
-from lightrl.utils.utils import set_seed
-from lightrl.utils.utils import setup_loggers
-from lightrl.reg_models import get_actor_model
-from lightrl.env.vec_env import fast_from_data_list
-from lightrl.utils.utils import SummaryStats
-from lightrl.utils.radam_optimizer import RAdam
+from LambdaZero.examples.lightrl.utils.utils import set_seed
+from LambdaZero.examples.lightrl.utils.utils import setup_loggers
+from LambdaZero.examples.lightrl.reg_models import get_actor_model
+from LambdaZero.examples.lightrl.env.vec_env import fast_from_data_list
+from LambdaZero.examples.lightrl.utils.utils import SummaryStats
+from LambdaZero.examples.lightrl.utils.radam_optimizer import RAdam
 
 datasets_dir, programs_dir, summaries_dir = None, None, None
 
@@ -390,6 +390,6 @@ if __name__ == "__main__":
     import torch.multiprocessing as mp
     mp.set_start_method('spawn')
 
-    from lightrl.utils.utils import parse_opts
+    from LambdaZero.examples.lightrl.utils.utils import parse_opts
     run(parse_opts())
 

@@ -1,0 +1,6 @@
+r_max_distance: [0.2, 0.5, 1.0]
+
+env_cfg:
+  wrapper: [["CountBasedReward"], []]  #  List of wrappers - applied in reverse order
+  env_args:
+    max_steps: [7, 14]

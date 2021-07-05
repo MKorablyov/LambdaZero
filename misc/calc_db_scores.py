@@ -10,10 +10,10 @@ import json
 import os
 
 from LambdaZero.contrib.oracle.oracle import PreDockingDB
-from lightrl import env
-from lightrl.env.reward import DummyReward
-from lightrl.env.scores import QEDEstimator, ParallelSynth
-from lightrl.env.molMDP import MolMDP
+from LambdaZero.examples.lightrl import env
+from LambdaZero.examples.lightrl.env.reward import DummyReward
+from LambdaZero.examples.lightrl.env.scores import QEDEstimator, ParallelSynth
+from LambdaZero.examples.lightrl.env.molMDP import MolMDP
 from LambdaZero.utils import get_external_dirs
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
