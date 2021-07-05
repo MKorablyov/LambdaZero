@@ -5,7 +5,14 @@ import multiprocessing
 import copy
 from argparse import Namespace
 
-from LambdaZero.contrib.oracle.oracle import DockVina_smi_db
+try:
+    # Try in case no existing docking with database log
+    from LambdaZero.contrib.oracle.oracle import DockVina_smi_db as DockVina_smi
+    DOCK_DB = True
+except:
+    from LambdaZero.chem import DockVina_smi as DockVina_smi
+    DOCK_DB = False
+
 from LambdaZero.contrib.oracle.oracle import config_DockingOracle_v1 as oracle_config
 from LambdaZero.contrib.oracle import DockingOracle
 
@@ -19,12 +26,14 @@ class FakeRemoteLog:
         self._last_log = log
 
 
-class DockingEstimatorThread(DockVina_smi_db):
+class DockingEstimatorThread(DockVina_smi):
     """ Docking estimator separate for each env. """
     def __init__(self, dockVina_config):
-        DockVina_smi_db.__init__(self, **dockVina_config)
+        DockVina_smi.__init__(self, **dockVina_config)
 
     def eval(self, smiles, **kwargs):
+        if not DOCK_DB:
+            kwargs.clear()
         try:
             mol_name, dockscore, coord = self.dock(smiles, **kwargs)
         except Exception as e:
