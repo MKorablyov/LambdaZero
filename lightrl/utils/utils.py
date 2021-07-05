@@ -1,7 +1,7 @@
 from argparse import Namespace
 import yaml
 import os
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 import torch
 import numpy as np
 import random
@@ -11,7 +11,8 @@ from liftoff import OptionParser, dict_to_namespace
 from lightrl.env.transforms import TransformInfoDiscounted, TransformCompose, TransformInfoOracle
 
 
-def flatten_cfg(cfg: Namespace):
+def flatten_cfg(cfg: Namespace) -> List[Any]:
+    """ Flatten nested Namespaces """
     lst = []
     for key, value in cfg.__dict__.items():
         if isinstance(value, Namespace):
@@ -22,8 +23,8 @@ def flatten_cfg(cfg: Namespace):
     return lst
 
 
-def update_cfg(base_cfg: Namespace, new_cfg: Namespace):
-    """ Inplace update cfg """
+def update_cfg(base_cfg: Namespace, new_cfg: Namespace) -> None:
+    """ Inplace update base cfg with new_cfg """
     for k, v in new_cfg.__dict__.items():
         if isinstance(base_cfg.__dict__.get(k, None), Namespace):
             update_cfg(base_cfg.__dict__[k], v)
@@ -32,6 +33,7 @@ def update_cfg(base_cfg: Namespace, new_cfg: Namespace):
 
 
 def add_to_cfg(cfg: Namespace, subgroups: List[str], new_arg: str, new_arg_value) -> None:
+    """ Add new_arg to all subgroups items in cfg """
     if subgroups is None:
         subgroups = [x for x in cfg.__dict__.keys() if isinstance(cfg.__dict__[x], Namespace)]
 
@@ -79,7 +81,8 @@ def parse_opts(check_out_dir: bool = True):
     return opts
 
 
-def set_seed(seed: int, use_cuda: bool, cuda_deterministic: bool = False):
+def set_seed(seed: int, use_cuda: bool, cuda_deterministic: bool = False) -> None:
+    """ Set seed for different tools """
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
@@ -108,9 +111,9 @@ class MeanVarianceNormalizer:
         return x
 
 
-def setup_loggers(args: Namespace):
+def setup_loggers(args: Namespace) -> str:
+    """ Load wandb - to args.project_name & with an experiment_name. if logging is activated"""
     import wandb
-    import csv
     from LambdaZero.utils import get_external_dirs
 
     datasets_dir, programs_dir, summaries_dir = get_external_dirs()
@@ -129,9 +132,11 @@ def setup_loggers(args: Namespace):
         wandb.config.update(dict(flatten_cfg(args)))
 
     out_dir = args.out_dir
+    return out_dir
 
 
 class SummaryStats:
+    """ Keep summary statistics of MIN and MAX values - log to wand summary as well"""
     def __init__(self, log_wandb=False):
         self.mem = dict()  # type: Dict[List[int, int]] # dict of [min, max] values
         self.log_wand = log_wandb
@@ -162,7 +167,7 @@ class SummaryStats:
         return update_keys
 
 
-def get_stats(values, name, empty_val = 0):
+def get_stats(values, name, empty_val: float = 0) -> Dict:
     if len(values) == 0:
         values = [empty_val]
 
@@ -173,7 +178,6 @@ def get_stats(values, name, empty_val = 0):
         f"{name}_median": np.median(values),
         f"{name}_std": np.std(values),
     }
-
 
 
 class LogTopStats:
