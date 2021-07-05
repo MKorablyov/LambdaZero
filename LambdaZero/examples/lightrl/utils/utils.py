@@ -8,7 +8,9 @@ import random
 import wandb
 from collections import deque
 from liftoff import OptionParser, dict_to_namespace
-from LambdaZero.examples.lightrl.env.transforms import TransformInfoDiscounted, TransformCompose, TransformInfoOracle
+
+from LambdaZero.examples.lightrl.env.transforms import \
+    TransformInfoDiscounted, TransformCompose, TransformInfoOracle
 
 
 def flatten_cfg(cfg: Namespace) -> List[Any]:
