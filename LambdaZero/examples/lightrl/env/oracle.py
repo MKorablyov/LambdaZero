@@ -6,7 +6,7 @@ import copy
 from argparse import Namespace
 
 from LambdaZero.contrib.oracle.oracle import DockVina_smi_db
-from LambdaZero.contrib.config_acquirer import oracle_config
+from LambdaZero.contrib.oracle.oracle import config_DockingOracle_v1 as oracle_config
 from LambdaZero.contrib.oracle import DockingOracle
 
 
