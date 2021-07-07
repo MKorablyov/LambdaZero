@@ -11,7 +11,7 @@ class MPNNet(nn.Module):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
     """
-    def __init__(self, cfg: Namespace):
+    def __init__(self, cfg: Namespace, **kwargs):
         super(MPNNet, self).__init__()
         num_feat = getattr(cfg, "num_feat", 14)
         dim = getattr(cfg, "dim", 64)
