@@ -12,13 +12,22 @@ from typing import List, Tuple
 import re
 import pandas as pd
 import gc
-from LambdaZero.utils.actor_pool_wait import ActorPoolWait
+import json
 
+from LambdaZero.utils.actor_pool_wait import ActorPoolWait
 from LambdaZero.chem import DockVina_smi
 from LambdaZero.models import ChempropWrapper_v1
 from LambdaZero.utils import get_external_dirs
+import os.path as osp
+import LambdaZero
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
+
+
+config_DockingOracle_v1 = {"num_threads":8,
+                           "dockVina_config": {"outpath": osp.join(summaries_dir, "docking")},
+                           "mean":-8.6, "std": 1.1, "act_y":LambdaZero.contrib.functional.elu2,
+                           }
 
 
 class PreDockingDB:
@@ -69,12 +78,25 @@ class PreDockingDB:
         self.pre_dock_scores[smiles] = dockscore
 
     @staticmethod
-    def get_dock_db_base_path():
+    def get_dock_db_base_path() -> str:
         dock_db_dir = os.path.join(datasets_dir, "dock_dbs")
         if not os.path.isdir(dock_db_dir):
             os.mkdir(dock_db_dir)
 
         return os.path.join(dock_db_dir, "dock_db")
+
+    @staticmethod
+    def get_db_scores_base_path() -> str:
+        db_dir = os.path.join(datasets_dir, "dock_db_scores")
+        if not os.path.isdir(db_dir):
+            os.mkdir(db_dir)
+
+        return db_dir
+
+    @staticmethod
+    def get_db_scores_path(db_path: str) -> str:
+        name = os.path.basename(db_path).split(".")[0]
+        return f"{PreDockingDB.get_db_scores_base_path()}/{name}.pk"
 
     @staticmethod
     def get_new_db_name() -> str:
@@ -92,6 +114,35 @@ class PreDockingDB:
             return None, dbs
 
         return dbs[-1], dbs
+
+    @staticmethod
+    def read_last_db(sample_size: int = 0, with_scores: bool = False) -> pd.DataFrame:
+        pathdb, all_dbs = PreDockingDB.get_last_db()
+        columns = ["smiles", "dockscore", "blockidxs", "slices", "jbonds", "stems"]
+        store = pd.HDFStore(pathdb, "r")
+        df = store.select('df')  # type: pd.DataFrame
+
+        if sample_size != 0:
+            df = df.iloc[:sample_size]
+
+        for cl_mame in columns[2:]:
+            df.loc[:, cl_mame] = df[cl_mame].apply(json.loads)
+        df.dockscore = df.dockscore.apply(lambda x: np.around(np.float64(x), 1))
+
+        if with_scores:
+            score_path = PreDockingDB.get_db_scores_path(pathdb)
+            assert os.path.isfile(score_path), f"Did not found scores for {pathdb}"
+            db_scores = pd.read_pickle(score_path)
+
+            if sample_size != 0:
+                db_scores = db_scores.iloc[:sample_size]
+
+            assert (df.index.values == db_scores.smiles.values).all(), "Not same smiles"
+
+            df["qed_score"] = db_scores["qed_score"].values
+            df["synth_score"] = db_scores["synth_score"].values
+
+        return df
 
 
 class DockVina_smi_db(DockVina_smi):
@@ -188,8 +239,10 @@ class DockingOracle:
             self.predocked = PreDockingDB()
 
         # create actor pool
-        self.actors = [DockingEstimator.remote(dockVina_config) for i in range(self.num_threads)]
-        self.pool = ActorPoolWait(self.actors, timeout=360)
+        self.actors, self.pool = [], None
+        if self.num_threads > 0:
+            self.actors = [DockingEstimator.remote(dockVina_config) for i in range(self.num_threads)]
+            self.pool = ActorPoolWait(self.actors, timeout=360)
 
         self.mean = mean
         self.std = std
@@ -283,6 +336,15 @@ class DockingOracle:
 
         return dockscores
 
+    def update_predocked(self, smiles: str, dockscore: float):
+        if dockscore is None:
+            # Update failed hits
+            if smiles in self._failed_hits:
+                self._failed_hits[smiles] += 1
+            else:
+                self._failed_hits[smiles] = 1
+        else:
+            self.predocked.local_update(smiles, dockscore)
 
 @ray.remote
 class QEDEstimator:
