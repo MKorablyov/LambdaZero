@@ -76,14 +76,14 @@ class ProxyDockNetRun(torch.nn.Module):
         if isinstance(data, Data):
             # Create batch (this will create new Batch so no problem overwriting the edge_index
             device = data.x.device
+            if self._transform is not None:
+                data = self._transform(data)
+
             data = fast_from_data_list([data])
             data = data.to(device)
         elif new_batch_graph:
             # TODO copy to new batch
             raise NotImplementedError
-
-        if self._transform is not None:
-            data = self._transform(data)
 
         if self.edge_weidht:
 
@@ -111,6 +111,7 @@ def load_docknet(docknetpath, device):
     model = get_reg_model(cfg.model)
     model.to(device)
     model.load_state_dict(checkpoint["state_dict"])
+
 
     # Used to calculate graph
     db = ListGraphDBDataset(pd.DataFrame(), cfg.dataset)

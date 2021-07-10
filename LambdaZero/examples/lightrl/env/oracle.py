@@ -7,13 +7,13 @@ from argparse import Namespace
 
 try:
     # Try in case no existing docking with database log
-    from LambdaZero.contrib.oracle.oracle import DockVina_smi_db as DockVina_smi
+    from LambdaZero.contrib.oracle.oracle_predocked import DockVina_smi_db as DockVina_smi
     DOCK_DB = True
 except:
     from LambdaZero.chem import DockVina_smi as DockVina_smi
     DOCK_DB = False
 
-from LambdaZero.contrib.oracle.oracle import config_DockingOracle_v1 as oracle_config
+from LambdaZero.contrib.oracle.oracle_predocked import config_DockingOracle_v1 as oracle_config
 from LambdaZero.contrib.oracle import DockingOracle
 
 

@@ -9,7 +9,7 @@ import torch
 import json
 import os
 
-from LambdaZero.contrib.oracle.oracle import PreDockingDB
+from LambdaZero.contrib.oracle.oracle_predocked import PreDockingDB
 from LambdaZero.examples.lightrl import env
 from LambdaZero.examples.lightrl.env.reward import DummyReward
 from LambdaZero.examples.lightrl.env.scores import QEDEstimator, ParallelSynth

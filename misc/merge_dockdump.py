@@ -15,7 +15,7 @@ from datetime import datetime
 import re
 
 from LambdaZero.utils import get_external_dirs
-from LambdaZero.contrib.oracle.oracle import PreDockingDB
+from LambdaZero.contrib.oracle.oracle_predocked import PreDockingDB
 
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()

@@ -355,7 +355,7 @@ def load_predocked_dataset(args: Namespace):
     import numpy as np
     from multiprocessing import Pool
     import functools
-    from LambdaZero.contrib.oracle.oracle import PreDockingDB
+    from LambdaZero.contrib.oracle.oracle_predocked import PreDockingDB
 
     num_pool = getattr(args, "mol_graph_pool", 10)
     max_mol = getattr(args, "max_mol", None)
@@ -403,7 +403,7 @@ def load_predocked_data(args: Namespace):
     import numpy as np
     from multiprocessing import Pool
     import functools
-    from LambdaZero.contrib.oracle.oracle import PreDockingDB
+    from LambdaZero.contrib.oracle.oracle_predocked import PreDockingDB
 
     num_pool = getattr(args, "mol_graph_pool", 10)
     max_mol = getattr(args, "max_mol", None)
@@ -485,7 +485,6 @@ def get_splits(graphs, split_probs, split_seed, return_ids_only=True):
         else:
             g_split.append([graphs[x] for x in graph_ids[split_i: split_j]])
     return g_split
-
 
 
 
