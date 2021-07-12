@@ -52,7 +52,7 @@ policy:
 
 # -- Model config
 model:
-  name: MPNNcond # MPNNextra # EGNNetRLBO #MPNNet_v2  # MPNNetMultihead # MPNNcondTestSet - might be better
+  name: MPNNcond # MPNNextra # EGNNetRLBO #MPNNet_v2  # MPNNetMultihead
   recurrent: False
   dim: 128
   use_init: True
