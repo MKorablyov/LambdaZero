@@ -26,10 +26,9 @@ algo: "ppo_twov"
 
 ### Usage 
 
-Run 1 config: 
+Run 1 config (Best config Jul/2021): 
 
-`liftoff train_light.py lightrl/configs/cl_ppo_objects_1.yaml`
-`liftoff LambdaZero.examples.generative_models.molsv2.mol_activelearning.py LambdaZero/examples/generative_models/molsv2/configs/base.yaml`
+`liftoff train_light.py LambdaZero/examples/lightrl/configs/ppo_best_jul21.yaml`
 
 Prepare & run batch of configs (example):
 1. `liftoff-prepare LambdaZero/examples/lightrl/configs/rl_grid/ --runs-no 3 --results-path /scratch/andrein/lz2/results/  --do`
