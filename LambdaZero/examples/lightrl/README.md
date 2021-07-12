@@ -30,6 +30,13 @@ Run 1 config (Best config Jul/2021):
 
 `liftoff train_light.py LambdaZero/examples/lightrl/configs/ppo_best_jul21.yaml`
 
+Set path for proxy model weights in config `proxy_dock: path_to_proxy_model.pk`
+
+For pre-docked Oracle necessary dbs:
+- `$(datasets)/dock_dbs/dock_db_1624547349tp_2021_06_24_11h.h5 `  (Predocked dockscores)
+- `$(datasets)/dock_db_scores/dock_db_1624547349tp_2021_06_24_11h.pk `  (precalculated synth and qed)
+
+
 Prepare & run batch of configs (example):
 1. `liftoff-prepare LambdaZero/examples/lightrl/configs/rl_grid/ --runs-no 3 --results-path /scratch/andrein/lz2/results/  --do`
  Prepare all experiments from folder `rl_grid` (based on the folder's `default.yaml` and `config*.yaml` files) - for `runs-no` seeds / config (3 in our example) - and generate experiment folders at the specified `results-path` (should be on scratch).
