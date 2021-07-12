@@ -38,9 +38,9 @@ from LambdaZero.environments.block_mol_v3 import DEFAULT_CONFIG as env_v3_cfg, B
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
 from LambdaZero.utils import get_external_dirs
 
-from mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
+from LambdaZero.examples.generative_models.mols.mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
 
-import model_atom, model_block, model_fingerprint
+from LambdaZero.examples.generative_models.mols import model_atom, model_block, model_fingerprint
 
 
 '''
@@ -90,7 +90,7 @@ parser.add_argument("--dump_episodes", default='')
 
 
 
-from main_flow import Dataset as _Dataset
+from LambdaZero.examples.generative_models.mols.main_flow import Dataset as _Dataset
 
 
 class Dataset(_Dataset):

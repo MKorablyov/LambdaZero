@@ -1,12 +1,14 @@
 from collections import defaultdict
 import os.path
 import numpy as np
+import torch
 
 from LambdaZero.environments.molMDP import BlockMoleculeData, MolMDP
 from LambdaZero import chem
 from rdkit import Chem
+import copy
 
-import model_atom, model_block, model_fingerprint
+from LambdaZero.examples.generative_models.mols import model_atom, model_block, model_fingerprint
 
 
 class BlockMoleculeDataExtended(BlockMoleculeData):
@@ -194,7 +196,8 @@ class MolMDPExtended(MolMDP):
         return None
 
 
-    def post_init(self, device, repr_type, include_bonds=False, include_nblocks=False):
+    def post_init(
+            self, device, repr_type, include_bonds=False, include_nblocks=False, floatX="float32"):
         self.device = device
         self.repr_type = repr_type
         #self.max_bond_atmidx = max([max(i) for i in self.block_rs])
@@ -210,6 +213,7 @@ class MolMDPExtended(MolMDP):
         self.include_bonds = include_bonds
         #print(self.max_num_atm, self.num_stem_types)
         self.molcache = {}
+        self.floatX = getattr(torch, floatX)
 
     def mols2batch(self, mols):
         if self.repr_type == 'block_graph':
@@ -219,22 +223,33 @@ class MolMDPExtended(MolMDP):
         elif self.repr_type == 'morgan_fingerprint':
             return model_fingerprint.mols2batch(mols, self)
 
-    def mol2repr(self, mol=None):
+    def mol2repr(self, mol=None, **kwargs):
         if mol is None:
             mol = self.molecule
         #molhash = str(mol.blockidxs)+':'+str(mol.stems)+':'+str(mol.jbonds)
         #if molhash in self.molcache:
         #    return self.molcache[molhash]
         if self.repr_type == 'block_graph':
-            r = model_block.mol2graph(mol, self, self.floatX)
+            r = model_block.mol2graph(mol, self, self.floatX, **kwargs)
         elif self.repr_type == 'atom_graph':
             r = model_atom.mol2graph(mol, self, self.floatX,
                                      bonds=self.include_bonds,
-                                     nblocks=self.include_nblocks)
+                                     nblocks=self.include_nblocks, **kwargs)
         elif self.repr_type == 'morgan_fingerprint':
-            r = model_fingerprint.mol2fp(mol, self, self.floatX)
+            r = model_fingerprint.mol2fp(mol, self, self.floatX, **kwargs)
         #self.molcache[molhash] = r
         return r
+
+    def load(self, state: dict) -> BlockMoleculeDataExtended:
+        self.reset()
+        state = copy.deepcopy(state)
+        self.molecule.blockidxs = state["blockidxs"]  # indexes of every block
+        self.molecule.slices = state["slices"]  # atom index at which every block starts
+        self.molecule.jbonds = state["jbonds"]  # [block1, block2, bond1, bond2]
+        self.molecule.stems = state["stems"]  # [block1, bond1]
+        self.molecule.numblocks = len(self.molecule.blockidxs)
+        self.molecule.blocks = [self.block_mols[idx] for idx in self.molecule.blockidxs]  # rdkit
+        return self.molecule
 
 def test_mdp_parent():
     datasets_dir, programs_dir, summaries_dir = get_external_dirs()
