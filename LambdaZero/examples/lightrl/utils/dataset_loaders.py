@@ -16,8 +16,6 @@ import random
 import _pickle as cPickle
 
 from LambdaZero.contrib.oracle.oracle_predocked import PreDockingDB
-from LambdaZero.examples.lightrl import env
-from LambdaZero.examples.lightrl.env.reward import DummyReward
 from LambdaZero.utils import get_external_dirs
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
