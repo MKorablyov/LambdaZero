@@ -225,9 +225,9 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         self._prev_obs = None
         self._mock_obs = None
 
-        worker_index = proc_id  # getattr(config, "worker_index", 0)
-        vector_index = getattr(config, "vector_index", 0)
-        self._pre_saved_graph = getattr(config, "pre_saved_graph", False)
+        worker_index = proc_id
+        vector_index = config.get("vector_index", 0)
+        self._pre_saved_graph = False  # TODO Fix Deprecated  config.get("pre_saved_graph", False)
         self._reset_mode = False
         self._env_rnd_state = None
         self._env_seed = None

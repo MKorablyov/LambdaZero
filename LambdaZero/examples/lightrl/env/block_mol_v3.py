@@ -158,8 +158,8 @@ class BlockMolEnv_v3(gym.core.Env):
 
         self._prev_obs = None
 
-        worker_index = proc_id  # getattr(config, "worker_index", 0)
-        vector_index = getattr(config, "vector_index", 0)
+        worker_index = proc_id
+        vector_index = config.get("vector_index", 0)
         self._reset_mode = False
         self._env_rnd_state = None
         self._env_seed = None
