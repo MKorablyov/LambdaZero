@@ -110,6 +110,12 @@ if __name__ == "__main__":
         }}
 
     data = pd.read_csv(os.path.join(datasets_dir, "seh/seh_chembl.csv"), sep=";")
+    #print("data columns", data.columns, set(data["Standard Units"]))
+    # BAO label
+    # IC50 or Ki
+    
+
+
     binding = data[["Smiles", "Standard Value", "Ligand Efficiency BEI", "Ligand Efficiency SEI"]].copy()
     binding["Standard Value"] = pd.to_numeric(binding["Standard Value"], errors="coerce")
     binding["Ligand Efficiency BEI"] = pd.to_numeric(binding["Ligand Efficiency BEI"], errors="coerce")
@@ -121,27 +127,31 @@ if __name__ == "__main__":
     decoys = ic50 > 10000
     binding = pd.concat([binding[binders], binding[decoys]])
     binding.reset_index(inplace=True)
-    smis = binding["Smiles"].to_numpy()
 
-    # dock_smi = DockVina_smi(config)
-    # dockscore = pd.DataFrame({"dockscore": [dock_smi.dock(smi) for smi in smis]})
-    # binding = pd.concat([binding, dockscore], axis=1)
+    #print("binding", binding.columns)
+
+
+#    smis = binding["Smiles"].to_numpy()
+
+    # # dock_smi = DockVina_smi(config)
+    # # dockscore = pd.DataFrame({"dockscore": [dock_smi.dock(smi) for smi in smis]})
+    # # binding = pd.concat([binding, dockscore], axis=1)
+    # #
+    # # binding.to_feather(os.path.join(config["outpath"], "seh.ftr"))
+    # # binding = pd.read_feather(os.path.join(config["outpath"], "seh.ftr"))
     #
-    # binding.to_feather(os.path.join(config["outpath"], "seh.ftr"))
-    # binding = pd.read_feather(os.path.join(config["outpath"], "seh.ftr"))
-
-
-    binding = pd.read_feather(os.path.join(datasets_dir, "seh/4jnc/docked/seh.ftr"))
-    binding = binding.dropna()
-
-    fpr, tpr, _ = roc_curve(binding["Standard Value"] < 1, -binding["dockscore"])
-    roc_auc = auc(fpr, tpr)
-    # plt.plot(fpr,tpr)
-    # plt.show()
-    print(roc_auc)
-    top50 = np.argsort(binding["dockscore"].to_numpy())[:33]
-    enrichment_50 = np.mean(binding["Standard Value"].to_numpy()[top50] < 1)
-    print(enrichment_50)
+    #
+    # binding = pd.read_feather(os.path.join(datasets_dir, "seh/4jnc/docked/seh.ftr"))
+    # binding = binding.dropna()
+    #
+    # fpr, tpr, _ = roc_curve(binding["Standard Value"] < 1, -binding["dockscore"])
+    # roc_auc = auc(fpr, tpr)
+    # # plt.plot(fpr,tpr)
+    # # plt.show()
+    # print(roc_auc)
+    # top50 = np.argsort(binding["dockscore"].to_numpy())[:33]
+    # enrichment_50 = np.mean(binding["Standard Value"].to_numpy()[top50] < 1)
+    # print(enrichment_50)
 
     #print(len(dock_order))
     #binding["Standard Value"] < 1,
