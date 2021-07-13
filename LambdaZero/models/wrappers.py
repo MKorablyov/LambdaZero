@@ -7,8 +7,8 @@ from chemprop.train import cross_validate
 
 
 class ChempropWrapper_v1:
-    def __init__(self, config):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    def __init__(self, config, use_cuda=True):
+        self.device = torch.device('cuda' if torch.cuda.is_available() and use_cuda else 'cpu')
 
         # prediction
         self.checkpoint_path = config["predict_config"]["checkpoint_path"]
