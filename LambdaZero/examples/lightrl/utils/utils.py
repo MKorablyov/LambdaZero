@@ -194,13 +194,15 @@ class LogTopStats:
 
         self._topk = topk
         self._score_keys = score_keys
+        self.do_dockscore = do_dockscore = "dockscore" in score_keys
+
         self._order_key = order_key
         self._seen_mol = set()
         self._new_info = []
         self._order_ascending = order_ascending
         self._unique_key = unique_key
         self._filter_candidates = filter_candidates
-        if transform_info is None:
+        if transform_info is None and do_dockscore:
             transform_info = TransformCompose([
                 TransformInfoOracle(), TransformInfoDiscounted()
             ])

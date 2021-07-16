@@ -242,7 +242,7 @@ class BlockMolEnvGraph_v1(BlockMolEnv_v3):
         if self._pre_saved_graph:
             self._saved_graphs = torch.load(f"{datasets_dir}/mol_data.pkl")
 
-        self.obs_cuda = config.get("obs_cuda", True)
+        self.obs_cuda = config.get("obs_cuda", torch.cuda.is_available())
 
     def _debug_step(self, action):
         try:
