@@ -69,7 +69,7 @@ eval_determinitistic: False
 
 eval_env_cfg:  # Example of envs cfg -
   env: BlockMolEnvGraph-v1 # Env name
-  procs: 1 # Number of parallel environments to run
+  procs: 0 # Number of parallel environments to run
   actual_procs: 1 # Actual number of CPU threads to distribute the environments
   eval_mode: True
   env_args:
