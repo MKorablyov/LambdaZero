@@ -14,7 +14,7 @@ except:
     DOCK_DB = False
 
 from LambdaZero.contrib.oracle.oracle_predocked import config_DockingOracle_v1 as oracle_config
-from LambdaZero.contrib.oracle import DockingOracle
+from LambdaZero.contrib.oracle.oracle_predocked import DockingOracle
 
 
 class FakeRemoteLog:
