@@ -207,9 +207,7 @@ class AllTimeTop:
         for topk, topkv in self._best_scores_buffer.items():
             info[f"all_time_top{topk}_{self._name}_count"] = len(topkv)
             if len(topkv) > 0:
-                info[f"all_time_top{topk}_{self._name}_mean"] = np.mean(topkv)
-                info[f"all_time_top{topk}_{self._name}_std"] = np.std(topkv)
-                info[f"all_time_top{topk}_{self._name}_median"] = np.median(topkv)
+                info.update(get_stats(topkv, f"all_time_top{topk}_{self._name}"))
 
         return info
 
@@ -408,3 +406,26 @@ class FakeRemoteLog:
     def remote(self, log):
         self._last_log = log
 
+
+if __name__ == "__main__":
+    import random
+    import string
+    import pprint
+
+    letters = string.ascii_lowercase
+    log_stats = LogTopStats(topk=100, unique_key="smiles", score_keys=("proxy", "qed", "synth"))
+
+    for i in range(10000):
+        proxy = np.random.rand() * -1
+        info = {
+            "smiles": ''.join(random.choice(letters) for i in range(10)),
+            "proxy": proxy,
+            "qed": np.random.rand() * 10,
+            "synth": np.random.rand() * 10,
+            "score": proxy * -1,
+        }
+        log_stats.collect([info])
+
+    # printing lowercase
+
+    pprint.pprint(log_stats.log())
