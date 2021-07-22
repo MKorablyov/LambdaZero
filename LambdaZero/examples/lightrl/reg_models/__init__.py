@@ -47,22 +47,22 @@ def get_actor_model(cfg: Namespace, **kwargs) -> torch.nn.Module:
     return ActorWrapper(model_base, cfg, **kwargs)
 
 
-# ADD batch of networks
-python_paths = glob.glob("LambdaZero/examples/lightrl/reg_models/geometric_examples/*.py")
-var_name = "network"
-
-for python_path in python_paths:
-    module_path = python_path.replace("/", ".").replace(".py", "")
-
-    mod = import_module(module_path)
-    if hasattr(mod, var_name):
-
-        if isinstance(getattr(mod, var_name), list):
-            _models = getattr(mod, var_name)
-        else:
-            _models = [getattr(mod, var_name)]
-
-        for network_name, network in _models:
-            assert network_name not in MODELS, f"Network name already exists {network_name} - " \
-                                               f"{MODELS[network_name]} was before {network}"
-            MODELS[network_name] = network
+# # ADD batch of networks
+# python_paths = glob.glob("LambdaZero/examples/lightrl/reg_models/geometric_examples/*.py")
+# var_name = "network"
+#
+# for python_path in python_paths:
+#     module_path = python_path.replace("/", ".").replace(".py", "")
+#
+#     mod = import_module(module_path)
+#     if hasattr(mod, var_name):
+#
+#         if isinstance(getattr(mod, var_name), list):
+#             _models = getattr(mod, var_name)
+#         else:
+#             _models = [getattr(mod, var_name)]
+#
+#         for network_name, network in _models:
+#             assert network_name not in MODELS, f"Network name already exists {network_name} - " \
+#                                                f"{MODELS[network_name]} was before {network}"
+#             MODELS[network_name] = network

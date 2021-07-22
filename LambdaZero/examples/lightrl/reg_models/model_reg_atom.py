@@ -16,7 +16,6 @@ import torch_geometric.nn as gnn
 
 from LambdaZero import chem
 from LambdaZero.chem import atomic_numbers
-from LambdaZero.examples.lightrl.models.model_base import ModelBase
 
 
 warnings.filterwarnings('ignore')
