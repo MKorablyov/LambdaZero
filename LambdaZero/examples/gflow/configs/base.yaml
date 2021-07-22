@@ -1,0 +1,102 @@
+project_name: gflow
+
+main:
+  use_gpu: &use_gpu True
+  seed: 13
+  plot: False
+  num_outer_loop_iters: 1
+  log_topk: 100  # Training step freq to log top k -> procs * num_steps * interval frames
+  log_topk_freq: 204800
+  log_dockscore: False
+
+proxy:
+  name: CandidateWrapper
+  proxy:
+    name: ProxyExample
+    checkpoint: "/scratch/andrein/Datasets/Datasets/best_model.pk"
+  default_score: 16
+
+#proxy:
+#  proxy_learning_rate: 2.5e-4 #  help="Learning rate", type=float)
+#  proxy_dropout: 0.0 #, help="MC Dropout in Proxy", type=float)
+#  proxy_weight_decay: 1.e-6  # , help="Weight Decay in Proxy", type=float)
+#  proxy_mbsize: 64 #, help="Minibatch size", type=int)
+#  proxy_opt_beta: 0.9 # , type=float)
+#  proxy_nemb: 64 # , help="#hidden", type=int)
+#  proxy_num_iterations: 10000  # , type=int)
+#  num_init_examples: 2000  #, type=int)
+#  num_samples: 200  # , type=int)
+#  proxy_num_conv_steps: 12  # , type=int)
+#  proxy_repr_type: 'atom_graph'
+#  proxy_model_version: 'v2'
+#  save_path: 'results/'
+#  cpu_req: 8
+#  progress: 'store_true'
+#  include_nblocks: False
+#  proxy_data_path: "/scratch/andrein/Datasets/Datasets/dock_dbs/dock_db_1619111711tp_2021_04_22_13h.h5"
+
+gflow_dataset:
+  name: OnlineDataFeed # OnlineDataFeed
+  wrapper:
+  mdp_init:
+    bpath: "fragdb/blocks_PDB_105.json"
+    repr_type: &repr_type 'block_graph'  # )
+    include_nblocks: False
+    floatX: &floatX 'float64'  #)
+
+  min_blocks: &min_blocks 2 #, type=int)
+  max_blocks: &max_blocks 7  #, type=int)
+  reward_exp: 10  #, type=float)
+  reward_norm: 8  #, type=float)
+  random_action_prob: 0.05  #, type=float)
+  R_min: 0.1  # , type=float)
+  do_wrong_thing: False
+  sample_prob: 1.
+  sample_procs: 6
+  sample_proc_buffer_size: 64
+  batch_procs: 0
+  sample_batch_buffer_size: 3
+  repr_procs: 10
+  iter_sample_new_traj: 16 # , New trajectories to sample each training batch
+  max_transition_buffer_size: 266 # , New trajectories to sample each training batch
+  max_online_mols: 1000 # , New trajectories to sample each training batch
+
+gflow_model:
+  name: GraphAgent
+  repr_type: *repr_type
+  nemb: 256 # , help="#hidden", type=int)
+  num_conv_steps: 10  #, type=int)
+  model_version: 'v4'  #)
+  floatX: *floatX  #)
+
+gflow:
+  name: TrainGFlowV2
+  optim: Adam
+  optim_args:
+    lr: 5.e-4 # , help="Learning rate", type=float)
+    weight_decay: 0  #, type=float)
+    betas: [0.9, 0.999] # , type=float)
+    eps: 1.e-8 # , type=float)
+
+  batch_size: 256 # , help="Transition batch size" (could be approx if sampling traj))
+  kappa: 0.1 # , type=float)
+  num_iterations: 300000 #, type=int)
+  log_reg_c: 2.4414062500000004e-08 # (0.1/8)**4  #, type=float)
+  sample_prob: 1  #, type=float)
+  clip_grad: 0  #, type=float)
+  clip_loss: 0  #, type=float)
+  leaf_coef: 10  #, type=float)
+  bootstrap_tau: 0  #, type=float)
+  do_nblocks_reg: False  #, type=float)
+  array: ''  #)
+  run: 0  # , help="run", type=int)
+  balanced_loss: True #)
+  floatX: *floatX
+  max_blocks: *max_blocks
+
+gflow_eval:
+  eval_freq: 250
+  cpu_req: 8
+  num_samples: 200
+  max_blocks: *max_blocks
+  min_blocks: *min_blocks
