@@ -38,10 +38,20 @@ class BlockMoleculeDataExtended(BlockMoleculeData):
                 'jbonds': self.jbonds,
                 'stems': self.stems}
 
+    def dump(self) -> dict:
+        mol_data = copy.deepcopy({
+            "blockidxs": self.blockidxs,
+            "slices": self.slices,
+            "jbonds": self.jbonds,
+            "stems": self.stems,
+            "smiles": self.smiles
+        })
+        return mol_data
+
 
 class MolMDPExtended(MolMDP):
 
-    def build_translation_table(self):
+    def build_translation_table(self, fill_in: bool = True):
         """build a symmetry mapping for blocks. Necessary to compute parent transitions"""
         self.translation_table = {}
         for blockidx in range(len(self.block_mols)):
@@ -70,37 +80,37 @@ class MolMDPExtended(MolMDP):
         # block_rs == [0,1] has no duplicate, because the duplicate
         # with block_rs [1,0] would be a symmetric version (both C
         # atoms are the "same").
-
-        # To test this, let's create nonsense molecules by attaching
-        # duplicate blocks to a Gold atom, and testing whether they
-        # are the same.
-        gold = Chem.MolFromSmiles('[Au]')
-        # If we find that two molecules are the same when attaching
-        # them with two different atoms, then that means the atom
-        # numbers are symmetries. We can add those to the table.
-        for blockidx in range(len(self.block_mols)):
-            for j in self.block_rs[blockidx]:
-                if j not in self.translation_table[blockidx]:
-                    symmetric_duplicate = None
-                    for atom, block_duplicate in self.translation_table[blockidx].items():
-                        molA, _ = chem.mol_from_frag(
-                            jun_bonds=[[0,1,0,j]],
-                            frags=[gold, self.block_mols[blockidx]])
-                        molB, _ = chem.mol_from_frag(
-                            jun_bonds=[[0,1,0,atom]],
-                            frags=[gold, self.block_mols[blockidx]])
-                        if (Chem.MolToSmiles(molA) == Chem.MolToSmiles(molB) or
-                            molA.HasSubstructMatch(molB)):
-                            symmetric_duplicate = block_duplicate
-                            break
-                    if symmetric_duplicate is None:
-                        raise ValueError('block', blockidx, self.block_smi[blockidx],
-                                         'has no duplicate for atom', j,
-                                         'in position 0, and no symmetrical correspondance')
-                    self.translation_table[blockidx][j] = symmetric_duplicate
-                    #print('block', blockidx, '+ atom', j,
-                    #      'in position 0 is a symmetric duplicate of',
-                    #      symmetric_duplicate)
+        if fill_in:
+            # To test this, let's create nonsense molecules by attaching
+            # duplicate blocks to a Gold atom, and testing whether they
+            # are the same.
+            gold = Chem.MolFromSmiles('[Au]')
+            # If we find that two molecules are the same when attaching
+            # them with two different atoms, then that means the atom
+            # numbers are symmetries. We can add those to the table.
+            for blockidx in range(len(self.block_mols)):
+                for j in self.block_rs[blockidx]:
+                    if j not in self.translation_table[blockidx]:
+                        symmetric_duplicate = None
+                        for atom, block_duplicate in self.translation_table[blockidx].items():
+                            molA, _ = chem.mol_from_frag(
+                                jun_bonds=[[0,1,0,j]],
+                                frags=[gold, self.block_mols[blockidx]])
+                            molB, _ = chem.mol_from_frag(
+                                jun_bonds=[[0,1,0,atom]],
+                                frags=[gold, self.block_mols[blockidx]])
+                            if (Chem.MolToSmiles(molA) == Chem.MolToSmiles(molB) or
+                                molA.HasSubstructMatch(molB)):
+                                symmetric_duplicate = block_duplicate
+                                break
+                        if symmetric_duplicate is None:
+                            raise ValueError('block', blockidx, self.block_smi[blockidx],
+                                             'has no duplicate for atom', j,
+                                             'in position 0, and no symmetrical correspondance')
+                        self.translation_table[blockidx][j] = symmetric_duplicate
+                        #print('block', blockidx, '+ atom', j,
+                        #      'in position 0 is a symmetric duplicate of',
+                        #      symmetric_duplicate)
 
     def parents(self, mol=None):
         """returns all the possible parents of molecule mol (or the current
@@ -156,8 +166,26 @@ class MolMDPExtended(MolMDP):
             removed_stem_atom = (
                 rbond[3] if rblockidx == rbond[1] else rbond[2])
             blockid = mol.blockidxs[rblockidx]
+
+            what_block_bond_block = (
+                mol.blockidxs[rbond[0] if rblockidx == rbond[1] else rbond[1]], stem[1], blockid
+            )
+
+            # You shouldn't add a stem back if it is using the init connecting used by the the block
+            remaining_block_rs = self.block_rs[what_block_bond_block[0]]
+
+            if len(new_mol.blockidxs) > 1 and remaining_block_rs[0] == what_block_bond_block[1]:
+                # must not have the other bonds connected
+                continue
+
             if removed_stem_atom not in self.translation_table[blockid]:
                 raise ValueError('Could not translate removed stem to duplicate or symmetric block.')
+
+            # TODO This should be fixed with the bug fix in the env
+            if self.translation_table[blockid][removed_stem_atom] != blockid:
+                # QUICK FIX: Skip if not the same blockidx (so the mol can be reconsctructed)
+                continue
+
             parent_mols.append([new_mol,
                                 # action = (block_idx, stem_idx)
                                 (self.translation_table[blockid][removed_stem_atom],
@@ -197,7 +225,9 @@ class MolMDPExtended(MolMDP):
 
 
     def post_init(
-            self, device, repr_type, include_bonds=False, include_nblocks=False, floatX="float32"):
+            self, device, repr_type, include_bonds=False, include_nblocks=False, floatX="float32",
+                add_stem_mask=True, donor_features=False, ifcoord=False, one_hot_atom=True, **kwargs
+    ):
         self.device = device
         self.repr_type = repr_type
         #self.max_bond_atmidx = max([max(i) for i in self.block_rs])
@@ -214,6 +244,10 @@ class MolMDPExtended(MolMDP):
         #print(self.max_num_atm, self.num_stem_types)
         self.molcache = {}
         self.floatX = getattr(torch, floatX)
+        self.add_stem_mask = add_stem_mask
+        self.donor_features = donor_features
+        self.ifcoord = ifcoord
+        self.one_hot_atom = one_hot_atom
 
     def mols2batch(self, mols):
         if self.repr_type == 'block_graph':
@@ -223,20 +257,26 @@ class MolMDPExtended(MolMDP):
         elif self.repr_type == 'morgan_fingerprint':
             return model_fingerprint.mols2batch(mols, self)
 
-    def mol2repr(self, mol=None, **kwargs):
+    def mol2repr(self, mol=None):
         if mol is None:
             mol = self.molecule
         #molhash = str(mol.blockidxs)+':'+str(mol.stems)+':'+str(mol.jbonds)
         #if molhash in self.molcache:
         #    return self.molcache[molhash]
         if self.repr_type == 'block_graph':
-            r = model_block.mol2graph(mol, self, self.floatX, **kwargs)
+            r = model_block.mol2graph(mol, self, self.floatX,
+                                      bonds=self.include_bonds,
+                                      nblocks=self.include_nblocks)
         elif self.repr_type == 'atom_graph':
             r = model_atom.mol2graph(mol, self, self.floatX,
                                      bonds=self.include_bonds,
-                                     nblocks=self.include_nblocks, **kwargs)
+                                     nblocks=self.include_nblocks,
+                                     add_stem_mask=self.add_stem_mask,
+                                     donor_features=self.donor_features,
+                                     ifcoord=self.ifcoord,
+                                     one_hot_atom=self.one_hot_atom)
         elif self.repr_type == 'morgan_fingerprint':
-            r = model_fingerprint.mol2fp(mol, self, self.floatX, **kwargs)
+            r = model_fingerprint.mol2fp(mol, self, self.floatX)
         #self.molcache[molhash] = r
         return r
 
