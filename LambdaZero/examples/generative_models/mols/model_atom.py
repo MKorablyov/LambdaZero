@@ -217,7 +217,8 @@ def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False,
               ifcoord=False, one_hot_atom=True, donor_features=False, add_stem_mask=True):
     rdmol = mol.mol
     if rdmol is None:
-        g = Data(x=torch.zeros((1, 14 + len(atomic_numbers))),
+        extra = len(atomic_numbers) if one_hot_atom else 0
+        g = Data(x=torch.zeros((1, 14 + extra)),
                  edge_attr=torch.zeros((0, 4)),
                  edge_index=torch.zeros((0, 2)).long())
     else:
