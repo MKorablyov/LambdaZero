@@ -54,7 +54,7 @@ class BaseProxy(torch.nn.Module):
 
     def block_mol_2_repr(self, mol: BlockMoleculeData) -> Data:
         """ Receives a BlockMoleculeData point and returns torch.geometric.Data """
-        return self.mdp.mol2repr(mol, **self.mdp_repr_kwargs)
+        return self.mdp.mol2repr(mol)
 
     def geom_data_2_batch(self, data_list: List[Data]) -> Batch:
         """ Generates a torch geometric Batch """
@@ -75,18 +75,13 @@ class BaseProxy(torch.nn.Module):
 
     def _load_representation(self, args: Namespace) -> None:
         bpath = getattr(args, "bpath", osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"))
-        repr_type = getattr(args, "repr_type", "atom_graph")
 
         self.mdp = MolMDPExtended(bpath)  # Used for generating representation
-        mdp_init = getattr(args, "mdp_init", {})
+        mdp_init = getattr(args, "mdp_init", {"repr_type": "atom_graph"})
         mdp_init = getattr(mdp_init, "__dict__", mdp_init)
-        mdp_init["repr_type"] = repr_type
         mdp_init["device"] = args.device
 
         self.mdp.post_init(**mdp_init)
-        mdp_repr_kwargs = getattr(args, "mdp_repr", {})
-        mdp_repr_kwargs = getattr(mdp_repr_kwargs, "__dict__", mdp_repr_kwargs)
-        self.mdp_repr_kwargs = mdp_repr_kwargs
 
         self.target_norm = getattr(args, "target_norm", [-8.6, 1.10])
 

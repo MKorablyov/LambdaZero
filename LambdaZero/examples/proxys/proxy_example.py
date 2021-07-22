@@ -18,7 +18,12 @@ datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 class ProxyExample(BaseProxy):
     def __init__(self, args: Namespace):
+        repr_type = getattr(args, "repr_type", "atom_graph")
         args.representation.mdp_repr.add_stem_mask = False  # TODO fix from checkpoint
+        args.representation.mdp_init = {
+            "repr_type": "atom_graph", **args.representation.mdp_repr.__dict__
+        }
+
         super(ProxyExample, self).__init__(args)
         self._transform = LambdaZero.utils.Complete()
 
@@ -28,5 +33,5 @@ class ProxyExample(BaseProxy):
 
     def block_mol_2_repr(self, mol: BlockMoleculeData) -> Data:
         """ Receives a BlockMoleculeData point and returns torch.geometric.Data """
-        data_repr = self.mdp.mol2repr(mol, **self.mdp_repr_kwargs)
+        data_repr = self.mdp.mol2repr(mol)
         return self._transform(data_repr)
