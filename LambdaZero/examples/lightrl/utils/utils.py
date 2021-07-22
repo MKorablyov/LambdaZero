@@ -5,6 +5,7 @@ from typing import List, Dict, Tuple, Any
 import torch
 import numpy as np
 import random
+import bisect
 import wandb
 from collections import deque
 from liftoff import OptionParser, dict_to_namespace
@@ -182,9 +183,41 @@ def get_stats(values, name, empty_val: float = 0) -> Dict:
     }
 
 
+class AllTimeTop:
+    """ Keep buffers for best scores """
+    def __init__(self, all_time_topk: List[int] = [10, 100, 100], order_ascending=True,
+                 name: str = "score"):
+        self._all_time_topk = all_time_topk
+        # Compare new score to worst in buffer
+        self._insert = getattr(bisect, "insort_right" if order_ascending else "insort_left")
+        self._pop = 0 if order_ascending else -1
+        self._best_scores_buffer = {x: [] for x in all_time_topk}
+        self._name = name
+
+    def update(self, values: List[float]):
+        for new_value in values:
+            for topk in self._all_time_topk:
+                tokv = self._best_scores_buffer[topk]
+                self._insert(tokv, new_value)
+                if len(tokv) > topk:
+                    tokv.pop(self._pop)
+
+    def log(self) -> dict:
+        info = {}
+        for topk, topkv in self._best_scores_buffer.items():
+            info[f"all_time_top{topk}_{self._name}_count"] = len(topkv)
+            if len(topkv) > 0:
+                info[f"all_time_top{topk}_{self._name}_mean"] = np.mean(topkv)
+                info[f"all_time_top{topk}_{self._name}_std"] = np.std(topkv)
+                info[f"all_time_top{topk}_{self._name}_median"] = np.median(topkv)
+
+        return info
+
+
 class LogTopStats:
     def __init__(self,
                  topk: int = 100,
+                 all_time_topk: List[int] = [10, 100, 1000],
                  score_keys: Tuple[str] = ("proxy", "qed", "synth", "dockscore", "dscore"),
                  order_key: str = "score",
                  order_ascending: bool = True,
@@ -193,6 +226,7 @@ class LogTopStats:
                  filter_candidates: dict = {"qed": 0.3, "synth": 4.}):
 
         self._topk = topk
+        self._all_time_topk = all_time_topk
         self._score_keys = score_keys
         self.do_dockscore = do_dockscore = "dockscore" in score_keys
 
@@ -208,6 +242,11 @@ class LogTopStats:
             ])
         self._transform_info = transform_info
 
+        self._all_time_topk_score = AllTimeTop(
+            all_time_topk=all_time_topk,
+            order_ascending=order_ascending
+        )
+
     def reset(self):
         self._new_info.clear()
 
@@ -220,11 +259,15 @@ class LogTopStats:
                     if info[k] < v:
                         good = False
                         break
+
+                # If new key and respects candidate conditions
                 if good:
                     self._new_info.append(info)
+                    self._all_time_topk_score.update([info[self._order_key]])
 
     def log(self):
         logs = dict({f"top{self._topk}_count": len(self._new_info)})
+        logs.update(self._all_time_topk_score.log())
 
         if len(self._new_info) > self._topk:
             order_scores = [x[self._order_key] for x in self._new_info]
@@ -364,3 +407,4 @@ class FakeRemoteLog:
 
     def remote(self, log):
         self._last_log = log
+
