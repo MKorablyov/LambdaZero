@@ -4,8 +4,6 @@ import ray
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch_geometric.nn import NNConv
-from torch_geometric.nn import Set2Set
 
 import numpy as np
 from torch.utils.data import DataLoader
@@ -14,17 +12,16 @@ from torch_geometric.data import Batch
 from LambdaZero.models import MPNNetDrop
 from LambdaZero.inputs import random_split
 from LambdaZero.contrib.data import ListGraphDataset
-from LambdaZero.contrib.modelBO import ModelBO, train_epoch, val_epoch
+from LambdaZero.contrib.modelBO import ModelBO, train_epoch, val_epoch, MolMCDropGNN
 from .molecule_models import get_mcdrop_var_batch
 from sklearn.model_selection import KFold
 from copy import deepcopy
-from .metrics import uncertainty_metrics
+from .metrics import create_uncertainty_metrics, uncertainty_metrics
 
 
 def train_deup_epoch(loader, e_model, e_optimizer, feature_to_deup, device):
     e_model.train()
-    epoch_y, epoch_y_hat, epoch_e, epoch_e_hat, epoch_pearson_deup, epoch_pearson_mc, epoch_spearman_deup, \
-        epoch_spearman_mc = ([] for i in range(8))
+    epoch_e, epoch_e_hat = [], []
 
     for bidx, data in enumerate(loader):
         data = data.to(device)
@@ -51,31 +48,19 @@ def train_deup_epoch(loader, e_model, e_optimizer, feature_to_deup, device):
 
             e_optimizer.step()
 
-        # # Calculate correlation between true error and predicted uncertainty
-        # mcdrop_metrics = uncertainty_metrics(data.out_sample_e.cpu().numpy(), data.out_sample_mcdrop_var.cpu().numpy())
-        # deup_metrics = uncertainty_metrics(data.out_sample_e.cpu().numpy(), e_hat[:, 0].detach().cpu().numpy())
-
         epoch_e.append(data.out_sample_e.cpu().numpy())
         epoch_e_hat.append(e_hat[:, 0].detach().cpu().numpy())
-        # epoch_pearson_deup.append(deup_metrics['pear_corr'])
-        # epoch_pearson_mc.append(mcdrop_metrics['pear_corr'])
-        # epoch_spearman_mc.append(deup_metrics['spearman_corr'])
-        # epoch_spearman_deup.append(mcdrop_metrics['spearman_corr'])
 
     # todo: make more detailed metrics including examples being acquired
-    return {"model/train_deup_mse_loss": ((np.concatenate(epoch_e_hat, 0) - np.concatenate(epoch_e, 0)) ** 2).mean(),
-            }
-            # "model/train_correlation_deup_true_error": np.array(epoch_pearson_deup).mean(),
-            # "model/train_correlation_mc_var_true_error": np.array(epoch_pearson_mc).mean(),
-            # "model/train_spearman_corr_deup_true_error": np.array(epoch_spearman_deup).mean(),
-            # "model/train_spearman_corr_mc_var_true_error": np.array(epoch_spearman_mc).mean()
+    return {"model/train_deup_mse_loss": ((np.concatenate(epoch_e_hat, 0) - np.concatenate(epoch_e, 0)) ** 2).mean(),}
 
 
 def val_deup_epoch(loader, model, e_model, feature_to_deup, num_mc_samples, device, i):
     model.eval()
     e_model.eval()
 
-    epoch_metrics_deup, epoch_metrics_mc = {}, {}
+    epoch_metrics_deup = create_uncertainty_metrics()
+    epoch_metrics_mc = create_uncertainty_metrics()
     for bidx, data in enumerate(loader):
         data = data.to(device)
         y_hat = model(data, do_dropout=False)
@@ -90,19 +75,13 @@ def val_deup_epoch(loader, model, e_model, feature_to_deup, num_mc_samples, devi
             deup_input = torch.transpose(torch.tensor(deup_input), 0, 1)
 
             e_hat = e_model(deup_input.to(device))
-        # true_error = F.mse_loss(y_hat[:, 0], data.y, reduction='none').detach()
 
         mcdrop_uncertainty_metrics = uncertainty_metrics(y_hat[:, 0].detach().cpu().numpy(), data.y.detach().cpu().numpy(), mcdrop_var)
         deup_uncertainty_metrics = uncertainty_metrics(y_hat[:, 0].detach().cpu().numpy(), data.y.detach().cpu().numpy(),  e_hat[:, 0].detach().cpu().numpy())
 
-        import pdb; pdb.set_trace()
         for key in deup_uncertainty_metrics.keys():
-            if bidx == 0:
-                epoch_metrics_deup[key] = []
             epoch_metrics_deup[key].append(deup_uncertainty_metrics[key])
         for key in mcdrop_uncertainty_metrics.keys():
-            if bidx == 0:
-                epoch_metrics_mc[key] = []
             epoch_metrics_mc[key].append(mcdrop_uncertainty_metrics[key])
 
 
@@ -115,18 +94,6 @@ def val_deup_epoch(loader, model, e_model, feature_to_deup, num_mc_samples, devi
             "model/val_ll_deup": np.array(epoch_metrics_deup['neg_log_lik']).mean(),
             "model/val_ll_mcdrop": np.array(epoch_metrics_mc['neg_log_lik']).mean(),
             }
-
-class EvaluateOnDatasets():
-    def __init__(self, file_names, data_idxs, logger):
-        # for file_names:
-        # self.xy.append((x, y, name)) = load_data(file_names, data_idx)
-        pass
-
-    def __call__(self, model, ):
-        # model.get_mean_and_variance()
-        # if evaluate_uncertainty()
-        # self.logger.log(uncertainty_metrics)
-        pass
 
 
 def create_e_net(mpnn_config, feature_to_deup, lr, device):
@@ -149,41 +116,23 @@ def create_e_net(mpnn_config, feature_to_deup, lr, device):
     return model, optimizer, e_model, e_optimizer
 
 
-class MolMCDropGNNDeup(ModelBO):
+class MolMCDropGNNDeup(MolMCDropGNN):
     def __init__(self, train_epochs, batch_size, mpnn_config, lr, transform, num_mc_samples, log_epoch_metrics, device,
                  logger):
-        ModelBO.__init__(self, logger)
-        self.train_epochs = train_epochs
-        self.batch_size = batch_size
-        self.mpnn_config = mpnn_config
-        self.lr = lr
-        self.transform = transform
-        self.num_mc_samples = num_mc_samples
+        MolMCDropGNN.__init__(self, train_epochs, batch_size, mpnn_config, lr, transform, num_mc_samples, log_epoch_metrics, device,
+                 logger)
+
         self.feature_to_deup = 'xb'
         self.load_densities = True
         self.fine_tune = True
-        self.log_epoch_metrics = log_epoch_metrics
-        self.device = device
+
 
         if self.fine_tune:
             self.model, self.optimizer, self.e_model, self.e_optimizer = create_e_net(
                 self.mpnn_config, self.feature_to_deup, self.lr, self.device)
 
-    def _preprocess(self, x):
-        graphs = [m["mol_graph"] for m in x]
-        graphs = deepcopy(graphs)
-        # todo: I am forced to deepcopy graphs; I could solve that at data loading
-        # todo: maybe try to save processed graphs in a separate field ..
-        if self.transform is not None: graphs = [self.transform(g) for g in graphs]
-        return graphs
-
-    def eval(self, x, y):
-        y_hat_mean, y_hat_var = self.get_mean_and_variance(x)
-        metrics = uncertainty_metrics(y, y_hat_mean, y_hat_var)
-        return metrics
-
     def fit(self,x,y):
-        # import pdb; pdb.set_trace()
+
         # initialize new model and optimizer
         if not self.fine_tune:
             self.model, self.optimizer, self.e_model, self.e_optimizer = create_e_net(
@@ -210,6 +159,7 @@ class MolMCDropGNNDeup(ModelBO):
 
         train_loader, iid_metrics, val_metrics = self.build_dataset(train_graphs, val_loader)
         # Train DEUP
+        print('Training the main predictor...')
         for i in range(self.train_epochs):
             train_deup_metrics = train_deup_epoch(train_loader, self.e_model, self.e_optimizer,
                                                   self.feature_to_deup, self.device)
@@ -223,18 +173,6 @@ class MolMCDropGNNDeup(ModelBO):
         self.logger.log.remote(train_deup_metrics)
         self.logger.log.remote(val_metrics)
         self.logger.log.remote(val_deup_metrics)
-
-    def update(self, x, y, x_new, y_new):
-        mean, var = self.get_mean_and_variance(x_new)
-        self.logger.log.remote({"model/acquired_mse_before_update":((np.array(y_new) - np.array(mean))**2).mean(),
-                                "model/acquired_expvar_before_update": explained_variance_score(y_new, mean)
-                                })
-        self.fit(x+x_new, y+y_new)
-        mean, var = self.get_mean_and_variance(x_new)
-        self.logger.log.remote({"model/acquired_mse_after_update": ((np.array(y_new) - np.array(mean)) ** 2).mean(),
-                                "model/acquired_expvar_after_update": explained_variance_score(y_new, mean)
-                                })
-        return None
 
     def get_mean_and_variance(self,x):
         y_hat_mc = self.get_samples(x, num_samples=self.num_mc_samples)
@@ -270,7 +208,6 @@ class MolMCDropGNNDeup(ModelBO):
         dataloader = DataLoader(dataset, batch_size=self.batch_size, collate_fn=Batch.from_data_list)
         e_hat_epoch = []
         for data in dataloader:
-            # import pdb; pdb.set_trace()
             data.to(self.device)
             # todo: find a better way to compute mcdropout var for a batch
             mcdrop_var = get_mcdrop_var_batch(self.model, data, self.num_mc_samples)[1]
@@ -288,7 +225,6 @@ class MolMCDropGNNDeup(ModelBO):
 
                 e_hat = self.e_model(deup_input.to(self.device))
             e_hat_epoch.append(e_hat.detach().cpu().numpy().ravel())
-        # import pdb; pdb.set_trace()
         return np.concatenate(e_hat_epoch, 0)
 
     def get_lstm_densities(self, x, load_densities):
@@ -320,6 +256,7 @@ class MolMCDropGNNDeup(ModelBO):
         optimizers = [None] * n_splits
         fold = 0
         for iid_index, ood_index in kf.split(train_graphs):
+            print(f'Training the error predictor on fold number {fold+1} ...')
             model = MPNNetDrop(**self.mpnn_config).to(self.device)
             models[fold] = model
             optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
@@ -330,6 +267,7 @@ class MolMCDropGNNDeup(ModelBO):
             iid_loader = DataLoader(iid_set, batch_size=self.batch_size, collate_fn=Batch.from_data_list, shuffle=False)
             ood_set = ListGraphDataset(ood_graph)
             ood_loader = DataLoader(ood_set, batch_size=self.batch_size, collate_fn=Batch.from_data_list, shuffle=False)
+
             for i in range(self.train_epochs):
                 iid_metrics = train_epoch(iid_loader, model, optimizer, self.device)
                 val_metrics = val_epoch(val_loader, model, self.device)
@@ -337,11 +275,12 @@ class MolMCDropGNNDeup(ModelBO):
                     self.logger.log.remote(iid_metrics)
                     self.logger.log.remote(val_metrics)
 
+            model.eval()
+
             in_sample_error = []
             mcdrop_vars = []
             for bidx, data in enumerate(iid_loader):
                 data = data.to(self.device)
-                model.eval()
                 y_hat = model(data, do_dropout=False)
                 in_sample_error += F.mse_loss(y_hat[:, 0], data.y, reduction='none').detach().cpu().numpy().tolist()
                 mcdrop_vars += get_mcdrop_var_batch(model, data, self.num_mc_samples)[1].tolist()
@@ -354,7 +293,6 @@ class MolMCDropGNNDeup(ModelBO):
             mcdrop_vars = []
             for bidx, data in enumerate(ood_loader):
                 data = data.to(self.device)
-                model.eval()
                 y_hat = model(data, do_dropout=False)
                 out_sample_error += F.mse_loss(y_hat[:, 0], data.y, reduction='none').detach().cpu().numpy().tolist()
                 mcdrop_vars += get_mcdrop_var_batch(model, data, self.num_mc_samples)[1].tolist()
@@ -372,45 +310,16 @@ class MolMCDropGNNDeup(ModelBO):
         return final_ood_loader, iid_metrics, val_metrics
 
 
-class MPNNetDropDeup(nn.Module):
+class MPNNetDropDeup(MPNNetDrop):
     """
     A message passing neural network implementation based on Gilmer et al. <https://arxiv.org/pdf/1704.01212.pdf>
     Adapted for error predictor: Statioanry features are concatenated to embeddings
     """
     def __init__(self, drop_last, drop_data, drop_weights, drop_prob, num_feat=14, dim=64, out_dim=1):
-        super(MPNNetDropDeup, self).__init__()
-        self.drop_last = drop_last
-        self.drop_data = drop_data
-        self.drop_weights = drop_weights
-        self.drop_prob = drop_prob
-        self.lin0 = nn.Linear(num_feat, dim)
+        super().__init__(drop_last, drop_data, drop_weights, drop_prob, num_feat, dim, out_dim)
 
-        h = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), nn.Linear(128, dim * dim))
-        self.conv = NNConv(dim, dim, h, aggr='mean')
-        self.gru = nn.GRU(dim, dim)
-        self.set2set = Set2Set(dim, processing_steps=3)
-        self.lin1 = nn.Linear(2 * dim, dim)
-        self.lin2 = nn.Linear(dim+1, out_dim)
-
-    def get_embed(self, data, do_dropout):
-        if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
-        out = F.relu(self.lin0(data.x))
-        h = out.unsqueeze(0)
-        if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
-
-        for i in range(3):
-            m = F.relu(self.conv(out, data.edge_index, data.edge_attr))
-            if self.drop_weights: m = F.dropout(m, training=do_dropout, p=self.drop_prob)
-            self.gru.flatten_parameters()
-            out, h = self.gru(m.unsqueeze(0), h)
-            if self.drop_weights: h = F.dropout(h, training=do_dropout, p=self.drop_prob)
-            out = out.squeeze(0)
-
-        out = self.set2set(out, data.batch)
-        if self.drop_weights: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
-        out = F.relu(self.lin1(out))
-        if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
-        return out
+        self.lin2 = nn.Sequential(nn.Linear(dim+1, out_dim),
+                                  nn.Softplus())
 
     def forward(self, data, do_dropout, out_sample=0):
         embed = self.get_embed(data, do_dropout)
