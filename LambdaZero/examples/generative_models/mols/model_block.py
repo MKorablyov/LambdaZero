@@ -14,7 +14,10 @@ class GraphAgent(nn.Module):
     def __init__(self, nemb, nvec, out_per_stem, out_per_mol, num_conv_steps, mdp_cfg, version='v1'):
         super().__init__()
         print(version)
-        if version == 'v5': version = 'v4'
+        if version == 'v6':
+            version = 'v3'
+            self.do_default_emb = True
+            self.default_emb = nn.Parameter(torch.zeros((1, nvec)))
         self.version = version
         self.embeddings = nn.ModuleList([
             nn.Embedding(mdp_cfg.num_true_blocks + 1, nemb),
@@ -41,14 +44,13 @@ class GraphAgent(nn.Module):
 
     def forward(self, graph_data, vec_data=None, do_stems=True):
         blockemb, stememb, bondemb = self.embeddings
-        graph_data.x = blockemb(graph_data.x)
+        out = blockemb(graph_data.x)
         if do_stems:
-            graph_data.stemtypes = stememb(graph_data.stemtypes)
-        graph_data.edge_attr = bondemb(graph_data.edge_attr)
-        graph_data.edge_attr = (
-            graph_data.edge_attr[:, 0][:, :, None] * graph_data.edge_attr[:, 1][:, None, :]
+            stemtypes = stememb(graph_data.stemtypes)
+        edge_attr = bondemb(graph_data.edge_attr)
+        edge_attr = (
+            edge_attr[:, 0][:, :, None] * edge_attr[:, 1][:, None, :]
         ).reshape((graph_data.edge_index.shape[1], self.nemb**2))
-        out = graph_data.x
         if self.version == 'v1' or self.version == 'v3':
             batch_vec = vec_data[graph_data.batch]
             out = self.block2emb(torch.cat([out, batch_vec], 1))
@@ -58,7 +60,7 @@ class GraphAgent(nn.Module):
         h = out.unsqueeze(0)
 
         for i in range(self.num_conv_steps):
-            m = F.leaky_relu(self.conv(out, graph_data.edge_index, graph_data.edge_attr))
+            m = F.leaky_relu(self.conv(out, graph_data.edge_index, edge_attr))
             out, h = self.gru(m.unsqueeze(0).contiguous(), h.contiguous())
             out = out.squeeze(0)
 
@@ -73,7 +75,7 @@ class GraphAgent(nn.Module):
                 stem_out_cat = torch.cat([out[stem_block_batch_idx], graph_data.stemtypes], 1)
             elif self.version == 'v2' or self.version == 'v3':
                 stem_out_cat = torch.cat([out[stem_block_batch_idx],
-                                          graph_data.stemtypes,
+                                          stemtypes,
                                           vec_data[graph_data.stems_batch]], 1)
 
             stem_preds = self.stem2pred(stem_out_cat)
@@ -122,6 +124,7 @@ def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
             stemtypes=f([mdp.num_stem_types])) # also extra stem type embedding
         return data
     edges = [(i[0], i[1]) for i in mol.jbonds]
+    edges += [(i[1], i[0]) for i in mol.jbonds]
     #edge_attrs = [mdp.bond_type_offset[i[2]] +  i[3] for i in mol.jbonds]
     t = mdp.true_blockidx
     if 0:
@@ -129,9 +132,12 @@ def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
                        (mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3]))
                       for i in mol.jbonds]
     else:
-        edge_attrs = [(mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2],
-                       mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3])
-                      for i in mol.jbonds]
+        edge_attrs = ([(mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2],
+                        mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3])
+                       for i in mol.jbonds] + 
+                      [(mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3],
+                        mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2])
+                       for i in mol.jbonds])
     # Here stem_type_offset is a list of offsets to know which
     # embedding to use for a particular stem. Each (blockidx, atom)
     # pair has its own embedding.

@@ -368,10 +368,10 @@ class Dataset:
             [i.join(0.05) for i in self.sampler_threads]
 
 
-def make_model(args, mdp, out_per_mol=1):
+def make_model(args, mdp, out_per_mol=1, nvec=0):
     if args.repr_type == 'block_graph':
         model = model_block.GraphAgent(nemb=args.nemb,
-                                       nvec=0,
+                                       nvec=nvec,
                                        out_per_stem=mdp.num_blocks,
                                        out_per_mol=out_per_mol,
                                        num_conv_steps=args.num_conv_steps,
@@ -379,7 +379,7 @@ def make_model(args, mdp, out_per_mol=1):
                                        version=args.model_version)
     elif args.repr_type == 'atom_graph':
         model = model_atom.MolAC_GCN(nhid=args.nemb,
-                                     nvec=0,
+                                     nvec=nvec,
                                      num_out_per_stem=mdp.num_blocks,
                                      num_out_per_mol=out_per_mol,
                                      num_conv_steps=args.num_conv_steps,

@@ -120,9 +120,8 @@ class Dataset(_Dataset):
         df.dockscore = df.dockscore.astype("float64")
         for cl_mame in columns[2:]:
             df.loc[:, cl_mame] = df[cl_mame].apply(json.loads)
-        # if num_examples is None:
-
-        # num_examples = len(df)
+        if num_examples is None:
+            num_examples = len(df)
         # idxs = range(len(df))
         # else:
         #    idxs = self.test_split_rng.choice(len(df), int((1-test_ratio) * num_examples), replace=False)
@@ -132,7 +131,7 @@ class Dataset(_Dataset):
 
         split_bool = np.zeros(len(df), dtype=np.bool)
         split_bool[test_idxs] = True
-        print("slit test", sum(split_bool), len(split_bool), "num examples", num_examples)
+        print("split test", sum(split_bool), len(split_bool), "num examples", num_examples)
         self.rews = []
         for i in tqdm(range(len(df)), disable=not args.progress):
             m = BlockMoleculeDataExtended()
