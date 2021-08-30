@@ -38,9 +38,9 @@ from LambdaZero.environments.block_mol_v3 import DEFAULT_CONFIG as env_v3_cfg, B
 from LambdaZero.examples.synthesizability.vanilla_chemprop import synth_config, binding_config
 from LambdaZero.utils import get_external_dirs
 
-from mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
+from LambdaZero.examples.generative_models.mols.mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
 
-import model_atom, model_block, model_fingerprint
+from LambdaZero.examples.generative_models.mols import model_atom, model_block, model_fingerprint
 
 
 '''
@@ -330,7 +330,10 @@ class Dataset:
         #    score = self.R_min
         #return score
 
-
+    def inv_r2r(self, r_scores):
+        normscore = r_scores ** (1. / self.reward_exp) * self.reward_norm
+        dockscore = ((4 - normscore) * self.target_norm[1]) + self.target_norm[0]
+        return dockscore
 
 
     def start_samplers(self, n, mbsize):
@@ -376,10 +379,10 @@ class Dataset:
             [i.join(0.05) for i in self.sampler_threads]
 
 
-def make_model(args, mdp, out_per_mol=1):
+def make_model(args, mdp, out_per_mol=1, nvec=0):
     if args.repr_type == 'block_graph':
         model = model_block.GraphAgent(nemb=args.nemb,
-                                       nvec=0,
+                                       nvec=nvec,
                                        out_per_stem=mdp.num_blocks,
                                        out_per_mol=out_per_mol,
                                        num_conv_steps=args.num_conv_steps,
@@ -387,7 +390,7 @@ def make_model(args, mdp, out_per_mol=1):
                                        version=args.model_version)
     elif args.repr_type == 'atom_graph':
         model = model_atom.MolAC_GCN(nhid=args.nemb,
-                                     nvec=0,
+                                     nvec=nvec,
                                      num_out_per_stem=mdp.num_blocks,
                                      num_out_per_mol=out_per_mol,
                                      num_conv_steps=args.num_conv_steps,

@@ -213,15 +213,18 @@ class MolAC_GCN(nn.Module):
     def _restore(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
-def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
+def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False,
+              ifcoord=False, one_hot_atom=True, donor_features=False, add_stem_mask=True):
     rdmol = mol.mol
     if rdmol is None:
         g = Data(x=torch.zeros((1, 14 + len(atomic_numbers))),
                  edge_attr=torch.zeros((0, 4)),
                  edge_index=torch.zeros((0, 2)).long())
     else:
-        atmfeat, _, bond, bondfeat = chem.mpnn_feat(mol.mol, ifcoord=False,
-                                                    one_hot_atom=True, donor_features=False)
+        atmfeat, _, bond, bondfeat = chem.mpnn_feat(mol.mol,
+                                                    ifcoord=ifcoord,
+                                                    one_hot_atom=one_hot_atom,
+                                                    donor_features=donor_features)
         g = chem.mol_to_graph_backend(atmfeat, None, bond, bondfeat)
     stems = mol.stem_atmidxs
     if not len(stems):
@@ -234,8 +237,11 @@ def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
                    ((1 + mdp._cue_max_blocks - len(mol.blockidxs)) / mdp._cue_max_blocks))
         g.x = torch.cat([g.x, stem_mask, nblocks], 1).to(floatX)
         g.nblocks = nblocks[0] * mdp._cue_max_blocks
-    else:
+    elif add_stem_mask:
         g.x = torch.cat([g.x, stem_mask], 1).to(floatX)
+    else:
+        g.x = g.x.to(floatX)
+
     g.edge_attr = g.edge_attr.to(floatX)
     if bonds:
         if len(mol.jbonds):

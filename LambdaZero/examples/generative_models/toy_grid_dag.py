@@ -61,6 +61,13 @@ parser.add_argument("--clip_grad_norm", default=0., type=float)
 parser.add_argument("--sac_alpha", default=0.98*np.log(1/3), type=float)
 
 
+# This is alpha in the note, smooths the learned distribution into a uniform exploratory one
+#parser.add_argument("--uniform_sample_prob", default=0.00, type=float)
+#parser.add_argument("--do_is_queue", action='store_true')
+#parser.add_argument("--queue_thresh", default=10, type=float)
+parser.add_argument("--device", default='cpu', type=str)
+parser.add_argument("--progress", action='store_true')
+parser.add_argument('--seed', default=0)
 
 
 _dev = [torch.device('cpu')]
@@ -540,8 +547,6 @@ class PPOAgent:
         action_loss = -torch.min(surr1, surr2).mean()
         value_loss = 0.5 * (G - values).pow(2).mean()
         entropy = new_pol.entropy().mean()
-        if not it % 100:
-            print(G.mean())
         return (action_loss + value_loss - entropy * self.entropy_coef,
                 action_loss, value_loss, entropy)
 
@@ -684,6 +689,9 @@ def main(args):
          'corners_floor_A': func_corners_floor_A,
          'corners_floor_B': func_corners_floor_B,
     }[args.func]
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
     args.is_mcmc = args.method in ['mars', 'mcmc']
 
