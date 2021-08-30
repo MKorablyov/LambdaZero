@@ -268,7 +268,15 @@ class Dataset:
     def _get_reward(self, m):
         rdmol = m.mol
         if rdmol is None:
-            return self.R_min
+            return self.r2r(normscore=self.R_min)
+        if 0: #QED
+            return self.r2r(normscore=QED.qed(rdmol))
+        if 1: #logP
+            s = Chem.Crippen.MolLogP(rdmol)
+            r = self.r2r(normscore=s)
+            print(s,r)
+            return r
+
         smi = m.smiles
         if smi in self.train_mols_map:
             return self.train_mols_map[smi].reward
