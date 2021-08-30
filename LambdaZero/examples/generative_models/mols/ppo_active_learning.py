@@ -41,22 +41,22 @@ parser.add_argument("--include_nblocks", action='store_true')
 
 # gen_model
 parser.add_argument("--learning_rate", default=5e-4, help="Learning rate", type=float)
-parser.add_argument("--mbsize", default=4, help="Minibatch size", type=int)
+parser.add_argument("--mbsize", default=16, help="Minibatch size", type=int)
 parser.add_argument("--opt_beta", default=0.9, type=float)
-parser.add_argument("--opt_beta2", default=0.999, type=float)
+parser.add_argument("--opt_beta2", default=0.99, type=float)
 parser.add_argument("--opt_epsilon", default=1e-8, type=float)
 parser.add_argument("--kappa", default=0.1, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
 parser.add_argument("--max_blocks", default=6, type=int)
-parser.add_argument("--num_iterations", default=4000, type=int) # fixme [maksym] 4000
+parser.add_argument("--num_iterations", default=1000, type=int) # fixme [maksym] 4000
 parser.add_argument("--num_conv_steps", default=6, type=int) # maksym: do 6
-parser.add_argument("--log_reg_c", default=(0.1 / 8) ** 4, type=float)
-parser.add_argument("--reward_exp", default=10, type=float)
+parser.add_argument("--log_reg_c", default=1e-2, type=float)
+parser.add_argument("--reward_exp", default=4, type=float)
 parser.add_argument("--reward_norm", default=8, type=float)
 parser.add_argument("--R_min", default=0.1, type=float)
 parser.add_argument("--sample_prob", default=1, type=float)
-parser.add_argument("--clip_grad", default=0, type=float)
+parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--clip_loss", default=0, type=float)
 parser.add_argument("--random_action_prob", default=0.05, type=float)
 parser.add_argument("--leaf_coef", default=10, type=float)
@@ -323,8 +323,6 @@ def main(args):
 
 
 
-
-
 if __name__ == '__main__':
     print(sys.argv)
     args = parser.parse_args()
@@ -336,6 +334,7 @@ if __name__ == '__main__':
     #else:
     #    run = 0
 
+    run = 5
     configs = [{"run": 0},
                {"run": 1,"num_init_examples": 512, "num_samples": 256},
                {"run": 2, "num_init_examples": 2048, "num_samples": 256},

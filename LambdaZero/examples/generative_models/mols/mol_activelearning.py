@@ -1,3 +1,4 @@
+import cv2
 import argparse
 from copy import copy, deepcopy
 from collections import defaultdict
@@ -83,6 +84,9 @@ parser.add_argument("--save_path", default='results/')
 parser.add_argument("--cpu_req", default=8)
 parser.add_argument("--progress", action='store_true')
 parser.add_argument("--include_nblocks", default=False)
+parser.add_argument("--proxy_load", default=None)
+parser.add_argument("--proxy_save", action='store_true')
+parser.add_argument("--dock_db_path", default='/scratch/mjain/dock_db_1619111711tp_2021_04_22_13h.h5')
 
 # gen_model
 parser.add_argument("--learning_rate", default=5e-4, help="Learning rate", type=float)
@@ -445,6 +449,7 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
         if not i % 100:
             last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
             print(i, last_losses)
+
             #print(torch.logsumexp(stem_out_p[0], 0).item(),
             #      outflow_plus_r[0].item(), inflow[0].item(), a[0])
             print('time:', time.time() - time_last_check)
@@ -521,6 +526,29 @@ def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, doc
     }
 
 
+def test_500(proxy, proxy_dataset, topk=500):
+    # Test proxy on top mol:
+    from LambdaZero.examples.lightrl.utils.dataset_loaders import load_predocked_df
+    from argparse import Namespace
+
+    proxy.proxy = proxy.proxy.double()
+    mdp = proxy_dataset.mdp
+
+    df = load_predocked_df(Namespace(filter_candidates=True))
+    test_df = df.nsmallest(topk, "dockscore")
+    mols = []
+    for irow, row in test_df.iterrows():
+        mol = mdp.load(row)
+        mols.append(mol)
+    tgt_dockscores = test_df.dockscore.values
+
+    predictions = [proxy(x) for x in mols]
+    dockscore_pred = np.array([proxy_dataset.inv_r2r(x) for x in predictions])
+    l1diff = np.abs(tgt_dockscores - dockscore_pred)
+
+    print(f"[TEST{topk}] MAE Mean : {np.mean(l1diff)} | max: {np.max(l1diff)} | min : {np.min(l1diff)}")
+
+
 def main(args):
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
@@ -536,7 +564,7 @@ def main(args):
     args.reward_exp = 1
     args.reward_norm = 1
     proxy_dataset = ProxyDataset(args, bpath, device, floatX=torch.float)
-    proxy_dataset.load_h5("/scratch/mjain/dock_db_1619111711tp_2021_04_22_13h.h5", args, num_examples=args.num_init_examples)
+    proxy_dataset.load_h5(args.dock_db_path, args, num_examples=args.num_init_examples)
     rews.append(proxy_dataset.rews)
     smis.append([mol.smiles for mol in proxy_dataset.train_mols])
     rew_max = np.max(proxy_dataset.rews)
@@ -552,7 +580,17 @@ def main(args):
     mdp = proxy_dataset.mdp
     train_metrics = []
     metrics = []
-    proxy.train(proxy_dataset)
+
+    if args.proxy_load is not None:
+        chkpt = torch.load(args.proxy_load)
+        proxy.proxy.load_state_dict(chkpt["state_dict"])
+        print("!!!LOADED PROXY FROM CHECKPOINT!!!")
+        test_500(proxy, proxy_dataset)
+    else:
+        proxy.train(proxy_dataset)
+        if args.proxy_save:
+            torch.save({"state_dict": proxy.proxy.state_dict()}, f'{exp_dir}/proxy_checkpoint.pk')
+            print("!!!Saved proxy checkpoint!!!")
 
     for i in range(args.num_outer_loop_iters):
         print(f"Starting step: {i}")
