@@ -298,4 +298,5 @@ class SynthQEDReward:
             discounted_reward = qed_discount * synth_discount
 
             return discounted_reward, {"discounted_reward": discounted_reward, "QED": qed, "synthesizability": synth}
-        else: return 0.0, {"discounted_reward": 0.0, "QED": 0.0}
+        else:
+            return 0.0, {"discounted_reward": 0.0, "QED": 0.0}
