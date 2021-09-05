@@ -4,6 +4,7 @@ import os
 import random
 import string
 import subprocess
+import warnings
 from collections import Counter
 
 import numpy as np
@@ -416,106 +417,263 @@ class Dock_smi:
         return gridscore, coord
 
 
-class GenMolFile:
-    def __init__(self, outpath, mgltools, mglbin):
+class GenMolFiles:
+    """Generate from SMILES string files of different formats representing molecule in the free space.
+
+    Generates sdf, mol2 and pdbqt files.
+    Generation is chain-dependant:
+        1. SMILES string -> [rdkit] -> sdf
+        2. sdf -> [Open Babel] -> mol2
+        3. mol2 -> [MGLTools] -> pdbqt
+
+    Open Babel and MGLTools are external programs.
+    Open Babel should be installed in the environment and be accessible via obabel command.
+
+    Arguments:
+        outpath: directory where to store generated files
+        n_gen_conformations: number of embeddings from SMILES string to 3D space (to be used in rdkit subroutine)
+        mgltools_dir: directory with MGLTools
+    """
+    def __init__(self,
+                 outpath,
+                 n_gen_conformations=20,
+                 mgltools_dir=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6")):
         self.outpath = outpath
-        self.prepare_ligand4 = os.path.join(mgltools, "AutoDockTools/Utilities24/prepare_ligand4.py")
-        self.mglbin = mglbin
+        self.n_gen_conformations = n_gen_conformations
+        self.mgltools_bin = os.path.join(mgltools_dir, "bin", "pythonsh")
+        self.prepare_ligand4 = os.path.join(mgltools_dir, "MGLToolsPckgs", "AutoDockTools", "Utilities24", "prepare_ligand4.py")
 
-        os.makedirs(os.path.join(outpath, "sdf"), exist_ok=True)
-        os.makedirs(os.path.join(outpath, "mol2"), exist_ok=True)
-        os.makedirs(os.path.join(outpath, "pdbqt"), exist_ok=True)
+        # set up directory structure
+        os.makedirs(os.path.join(self.outpath, "smi"), exist_ok=True)
+        os.makedirs(os.path.join(self.outpath, "sdf"), exist_ok=True)
+        os.makedirs(os.path.join(self.outpath, "mol2"), exist_ok=True)
+        os.makedirs(os.path.join(self.outpath, "pdbqt"), exist_ok=True)
 
-    def __call__(self, smi, mol_name, num_conf):
-        sdf_file = os.path.join(self.outpath, "sdf", f"{mol_name}.sdf")
-        mol2_file = os.path.join(self.outpath, "mol2", f"{mol_name}.mol2")
-        pdbqt_file = os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt")
+        # filepath templates - expected to be completed with mol_name on each particular instance
+        self.smi_filepath = os.path.join(self.outpath, "smi", "{}.smi")
+        self.sdf_filepath = os.path.join(self.outpath, "sdf", "{}.sdf")
+        self.mol2_filepath = os.path.join(self.outpath, "mol2", "{}.mol2")
+        self.pdbqt_filepath = os.path.join(self.outpath, "pdbqt", "{}.pdbqt")
 
+    def generate(self, smi, mol_name):
+        """Generate from SMILES string sdf, mol2 and pdbqt files"""
+        smi_filepath = self.smi_filepath.format(mol_name)
+        sdf_filepath = self.sdf_filepath.format(mol_name)
+        mol2_filepath = self.mol2_filepath.format(mol_name)
+        pdbqt_filepath = self.pdbqt_filepath.format(mol_name)
+
+        # smi
+        with open(smi_filepath, "w") as smi_file:
+            smi_file.write(smi)
+
+        # sdf
         mol = Chem.MolFromSmiles(smi)
         Chem.SanitizeMol(mol)
         mol_h = Chem.AddHs(mol)
-        AllChem.EmbedMultipleConfs(mol_h, numConfs=num_conf)
-        for i in range(num_conf):
+        AllChem.EmbedMultipleConfs(mol_h, numConfs=self.n_gen_conformations)
+        for i in range(self.n_gen_conformations):
             AllChem.MMFFOptimizeMolecule(mol_h, confId=i)
         mp = AllChem.MMFFGetMoleculeProperties(mol_h, mmffVariant='MMFF94')
-        # choose minimum energy conformer
-        mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(num_conf)])
-        print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_file, 'w+'))
-        os.system(f"obabel -isdf {sdf_file} -omol2 -O {mol2_file}")
-        os.system(f"{self.mglbin}/pythonsh {self.prepare_ligand4} -l {mol2_file} -o {pdbqt_file}")
-        return pdbqt_file
+        # choose conformer with min energy
+        mi = np.argmin([AllChem.MMFFGetMoleculeForceField(mol_h, mp, confId=i).CalcEnergy() for i in range(self.n_gen_conformations)])
+        print(Chem.MolToMolBlock(mol_h, confId=int(mi)), file=open(sdf_filepath, 'w+'))
+
+        # mol2
+        os.system(f"obabel -isdf {sdf_filepath} -omol2 -O {mol2_filepath}")
+
+        # pdbqt
+        os.system(f"{self.mgltools_bin} {self.prepare_ligand4} -l {mol2_filepath} -o {pdbqt_filepath}")
+        return sdf_filepath, mol2_filepath, pdbqt_filepath
+
+    @staticmethod
+    def parse_free_pose(path):
+        """Parse 3D positions of atoms from (sdf) file. Order of atoms matches the order of appearance in smiles string."""
+        mol = Chem.SDMolSupplier(path)[0]
+        conf = mol.GetConformer()
+        pose = conf.GetPositions()
+        return pose
+
+    @staticmethod
+    def parse_permuted_free_pose(path):
+        """Parse 3D positions of atoms from (pdbqt) file. Order of atoms is permuted compared to the order in smiles string."""
+        with open(path) as f:
+            data = [line for line in f if line.startswith("ATOM")]
+        # number of entries in a line is unstable, but counting from the back appears to work as intended
+        pose = np.array([line.split()[-7:-4] for line in data], dtype=np.float32)
+        return pose
+
+    @staticmethod
+    def get_atoms_reordering(free_pose, permuted_free_pose):
+        """Find indices (order) that satisfy: free_pose = permuted_free_pose[order]"""
+        order = np.argmin(np.abs(free_pose.reshape((1, -1, 3)) - permuted_free_pose.reshape((-1, 1, 3))).sum(axis=2), axis=0)
+        return order
+
+    def cleanup(self, mol_name):
+        """Delete generated files"""
+        # https://docs.python.org/3/library/contextlib.html
+        # contextlib.suppress
+        # Return a context manager that suppresses any of the specified exceptions if they are raised in the body of a with statement
+        # and then resumes execution with the first statement following the end of the with statement.
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.smi_filepath.format(mol_name))
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.sdf_filepath.format(mol_name))
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.mol2_filepath.format(mol_name))
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.pdbqt_filepath.format(mol_name))
 
 
 class DockVina_smi:
+    """Dock SMILES string with AutoDock Vina.
+
+    AutoDock Vina expects molecule in pdbqt file as an input, and outputs pdb file with docking results.
+    Conversion from SMILES string to pdbqt file is handled by preparation pipeline encapsulated in GenMolFiles class.
+
+
+    Arguments:
+        outpath: directory where to store generated input files and files with docking results
+        n_conformations: number of requested docking conformations. When supplied 1 - return only conformation with the best docking score
+        vina_bin: path to the AutoDock Vina executable binary
+        rec_file: path to the file with receptor
+        bindsite: spatial volume of search for docking, defined by 6-numbers tuple (center, side lengths)
+        dock_pars: string of extra arguments to be passed to the docking executable
+        docking_timeout: number of seconds to wait for docking completion before terminating execution
+        do_cleanup: whether to delete files produced by preparation pipeline and docking after execution
+        **genmol_kwargs (optional): parameters to be passed to GenMolFiles class initialization
+    """
     def __init__(self,
                  outpath,
-                 mgltools_dir=os.path.join(programs_dir, "mgltools_x86_64Linux2_1.5.6"),
-                 vina_dir=os.path.join(programs_dir, "vina"),
-                 docksetup_dir=os.path.join(datasets_dir, "seh/4jnc"),
-                 rec_file="4jnc.nohet.aligned.pdbqt",
+                 n_conformations=1,
+                 vina_bin=os.path.join(programs_dir, "vina", "bin", "vina"),
+                 rec_file=os.path.join(datasets_dir, "seh", "4jnc", "4jnc.nohet.aligned.pdbqt"),
                  bindsite=(-13.4, 26.3, -13.3, 20.013, 16.3, 18.5),
                  dock_pars="",
-                 cleanup=True):
-
+                 docking_timeout=60 * 5,
+                 do_cleanup=True,
+                 **genmol_kwargs):
         self.outpath = outpath
-        self.mgltools = os.path.join(mgltools_dir, "MGLToolsPckgs")
-        self.mgltools_bin = os.path.join(mgltools_dir, "bin")
-        self.vina_bin = os.path.join(vina_dir, "bin/vina")
-        self.rec_file = os.path.join(docksetup_dir, rec_file)
+        self.n_conformations = n_conformations
+        self.vina_bin = vina_bin
+        self.rec_file = rec_file
         self.bindsite = bindsite
-        self.dock_pars = dock_pars
-        self.cleanup = cleanup
+        self.docking_timeout = docking_timeout
+        self.do_cleanup = do_cleanup
 
-        self.gen_molfile = GenMolFile(self.outpath, self.mgltools, self.mgltools_bin)
-        # make vina command
+        # Construct dock_pars
+        if "num_modes" not in dock_pars:
+            dock_pars += f" --num_modes {n_conformations}"
+        else:
+            raise ValueError("DockVina: do not specify --num_nodes in dock_pars! Use n_conf argument instead!")
+
+        energy_range = 100  # arbitrary sufficiently big value
+        if "energy_range" not in dock_pars:
+            dock_pars += f" --energy_range {energy_range}"
+        self.dock_pars = dock_pars
+
+        # prepare template for Autodock Vina execution command
+        # ligand and out arguments are to be filled upon each individual call for docking
         self.dock_cmd = "{} --receptor {} " \
                         "--center_x {} --center_y {} --center_z {} " \
                         "--size_x {} --size_y {} --size_z {} "
         self.dock_cmd = self.dock_cmd.format(self.vina_bin, self.rec_file, *self.bindsite)
-        self.dock_cmd += " --ligand {} --out {}"
+        self.dock_cmd += "--ligand {} --out {} "
+        self.dock_cmd += self.dock_pars
 
+        # Note: GenMolFiles sets up some directories upon initialization
+        self.input_mol_files = GenMolFiles(outpath, **genmol_kwargs)
+
+        # prepare output directory and filepath template
         os.makedirs(os.path.join(self.outpath, "docked"), exist_ok=True)
+        self.docked_pdb_filepath = os.path.join(self.outpath, "docked", "{}.pdb")
 
-    def dock(self, smi, mol_name=None, molgen_conf=20):
-        mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
-        docked_file = os.path.join(self.outpath, "docked", f"{mol_name}.pdb")
-        input_file = self.gen_molfile(smi, mol_name, molgen_conf)
-        # complete docking query
-        dock_cmd = self.dock_cmd.format(input_file, docked_file)
-        dock_cmd = dock_cmd + " " + self.dock_pars
+    def dock(self, smi, mol_name=None):
+        """Perform docking for given SMILES strings and return docking results
 
-        # dock
-        cl = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
-        cl.wait()
-        # parse energy
-        with open(docked_file) as f:
-            docked_pdb = f.readlines()
-        if docked_pdb[1].startswith("REMARK VINA RESULT"):
-            dockscore = float(docked_pdb[1].split()[3])
-        else:
-            raise Exception("Can't parse docking energy")
-        # parse coordinates
-        # TODO: fix order
-        coord = []
-        endmodel_idx = 0
-        for idx, line in enumerate(docked_pdb):
-            if line.startswith("ENDMDL"):
-                endmodel_idx = idx
-                break
+        Arguments:
+            smi: SMILES string
+            mol_name: shared part of the file name
 
-        docked_pdb_model_1 = docked_pdb[:endmodel_idx]  # take only the model corresponding to the best energy
-        docked_pdb_model_1_atoms = [line for line in docked_pdb_model_1 if line.startswith("ATOM")
-                                    and line.split()[2][0] != 'H']  # ignore hydrogen
-        coord.append([line.split()[-7:-4] for line in docked_pdb_model_1_atoms])
-        coord = np.array(coord, dtype=np.float32)
+        Returns:
+            mol_name: string supplied as input or randomly generated if there was none
+            dockscores: list of scores obtained by docking, one per conformation
+            free_pose: 3D coordinates of atoms for a molecule in the free space
+            docked_poses: list, where each entry is 3D coordinates of atoms for a docked molecule, number of entries match number of conformations
+        """
+        try:
+            mol_name = mol_name or ''.join(random.choices(string.ascii_uppercase + string.digits, k=15))
 
-        if self.cleanup:
-            with contextlib.suppress(FileNotFoundError):
-                os.remove(os.path.join(self.outpath, "sdf", f"{mol_name}.sdf"))
-                os.remove(os.path.join(self.outpath, "mol2", f"{mol_name}.mol2"))
-                os.remove(os.path.join(self.outpath, "pdbqt", f"{mol_name}.pdbqt"))
-                os.remove(os.path.join(self.outpath, "docked", f"{mol_name}.pdb"))
-        return mol_name, dockscore, coord
+            self.input_mol_files.generate(smi, mol_name)
+            input_pdbqt_filepath = self.input_mol_files.pdbqt_filepath.format(mol_name)
+            docked_pdb_filepath = self.docked_pdb_filepath.format(mol_name)
+
+            # complete docking query and dock
+            dock_cmd = self.dock_cmd.format(input_pdbqt_filepath, docked_pdb_filepath)
+            dock_query = subprocess.Popen(dock_cmd, shell=True, stdout=subprocess.PIPE)
+            dock_query.wait(timeout=self.docking_timeout)
+
+            # parse energy and coordinates
+            # underscore masks smi retrieved from the generated file, no need to overwrite smi here
+            _, mol_name, dockscores, free_pose, docked_poses = self.parse(mol_name)
+
+            # if docking succeeded at all, the number of obtained conformation is expected to always match the number of requested
+            # if that is not the case, output is assumed to be corrupted, thus discarded
+            if len(dockscores) != self.n_conformations:
+                raise RuntimeError(f"DockVina: for {smi} the number of obtained conformations ({len(dockscores)}) mismatches the number of requested conformations ({self.n_conformations})")
+        finally:
+            # https://docs.python.org/3/tutorial/errors.html
+            # If the exception is not handled by an except clause, the exception is re-raised after the finally clause has been executed.
+            if self.do_cleanup:
+                self.cleanup(mol_name)
+
+        return smi, mol_name, dockscores, free_pose, docked_poses
+
+    # separated parse function is useful for recovering data should program crash unexpectedly, e.g. node failure on cluster
+    def parse(self, mol_name):
+        """Parse docking scores and both 3D coordinates of atoms for a docked molecule and a molecule in the free space, from already existing files generated by docking and preparation pipeline."""
+        input_smi_filepath = self.input_mol_files.smi_filepath.format(mol_name)
+        input_sdf_filepath = self.input_mol_files.sdf_filepath.format(mol_name)
+        input_pdbqt_filepath = self.input_mol_files.pdbqt_filepath.format(mol_name)
+        docked_pdb_filepath = self.docked_pdb_filepath.format(mol_name)
+
+        with open(input_smi_filepath, "r") as smi_file:
+            smi = smi_file.readline()
+
+        dockscores, docked_poses = DockVina_smi.parse_scores_and_docked_poses(docked_pdb_filepath)
+        free_pose = self.input_mol_files.parse_free_pose(input_sdf_filepath)
+        permuted_free_pose = self.input_mol_files.parse_permuted_free_pose(input_pdbqt_filepath)
+        order = self.input_mol_files.get_atoms_reordering(free_pose, permuted_free_pose)
+        docked_poses = docked_poses[:, order]
+
+        return smi, mol_name, dockscores, free_pose, docked_poses
+
+    @staticmethod
+    def parse_scores_and_docked_poses(path):
+        """Parse docking scores and 3D positions of atoms of docked molecule from (pdb) file. Order of atoms is permuted compared to the order in smiles string.
+        Permutation is the same as for input (pdbqt) file."""
+        with open(path) as f:
+            data = f.readlines()
+
+        indices = [idx for idx, line in enumerate(data) if line.startswith("MODEL") or line.startswith("ENDMDL")]
+        indices = np.array(indices, dtype=np.int64).reshape(-1, 2)
+
+        scores = []
+        poses = []
+        for start, end in indices:
+            data_sub = data[start:end]
+            scores.append(float(data_sub[1].split()[3]))
+            data_sub_atoms = [line for line in data_sub if line.startswith("ATOM")]
+            poses.append([line.split()[-7:-4] for line in data_sub_atoms])
+
+        scores = np.array(scores, dtype=np.float32)
+        poses = np.array(poses, dtype=np.float32)
+        return scores, poses
+
+    def cleanup(self, mol_name):
+        """Delete files generated by preparation pipeline and by docking"""
+        self.input_mol_files.cleanup(mol_name)
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(self.docked_pdb_filepath.format(mol_name))
 
 
 class ScaffoldSplit:
@@ -694,8 +852,8 @@ def mpnn_feat(mol, ifcoord=True, panda_fmt=False, one_hot_atom=False, donor_feat
 
     # convert atmfeat to pandas
     if panda_fmt:
-        atmfeat_pd = pd.DataFrame(index=range(natm), columns=[
-            "type_idx", "atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3", "num_hs"])
+        atmfeat_pd = pd.DataFrame(index=range(natm),
+                                  columns=["type_idx", "atomic_number", "acceptor", "donor", "aromatic", "sp", "sp2", "sp3", "num_hs"])
         atmfeat_pd['type_idx'] = atmfeat[:, :ntypes+1]
         atmfeat_pd['atomic_number'] = atmfeat[:, ntypes+1]
         atmfeat_pd['acceptor'] = atmfeat[:, ntypes+2]
