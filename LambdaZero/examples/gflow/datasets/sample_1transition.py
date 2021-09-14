@@ -79,30 +79,12 @@ def parents_to_del_stem(parents: List[BlockMoleculeDataExtended], mol: BlockMole
     return np.array(del_stems).reshape(-1, 2)
 
 
-class OnlineDataFeedTransition(DataGenerator):
+class DataGenSampleParentsTraj(DataGenerator):
     def __init__(self, args: Namespace, device: torch.device,
                  model: torch.nn.Module = None, proxy: BaseProxy = None, sample_prob: float = 0.5):
 
-        super(OnlineDataFeedTransition, self).__init__(args, device, model, proxy, sample_prob)
+        super(DataGenSampleParentsTraj, self).__init__(args, device, model, proxy, sample_prob)
         self._sample_traj_bwd_trans = getattr(args, "sample_traj_bwd_trans", False)
-
-    # def _sample_train_transitions(self, batch_size: int):
-    #     """ Train only on last transition """
-    #     # sample batch of transitions
-    #     samples = []
-    #     traj_cnt = 0
-    #     tr = self.train_transition_buffer
-    #     transition_pos = len(tr) - 1
-    #
-    #     while traj_cnt < self.args.iter_sample_new_traj:
-    #         transition_pos -= 1  # Move before done
-    #         while tr[transition_pos].d != 1:  # while not done
-    #             transition_pos -= 1
-    #         traj_cnt += 1
-    #
-    #     samples = tr[(transition_pos+1):]
-    #
-    #     return samples, list(range(transition_pos+1, len(tr)))
 
     def sample2batch(self, samples: List[Any]):
         atom_graph = self.mdp.repr_type == "atom_graph"

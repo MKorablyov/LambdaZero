@@ -10,7 +10,7 @@ from LambdaZero.examples.gflow.datasets import sample_offline_traj
 TRAIN_DATASET = {
     "DataGenerator": data_generator.DataGenerator,
     "DataGeneratorMultiProc": data_generator_multiproc.DataGeneratorMultiProc,
-    "OnlineDataFeedTransition": sample_1transition.OnlineDataFeedTransition,
+    "DataGenSampleParentsTraj": sample_1transition.DataGenSampleParentsTraj,
     "PrioritySamplingData": priority_sampling.PrioritySamplingData,
     "BatchWithOfflineTraj": sample_offline_traj.BatchWithOfflineTraj,
 }
