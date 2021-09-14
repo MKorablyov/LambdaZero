@@ -6,6 +6,7 @@ from LambdaZero.examples.gflow.datasets import data_generator_multiproc
 from LambdaZero.examples.gflow.datasets import sample_1transition
 from LambdaZero.examples.gflow.datasets import priority_sampling
 from LambdaZero.examples.gflow.datasets import sample_offline_traj
+from LambdaZero.examples.gflow.datasets import data_no_online
 
 TRAIN_DATASET = {
     "DataGenerator": data_generator.DataGenerator,
@@ -13,6 +14,7 @@ TRAIN_DATASET = {
     "DataGenSampleParentsTraj": sample_1transition.DataGenSampleParentsTraj,
     "PrioritySamplingData": priority_sampling.PrioritySamplingData,
     "BatchWithOfflineTraj": sample_offline_traj.BatchWithOfflineTraj,
+    "DataFilterAddOnline": data_no_online.DataFilterAddOnline,
 }
 
 

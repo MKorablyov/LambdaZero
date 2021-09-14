@@ -344,7 +344,7 @@ class DataGenerator:
 
         return samples, [r, m, trajectory_stats, None, info]
 
-    def _add_mol_to_online(self, r, score, m):
+    def _add_mol_to_online(self, r: float, score: float, m: BlockMoleculeDataExtended):
         self.online_mols.append((r, score, m))
         if len(self.online_mols) > self.max_online_mols:
             self.online_mols = sorted(self.online_mols, key=lambda x: x[1])

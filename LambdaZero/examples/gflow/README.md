@@ -1,6 +1,13 @@
 ### 
 ### Usage 
 
+### Two Gflows
+Look into:
+
+    - basic_trainer.py / compute_loss method
+    - Think about how you normalize losses -> into reward
+    - Sampe method in train.py / sample_and_update_dataset_batch
+
 Req: `liftoff` (`pip install git+git://github.com/tudor-berariu/liftoff.git#egg=liftoff`)
 
 **Run 1 config file**: 

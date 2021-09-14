@@ -598,6 +598,64 @@ class ProxyDebug131_11(torch.nn.Module):
         return res_scores, infos
 
 
+# TODO D
+class ProxyGflowErrorWrapper(torch.nn.Module):
+    def __init__(self, args: Namespace,
+                 gflow_model_one=None,
+                 gflow_dataset_one=None,
+                 gflow_trainer_one=None,
+                 **kwargs):
+        super(ProxyGflowErrorWrapper, self).__init__()
+
+        self.gflow_model_one = gflow_model_one
+        self.gflow_dataset_one = gflow_dataset_one
+        self.gflow_trainer_one = gflow_trainer_one
+
+        self._default_score = args.default_score
+        self._memory = dict()
+
+        self._seen = set()
+        self._seen_nan_count = 0
+        self._seen_p = []
+        self._seen_scores = deque(maxlen=10000)
+
+    def setup_gflow_one(self, gflow_model_one, gflow_dataset_one, gflow_trainer_one):
+        self.gflow_model_one = gflow_model_one
+        self.gflow_dataset_one = gflow_dataset_one
+        self.gflow_trainer_one = gflow_trainer_one
+
+    @torch.no_grad()
+    def __call__(self, mols: List[BlockMoleculeData]):
+        gflow_model_one = self.gflow_model_one
+
+        mols = mols if isinstance(mols, list) else [mols]
+
+        res_scores = [self._default_score] * len(mols)
+        infos = [{x: None for x in ["proxy", "qed", "synth", "score", "smiles"]} for _ in range(len(mols))]
+
+        for ix, xmol in enumerate(mols):
+            # TODO D
+            # Calculate Error based on gflow model !!!!
+            # Note that parents can be different if xmol has been chosen based on terminate or reached max steps
+
+            # should be -(gflow_model_one.in_flow(xmol) - gflow_model_one.out_flow(xmol)).pow(2)
+            proxy = 0
+
+            # keep for logging
+            if mols[ix].smiles not in self._seen:
+                self._seen.update([mols[ix].smiles])
+                self._seen_p.append(proxy)
+            self._seen_scores.append(proxy * -1)
+
+            infos[ix]["smiles"] = mols[ix].smiles
+            infos[ix]["synth"] = 100  # TODO Hack to not change candidate filering
+            infos[ix]["qed"] = 100  # TODO Hack to not change candidate filering
+            infos[ix]["proxy"] = res_scores[ix] = proxy
+            infos[ix]["score"] = res_scores[ix] * -1
+
+        return res_scores, infos
+
+
 PROXY_WRAPPERS = {
     "CandidateWrapper": CandidateWrapper,
     "ProxyOnlyWrapper": ProxyOnlyWrapper,
