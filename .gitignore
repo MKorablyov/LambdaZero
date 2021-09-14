@@ -1,4 +1,9 @@
 .idea/
+LambdaZero/examples/gflow/configs/*
+data/
+playground/
+wandb/
+
 # User-specific stuff
 #.idea/**/workspace.xml
 #.idea/**/tasks.xml

@@ -230,6 +230,7 @@ class LogTopStats:
 
         self._order_key = order_key
         self._seen_mol = set()
+        self._collected_mol = 0
         self._new_info = []
         self._order_ascending = order_ascending
         self._unique_key = unique_key
@@ -249,6 +250,7 @@ class LogTopStats:
         self._new_info.clear()
 
     def collect(self, infos: List[dict]):
+        self._collected_mol += len(infos)
         for info in infos:
             _id = info.get(self._unique_key, None)
             if _id is not None and _id not in self._seen_mol:
@@ -260,11 +262,18 @@ class LogTopStats:
 
                 # If new key and respects candidate conditions
                 if good:
+                    # TODO Should consider seen only the mol we actually calculate GT for (oracle d)
+                    self._seen_mol.update([_id])  # TODO Should fix this
+
                     self._new_info.append(info)
                     self._all_time_topk_score.update([info[self._order_key]])
 
     def log(self):
-        logs = dict({f"top{self._topk}_count": len(self._new_info)})
+        logs = dict({
+            f"top{self._topk}_count": len(self._new_info),
+            f"top{self._topk}_seen_mol": len(self._seen_mol),
+            f"top{self._topk}_collected_mol": self._collected_mol,
+        })
         logs.update(self._all_time_topk_score.log())
 
         if len(self._new_info) > self._topk:
@@ -274,11 +283,12 @@ class LogTopStats:
 
             log_info = [self._new_info[x] for x in topk_idx]  # type: List[dict]
 
-            # Add logged molecules to seen set
-            for info in log_info:
-                _id = info.get(self._unique_key, None)
-                if _id is not None and _id not in self._seen_mol:
-                    self._seen_mol.update([_id])
+            # TODO Should consider seen only the mol we actually calculate GT for
+            # # Add logged molecules to seen set
+            # for info in log_info:
+            #     _id = info.get(self._unique_key, None)
+            #     if _id is not None and _id not in self._seen_mol:
+            #         self._seen_mol.update([_id])
 
             if self._transform_info is not None:
                 log_info = self._transform_info(log_info)
