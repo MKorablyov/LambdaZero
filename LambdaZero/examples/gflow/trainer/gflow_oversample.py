@@ -7,20 +7,19 @@ import gzip
 import numpy as np
 from argparse import Namespace
 
+
 from LambdaZero.examples.gflow.datasets.data_generator import DataGenerator, TrainBatch
 from LambdaZero.examples.gflow.utils import LogMetrics, TimeStats
 from LambdaZero.examples.gflow.trainer.basic_trainer import BasicTrainer
 
 
-_stop = [None]
-
-
-class TrainGFlowFwdBack(BasicTrainer):
+class GflowOversample(BasicTrainer):
     def __init__(self,
                  args,
                  model=None, proxy=None, dataset: DataGenerator=None, do_save=True):
 
         super().__init__(args, model, proxy, dataset, do_save)
+        self._seen_rewards = []
 
     def train_epoch(self, epoch: int, train_batch: TrainBatch):
         debug_no_threads = self.debug_no_threads
@@ -42,66 +41,87 @@ class TrainGFlowFwdBack(BasicTrainer):
 
         tf = lambda x: torch.tensor(x, device=device).to(self.float_ttype)
         clip_loss = tf([args.clip_loss])
-        log_log_reg_c = torch.log(tf([args.log_reg_c])[0])
 
+        self._ts_stats.sample.start()
         b_p, b_pb, b_a, b_r, b_s, b_d, mols = train_batch
+
+        # Calculate allowed undersampling
+        b_dones = b_d == 1
+        self._seen_rewards += b_r[b_dones].data.cpu().numpy().tolist()
+        r_threshold = np.quantile(np.unique(self._seen_rewards), 0.5)
+        print(f"R 40 {r_threshold}")
+        r_fill = torch.zeros_like(b_r)
+        for ix in range(0, len(b_r)-1)[::-1]:
+            if b_r[ix] != 0:
+                b_r[ix] = b_r[ix+1]
+        allow_undersample = (b_r < r_threshold) & (~b_dones)
+
+        self._ts_stats.sample.end()
+
+        self._ts_stats.train.start()
 
         ntransitions = b_r.shape[0]
 
         self.train_num_mol += ntransitions
 
-        # Calculate forward / backward policy log probs and values
-        p_stem_out, p_mol_out, _ = model.run_model(b_p, do_bonds=False)
-        # s_stem_out, s_mol_out, s_jbond_out = model.run_model(b_s)
-        s_stem_out, s_mol_out, _ = model.run_model(b_s, do_bonds=False)
-        s_mol_out, s_v_out = s_mol_out[:, :1], s_mol_out[:, 1]
-        p_mol_out, p_v_out = p_mol_out[:, :1], p_mol_out[:, 1]  # Assume two values out / molecule
+        self._ts_stats.inflow.start()
+        # state outputs
+        if args.bootstrap_tau > 0:
+            with torch.no_grad():
+                stem_out_s, mol_out_s = self.target_model(b_s)
+        else:
+            stem_out_s, mol_out_s = model(b_s)
+        # parents of the state outputs
+        stem_out_p, mol_out_p = model(b_p)
 
-        # print("WTFFFFF")
         if clip_policy > 0:
-            for ix, p_out in enumerate([p_stem_out, p_mol_out, s_stem_out, s_mol_out]):
+            for ix, p_out in enumerate([stem_out_s, mol_out_s, stem_out_p, mol_out_p]):
                 p_out.clip_(-clip_policy, clip_policy)
 
-        # Forward Q approximation based on V(p) * pi_fwd(a, p)
-        f_action_logprob = -model.action_negloglikelihood(b_p, b_a, 0, p_stem_out, p_mol_out)
-        fwd_flow = torch.logaddexp(log_log_reg_c, p_v_out + f_action_logprob)
+        # index parents by their corresponding actions
+        qsa_p = model.index_output_by_action(b_p, stem_out_p, mol_out_p[:, 0], b_a)
 
-        # Calculate backward policy log prob - based on delete per bond atom prediction
-        # bond_act = torch.zeros_like(b_a)
-        # b_action_logprob = -model.action_negloglikelihood_bonds(s, bond_act, s_jbond_out)
+        # then sum the parents' contribution, this is the inflow
+        exp_inflow = (torch.zeros((ntransitions,), device=device, dtype=dataset.floatX)
+                      .index_add_(0, b_pb, torch.exp(qsa_p))) # pb is the parents' batch index
+        inflow = torch.log(exp_inflow + args.log_reg_c)
+        self._ts_stats.inflow.end()
 
-        b_cnt = torch.tensor(b_s.__slices__['bonds'])
-        pjbonds = (b_cnt[1:] - b_cnt[:-1]).clamp(min=1)
-        # b_action_logprob = torch.log(1 / pjbonds).to(p_stem_out.dtype).to(p_stem_out.device)
+        self._ts_stats.outflow.start()
 
-        # Backward Q approximation based on V(s) * pi_fwd(a, s)
-        # bck_flow = torch.exp(s_v_out + b_action_logprob)
-        bck_flow = torch.exp(s_v_out) / pjbonds.to(p_stem_out.device)
-
+        # sum the state's Q(s,a), this is the outflow
+        exp_outflow = model.sum_output(b_s, torch.exp(stem_out_s), torch.exp(mol_out_s[:, 0]))
         # include reward and done multiplier, then take the log
         # we're guarenteed that r > 0 iff d = 1, so the log always works
-        bck_flow_plus_r = torch.log(args.log_reg_c + b_r + bck_flow * (1-b_d))
-
+        outflow_plus_r = torch.log(args.log_reg_c + b_r + exp_outflow * (1-b_d))
         if args.do_nblocks_reg:
-            losses = _losses = ((fwd_flow - bck_flow_plus_r) / (b_s.nblocks * args.max_blocks)).pow(2)
+            losses = _losses = ((inflow - outflow_plus_r) / (b_s.nblocks * args.max_blocks)).pow(2)
         else:
-            losses = _losses = (fwd_flow - bck_flow_plus_r).pow(2)
+            mae_loss = inflow - outflow_plus_r
+            mae_loss[(mae_loss < outflow_plus_r) & allow_undersample] *= 0.1
+
+            losses = _losses = mae_loss.pow(2)
 
         if clip_loss > 0:
             ld = losses.detach()
             losses = losses / ld * torch.minimum(ld, clip_loss)
+        self._ts_stats.outflow.end()
 
+        self._ts_stats.lossbackward.start()
         term_loss = (losses * b_d).sum() / (b_d.sum() + 1e-20)
         flow_loss = (losses * (1-b_d)).sum() / ((1-b_d).sum() + 1e-20)
-
+        priority = _losses.detach().clone()
         if args.balanced_loss:
             loss = term_loss * args.leaf_coef + flow_loss
+            priority[b_d == 1] *= args.leaf_coef
         else:
             loss = losses.mean()
 
         opt.zero_grad()
         loss.backward(retain_graph=(not epoch % 50))
+        self._ts_stats.lossbackward.end()
 
+        self._ts_stats.optstep.start()
         _term_loss = (_losses * b_d).sum() / (b_d.sum() + 1e-20)
         _flow_loss = (_losses * (1-b_d)).sum() / ((1-b_d).sum() + 1e-20)
         last_losses.append((loss.item(), term_loss.item(), flow_loss.item()))
@@ -115,55 +135,38 @@ class TrainGFlowFwdBack(BasicTrainer):
             t_metrics.update(_t_infos_k, [
                 _term_loss.data.cpu().numpy(),
                 _flow_loss.data.cpu().numpy(),
-                fwd_flow.data.cpu().numpy(),
-                bck_flow.data.cpu().numpy(),
+                exp_inflow.data.cpu().numpy(),
+                exp_outflow.data.cpu().numpy(),
                 b_r.data.cpu().numpy(),
                 mols[1],
                 [i.pow(2).sum().item() for i in model.parameters()],
-                torch.autograd.grad(loss, f_action_logprob, retain_graph=True)[0].data.cpu().numpy(),
-                torch.autograd.grad(loss, f_action_logprob, retain_graph=True)[0].data.cpu().numpy(),
-                torch.autograd.grad(loss, fwd_flow, retain_graph=True)[0].data.cpu().numpy(),
+                torch.autograd.grad(loss, qsa_p, retain_graph=True)[0].data.cpu().numpy(),
+                torch.autograd.grad(loss, stem_out_s, retain_graph=True)[0].data.cpu().numpy(),
+                torch.autograd.grad(loss, stem_out_p, retain_graph=True)[0].data.cpu().numpy(),
                 self.train_num_mol / (time.time() - self._train_start_time)
             ])
         if args.clip_grad > 0:
             torch.nn.utils.clip_grad_value_(model.parameters(), args.clip_grad)
 
         opt.step()
+        self._ts_stats.optstep.end()
+
+        self._ts_stats.train.end()
 
         model.training_steps = epoch + 1
         if args.bootstrap_tau > 0:
             for _a,b in zip(model.parameters(), self.target_model.parameters()):
                 b.data.mul_(1-args.bootstrap_tau).add_(args.bootstrap_tau*_a)
 
-        if False and not epoch % 50:
-            loss_sort_idx = _losses.argsort().flip((0,))
-            print(f"_losses {_losses[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"b_action_logprob {b_action_logprob[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"f_action_logprob {f_action_logprob[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"Rew {b_r[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"Done {b_d[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"eS_v_out {torch.exp(s_v_out)[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"eP_v_out {torch.exp(p_v_out)[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"efwd_flow {torch.exp(fwd_flow)[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"ebck_flow_plus_r {torch.exp(bck_flow_plus_r)[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"bck_flow {bck_flow[loss_sort_idx].data.cpu().numpy().tolist()}")
-            print(f"act {b_a[loss_sort_idx].data.cpu().numpy().tolist()}")
-
-            pmol = [mols[0][imol][0] for imol in loss_sort_idx]
-            smol = [mols[1][imol] for imol in loss_sort_idx]
-            print(f"pmol_size {[len(x.blockidxs) for x in pmol]}")
-            print(f"pmol_bs {[x.blockidxs for x in pmol]}")
-            print(f"pmol_jbonds {[x.jbonds for x in pmol]}")
-            # if epoch > 500:
-            #     import pdb;
-            #     pdb.set_trace()
-
-        if not epoch % 50:
+        if not epoch % 100:
             last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
             print(epoch, last_losses)
             print('time:', time.time() - self.time_last_check)
             self.time_last_check = time.time()
             last_losses = []
+
+            for k, v in self._ts_stats.__dict__.items():
+                print(f"{k}: {v.stats():.6f}")
 
             if not epoch % 1000 and do_save:
                 self.save_stuff()
@@ -178,5 +181,4 @@ class TrainGFlowFwdBack(BasicTrainer):
         if do_save:
             self.save_stuff()
 
-        return {"losses": _losses.detach()}, log_metrics
-
+        return {"losses": priority.detach()}, log_metrics

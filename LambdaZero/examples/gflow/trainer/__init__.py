@@ -1,13 +1,23 @@
 from argparse import Namespace
 
-from LambdaZero.examples.gflow.trainer import baseline_trainer
-from LambdaZero.examples.gflow.trainer import trainer_v2
+from LambdaZero.examples.gflow.trainer import basic_trainer
 from LambdaZero.examples.gflow.trainer import trainer_fwdback
+from LambdaZero.examples.gflow.trainer import train_with_long_credit
+from LambdaZero.examples.gflow.trainer import trainer_fwdback_ppo
+from LambdaZero.examples.gflow.trainer import trainer_fwdback_leafv
+from LambdaZero.examples.gflow.trainer import mse_terminal
+from LambdaZero.examples.gflow.trainer import gflow_credit
+from LambdaZero.examples.gflow.trainer import gflow_oversample
 
 GFLOW_TRAINERS = {
-    "TrainGFlow": baseline_trainer.TrainGFlow,
-    "TrainGFlowV2": trainer_v2.TrainGFlowV2,
-    "TrainGFlowFwdBack": trainer_fwdback.TrainGFlowFwdBack
+    "BasicTrainer": basic_trainer.BasicTrainer,
+    "TrainGFlowFwdBack": trainer_fwdback.TrainGFlowFwdBack,
+    "TrainLongCredit": train_with_long_credit.TrainLongCredit,
+    "TrainGFlowFwdBackPPO": trainer_fwdback_ppo.TrainGFlowFwdBackPPO,
+    "TrainGFlowFwdBackLeafV": trainer_fwdback_leafv.TrainGFlowFwdBackLeafV,
+    "MseTerminal": mse_terminal.MseTerminal,
+    "GflowCreditAssign": gflow_credit.GflowCreditAssign,
+    "GflowOversample": gflow_oversample.GflowOversample,
 }
 
 

@@ -15,7 +15,7 @@ from LambdaZero.examples.gflow.trainer.basic_trainer import BasicTrainer
 _stop = [None]
 
 
-class TrainGFlowFwdBack(BasicTrainer):
+class TrainGFlowFwdBackLeafV(BasicTrainer):
     def __init__(self,
                  args,
                  model=None, proxy=None, dataset: DataGenerator=None, do_save=True):
@@ -51,20 +51,45 @@ class TrainGFlowFwdBack(BasicTrainer):
         self.train_num_mol += ntransitions
 
         # Calculate forward / backward policy log probs and values
-        p_stem_out, p_mol_out, _ = model.run_model(b_p, do_bonds=False)
-        # s_stem_out, s_mol_out, s_jbond_out = model.run_model(b_s)
-        s_stem_out, s_mol_out, _ = model.run_model(b_s, do_bonds=False)
-        s_mol_out, s_v_out = s_mol_out[:, :1], s_mol_out[:, 1]
-        p_mol_out, p_v_out = p_mol_out[:, :1], p_mol_out[:, 1]  # Assume two values out / molecule
+        p_stem_out, p_mol_out, _ = model.run_model(b_p)
+        s_stem_out, s_mol_out, s_jbond_out = model.run_model(b_s)
+        s_mol_out, s_v_out, s_v_term = s_mol_out[:, :1], s_mol_out[:, 1], s_mol_out[:, 2]
+        p_mol_out, p_v_out, p_v_term = p_mol_out[:, :1], p_mol_out[:, 1], p_mol_out[:, 2]  # Assume two values out / molecule
 
-        # print("WTFFFFF")
+        # print("P", p_v_out.std().item(), "S", s_v_out.std().item())
+        split_v = False
+        non_term = b_a[:, 0] > -1
+        term = ~non_term
+        if split_v:
+            # print("WTFFFFF")
+            # Terminal ones have done True so don't need to correct
+            s_v_out = torch.log(torch.exp(s_v_out) + torch.exp(s_v_term.detach()))
+
+            # We should correct based on True terminal value
+            term_p_v = b_r.clone()
+            term_p_v[non_term] = torch.exp(p_v_term[non_term].detach())
+            p_v_out = torch.log(torch.exp(p_v_out) + term_p_v)
+
         if clip_policy > 0:
-            for ix, p_out in enumerate([p_stem_out, p_mol_out, s_stem_out, s_mol_out]):
+            for ix, p_out in enumerate([p_stem_out, p_mol_out, s_stem_out, s_mol_out, s_jbond_out]):
                 p_out.clip_(-clip_policy, clip_policy)
 
         # Forward Q approximation based on V(p) * pi_fwd(a, p)
+        # f_action_logprob = -model.action_negloglikelihood(p, a, 0, p_stem_out, p_mol_out)
+        # fwd_flow = torch.log(args.log_reg_c + torch.exp(p_v_out + f_action_logprob))
+        #
         f_action_logprob = -model.action_negloglikelihood(b_p, b_a, 0, p_stem_out, p_mol_out)
         fwd_flow = torch.logaddexp(log_log_reg_c, p_v_out + f_action_logprob)
+
+        do_log_terminal = False
+        if do_log_terminal:
+            # index parents by their corresponding actions
+            qsa_p = model.index_output_by_action(b_p, p_stem_out, p_mol_out[:, 0], b_a)
+
+            # then sum the parents' contribution, this is the inflow
+            exp_inflow = (torch.zeros((ntransitions,), device=device, dtype=dataset.floatX)
+                          .index_add_(0, b_pb, torch.exp(qsa_p)))  # pb is the parents' batch index
+            inflow = torch.log(exp_inflow + args.log_reg_c)
 
         # Calculate backward policy log prob - based on delete per bond atom prediction
         # bond_act = torch.zeros_like(b_a)
@@ -77,10 +102,14 @@ class TrainGFlowFwdBack(BasicTrainer):
         # Backward Q approximation based on V(s) * pi_fwd(a, s)
         # bck_flow = torch.exp(s_v_out + b_action_logprob)
         bck_flow = torch.exp(s_v_out) / pjbonds.to(p_stem_out.device)
+        # bck_flow = torch.exp(s_v_out)  # TODO
 
         # include reward and done multiplier, then take the log
         # we're guarenteed that r > 0 iff d = 1, so the log always works
+        # bck_flow_plus_r = torch.log(args.log_reg_c + b_r + bck_flow * (1-b_d))
         bck_flow_plus_r = torch.log(args.log_reg_c + b_r + bck_flow * (1-b_d))
+
+        # print(f_action_logprob.size(), fwd_flow.size(), bck_flow.size(), b_r.size(), bck_flow_plus_r.size())
 
         if args.do_nblocks_reg:
             losses = _losses = ((fwd_flow - bck_flow_plus_r) / (b_s.nblocks * args.max_blocks)).pow(2)
@@ -98,6 +127,11 @@ class TrainGFlowFwdBack(BasicTrainer):
             loss = term_loss * args.leaf_coef + flow_loss
         else:
             loss = losses.mean()
+
+        if split_v and term.sum() > 0:
+            # calculate loss for term value
+            loss_term_act = (b_r[term] - torch.exp(p_v_term)[term]).pow(2).mean()
+            loss += loss_term_act
 
         opt.zero_grad()
         loss.backward(retain_graph=(not epoch % 50))
