@@ -1,6 +1,13 @@
+import cv2
 from typing import List, Any
 import numpy as np
 import time
+from argparse import Namespace
+from torch.multiprocessing import Process, Queue
+import plotly.express as px
+import plotly.graph_objects as go
+
+from LambdaZero.examples.lightrl.utils.utils import LogTopStats
 
 
 def calc_metrics(key: str, values: List[Any]) -> dict:
@@ -84,3 +91,129 @@ class TimeStats:
 
     def stats(self):
         return np.mean(self._buffer)
+
+
+def log_stats_remote(conn_recv, conn_send, log_topk, do_dockscore):
+    if do_dockscore:
+        score_keys = ("proxy", "qed", "synth", "dockscore", "dscore")
+    else:
+        score_keys = ("proxy", "qed", "synth")
+
+    log_stats = LogTopStats(topk=log_topk, unique_key="smiles", score_keys=score_keys)
+
+    while True:
+        cmd, recv = conn_recv.get()
+        if cmd == 0:
+            log_stats.collect(*recv)
+        elif cmd == 1:
+            stats = log_stats.log()
+            stats.update(recv)
+            conn_send.put(stats)
+
+
+class LogTopKproc:
+    def __init__(self, args: Namespace):
+        self.log_stats_remote_send = log_stats_remote_send = Queue()
+        self.log_stats_remote_recv = log_stats_remote_recv = Queue()
+        log_proc_stats = Process(
+            target=log_stats_remote,
+            args=(log_stats_remote_send, log_stats_remote_recv, args.main.log_topk,
+                  args.main.log_dockscore)
+        )
+        log_proc_stats.start()
+        self.recv_logtop = 0
+        self.sent_logtop = 0
+        self.log_topk_freq = args.main.log_topk_freq
+        self._last_topk_step = 0
+        self._no_score_infos = 0
+        self._none_score_infos = 0
+        self._collected = 0
+        self._with_scores = 0
+        self._req_stats = {}
+        self._all_time_collected = 0
+
+    def collect(self, infos: List[dict], step_log: dict):
+        """
+            Send infos for good candidates to keep buffer for topK
+            Dict should have following keys with values ("proxy", "qed", "synth", "smiles", "score")
+            TopK will be chosen based on the score value
+
+            total_num_steps: number of steps at collection time
+        """
+
+        # If proxy exist -> rest of the scores exist
+        send_info = []
+        for sinfo in infos:
+            self._collected += 1
+            self._all_time_collected += 1
+            send_info.append(sinfo)
+
+            # Time to log new info
+            if self._all_time_collected >= self._last_topk_step + self.log_topk_freq:
+                # Send molecules collected so far
+                self.log_stats_remote_send.put((0, (send_info,)))
+                send_info = []
+
+                # So we can sync plots at same time
+                step_log["approx_step"] = self._last_topk_step + self.log_topk_freq
+                step_log["eval_step"] = self._all_time_collected
+                step_log["num_sampled_mols"] = self._all_time_collected
+
+                # send request for logs for all new mols so far
+                self.send_stats_request(self._all_time_collected, step_log)
+                while self._all_time_collected >= self._last_topk_step + self.log_topk_freq:
+                    self._last_topk_step += self.log_topk_freq
+
+        if len(send_info) > 0:
+            self.log_stats_remote_send.put((0, (send_info,)))
+
+    def get_stats(self):
+        """ Non-blocking get """
+        log_stats_remote_recv = self.log_stats_remote_recv
+        ret_log_stats = []
+        while not log_stats_remote_recv.empty():
+            log_stats = log_stats_remote_recv.get()
+            log_stats.update(self._req_stats.pop(log_stats["eval_step"]))
+            ret_log_stats.append(log_stats)
+            self.recv_logtop += 1
+
+        return ret_log_stats
+
+    def _local_stats(self):
+        collected = self._collected
+        stats = {
+            "topk_received": collected,
+        }
+        self._collected = 0
+        return stats
+
+    def send_stats_request(self, step: int, extra_log: dict):
+        """
+            Non blocking send request. LogTopStats will start calculating TopK with current buffer
+        """
+        if (self.sent_logtop - self.recv_logtop) < 2:
+            self._req_stats[step] = self._local_stats()
+            self.log_stats_remote_send.put((1, extra_log))
+            self.sent_logtop += 1
+        else:
+            print(f"NOT GOOD. Skipping log top {step}")
+
+
+def show_histogram(data, scale, edges, zrange=None):
+    data = np.stack(data).transpose()
+    data = data[::-1, :]
+    scaled_data = data / scale
+    if zrange is None:
+        zrange = [None, None]
+
+    fig = px.imshow(scaled_data, y=edges[::-1].astype(np.str), zmin=zrange[0], zmax=zrange[1])
+
+    fig.add_trace(go.Heatmap(
+        # x=list(range(evalhs.shape[0])),
+        # y=edges[::-1],
+        z=scaled_data,
+        customdata=data,
+        hovertemplate='Step: %{x}<br>Bin: %{y}<br>Num samples:%{customdata:.3f} <br><b>Prob:%{z:.3f}</b><br>',
+        coloraxis="coloraxis1", name=''),
+        1, 1)
+    return fig
