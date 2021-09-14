@@ -9,10 +9,25 @@ Req: `liftoff` (`pip install git+git://github.com/tudor-berariu/liftoff.git#egg=
 
 **Run batch config file**: 
 
-Scripts
+_runs-no - seeds /experiment_
+
+1. This will generate a batch of configs in a new folder  (let's call this new folder `exp_batch`, it will be printed at the console).
+
+`liftoff-prepare LambdaZero/examples/gflow/configs/demogrid/ --runs-no 3 --results-path /scratch/andrein/gflow/results  --do`
 
 
-Proxy info, preloaded model scores:
+2. We use the directory path produced by the above step and we can run `liftoff` on that directory to run all configs one by one (or just 1 of the configs using `--max-runs 1`):
+
+`liftoff LambdaZero/examples/gflow/train.py --max-runs 1 --no-detach ${exp_batch}`
+
+This way we can easily run a batch of experiments on the cluster, see `LambdaZero/examples/gflow/example_sbatch_array.sh`.
+
+We can clean failed experiments in a folder using e.g.:
+
+`liftoff-clean --clean-all --crashed-only /scratch/andrein/gflow/results/exp_batch/ --do`
+
+
+**Proxy info, preloaded model scores**:
 
 500 Test set (top 500 candidates from `dock_db_1624547349tp_2021_06_24_11h.h5`)
 
@@ -20,11 +35,6 @@ Proxy info, preloaded model scores:
 MAE Mean : 2.4388244991302486 | max: 5.020869636535645 | min : 1.2189960479736328
 ```
 
-vs `LambdaZero/examples/generative_models/mols/mol_activelearning.py` 1st outer loop proxy train:
-
-```
-MAE Mean : 6.929619735977136 | max: 9.559648336270634 | min : 5.0801467043507404
-```
 Test set info:
 ```
 count    500.000000
