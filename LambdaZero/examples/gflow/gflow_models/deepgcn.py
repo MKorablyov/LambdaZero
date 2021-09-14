@@ -3,21 +3,11 @@ Code for an atom-based graph representation and architecture
 
 """
 
-
-
 import warnings
 
 warnings.filterwarnings('ignore')
 import os
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.nn import NNConv, Set2Set
 import torch_geometric.nn as gnn
-from argparse import Namespace
-
-from LambdaZero.chem import atomic_numbers
 import LambdaZero.utils
 from LambdaZero.examples.gflow.gflow_models.gflow_model_base import GFlowModelBase
 
@@ -27,21 +17,16 @@ datasets_dir, programs_dir, summaries_dir = LambdaZero.utils.get_external_dirs()
 warnings.filterwarnings('ignore')
 
 
-import torch
-import torch.nn.functional as F
 from torch.nn import Linear, LayerNorm, ReLU
 
 from torch_geometric.nn import GENConv, DeepGCNLayer
-from argparse import Namespace
 from torch_geometric.nn import MessagePassing, Set2Set, global_add_pool
 
 
 from argparse import Namespace
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import Set2Set
 import torch
-from LambdaZero.examples.lightrl.models.model_base import ModelBase
 
 
 class ActorWrapper(torch.nn.Module):
@@ -50,7 +35,7 @@ class ActorWrapper(torch.nn.Module):
     def __init__(self, cfg: Namespace, model_base):
         super().__init__()
 
-        num_out_per_stem = getattr(cfg, "num_out_per_stem", 105)
+        num_out_per_stem = getattr(cfg, "out_per_stem", 105)
 
         self._model = model_base
         dim = self._model.per_atom_out_size
@@ -99,6 +84,15 @@ class RegBase(nn.Module):
         self.linh3 = nn.Linear(dim, dim)
         self.linh4 = nn.Linear(dim, num_out)
 
+        if self.num_out == 1:
+            pass
+        elif self.num_out == 2:
+            self.linh21 = nn.Linear(dim, dim)
+            self.linh22 = nn.Linear(dim, dim)
+            self.linh23 = nn.Linear(dim, dim)
+            self.linh24 = nn.Linear(dim, num_out)
+        else:
+            raise NotImplemented
     @property
     def per_atom_out_size(self):
         return self._per_atom_out_size
@@ -113,12 +107,20 @@ class RegBase(nn.Module):
         # rcond = data.rcond.float()[data.batch].unsqueeze(1)
         #
         # in_head = torch.cat([feat, rcond], dim=1)
+
         out = _act()(self.linh1(feat))
         out = self.linh2(out)
         out = global_add_pool(out, data.batch)
         out = _act()(self.linh3(out))
         out = self.linh4(out)
 
+        if self.num_out == 2:
+            out2 = _act()(self.linh21(feat))
+            out2 = self.linh22(out2)
+            out2 = global_add_pool(out2, data.batch)
+            out2 = _act()(self.linh23(out2))
+            out2 = self.linh24(out2)
+            out = torch.cat([out, out2], dim=-1)
         # ==========================================================================================
 
         # if self.num_out == 1:
@@ -133,9 +135,9 @@ class DeeperGCN(torch.nn.Module):
     def __init__(self, cfg: Namespace):
         super(DeeperGCN, self).__init__()
         num_feat = getattr(cfg, "num_feat", 14)
-        self.dim = dim = hidden_channels = getattr(cfg, "dim", 64)
+        self.dim = dim = hidden_channels = getattr(cfg, "dim", 128)  # default should be 64
         num_layers = getattr(cfg, "layers", 28)
-        self.dropout = getattr(cfg, "dropout", 0.1)
+        self.dropout = getattr(cfg, "dropout", 0.0)  # default is 0.1
         edge_attr_dim = getattr(cfg, "edge_attr_dim", 4)
 
         self.node_encoder = Linear(num_feat, hidden_channels)

@@ -6,9 +6,9 @@ from argparse import Namespace
 from LambdaZero.examples.gflow.gflow_models.gflow_model_base import GFlowModelBase
 
 
-class GraphAgent(GFlowModelBase):
+class GraphAgentMultiV(GFlowModelBase):
     def __init__(self, cfg: Namespace, **kwargs):
-        super(GraphAgent, self).__init__(cfg, **kwargs)
+        super(GraphAgentMultiV, self).__init__(cfg, **kwargs)
 
         nemb = getattr(cfg, "nemb", 256)
         nvec = getattr(cfg, "nvec", 0)
@@ -42,11 +42,12 @@ class GraphAgent(GFlowModelBase):
 
         self.global2pred = nn.Sequential(nn.Linear(nemb, nemb), nn.LeakyReLU(),
                                          nn.Linear(nemb, out_per_mol))
-        if out_per_mol == 2:
-            self.global2pred2 = nn.Sequential(nn.Linear(nemb, nemb), nn.LeakyReLU(),
-                                              nn.Linear(nemb, out_per_mol))
-        elif out_per_mol != 1:
-            raise NotImplemented
+
+        self.global2pred2 = nn.ModuleList([
+            nn.Sequential(nn.Linear(nemb, nemb), nn.LeakyReLU(),
+                          nn.Linear(nemb, out_per_mol))
+            for _ in range(1, out_per_mol)
+        ])
 
         #self.set2set = Set2Set(nemb, processing_steps=3)
         self.num_conv_steps = num_conv_steps
@@ -55,7 +56,7 @@ class GraphAgent(GFlowModelBase):
         self.categorical_style = 'softmax'
         self.escort_p = 6
 
-    def run_model(self, graph_data, vec_data=None, do_stems=True, do_bonds=True, **kwargs):
+    def run_model(self, graph_data, vec_data=None, do_stems=True, **kwargs):
         blockemb, stememb, bondemb = self.embeddings
 
         graph_data.x = blockemb(graph_data.x)
@@ -66,7 +67,6 @@ class GraphAgent(GFlowModelBase):
             graph_data.edge_attr[:, 0][:, :, None] * graph_data.edge_attr[:, 1][:, None, :]
         ).reshape((graph_data.edge_index.shape[1], self.nemb**2))
         out = graph_data.x
-
         if self.version == 'v1' or self.version == 'v3':
             batch_vec = vec_data[graph_data.batch]
             out = self.block2emb(torch.cat([out, batch_vec], 1))
@@ -100,7 +100,7 @@ class GraphAgent(GFlowModelBase):
 
         # Fwd per bond
         per_jbond_out = None
-        if hasattr(graph_data, "bonds") and do_bonds:
+        if hasattr(graph_data, "bonds"):
             # Expecting bond in stem format list of [[block, atom]]
 
             bond_block_batch_idx = (
@@ -116,16 +116,15 @@ class GraphAgent(GFlowModelBase):
         mol_out = gnn.global_mean_pool(out, graph_data.batch)
         mol_preds = self.global2pred(mol_out)
 
-        if self.out_per_mol == 2:
-            mol_preds2 = self.global2pred2(mol_out)
-            mol_preds = torch.cat([mol_preds, mol_preds2], dim=-1)
+        if self.out_per_mol > 1:
+            mol_out2 = gnn.global_add_pool(out, graph_data.batch)
+            mol_preds2 = [gp(mol_out2) for gp in self.global2pred2]
+            mol_preds = torch.cat([mol_preds] + mol_preds2, dim=-1)
 
         return stem_preds, mol_preds, per_jbond_out
 
     def forward(self, graph_data, vec_data=None, do_stems=True, **kwargs):
-        stem_preds, mol_preds, _ = self.run_model(
-            graph_data, vec_data, do_stems, do_bonds=False, **kwargs
-        )
+        stem_preds, mol_preds, _ = self.run_model(graph_data, vec_data, do_stems, **kwargs)
         return stem_preds, mol_preds[:, :1]
 
     def out_to_policy(self, s, stem_o, mol_o):

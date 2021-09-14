@@ -3,11 +3,13 @@ import torch
 
 from LambdaZero.examples.gflow.gflow_models import gflow1_model_atom, gflow1_model_block
 from LambdaZero.examples.gflow.gflow_models import deepgcn
+from LambdaZero.examples.gflow.gflow_models import gflow1_model_block_multi
 
 GFLOW_MODELS = {
     "GraphAgent": gflow1_model_block.GraphAgent,
     "MolACGCN": gflow1_model_atom.MolAC_GCN,
     "DeeperGCNv0": deepgcn.DeeperGCNGflow,
+    "GraphAgentMultiV": gflow1_model_block_multi.GraphAgentMultiV,
 }
 
 
