@@ -1,20 +1,12 @@
-import pdb
-import time
-
-from collections import deque
-
 from argparse import Namespace
 from typing import List, Any
 import numpy as np
 import torch
-from torch.multiprocessing import Process, Queue
-import os.path as osp
-from LambdaZero.examples.gflow.datasets.data_generator import DataGenerator
-from LambdaZero.examples.proxys.base_proxy import BaseProxy
-from LambdaZero.examples.generative_models.mols.mol_mdp_ext import MolMDPExtended
-import random
-from LambdaZero.utils import get_external_dirs
 from collections import Counter
+
+from LambdaZero.examples.gflow.datasets.data_generator import DataGenerator, TrainBatch
+from LambdaZero.examples.proxys.base_proxy import BaseProxy
+from LambdaZero.utils import get_external_dirs
 from LambdaZero.examples.generative_models.mols.mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
 
 
@@ -71,49 +63,109 @@ def get_rev_actions(parent: BlockMoleculeDataExtended, act, mol: BlockMoleculeDa
     return single_block_delete_atmidx
 
 
+def parents_to_del_stem(parents: List[BlockMoleculeDataExtended], mol: BlockMoleculeDataExtended):
+    # Empty block parent of action stop
+    if len(mol.jbonds) <= 0 or parents[0][1][0] == -1:
+        return np.array([[]]).transpose().reshape(-1, 2)
+
+    del_stems = []
+    for ixp, (parent, (block, parent_stem)) in enumerate(parents):
+        connect_block, connect_block_atm = parent.stems[parent_stem]
+
+        # Add atm idx to which this new block is connected (in mol representation)
+        connect_block_idx = mol._parent_connected_block[ixp]
+        del_stems.append([connect_block_idx, connect_block_atm])
+
+    return np.array(del_stems).reshape(-1, 2)
+
+
 class OnlineDataFeedTransition(DataGenerator):
     def __init__(self, args: Namespace, device: torch.device,
                  model: torch.nn.Module = None, proxy: BaseProxy = None, sample_prob: float = 0.5):
 
         super(OnlineDataFeedTransition, self).__init__(args, device, model, proxy, sample_prob)
+        self._sample_traj_bwd_trans = getattr(args, "sample_traj_bwd_trans", False)
 
-    def _sample_train_transitions(self, batch_size: int):
-        samples = super()._sample_train_transitions(batch_size)
+    # def _sample_train_transitions(self, batch_size: int):
+    #     """ Train only on last transition """
+    #     # sample batch of transitions
+    #     samples = []
+    #     traj_cnt = 0
+    #     tr = self.train_transition_buffer
+    #     transition_pos = len(tr) - 1
+    #
+    #     while traj_cnt < self.args.iter_sample_new_traj:
+    #         transition_pos -= 1  # Move before done
+    #         while tr[transition_pos].d != 1:  # while not done
+    #             transition_pos -= 1
+    #         traj_cnt += 1
+    #
+    #     samples = tr[(transition_pos+1):]
+    #
+    #     return samples, list(range(transition_pos+1, len(tr)))
 
-        # sample batch of transitions
-        single_tr_samples = []
+    def sample2batch(self, samples: List[Any]):
+        atom_graph = self.mdp.repr_type == "atom_graph"
 
-        for p, a, r, s, d in samples:
-            idx = self.train_rng.randint(len(p))
+        n_samples = []
+        bonds_atmidxs = []
+        bonds_slices = [0]
+        bonds_batch = []
+        bonds_blocks = []
+        bonds_count = 0
+        for ix, (p, a, r, s, d) in enumerate(samples):
+            if self._sample_traj_bwd_trans:
+                # Choose one parent at random
+                idx = self.train_rng.randint(len(p))
+            else:
+                # Choose the true parent that produced the trajectory
+                if len(p) == 1:
+                    idx = 0
+                else:
+                    if hasattr(s, "_backward_parent_idx"):
+                        idx = s._backward_parent_idx
+                    else:
+                        # Should be the one that was last (traj constructed by adding new block at end)
+                        idx = s._parent_deleted_block.index(len(s.blockidxs) - 1)
 
             parent_mol = p[idx]
             fwd_act = a[idx]
-            rev_actions = get_rev_actions(parent_mol, fwd_act, s)
 
-            single_tr_samples.append(
-                ((parent_mol,), (fwd_act,), r, s, d, rev_actions)
-            )
+            # reorder
+            parents, acts = list(p), list(a)
+            sorted_p = [parents.pop(idx)] + parents
+            sorted_a = [acts.pop(idx)] + acts
+            del_stems = parents_to_del_stem(list(zip(sorted_p, sorted_a)), s)
 
-        return single_tr_samples
+            if atom_graph:
+                jbond_atmidx = np.array(s.slices)[del_stems[:, 0]] + del_stems[:, 1]
+                jbond_atmidx = jbond_atmidx[:, None]
+            else:
+                blockidxs = s.blockidxs
+                bonds_blocks += [blockidxs[ix] for ix in del_stems[:, 0]]
+                jbond_atmidx = del_stems
 
-    def sample2batch(self, samples: List[Any]):
-        n_samples = []
-        bonds_atmidx = []
-        bonds_slices = [0]
-        bonds_batch = []
-        bonds_count = 0
-        for ix, smpl in enumerate(samples):
-            n_samples.append(smpl[:-1])
-            bonds_atmidx.append(smpl[-1])
-            bonds_count += len(smpl[-1])
-            bonds_batch += [ix] * len(smpl[-1])
+            n_samples.append(((parent_mol,), (fwd_act,), r, s, d))
+
+            bonds_atmidxs.append(jbond_atmidx)
+            bonds_count += len(jbond_atmidx)
+            bonds_batch += [ix] * len(jbond_atmidx)
             bonds_slices.append(bonds_count)
 
         (p, p_batch, a, r, state, d, mols) = super().sample2batch(n_samples)
 
-        bonds_atmidx = np.concatenate(bonds_atmidx)
-        state.bonds = torch.tensor(bonds_atmidx, device=self._device).long()
+        bonds_atmidxs = np.concatenate(bonds_atmidxs)
+        state.bonds = torch.tensor(bonds_atmidxs, device=self._device).long()
         state.bonds_batch = torch.tensor(bonds_batch, device=self._device).long()
         state.__slices__['bonds'] = bonds_slices
+        if not atom_graph:
+            # bond_graph = so we should construct bond_stem_types
+            true_blockidx = self.mdp.true_blockidx
+            stem_type_offset = self.mdp.stem_type_offset
+            stemtypes = [
+                stem_type_offset[true_blockidx[bonds_blocks[i]]] + bonds_atmidxs[i, 1]
+                for i in range(len(bonds_atmidxs))
+            ]
+            state.bondstypes = torch.tensor(stemtypes, device=self._device).long()
 
-        return (p, p_batch, a, r, state, d, mols)
+        return TrainBatch(p, p_batch, a, r, state, d, mols)
