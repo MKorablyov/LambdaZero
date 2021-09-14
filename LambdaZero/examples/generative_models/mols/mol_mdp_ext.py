@@ -1,12 +1,16 @@
 from collections import defaultdict
+from collections import OrderedDict
 import os.path
 import numpy as np
 import torch
+import networkx as nx
+import torch_geometric
 
 from LambdaZero.environments.molMDP import BlockMoleculeData, MolMDP
 from LambdaZero import chem
 from rdkit import Chem
 import copy
+from collections import Counter
 
 from LambdaZero.examples.generative_models.mols import model_atom, model_block, model_fingerprint
 
@@ -29,6 +33,7 @@ class BlockMoleculeDataExtended(BlockMoleculeData):
         o.numblocks = self.numblocks
         o.jbonds = list(self.jbonds)
         o.stems = list(self.stems)
+        o.pending_stems = list(self.pending_stems)
         return o
 
     def as_dict(self):
@@ -36,6 +41,7 @@ class BlockMoleculeDataExtended(BlockMoleculeData):
                 'slices': self.slices,
                 'numblocks': self.numblocks,
                 'jbonds': self.jbonds,
+                'pending_stems': self.pending_stems,
                 'stems': self.stems}
 
     def dump(self) -> dict:
@@ -44,15 +50,46 @@ class BlockMoleculeDataExtended(BlockMoleculeData):
             "slices": self.slices,
             "jbonds": self.jbonds,
             "stems": self.stems,
-            "smiles": self.smiles
+            "smiles": self.smiles,
+            "pending_stems": self.pending_stems,
         })
         return mol_data
 
 
-class MolMDPExtended(MolMDP):
+def node_match(x1, x2):
+    return x1["block"] == x2["block"]
 
-    def build_translation_table(self, fill_in: bool = True):
+
+def edge_match(x1, x2):
+    return x1["bond"] == x2["bond"]
+
+
+class MolMDPExtended(MolMDP):
+    def __init__(self, *args, fix_block_rs: bool = False, **kwargs):
+        super(MolMDPExtended, self).__init__(*args, **kwargs)
+
+        # TODO If not fix_block_rs we should actually check some constraints on the blocks
+        # E.g. constraints. 1 same smile blocks should have the same stems
+        # 2 Each smile block should have a duplicate block starting with each unique stem
+        if fix_block_rs:
+            """ Duplicate blocks with different set of bonds available. Fix it. """
+            smi_bonds = dict()
+            for ix, (b_smi, b_rs) in enumerate(zip(self.block_smi, self.block_rs)):
+                if b_smi in smi_bonds:
+                    smi_bonds[b_smi].update(Counter(b_rs) - smi_bonds[b_smi])
+                else:
+                    smi_bonds[b_smi] = Counter(b_rs)
+
+            new_blockrs = []
+            for ix, (b_smi, b_rs) in enumerate(zip(self.block_smi, self.block_rs)):
+                new_rs = b_rs + list((smi_bonds[b_smi] - Counter(b_rs)).elements())
+                new_blockrs.append(new_rs)
+
+            self.block_rs = new_blockrs
+
+    def build_translation_table(self, fill_in: bool = True, ):
         """build a symmetry mapping for blocks. Necessary to compute parent transitions"""
+
         self.translation_table = {}
         for blockidx in range(len(self.block_mols)):
             # Blocks have multiple ways of being attached. By default,
@@ -108,14 +145,20 @@ class MolMDPExtended(MolMDP):
                                              'has no duplicate for atom', j,
                                              'in position 0, and no symmetrical correspondance')
                         self.translation_table[blockidx][j] = symmetric_duplicate
-                        #print('block', blockidx, '+ atom', j,
-                        #      'in position 0 is a symmetric duplicate of',
-                        #      symmetric_duplicate)
 
-    def parents(self, mol=None):
+        # Not necessary if fix kids
+        self.translation_same_children = dict()
+        for block, block_table in self.translation_table.items():
+            crt_block_rs = Counter(self.block_rs[block])
+            same = [block]
+            for similar_block in np.unique(list(block_table.values())):
+                if similar_block != block and Counter(self.block_rs[similar_block]) == crt_block_rs:
+                    same.append(similar_block)
+            self.translation_same_children[block] = same
+
+    def parents(self, mol=None, keep_possible_children=False):
         """returns all the possible parents of molecule mol (or the current
         molecule if mol is None.
-
         Returns a list of (BlockMoleculeDataExtended, (block_idx, stem_idx)) pairs such that
         for a pair (m, (b, s)), MolMDPExtended.add_block_to(m, b, s) == mol.
         """
@@ -125,15 +168,26 @@ class MolMDPExtended(MolMDP):
             return [(BlockMoleculeDataExtended(), (mol.blockidxs[0], 0))]
 
         # Compute the how many blocks each block is connected to
-        blocks_degree = defaultdict(int)
-        for a,b,_,_ in mol.jbonds:
-            blocks_degree[a] += 1
-            blocks_degree[b] += 1
+        # Let's keep them ordered so we are sure to add last added block as a remove action
+        # Quick fix so we can determine which parent produced the trajectory -
+        # This should be the first parent in list
+        blocks_degree = OrderedDict()
+        for a, b, sa, sb in mol.jbonds[::-1]:
+            blocks_degree[b] = 1 if b not in blocks_degree else blocks_degree[b] + 1
+            blocks_degree[a] = 1 if a not in blocks_degree else blocks_degree[a] + 1
+
         # Keep only blocks of degree 1 (those are the ones that could
         # have just been added)
         blocks_degree_1 = [i for i, d in blocks_degree.items() if d == 1]
         # Form new molecules without these blocks
         parent_mols = []
+        parent_graphs = []
+        parent_molg = self.get_nx_graph(mol, true_block=True)
+        parents = defaultdict(list)
+
+        # Remember where we are deleting blocks from
+        mol._parent_deleted_block = []
+        mol._parent_connected_block = []
 
         for rblockidx in blocks_degree_1:
             new_mol = mol.copy()
@@ -155,9 +209,56 @@ class MolMDPExtended(MolMDP):
             # Compute which stem the bond was using
             stem = ([reindex[rbond[0]], rbond[2]] if rblockidx == rbond[1] else
                     [reindex[rbond[1]], rbond[3]])
+
+            mol_connected_block = rbond[0] if rblockidx == rbond[1] else rbond[1]
+
             # and add it back
             new_mol.stems = [list(i) for i in new_mol.stems] + [stem]
-            #new_mol.stems.append(stem)
+
+            # Repair blockidx to always have blocks with first stem (from block_rs) connected
+            # Need this to compare parents
+            connected_bidx = new_mol.blockidxs[stem[0]]
+            connected_stem_0 = False
+
+            if len(new_mol.blockidxs) == 1 and stem[1] == self.block_rs[connected_bidx][0]:
+                # Could be that its just 1 block and it has duplicate stems
+                connected_stem_0 = True
+            else:
+                for a, b, sa, sb in new_mol.jbonds:
+                    if (a == stem[0] and sa == stem[1]) or (b == stem[0] and sb == stem[1]):
+                        connected_stem_0 = True
+                        break
+
+            if not connected_stem_0:
+                prev = connected_bidx
+                # Get another stem used by the block
+                for a, b, sa, sb in new_mol.jbonds:
+                    if a == stem[0]:
+                        new_mol.blockidxs[stem[0]] = self.translation_table[connected_bidx][sa]
+                        break
+                    elif b == stem[0]:
+                        new_mol.blockidxs[stem[0]] = self.translation_table[connected_bidx][sb]
+                        break
+
+            blockid = mol.blockidxs[rblockidx]
+
+            # Solve duplicates parents same BlockID (check if we already parents for this)
+            # Notice difference in graph constructions get_nx_graph with true_block=True
+            new_p = True
+            new_molg = self.get_nx_graph(new_mol, true_block=True)
+            test_blockid = blockid
+
+            if test_blockid in parents:
+                for other_p in parents[test_blockid]:
+                    if self.graphs_are_isomorphic(other_p, new_molg):
+                        new_p = False
+                        break
+
+            if not new_p:
+                continue
+            else:
+                parents[test_blockid].append(new_molg)
+
             # and we have a parent. The stem idx to recreate mol is
             # the last stem, since we appended `stem` in the back of
             # the stem list.
@@ -165,35 +266,30 @@ class MolMDPExtended(MolMDP):
             # we broke, see build_translation_table().
             removed_stem_atom = (
                 rbond[3] if rblockidx == rbond[1] else rbond[2])
-            blockid = mol.blockidxs[rblockidx]
-
-            what_block_bond_block = (
-                mol.blockidxs[rbond[0] if rblockidx == rbond[1] else rbond[1]], stem[1], blockid
-            )
-
-            # You shouldn't add a stem back if it is using the init connecting used by the the block
-            remaining_block_rs = self.block_rs[what_block_bond_block[0]]
-
-            if len(new_mol.blockidxs) > 1 and remaining_block_rs[0] == what_block_bond_block[1]:
-                # must not have the other bonds connected
-                continue
 
             if removed_stem_atom not in self.translation_table[blockid]:
                 raise ValueError('Could not translate removed stem to duplicate or symmetric block.')
 
-            # TODO This should be fixed with the bug fix in the env
-            if self.translation_table[blockid][removed_stem_atom] != blockid:
-                # QUICK FIX: Skip if not the same blockidx (so the mol can be reconsctructed)
-                continue
+            action = (self.translation_table[blockid][removed_stem_atom], len(new_mol.stems) - 1)
+            parent_mols.append([new_mol, action])
+            mol._parent_deleted_block.append(rblockidx)
+            mol._parent_connected_block.append(mol_connected_block)
 
-            parent_mols.append([new_mol,
-                                # action = (block_idx, stem_idx)
-                                (self.translation_table[blockid][removed_stem_atom],
-                                 len(new_mol.stems) - 1)])
+            # Add other parents because of isomorphism (add to other stem => same block graph)
+            if len(new_mol.blockidxs) > 1:
+                for test_stem in range(len(new_mol.stems) - 1):
+                    test_child = self.add_block_to(new_mol, blockid, test_stem)
+                    testg = self.get_nx_graph(test_child, true_block=True)
+                    if self.graphs_are_isomorphic(parent_molg, testg):
+                        action = (action[0], test_stem)
+                        parent_mols.append([new_mol, action])
+                        mol._parent_deleted_block.append(rblockidx)
+                        mol._parent_connected_block.append(mol_connected_block)
+
         if not len(parent_mols):
             raise ValueError('Could not find any parents')
-        return parent_mols
 
+        return parent_mols
 
     def add_block_to(self, mol, block_idx, stem_idx=None, atmidx=None):
         '''out-of-place version of add_block'''
@@ -226,7 +322,7 @@ class MolMDPExtended(MolMDP):
 
     def post_init(
             self, device, repr_type, include_bonds=False, include_nblocks=False, floatX="float32",
-                add_stem_mask=True, donor_features=False, ifcoord=False, one_hot_atom=True, **kwargs
+                add_stem_mask=False, donor_features=False, ifcoord=False, one_hot_atom=False, **kwargs
     ):
         self.device = device
         self.repr_type = repr_type
@@ -260,9 +356,7 @@ class MolMDPExtended(MolMDP):
     def mol2repr(self, mol=None):
         if mol is None:
             mol = self.molecule
-        #molhash = str(mol.blockidxs)+':'+str(mol.stems)+':'+str(mol.jbonds)
-        #if molhash in self.molcache:
-        #    return self.molcache[molhash]
+
         if self.repr_type == 'block_graph':
             r = model_block.mol2graph(mol, self, self.floatX,
                                       bonds=self.include_bonds,
@@ -277,7 +371,7 @@ class MolMDPExtended(MolMDP):
                                      one_hot_atom=self.one_hot_atom)
         elif self.repr_type == 'morgan_fingerprint':
             r = model_fingerprint.mol2fp(mol, self, self.floatX)
-        #self.molcache[molhash] = r
+
         return r
 
     def load(self, state: dict) -> BlockMoleculeDataExtended:
@@ -287,9 +381,54 @@ class MolMDPExtended(MolMDP):
         self.molecule.slices = state["slices"]  # atom index at which every block starts
         self.molecule.jbonds = state["jbonds"]  # [block1, block2, bond1, bond2]
         self.molecule.stems = state["stems"]  # [block1, bond1]
+        self.molecule.pending_stems = state["pending_stems"]  # [block1, bond1]
         self.molecule.numblocks = len(self.molecule.blockidxs)
         self.molecule.blocks = [self.block_mols[idx] for idx in self.molecule.blockidxs]  # rdkit
         return self.molecule
+
+    def unique_id(self, mol: BlockMoleculeData) -> Counter:
+        bonds = []
+        block_smi = self.block_smi
+        if len(mol.jbonds) > 0:
+            for jbond in mol.jbonds:
+                blockidx0, blockidx1 = mol.blockidxs[jbond[0]], mol.blockidxs[jbond[1]]
+                bonds.append((block_smi[blockidx0], jbond[2], jbond[3], block_smi[blockidx1]))
+                bonds.append((block_smi[blockidx1], jbond[3], jbond[2], block_smi[blockidx0]))
+        else:
+            bonds.append((block_smi[mol.blockidxs[0]]))
+
+        mol_data = Counter(bonds)
+        return mol_data
+
+    def num_act_stems(self, mol: BlockMoleculeDataExtended):
+        if len(mol.blockidxs) <= 1:
+            return 1
+        elif len(mol.stems) == 0:
+            return 0
+        else:
+            return len(mol.stems)
+
+    def get_nx_graph(self, mol: BlockMoleculeData, true_block=False):
+        true_blockidx = self.true_blockidx
+
+        G = nx.DiGraph()
+        blockidxs = [true_blockidx[xx] for xx in mol.blockidxs] if true_block else mol.blockidxs
+
+        G.add_nodes_from([(ix, {"block": blockidxs[ix]}) for ix in range(len(blockidxs))])
+
+        if len(mol.jbonds) > 0:
+            edges = []
+            for jbond in mol.jbonds:
+                edges.append((jbond[0], jbond[1],
+                              {"bond": [jbond[2], jbond[3]]}))
+                edges.append((jbond[1], jbond[0],
+                              {"bond": [jbond[3], jbond[2]]}))
+            G.add_edges_from(edges)
+        return G
+
+    def graphs_are_isomorphic(self, g1, g2):
+        return nx.algorithms.is_isomorphic(g1, g2, node_match=node_match, edge_match=edge_match)
+
 
 def test_mdp_parent():
     datasets_dir, programs_dir, summaries_dir = get_external_dirs()
