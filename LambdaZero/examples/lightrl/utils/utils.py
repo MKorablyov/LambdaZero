@@ -96,6 +96,7 @@ def set_seed(seed: int, use_cuda: bool, cuda_deterministic: bool = False) -> Non
         torch.backends.cudnn.deterministic = True
     else:
         torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = False
 
 
 class MeanVarianceNormalizer:
@@ -131,8 +132,9 @@ def setup_loggers(args: Namespace) -> str:
 
         os.environ['WANDB_API_KEY'] = api_key
 
-        wandb.init(project=args.project_name, name=experiment_name)
+        ret_init = wandb.init(project=args.project_name, name=experiment_name, dir=args.out_dir)
         wandb.config.update(dict(flatten_cfg(args)))
+        print(f"[WANDB] INITIALIZED @ {ret_init.dir}")
 
     out_dir = args.out_dir
     return out_dir
@@ -216,7 +218,7 @@ class LogTopStats:
     def __init__(self,
                  topk: int = 100,
                  all_time_topk: List[int] = [10, 100, 1000],
-                 score_keys: Tuple[str] = ("proxy", "qed", "synth", "dockscore", "dscore"),
+                 score_keys: Tuple[str, ...] = ("proxy", "qed", "synth", "dockscore", "dscore"),
                  order_key: str = "score",
                  order_ascending: bool = True,
                  unique_key: str = "res_molecule",
@@ -231,6 +233,12 @@ class LogTopStats:
         self._order_key = order_key
         self._seen_mol = set()
         self._collected_mol = 0
+        self._new_received = 0
+        self._new_have_score = 0
+        self._new_good = 0
+        self._new_empty = 0
+        self._new_smi = 0
+
         self._new_info = []
         self._order_ascending = order_ascending
         self._unique_key = unique_key
@@ -251,9 +259,19 @@ class LogTopStats:
 
     def collect(self, infos: List[dict]):
         self._collected_mol += len(infos)
+        self._new_received += len(infos)
         for info in infos:
             _id = info.get(self._unique_key, None)
-            if _id is not None and _id not in self._seen_mol:
+            _sid = info.get(self._order_key, None)
+
+            self._new_empty += len(info) == 0
+            if _id is None or _sid is None:
+                continue
+
+            self._new_have_score += 1
+            if _id not in self._seen_mol:
+                self._new_smi += 1
+
                 good = True
                 for k, v in self._filter_candidates.items():
                     if info[k] < v:
@@ -269,8 +287,16 @@ class LogTopStats:
                     self._all_time_topk_score.update([info[self._order_key]])
 
     def log(self):
+        if self._new_received == 0:
+            self._new_received = 0.000001
+
         logs = dict({
-            f"top{self._topk}_count": len(self._new_info),
+            f"top{self._topk}_received": self._new_received,
+            f"top{self._topk}_good_count": len(self._new_info),
+            f"top{self._topk}_good_f": len(self._new_info) / self._new_received,
+            f"top{self._topk}_with_score_f": self._new_have_score / self._new_received,
+            f"top{self._topk}_new_smi_f": self._new_smi / self._new_received,
+            f"top{self._topk}_empty_f": self._new_empty / self._new_received,
             f"top{self._topk}_seen_mol": len(self._seen_mol),
             f"top{self._topk}_collected_mol": self._collected_mol,
         })
@@ -305,6 +331,11 @@ class LogTopStats:
                 logs.update(dict({f"top{self._topk}_{k}_count": len(scores)}))
 
             self.reset()
+
+        self._new_received = 0
+        self._new_have_score = 0
+        self._new_empty = 0
+        self._new_smi = 0
 
         return logs
 
