@@ -1,9 +1,18 @@
+import time
+
 import cv2
-from torch.multiprocessing import set_start_method
+import sys
+import pandas as pd
+import torch.multiprocessing as mp
+from collections import Counter, deque
+import sys
+import os
+import time
+
 try:
-     set_start_method('spawn')
-except RuntimeError:
-    pass
+    mp.set_start_method('spawn')
+except:
+    print("already set context", mp.get_context())
 
 from argparse import Namespace
 import os
@@ -19,6 +28,7 @@ from rdkit import DataStructs
 import torch
 from torch.distributions.categorical import Categorical
 from typing import List
+from scipy import stats
 
 from LambdaZero.utils import get_external_dirs
 
@@ -29,9 +39,10 @@ from LambdaZero.examples.generative_models.mols.mol_mdp_ext import BlockMolecule
 from LambdaZero.examples.gflow.gflow_models import get_gflow_model
 from LambdaZero.examples.gflow.utils import calc_metrics
 from LambdaZero.examples.gflow.trainer import get_gflow_trainer
-from LambdaZero.examples.gflow.proxy_wrappers import CandidateWrapper
-from LambdaZero.examples.lightrl.utils.utils import LogTopStats, SummaryStats
+from LambdaZero.examples.gflow.proxy_wrappers import PROXY_WRAPPERS
+from LambdaZero.examples.lightrl.utils.utils import SummaryStats
 from LambdaZero.examples.gflow.datasets import get_gflow_dataset
+from LambdaZero.examples.gflow.utils import LogTopKproc, show_histogram
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
@@ -39,175 +50,202 @@ tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
 os.makedirs(tmp_dir, exist_ok=True)
 
 
-def log_stats_remote(conn_recv, conn_send, log_topk, do_dockscore):
-    if do_dockscore:
-        score_keys = ("proxy", "qed", "synth", "dockscore", "dscore")
-    else:
-        score_keys = ("proxy", "qed", "synth")
+def analyse_eval(args, generator_dataset, proxy, model, epoch, sampled_infos,
+                 smis, rews, blocksize, entropy, exp_sum):
 
-    log_stats = LogTopStats(topk=log_topk, unique_key="smiles", score_keys=score_keys)
+    df = pd.DataFrame(np.array([blocksize, entropy, exp_sum]).transpose(),
+                      columns=["blocksize", "entropy", "exp_sum"])
+    print(df.groupby("blocksize")["entropy"].mean())
+    print(df.groupby("blocksize")["exp_sum"].mean())
+    candidate_proxy = [x["proxy"] for x in sampled_infos if x["proxy"] is not None]
+    candidate_scores = [x["score"] for x in sampled_infos if x["score"] is not None]
+    all_scores = [x["score"] if x["score"] is not None else proxy._default_score * -1 for x in sampled_infos]
 
-    while True:
-        cmd, recv = conn_recv.get()
-        if cmd == 0:
-            log_stats.collect(*recv)
-        elif cmd == 1:
-            stats = log_stats.log()
-            stats["total_num_steps"] = recv
-            conn_send.put(stats)
+    drcount = generator_dataset.debug_r_counter = \
+        getattr(generator_dataset, "debug_r_counter", deque(maxlen=args.num_samples*10))
+    dscount = generator_dataset.debug_s_counter = \
+        getattr(generator_dataset, "debug_s_counter", deque(maxlen=args.num_samples*10))
+    dssmis = generator_dataset.debug_s_smis = \
+        getattr(generator_dataset, "debug_s_smis", deque(maxlen=args.num_samples*10))
+    smpl_uniq = getattr(generator_dataset, "smpl_uniq", set())
+    smpl_uniq.update(smis)
+    dssmis += smis
+    drcount += rews
+    dscount += all_scores
 
+    e_r_bin_cnt, e_r_bin_edge = np.histogram(drcount, bins=64)
 
-class LogTopKproc:
-    def __init__(self, args: Namespace):
-        self.log_stats_remote_send = log_stats_remote_send = Queue()
-        self.log_stats_remote_recv = log_stats_remote_recv = Queue()
-        log_proc_stats = Process(
-            target=log_stats_remote,
-            args=(log_stats_remote_send, log_stats_remote_recv, args.main.log_topk, args.main.log_dockscore)
-        )
-        log_proc_stats.start()
-        self.recv_logtop = 0
-        self.sent_logtop = 0
-        self.log_topk_freq = args.main.log_topk_freq
-        self._last_topk_step = 0
-        self._no_score_infos = 0
-        self._none_score_infos = 0
-        self._collected = 0
-        self._req_stats = {}
+    print(f"EVAL (num uniq {len(smpl_uniq)}) with rew freq: {list(zip(e_r_bin_cnt, e_r_bin_edge))}")
+    print(f"EVAL (num uniq {len(smpl_uniq)}) with score freq: {list(zip(*np.histogram(dscount)))}")
 
-    def collect(self, infos: List[dict], total_num_steps: int):
-        """
-            Send infos for good candidates to keep buffer for topK
-            Dict should have following keys with values ("proxy", "qed", "synth", "smiles", "score")
-            TopK will be chosen based on the score value
+    debug_logs = {}
+    debug_hist = None
 
-            total_num_steps: number of steps at collection time
-        """
+    # -- Debug code for debug environment
+    if hasattr(proxy, "_tgt_score_edges"):
+        e_bin_cnt, e_bin_edge = np.histogram(dscount, bins=proxy._tgt_score_edges)
 
-        # If proxy exist -> rest of the scores exist
-        send_info = []
-        for sinfo in infos:
-            self._collected += 1
-            if "score" not in sinfo:
-                self._no_score_infos += 1
-            elif sinfo["score"] is None:
-                self._none_score_infos += 1
-            else:
-                send_info.append(sinfo)
+        tgt_bins = proxy._tgt_r_bin_probs * len(dscount)
 
-        if len(send_info) > 0:
-            self.log_stats_remote_send.put((0, (infos,)))
+        print(f"[DEBUG] Eval bin cnt (in tgt edge): {e_bin_cnt.tolist()}")
+        print(f"[DEBUG] EVAL target bin_cnt {np.around(tgt_bins, 1).tolist()}")
+        print(f"[DEBUG] Eval diff to target: {np.around(e_bin_cnt - tgt_bins, 1).tolist()}")
+        e_prob = e_bin_cnt / len(dscount)
 
-        if total_num_steps > self._last_topk_step + self.log_topk_freq:
-            self.send_stats_request(total_num_steps)
-            self._last_topk_step = total_num_steps
+        mae = np.abs(e_prob - proxy._tgt_r_bin_probs)
+        debug_logs = {"evalH_tgt_mae": np.mean(mae), "evalH_tgt_max": np.max(mae),
+                      "debug_found_top": proxy.found_top()}
 
-    def get_stats(self):
-        """ Non-blocking get """
-        log_stats_remote_recv = self.log_stats_remote_recv
-        ret_log_stats = []
-        while not log_stats_remote_recv.empty():
-            log_stats = log_stats_remote_recv.get()
-            log_stats.update(self._req_stats[log_stats["total_num_steps"]])
-            ret_log_stats.append(log_stats)
-            self.recv_logtop += 1
+        # plot histogram
+        # Plot history of eval samples vs tgt
+        if not hasattr(proxy, "_evalh_history"):
+            proxy._evalh_history = [proxy._tgt_r_bin_probs * dscount.maxlen]
+            proxy._evalh_err_history = [np.zeros_like(proxy._tgt_r_bin_probs)]
 
-        return ret_log_stats
+        evalh_history = proxy._evalh_history
+        evalh_err_history = proxy._evalh_err_history
 
-    def _local_stats(self):
-        collected = self._collected
-        stats = {
-            "topk_received": collected,
-        }
-        if self._collected > 0:
-            stats["topk_no_score"] = self._no_score_infos / collected
-            stats["topk_none_score"] = self._none_score_infos / collected
-            stats["topk_has_score"] = (self._no_score_infos + self._none_score_infos) / collected
+        evalh_history.append(e_bin_cnt)
+        evalh_err_history.append(e_bin_cnt - tgt_bins)
 
-        self._collected = 0
-        self._no_score_infos = 0
-        self._none_score_infos = 0
-        return stats
+        show_edges = proxy._show_tgt_score_edges[1:]
+        zrange = proxy._tgt_probs_zrange
 
-    def send_stats_request(self, total_num_steps: int):
-        """
-            Non blocking send request. LogTopStats will start calculating TopK with current buffer
-        """
-        if (self.sent_logtop - self.recv_logtop) < 2:
-            self._req_stats[total_num_steps] = self._local_stats()
-            self.log_stats_remote_send.put((1, total_num_steps))
-            self.sent_logtop += 1
-        else:
-            print(f"NOT GOOD. Skipping log top {total_num_steps}")
+        debug_hist = [
+            ("mevalH_debug_h", show_histogram(evalh_history, dscount.maxlen, show_edges, zrange=zrange)),
+            ("mevalH_debug_err_h", show_histogram(evalh_err_history, dscount.maxlen, show_edges))
+        ]
+
+        # run debug
+        if hasattr(proxy, "_debug_batch"):
+            debug_batch = proxy._debug_batch
+            out_dir = f"{args.out_dir}/debug"
+
+            if not os.path.isdir(out_dir):
+                os.mkdir(out_dir)
+                torch.save({"debug_batch": debug_batch}, f"{out_dir}/debug_batch.pk")
+
+            with torch.no_grad():
+                parents_out = model(debug_batch.parents.clone())
+                state_out = model(debug_batch.state.clone())
+            torch.save(
+                {"parents_out": parents_out, "state_out": state_out, **debug_logs},
+                f"{out_dir}/eval_{epoch}.pk"
+            )
+
+    print(f"PROXY (num uniq {len(proxy._seen)}) with score freq: "
+          f"{list(zip(*np.histogram(proxy._seen_scores)))}")
+
+    return {
+        "drcount": drcount,
+        "dscount": dscount,
+        "candidate_scores": candidate_scores,
+        "debug_hist": debug_hist,
+        "candidate_proxy": candidate_proxy,
+        "debug_logs": debug_logs,
+    }
 
 
-def sample_and_update_dataset(args, model, generator_dataset, proxy):
-    # generator_dataset.set_sampling_model(model, docker, sample_prob=args.sample_prob)
-    # sampler = generator_dataset.start_samplers(8, args.num_samples)
-    print("Sampling")
-    # sampled_mols = sampler()
-    # generator_dataset.stop_samplers_and_join()
-    # import pdb; pdb.set_trace()
+def sample_and_update_dataset_batch(args, model, generator_dataset, proxy, epoch):
+    """ Sample from learned gflow + some debugging code """
+    print("[Evaluation Sampling]")
+
     mdp = generator_dataset.mdp
     nblocks = mdp.num_blocks
-    sampled_mols = []
-    sampled_infos = []
-    rews = []
-    smis = []
+    sampled_mols, sampled_infos, rews, smis = [], [], [], [],
+    blocksize, entropy, exp_sum = [], [], []
+
     max_trials = args.num_samples
-    while len(sampled_mols) < args.num_samples:
-        mol = BlockMoleculeDataExtended()
-        for i in range(args.max_blocks):
-            s = mdp.mols2batch([mdp.mol2repr(mol)])
-            stem_o, mol_o = model(s)
-            logits = torch.cat([stem_o.flatten(), mol_o.flatten()])
-            if i < args.min_blocks:
-                logits[-1] = -1000
+    batch_size = 128
+
+    batch = [BlockMoleculeDataExtended() for _ in range(batch_size)]
+
+    while len(sampled_mols) < args.num_samples and max_trials > 0:
+        states = mdp.mols2batch([mdp.mol2repr(mol) for mol in batch])
+        with torch.no_grad():
+            stem_o, mol_o = model(states)
+
+        stem_idx = states.__slices__["stems"]
+
+        for imol in range(len(batch)):
+            done = False
+            s_o, m_o = stem_o[stem_idx[imol]: stem_idx[imol + 1]], mol_o[imol: imol + 1]
+
+            logits = torch.cat([s_o.flatten(), m_o.flatten()])
+            if len(batch[imol].blockidxs) < args.min_blocks:
+                logits[-1] = -1000  # TODO hardcoded - value is used in other places
+
             cat = Categorical(logits=logits)
+            blocksize.append(len(batch[imol].blockidxs))
+            entropy.append(cat.entropy().item())
+            exp_sum.append(torch.exp(logits).sum().item())
+
             act = cat.sample().item()
             if act == logits.shape[0] - 1:
-                break
+                done = True
             else:
                 act = (act % nblocks, act // nblocks)
-                mol = mdp.add_block_to(mol, block_idx=act[0], stem_idx=act[1])
-            if not len(mol.stems):
-                break
-        if mol.mol is None:
-            print('skip', mol.blockidxs, mol.jbonds)
+                batch[imol] = mdp.add_block_to(batch[imol], block_idx=act[0], stem_idx=act[1])
 
-            if max_trials > 0:
-                max_trials -= 1
-                continue
-            else:
-                print("Reached Max trails!!!")
-                break
+            if not len(batch[imol].stems):
+                done = True
 
-        # print('here')
-        res_scores, infos = proxy([mol])
-        # This is actually proxy score ( Could be default min if not candidate)
-        mol.reward = res_scores[0]
-        smis.append(mol.smiles)
-        rews.append(mol.reward)
-        sampled_mols.append(mol)
-        sampled_infos.append(infos[0])
-        # print(infos)
-        
+            if len(batch[imol].blockidxs) >= args.max_blocks or done:
+                mol = batch[imol]
+                batch[imol] = BlockMoleculeDataExtended()
+                if mol.mol is None:
+                    print('skip', mol.blockidxs, mol.jbonds)
+                    max_trials -= 1
+                    continue
+
+                r, info = generator_dataset._get_reward(mol)
+
+                # add to online mols from generator so they can be used in training
+                generator_dataset._add_mol_to_online(r, r, mol)
+
+                # This is actually proxy score ( Could be default min if not using candidate score)
+                mol.reward = r
+                smis.append(mol.smiles)
+                rews.append(mol.reward)
+                sampled_mols.append(mol)
+                sampled_infos.append(info)
+
+    # ==============================================================================================
+    # -- DEBUG CODE  # TODO messy / refactor or move somewhere else
+    debug_info = analyse_eval(
+        args=args, generator_dataset=generator_dataset, proxy=proxy, model=model, epoch=epoch,
+        sampled_infos=sampled_infos, smis=smis, rews=rews, blocksize=blocksize, entropy=entropy,
+        exp_sum=exp_sum)
+
+    drcount, dscount, candidate_scores, debug_hist, candidate_proxy, debug_logs = \
+        debug_info["drcount"], debug_info["dscount"], \
+        debug_info["candidate_scores"], debug_info["debug_hist"], debug_info["candidate_proxy"], \
+        debug_info["debug_logs"]
+
+    # ==============================================================================================
+
+    eval_r_90 = np.mean(drcount)
+    eval_score_90 = np.mean(dscount)
+    print(f"EVAL R 90%: {eval_r_90}")
+    print(f"EVAL Score 90%: {eval_score_90}")
+
     print("Computing distances")
     dists = []
     for m1, m2 in zip(sampled_mols, sampled_mols[1:] + sampled_mols[:1]):
         dist = DataStructs.FingerprintSimilarity(Chem.RDKFingerprint(m1.mol),
                                                  Chem.RDKFingerprint(m2.mol))
         dists.append(dist)
-    print("Get batch rewards")
-    rewards = []
-    for m in sampled_mols:
-        rewards.append(m.reward)
 
-    candidate_proxy = [x["proxy"] for x in sampled_infos if x["proxy"] is not None]
-    return rews, smis, \
-           {'dists': dists, 'proxy': rewards}, \
-           {**calc_metrics("eval_proxy", candidate_proxy),
-            f'eval_dists_mean': np.mean(dists), f'eval_dists_sum': np.sum(dists)},\
+    return candidate_scores, smis, \
+           {'dists': dists, "rews": rews, "debug_hist": debug_hist}, \
+           {**calc_metrics("eval_proxy", candidate_proxy), **debug_logs,
+            f'eval_dists_mean': np.mean(dists), f'eval_dists_sum': np.sum(dists),
+            f"eval_r_90": eval_r_90, f"eval_s_90": eval_score_90,
+            "eval_num_blocks_mean": np.mean([len(x.blockidxs) for x in sampled_mols]),
+            # f"evalH_tgt_std": np.std(e_r_bin_cnt - tgt_bin),
+            f"proxy_seen_count": len(proxy._seen),
+            # f"proxy_seen_sum_r": sum_r_seen,
+            "proxy_seen_nan_count": proxy._seen_nan_count},\
            sampled_infos
 
 
@@ -233,6 +271,13 @@ def preprocess_args(args: Namespace):
     out_dir = setup_loggers(args)
     add_to_cfg(args, None, "out_dir", out_dir)
 
+    # -- For grid experiment change Ref everywhere manually
+    add_to_cfg(args, None, "repr_type", args.gflow_dataset.mdp_init.repr_type)
+    add_to_cfg(args, None, "floatX", args.gflow_dataset.mdp_init.floatX)
+    add_to_cfg(args, None, "min_blocks", args.gflow_dataset.min_blocks)
+    add_to_cfg(args, None, "max_blocks", args.gflow_dataset.max_blocks)
+    args.gflow_eval.eval_freq = args.main.eval_freq
+
     return args
 
 
@@ -252,15 +297,14 @@ def run(args):
     num_outer_loop_iters = main_args.num_outer_loop_iters
 
     # -- Load classes to generate scores
-    proxy = CandidateWrapper(args.proxy)
-    # proxy = load_proxy(args.proxy)
-    # proxy.to(device)
+    proxy = PROXY_WRAPPERS[args.proxy.name](args.proxy)
+    proxy.to(device)
 
     # ==============================================================================================
     # -- GFlow training dataset (Generates samples and manages training batches)
     _gen_class = get_gflow_dataset(gflow_dataset_args)
-
-    if getattr(gflow_dataset_args, "wrapper", None) is not None:
+    _wrapper = getattr(gflow_dataset_args, "wrapper", None)
+    if _wrapper is not None and _wrapper != "":
         gflow_dataset_args.name = gflow_dataset_args.wrapper
         _wrapped_class = get_gflow_dataset(gflow_dataset_args)
         _wrapped_class.__bases__ = (_gen_class,)
@@ -282,6 +326,8 @@ def run(args):
     gflow_eval_args = args.gflow_eval
     eval_freq = gflow_eval_args.eval_freq
     last_eval_step = 0
+    if hasattr(proxy, "debug"):
+        proxy.debug(gen_model_dataset)
 
     # RUN TOPK
     # Get remote calculation of logs for topk stats (because we also calculate dockscore)
@@ -292,9 +338,11 @@ def run(args):
     log_summary = SummaryStats(log_wandb=do_plot)
 
     plot_train_k = ["train_loss_mean", "train_num_mol", "total_num_steps",
+                    "train_num_sampled_mols", "num_sampled_mols",
                     "train_num_trajectories", "train_r_mean", "train_r_max", "FPS_mean"]
-    plot_eval_k = ["eval_proxy_mean", "eval_proxy_cnt"]
-    plot_top_k = ["top100_proxy_mean", "top100_proxy_count", "top100_count"]
+    plot_eval_k = ["eval_proxy_mean", "eval_proxy_min", "eval_proxy_cnt"]
+    plot_top_k = ["top100_proxy_mean", "top100_proxy_min", "all_time_top10_score_mean",
+                  "top100_proxy_count", "top100_count"]
 
     def plot_keys(keys: List[str], metrics: dict):
         print_txt = " | ".join([f"{k}: {metrics[k]:.2f}" for k in keys if k in metrics])
@@ -309,57 +357,155 @@ def run(args):
         gflow_args, model=model, proxy=proxy, dataset=gen_model_dataset, do_save=False
     )
     num_iterations = gflow_args.num_iterations
+    max_sampled_mols = getattr(gflow_args, "max_sampled", 0)
 
+    # ==============================================================================================
+    # -- Pre-load online mols
+    pre_load_online_mols = getattr(gflow_dataset_args, "pre_load_online_mols", 0)
+    if pre_load_online_mols > 0:
+        from LambdaZero.examples.lightrl.utils.dataset_loaders import load_predocked_df
+        pre_load_filter_cand = getattr(gflow_dataset_args, "pre_load_filter_cand", False)
+        pre_load_add_max = getattr(gflow_dataset_args, "pre_load_add_max", 1.)
+
+        df = load_predocked_df(Namespace(with_scores=True, dockscore_unique=True))
+
+        if pre_load_filter_cand:
+            # Expecting that proxy contains thresholds for qed and synth
+            qed_th, synth_th = proxy.qed_th, proxy.synth_th
+            df = df[(df.qed_score >= qed_th) & (df.synth_score >= synth_th)]
+
+        # Debug might have a different num of blocks
+        df = df[df.blockidxs.apply(max) < gen_model_dataset.mdp.num_blocks]
+
+        # Filter by min/max num blocks
+        num_blocks = df.blockidxs.apply(len)
+        df = df[(num_blocks >= gflow_dataset_args.min_blocks) &
+                (num_blocks <= gflow_dataset_args.max_blocks)]
+
+        # Choose mols based on best dockscore ... which should be correlated with proxy
+        df = df.sort_values("dockscore", ascending=True)
+        num_best = int(pre_load_online_mols * pre_load_add_max)
+        preloaded_mol = df.iloc[:num_best]
+        if pre_load_online_mols - num_best > 0:
+            other = df.iloc[num_best:].sample(pre_load_online_mols - num_best)
+            preloaded_mol = pd.concat([preloaded_mol, other])
+
+        # Calculate proxy score for mols
+        mols = [gen_model_dataset.mdp.load(x) for x in preloaded_mol.to_dict(orient="records")]
+
+        max_batch = 256
+        online_mols = []
+        rrrs = []
+        proxy_scores = []
+        for ibatch in range(0, len(mols), max_batch):  # run in max batch
+            pmols = mols[ibatch: ibatch + max_batch]
+            res_scores, infos = proxy(pmols)
+            rrr = gen_model_dataset.r2r(dockscore=np.array(res_scores)).tolist()
+            rrrs += rrr
+            online_mols.extend(list(zip(rrr, rrr, pmols)))
+            proxy_scores += [x["proxy"] for x in infos]
+
+        for xonline in online_mols:
+            gen_model_dataset._add_mol_to_online(*xonline)
+
+        print(f"Added {len(online_mols)} mols with reward "
+              f"mean {np.mean(rrrs)} | min {min(rrrs)} | max {max(rrrs)}")
+
+        proxy_scores = sorted(proxy_scores)
+        print(f"Histogram of proxy scores: {np.histogram(proxy_scores)}")
+        print(f"Proxy min: {min(proxy_scores)} | Top100 mean: {np.mean(proxy_scores[:100])}")
+
+    # ==============================================================================================
+    num_sampled_mols = 0  # TODO no active learning implemented yet
     for i in range(num_outer_loop_iters):
         print(f"Starting step: {i}")
+
         # Initialize model and dataset for training generator
         # train model with with proxy
+        # TODO Should have here some active learning code
 
         for epoch in range(num_iterations):
-            model, _, training_metrics = gflow_trainer.train_epoch(epoch)
-            train_data_stats, train_mol_infos = gen_model_dataset.get_stats()
+            training_metrics = gen_model_dataset.run_train_batch(gflow_trainer, epoch)
+            train_data_stats, new_sampled_mol_infos = gen_model_dataset.get_stats(epoch)
+
             training_metrics.update(train_data_stats)
-            num_steps = training_metrics["total_num_steps"]
+            trainer_num_smpl = gen_model_dataset.sampled_mols_cnt
 
-            print(f"[E {epoch}] [TRAIN] {plot_keys(plot_train_k, training_metrics)}")
-            training_metrics["epoch"] = epoch
-            training_metrics["outer_epoch"] = i
+            # Every eval_freq number of training molecules add a batch of evaluation molecules
+            if eval_freq > 0 and trainer_num_smpl >= last_eval_step + eval_freq:
 
-            if eval_freq > 0 and num_steps > last_eval_step + eval_freq:
-                r, s, batch_metrics, log_metrics, sample_infos = sample_and_update_dataset(
-                    gflow_eval_args, model, gen_model_dataset, proxy
-                )
-                train_mol_infos += sample_infos
+                model.eval()
+                eval_r, s, batch_metrics, log_metrics, sample_infos = \
+                    sample_and_update_dataset_batch(
+                        gflow_eval_args, model, gen_model_dataset, proxy, epoch
+                    )
+                model.train()
+
+                new_sampled_mol_infos += sample_infos
                 log_summary.update(log_metrics)
                 training_metrics.update(log_metrics)
-                last_eval_step = num_steps
-                print("-"*100, f"\n[E {epoch}] [EVAL] {plot_keys(plot_eval_k, log_metrics)}\n", "-"*100)
+                last_eval_step += eval_freq
+
+                # Plot evaluation stuff
+                if do_plot:
+                    wandb.log({"evalH_r_h": wandb.Histogram(gen_model_dataset.debug_r_counter)})
+                    wandb.log({"evalH_s_h": wandb.Histogram(gen_model_dataset.debug_s_counter)})
+
+                    debug_hist = batch_metrics.get("debug_hist", None)
+                    if debug_hist is not None:
+                        for hname, hinfo in debug_hist:
+                            wandb.log({hname: hinfo})
+
+                p_eval = trainer_num_smpl/(num_sampled_mols + len(new_sampled_mol_infos))*100
+                training_metrics["p_eval_mols"] = p_eval
+
+                print("-"*100, f"\n[E {epoch}] [EVAL] {plot_keys(plot_eval_k, log_metrics)}")
+                print(f"[E {epoch}] [EVAL] Fraction of eval out of all sampled {p_eval:.2f} %")
+                print("-"*100)
+
+            num_sampled_mols += len(new_sampled_mol_infos)
+            training_metrics["epoch"] = epoch
+            training_metrics["outer_epoch"] = i
+            training_metrics["num_sampled_mols"] = num_sampled_mols
+            print(f"[E {epoch}] [TRAIN] {plot_keys(plot_train_k, training_metrics)}")
 
             if do_plot:
                 wandb.log(training_metrics)
 
             if args.main.log_topk_freq > 0:
                 # It starts calculating topk Automatically every args.main.log_topk_freq steps
-                log_top_k.collect(train_mol_infos, num_steps)
+                # Be sure that we send to collect all mol that want to be counted
+                # We will calculate logging step based on Number of collected molecules
+                log_top_k.collect(
+                    new_sampled_mol_infos,
+                    {"total_num_steps": training_metrics["total_num_steps"],
+                    "step_num_sampled_mols": num_sampled_mols,
+                     "train_num_sampled_mols": training_metrics["train_num_sampled_mols"]}
+                )
 
                 # Get async TopK logs (Has a different total_num_steps than previous logs)
                 all_stats_top_k = log_top_k.get_stats()
 
                 for stats_top_k in all_stats_top_k:
-                    print("-"*100, f"\n[E {epoch}] [TOPK] {plot_keys(plot_top_k, stats_top_k)}\n", "-"*100)
+                    print("-"*100,
+                          f"\n[E {epoch}] [TOPK] {plot_keys(plot_top_k, stats_top_k)}\n",
+                          "-"*100)
                     log_summary.update(stats_top_k)
                     if do_plot:
                         wandb.log(stats_top_k)
 
-        gflow_trainer.stop_everything()
+            if max_sampled_mols > 0 and num_sampled_mols > max_sampled_mols:
+                break
+
+    gflow_trainer.stop_everything()
+    gen_model_dataset.stop_samplers_and_join()
+
+    # Sometimes wandb gets stuck; let's help him with everything we have :)
+    print("IT'S WANDB`s fault"); sys.stdout.flush(); time.sleep(5); os._exit(0)
+    sys.exit(); exit();  quit()
 
 
 if __name__ == "__main__":
-    import torch.multiprocessing as mp
-    try:
-        mp.set_start_method('spawn')
-    except:
-        print("already set context")
 
     from LambdaZero.examples.lightrl.utils.utils import parse_opts
     run(parse_opts())
