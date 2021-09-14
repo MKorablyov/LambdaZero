@@ -1,0 +1,10 @@
+gflow_model:
+  name: ["DeeperGCNv0"]
+
+proxy:
+  name: ["ProxyOnlyWrapper"]
+
+gflow_dataset:
+  iter_sample_new_online_split: [1, 0.5, 0.75]
+  mdp_init:
+    repr_type: ['atom_graph']

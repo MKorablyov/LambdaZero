@@ -2,57 +2,62 @@ project_name: gflow
 
 main:
   use_gpu: &use_gpu True
-  seed: 13
-  plot: False
+  seed: 0
+  plot: True # False # True
   num_outer_loop_iters: 1
   log_topk: 100  # Training step freq to log top k -> procs * num_steps * interval frames
-  log_topk_freq: 204800
+  log_topk_freq: 5000 # 33153 # 33153 # 204800
   log_dockscore: False
-  eval_freq: &eval_freq 68000
+  eval_freq: &eval_freq 1000 #
 
 proxy:
-  name: CandidateWrapper
+  name: ProxyOnlyWrapper # ProxyDebugWrapper # ProxyOnlyWrapper
   proxy:
     name: ProxyExample
     checkpoint: "/scratch/andrein/Datasets/Datasets/best_model.pk"
   default_score: 16
 
 gflow_dataset:
-  name: OnlineDataFeed # OnlineDataFeed
+  name: DataGeneratorMultiProc # DataGenerator - for easier debugging
   wrapper:
   mdp_init:
-    bpath: "fragdb/blocks_PDB_105.json"
+    bpath: "fragdb/fix_131.json" # <<<<
     repr_type: &repr_type 'block_graph'  # )
     include_nblocks: False
     floatX: &floatX 'float64'  #)
 
   min_blocks: &min_blocks 2 #, type=int)
-  max_blocks: &max_blocks 7  #, type=int)
+  max_blocks: &max_blocks 7  # <<<<
   reward_exp: 10  #, type=float)
   reward_norm: 8  #, type=float)
   random_action_prob: 0.05  #, type=float)
-  R_min: 0.1  # , type=float)
+  R_min: 0.000001  # , type=float)
   do_wrong_thing: False
   sample_prob: 1.
-  sample_procs: 6
-  sample_proc_buffer_size: 64
-  batch_procs: 0
-  sample_batch_buffer_size: 3
+  sample_procs: 16
   repr_procs: 10
   iter_sample_new_traj: 16 # , New trajectories to sample each training batch
-  max_transition_buffer_size: 266 # , New trajectories to sample each training batch
-  max_online_mols: 1000 # , New trajectories to sample each training batch
+  max_transition_buffer_size: 20000 # 256 # , New trajectories to sample each training batch
+  max_online_mols: 2000 # , New trajectories to sample each training batch
+
+  iter_sample_online: 0
+  iter_sample_new_online_split: 1.
+  pre_load_online_mols: 0 # New trajectories to sample each training batch
+  pre_load_filter_cand: False # New trajectories to sample each training batch
+  pre_load_add_max: 1. # 0. Random sample from available - 1. choose best
 
 gflow_model:
   name: GraphAgent
   repr_type: *repr_type
+  out_per_stem: 131
   nemb: 256 # , help="#hidden", type=int)
   num_conv_steps: 10  #, type=int)
   model_version: 'v4'  #)
   floatX: *floatX  #)
+  out_per_mol: 1
 
 gflow:
-  name: TrainGFlowV2
+  name: BasicTrainer # TrainGFlowFwdBack # TrainGFlowV2
   optim: Adam
   optim_args:
     lr: 5.e-4 # , help="Learning rate", type=float)
@@ -60,13 +65,15 @@ gflow:
     betas: [0.9, 0.999] # , type=float)
     eps: 1.e-8 # , type=float)
 
-  batch_size: 256 # , help="Transition batch size" (could be approx if sampling traj))
+  traj_batch_size: 16
+#  batch_size: 256 # , help="Transition batch size" (could be approx if sampling traj))
   kappa: 0.1 # , type=float)
-  num_iterations: 300000 #, type=int)
+  num_iterations: 3000000 #, type=int)
   log_reg_c: 2.4414062500000004e-08 # (0.1/8)**4  #, type=float)
   sample_prob: 1  #, type=float)
   clip_grad: 0  #, type=float)
   clip_loss: 0  #, type=float)
+  clip_policy: 300.  #, type=float)
   leaf_coef: 10  #, type=float)
   bootstrap_tau: 0  #, type=float)
   do_nblocks_reg: False  #, type=float)
@@ -79,6 +86,6 @@ gflow:
 gflow_eval:
   eval_freq: *eval_freq
   cpu_req: 8
-  num_samples: 200
+  num_samples: 256
   max_blocks: *max_blocks
   min_blocks: *min_blocks
