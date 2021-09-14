@@ -121,17 +121,29 @@ def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
             stems=f([(0,0)]),
             stemtypes=f([mdp.num_stem_types])) # also extra stem type embedding
         return data
-    edges = [(i[0], i[1]) for i in mol.jbonds]
-    #edge_attrs = [mdp.bond_type_offset[i[2]] +  i[3] for i in mol.jbonds]
+
     t = mdp.true_blockidx
-    if 0:
-        edge_attrs = [((mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2]) * mdp.num_stem_types +
-                       (mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3]))
-                      for i in mol.jbonds]
-    else:
-        edge_attrs = [(mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2],
-                       mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3])
-                      for i in mol.jbonds]
+
+    edges = []
+    edge_attrs = []
+    for ijbond in mol.jbonds:
+        edges += [(ijbond[0], ijbond[1]), (ijbond[1], ijbond[0])]
+        edge_attrs += [
+            (mdp.stem_type_offset[t[mol.blockidxs[ijbond[0]]]] + ijbond[2],
+             mdp.stem_type_offset[t[mol.blockidxs[ijbond[1]]]] + ijbond[3]),
+            (mdp.stem_type_offset[t[mol.blockidxs[ijbond[1]]]] + ijbond[3],
+             mdp.stem_type_offset[t[mol.blockidxs[ijbond[0]]]] + ijbond[2]),
+        ]
+
+    # if 0:
+    #     edge_attrs = [((mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2]) * mdp.num_stem_types +
+    #                    (mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3]))
+    #                   for i in mol.jbonds]
+    # else:
+    #     edge_attrs = [(mdp.stem_type_offset[t[mol.blockidxs[i[0]]]] + i[2],
+    #                    mdp.stem_type_offset[t[mol.blockidxs[i[1]]]] + i[3])
+    #                   for i in mol.jbonds]
+
     # Here stem_type_offset is a list of offsets to know which
     # embedding to use for a particular stem. Each (blockidx, atom)
     # pair has its own embedding.
@@ -142,7 +154,7 @@ def mol2graph(mol, mdp, floatX=torch.float, bonds=False, nblocks=False):
                 edge_attr=f(edge_attrs) if len(edges) else f([]).reshape((0,2)),
                 stems=f(mol.stems) if len(mol.stems) else f([(0,0)]),
                 stemtypes=f(stemtypes) if len(mol.stems) else f([mdp.num_stem_types]))
-    data.to(mdp.device)
+    # data.to(mdp.device)  # TODO DISABLE
     assert not bonds and not nblocks
     #print(data)
     return data
