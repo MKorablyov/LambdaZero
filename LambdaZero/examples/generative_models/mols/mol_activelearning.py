@@ -31,6 +31,8 @@ import torch.nn.functional as F
 from torch_geometric.data import Data, Batch
 import torch_geometric.nn as gnn
 from torch.distributions.categorical import Categorical
+import sys
+import wandb
 
 import LambdaZero.models
 from LambdaZero import chem
@@ -47,6 +49,7 @@ from mol_mdp_ext import MolMDPExtended, BlockMoleculeDataExtended
 import model_atom, model_block, model_fingerprint
 from train_proxy import Dataset as _ProxyDataset
 from main_flow import Dataset as GenModelDataset
+from LambdaZero.examples.lightrl.utils.utils import LogTopStats
 
 import importlib
 importlib.reload(model_atom)
@@ -86,6 +89,8 @@ parser.add_argument("--progress", action='store_true')
 parser.add_argument("--include_nblocks", default=False)
 parser.add_argument("--proxy_load", default=None)
 parser.add_argument("--proxy_save", action='store_true')
+parser.add_argument("--redirect_stdout", action='store_true')
+parser.add_argument("--use_wandb", action='store_true')
 parser.add_argument("--dock_db_path", default='/scratch/mjain/dock_db_1619111711tp_2021_04_22_13h.h5')
 
 # gen_model
@@ -97,16 +102,17 @@ parser.add_argument("--opt_epsilon", default=1e-8, type=float)
 parser.add_argument("--kappa", default=0.1, type=float)
 parser.add_argument("--nemb", default=256, help="#hidden", type=int)
 parser.add_argument("--min_blocks", default=2, type=int)
-parser.add_argument("--max_blocks", default=6, type=int)
+parser.add_argument("--max_blocks", default=7, type=int)
 parser.add_argument("--num_iterations", default=30000, type=int)
 parser.add_argument("--num_conv_steps", default=10, type=int)
 parser.add_argument("--log_reg_c", default=(0.1/8)**4, type=float)
-parser.add_argument("--reward_exp", default=8, type=float)
+parser.add_argument("--reward_exp", default=10, type=float)
 parser.add_argument("--reward_norm", default=8, type=float)
-parser.add_argument("--R_min", default=0.1, type=float)
+parser.add_argument("--R_min", default=0.0001, type=float)
 parser.add_argument("--sample_prob", default=1, type=float)
 parser.add_argument("--clip_grad", default=0, type=float)
 parser.add_argument("--clip_loss", default=0, type=float)
+parser.add_argument("--clip_policy", default=30., type=float)
 parser.add_argument("--random_action_prob", default=0.05, type=float)
 parser.add_argument("--leaf_coef", default=10, type=float)
 parser.add_argument("--replay_mode", default='online', type=str)
@@ -293,7 +299,8 @@ def make_model(args, mdp, is_proxy=False):
 
 
 _stop = [None]
-def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=True):
+def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=True, plot=False,
+                           log_topk=None):
     debug_no_threads = False
     device = torch.device('cuda')
 
@@ -309,7 +316,12 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
         os.makedirs(exp_dir, exist_ok=True)
 
     model = model.double()
-    proxy.proxy = proxy.proxy.double()
+    if hasattr(proxy, "proxy"):
+        proxy.proxy = proxy.proxy.double()
+        norm_proxy = True
+    else:
+        norm_proxy = False
+
     # import pdb; pdb.set_trace()
     dataset.set_sampling_model(model, proxy, sample_prob=args.sample_prob)
 
@@ -367,6 +379,10 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
     do_nblocks_reg = False
     max_blocks = args.max_blocks
     leaf_coef = args.leaf_coef
+    clip_policy = args.clip_policy
+
+    total_num_steps = 0
+    last_logged_smols = len(dataset.sampled_mols)
 
     for i in range(num_steps):
         if not debug_no_threads:
@@ -390,6 +406,12 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
             stem_out_s, mol_out_s = model(s, None)
         # parents of the state outputs
         stem_out_p, mol_out_p = model(p, None)
+
+        # values too big  - problems when torch.exp
+        if clip_policy > 0:
+            for p_out in [stem_out_s, mol_out_s, stem_out_p, mol_out_p]:
+                p_out.clip_(-clip_policy, clip_policy)
+
         # index parents by their corresponding actions
         qsa_p = model.index_output_by_action(p, stem_out_p, mol_out_p[:, 0], a)
         # then sum the parents' contribution, this is the inflow
@@ -445,8 +467,35 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
             for _a,b in zip(model.parameters(), target_model.parameters()):
                 b.data.mul_(1-tau).add_(tau*_a)
 
+        total_num_steps += ntransitions
 
-        if not i % 100:
+        if len(dataset.sampled_mols) > last_logged_smols:
+            new_mols = dataset.sampled_mols[last_logged_smols:]
+            last_logged_smols = len(dataset.sampled_mols)
+
+            infos = [
+                {"proxy": x[1].proxy, "score": -1 * x[1].proxy, "smiles": x[1].smiles}
+                for x in new_mols
+            ]
+            log_topk.collect(infos)
+
+            if log_topk.last_log_step + log_topk.log_topk_freq < total_num_steps:
+                topk_stats = log_topk.log()
+                topk_stats["total_num_steps"] = total_num_steps
+                topk_stats["train_num_sampled_mols"] = len(dataset.sampled_mols)
+                while log_topk.last_log_step + log_topk.log_topk_freq < total_num_steps:
+                    log_topk.last_log_step += log_topk.log_topk_freq
+
+                print("TopK\n", topk_stats)
+                if plot:
+                    wandb.log(topk_stats)
+
+        # if True:
+        #     last_mols = dataset.sampled_mols[-1000:]
+        #     new_mol_r = [x[0] for x in last_mols]
+        #     print(f"Debug [{len(dataset.sampled_mols)}] R_mean {np.mean(new_mol_r):.4f} | R_90 {np.percentile(new_mol_r, 90):.4f} | R_max {np.max(new_mol_r):.4f} | ntrans {ntransitions}")
+
+        if not i % 100:  # 100
             last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
             print(i, last_losses)
 
@@ -455,11 +504,30 @@ def train_generative_model(args, model, proxy, dataset, num_steps=None, do_save=
             print('time:', time.time() - time_last_check)
             time_last_check = time.time()
             last_losses = []
+            sys.stdout.flush()
+
+            if plot:
+
+                last_mols = dataset.sampled_mols[-64:]
+                new_mol_r = [x[0] for x in last_mols]
+                last_mol_dockscore = [dataset.inv_r2r(x) for x in new_mol_r]
+                log_scores = {
+                    "total_num_steps": total_num_steps,
+                    "train_num_sampled_mols": len(dataset.sampled_mols),
+                    "train_sampled_mols_R_mean": np.mean(new_mol_r),
+                    "train_sampled_mols_R_min": np.min(new_mol_r),
+                    "train_sampled_mols_R_max": np.max(new_mol_r),
+                    "train_sampled_mols_DS_mean": np.mean(last_mol_dockscore),
+                    "train_sampled_mols_DS_min": np.min(last_mol_dockscore),
+                    "train_sampled_mols_DS_max": np.max(last_mol_dockscore),
+                }
+                print(log_scores)
+                wandb.log(log_scores)
 
             if not i % 1000 and do_save:
                 save_stuff()
 
-    stop_everything()
+    # stop_everything()
     if do_save:
         save_stuff()
     return model, dataset, {'train_losses': train_losses,
@@ -479,6 +547,7 @@ def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, doc
     nblocks = mdp.num_blocks
     sampled_mols = []
     rews = []
+    scores = []
     smis = []
     while len(sampled_mols) < args.num_samples:
         mol = BlockMoleculeDataExtended()
@@ -506,7 +575,8 @@ def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, doc
         # mol.smiles = s
         smis.append(mol.smiles)
         rews.append(mol.reward)
-        print(mol.smiles, mol.reward)
+        scores.append(score)
+        print(mol.smiles, mol.reward, score)
         sampled_mols.append(mol)
     
     print("Computing distances")
@@ -521,7 +591,9 @@ def sample_and_update_dataset(args, model, proxy_dataset, generator_dataset, doc
     print("Add to dataset")
     proxy_dataset.add_samples(sampled_mols)
     return proxy_dataset, rews, smis, {
-        'dists': dists, 'rewards': rewards, 'reward_mean': np.mean(rewards), 'reward_max': np.max(rewards),
+        'dists': dists, 'rewards': rewards, 'reward_mean': np.mean(rewards),
+        'reward_max': np.max(rewards), 'reward_min': np.min(rewards),
+        'scores_mean': np.mean(scores), 'scores_max': np.max(scores), 'scores_min': np.min(scores),
         'dists_mean': np.mean(dists), 'dists_sum': np.sum(dists)
     }
 
@@ -531,7 +603,14 @@ def test_500(proxy, proxy_dataset, topk=500):
     from LambdaZero.examples.lightrl.utils.dataset_loaders import load_predocked_df
     from argparse import Namespace
 
-    proxy.proxy = proxy.proxy.double()
+    if hasattr(proxy, "proxy"):
+        proxy.proxy = proxy.proxy.double()
+        norm_proxy = True
+    else:
+        norm_proxy = False
+        # proxy = proxy.double()
+        pass
+
     mdp = proxy_dataset.mdp
 
     df = load_predocked_df(Namespace(filter_candidates=True))
@@ -543,13 +622,18 @@ def test_500(proxy, proxy_dataset, topk=500):
     tgt_dockscores = test_df.dockscore.values
 
     predictions = [proxy(x) for x in mols]
-    dockscore_pred = np.array([proxy_dataset.inv_r2r(x) for x in predictions])
+    if norm_proxy:
+        dockscore_pred = np.array([proxy_dataset.inv_r2r(x) for x in predictions])
+    else:
+        dockscore_pred = np.array([x[0] for x in predictions])
+
     l1diff = np.abs(tgt_dockscores - dockscore_pred)
 
     print(f"[TEST{topk}] MAE Mean : {np.mean(l1diff)} | max: {np.max(l1diff)} | min : {np.min(l1diff)}")
 
 
 def main(args):
+
     bpath = osp.join(datasets_dir, "fragdb/blocks_PDB_105.json")
     device = torch.device('cuda')
     proxy_repr_type = args.proxy_repr_type
@@ -572,6 +656,10 @@ def main(args):
     exp_dir = f'{args.save_path}/proxy_{args.array}_{args.run}/'
     os.makedirs(exp_dir, exist_ok=True)
 
+    redirect_stdout = args.redirect_stdout
+    if redirect_stdout:
+        sys.stdout = open(f'{exp_dir}/out.txt', 'w')
+
     print(len(proxy_dataset.train_mols), 'train mols')
     print(len(proxy_dataset.test_mols), 'test mols')
     print(args)
@@ -582,38 +670,69 @@ def main(args):
     metrics = []
 
     if args.proxy_load is not None:
-        chkpt = torch.load(args.proxy_load)
-        proxy.proxy.load_state_dict(chkpt["state_dict"])
-        print("!!!LOADED PROXY FROM CHECKPOINT!!!")
-        test_500(proxy, proxy_dataset)
+        # LOAD original proxy checkpoint
+        # chkpt = torch.load(args.proxy_load)
+        # proxy.proxy.load_state_dict(chkpt["state_dict"])
+        # print("!!!LOADED PROXY FROM CHECKPOINT!!!")
+        # test_500(proxy, proxy_dataset)
+
+        # Load pretrained proxy (~from lightrl):
+        from LambdaZero.examples.proxys import load_proxy
+        from argparse import Namespace
+        args_proxy = Namespace(name="ProxyExample", checkpoint= "/scratch/andrein/Datasets/Datasets/best_model.pk")
+        proxy = load_proxy(args_proxy)
+        # test_500(proxy, proxy_dataset)
     else:
         proxy.train(proxy_dataset)
         if args.proxy_save:
             torch.save({"state_dict": proxy.proxy.state_dict()}, f'{exp_dir}/proxy_checkpoint.pk')
             print("!!!Saved proxy checkpoint!!!")
 
+    use_wandb = args.use_wandb
+    if use_wandb:
+        import wandb
+        from LambdaZero.examples.lightrl.utils.utils import flatten_cfg
+
+        experiment_name = f"run_{args.array}_{args.run}"
+        with open(f"{summaries_dir}/wandb_key") as f:
+            api_key = f.readlines()[0].strip()
+
+        os.environ['WANDB_API_KEY'] = api_key
+
+        wandb.init(project="molactive", name=experiment_name)
+        wandb.config.update(dict(flatten_cfg(args)))
+
+    # Log topk stats
+    log_topk = LogTopStats(score_keys=("proxy",), unique_key="smiles", filter_candidates={})
+    log_topk.log_topk_freq = 204800  # 204800
+    log_topk.last_log_step = 0
+
     for i in range(args.num_outer_loop_iters):
         print(f"Starting step: {i}")
-        # Initialize model and dataset for training generator
-        args.sample_prob = 1
-        args.repr_type = repr_type
-        args.reward_exp = reward_exp
-        args.reward_norm = reward_norm
-        args.replay_mode = "online"
-        gen_model_dataset = GenModelDataset(args, bpath, device)
-        model = make_model(args, gen_model_dataset.mdp)
-        
-        if args.floatX == 'float64':
-            model = model.double()
-        model.to(device)
+        if i == 0:
+            # Initialize model and dataset for training generator
+            args.sample_prob = 1
+            args.repr_type = repr_type
+            args.reward_exp = reward_exp
+            args.reward_norm = reward_norm
+            args.replay_mode = "online"
+            gen_model_dataset = GenModelDataset(args, bpath, device)
+            model = make_model(args, gen_model_dataset.mdp)
+
+            if args.floatX == 'float64':
+                model = model.double()
+            model.to(device)
         # train model with with proxy
         print(f"Training model: {i}")
-        model, gen_model_dataset, training_metrics = train_generative_model(args, model, proxy, gen_model_dataset, do_save=False)
+        model, gen_model_dataset, training_metrics = train_generative_model(args, model, proxy, gen_model_dataset, do_save=False, plot=use_wandb, log_topk=log_topk)
 
         print(f"Sampling mols: {i}")
         # sample molecule batch for generator and update dataset with docking scores for sampled batch
         _proxy_dataset, r, s, batch_metrics = sample_and_update_dataset(args, model, proxy_dataset, gen_model_dataset, docker)
         print(f"Batch Metrics: dists_mean: {batch_metrics['dists_mean']}, dists_sum: {batch_metrics['dists_sum']}, reward_mean: {batch_metrics['reward_mean']}, reward_max: {batch_metrics['reward_max']}")
+        if use_wandb:
+            wandb.log({k: v for k, v in batch_metrics.items() if k not in ["dists", "rewards"]})
+
         rews.append(r)
         smis.append(s)
         args.sample_prob = 0
@@ -640,10 +759,12 @@ def main(args):
                      'args': args},
                     gzip.open(f'{exp_dir}/info.pkl.gz', 'wb'))
 
-        print(f"Updating proxy: {i}")
+        # print(f"Updating proxy: {i}")
         # update proxy with new data
-        proxy.train(proxy_dataset)
-    
+        # proxy.train(proxy_dataset)
+        if redirect_stdout:
+            sys.stdout.flush()
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
