@@ -75,6 +75,7 @@ class BaseProxy(torch.nn.Module):
 
     def _load_representation(self, args: Namespace) -> None:
         bpath = getattr(args, "bpath", osp.join(datasets_dir, "fragdb/blocks_PDB_105.json"))
+        print(f"PROXY fragdb {bpath} (Doesn't really matter for representation)")
 
         self.mdp = MolMDPExtended(bpath)  # Used for generating representation
         mdp_init = getattr(args, "mdp_init", {"repr_type": "atom_graph"})
