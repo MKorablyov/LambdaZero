@@ -272,7 +272,15 @@ class Dataset:
         smi = m.smiles
         if smi in self.train_mols_map:
             return self.train_mols_map[smi].reward
-        return self.r2r(normscore=self.proxy_reward(m))
+        if hasattr(self.proxy_reward, "proxy"):
+            proxy_score = self.proxy_reward(m)
+            _r_args = {"normscore": proxy_score}
+        else:
+            proxy_score = self.proxy_reward([m])[0]
+            _r_args = {"dockscore": proxy_score}
+
+        m.proxy = proxy_score
+        return self.r2r(**_r_args)
 
     def sample(self, n):
         if self.replay_mode == 'dataset':
