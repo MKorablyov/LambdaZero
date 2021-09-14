@@ -34,12 +34,12 @@ class BlockMoleculeData:
         self.slices.append(self.slices[-1] + block.GetNumAtoms())
         self.numblocks += 1
 
-        if len(self.blocks)==1:
+        if len(self.blocks) == 1:
+            # Just 1 stem available (keep the rest pending)
+            # This forces to have all blocks connected to their first stem (if not using del action)
             new_stems = [[self.numblocks - 1, r] for r in block_r]
             self.stems.append(new_stems[0])
             self.pending_stems = new_stems[1:]
-            # print("F", len(self.stems))
-            # [self.stems.append([self.numblocks - 1, r]) for r in block_r]
         else:
             # # add pending stems
             if len(self.blocks) == 2:
