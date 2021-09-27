@@ -306,6 +306,8 @@ def run(args):
     _wrapper = getattr(gflow_dataset_args, "wrapper", None)
     if _wrapper is not None and _wrapper != "":
         gflow_dataset_args.name = gflow_dataset_args.wrapper
+        gflow_dataset_args.base_generator = get_gflow_dataset(gflow_dataset_args)
+
         _wrapped_class = get_gflow_dataset(gflow_dataset_args)
         _wrapped_class.__bases__ = (_gen_class,)
         _gen_class = _wrapped_class

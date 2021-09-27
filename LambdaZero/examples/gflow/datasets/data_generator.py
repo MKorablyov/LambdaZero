@@ -380,6 +380,14 @@ class DataGenerator:
         r, info = self.train_mols_map[smi] = self.r2r(dockscore=res_scores[0]), info
         return r, info
 
+    # This is used by parallel procs generator instead of _get_reward
+    # TODO Fix - have just _get_reward
+    @torch.no_grad()
+    def _get_batch_reward(self, mmms: List[BlockMoleculeDataExtended]) -> Tuple[float, dict]:
+        res_scores, infos = self.proxy_reward(mmms)
+        res_scores = self.r2r(dockscore=np.array(res_scores, dtype=np.float64))
+        return res_scores, infos
+
     def sample2batch(self, samples: List[Transition]) -> TrainBatch:
         """ Input get list of transitions """
         p, a, r, s, d = list(zip(*samples))

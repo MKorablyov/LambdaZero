@@ -16,8 +16,8 @@ from LambdaZero.examples.generative_models.mols.mol_mdp_ext import MolMDPExtende
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
 
-def get_sample_model(send_que: Pipe, recv_que: Pipe, args, model, proxy):
-    dataset = DataGenerator(
+def get_sample_model(send_que: Pipe, recv_que: Pipe, args, model, proxy, _base_generator):
+    dataset = _base_generator(
         args, torch.device("cpu"), model=model, proxy=proxy, sample_prob=args.sample_prob
     )
 
@@ -65,6 +65,7 @@ class DataGeneratorMultiProc(DataGenerator):
         # Variables for online DataFeed
         self._sample_processes = []
         self._recv_sample = None
+        self._base_generator = getattr(args, "base_generator", DataGenerator)
 
     def _init_parallel_sampling(self):
         args = self.args
@@ -85,7 +86,7 @@ class DataGeneratorMultiProc(DataGenerator):
             self._send_sample.append(local2)
             p = Process(
                 target=get_sample_model,
-                args=(remote1, remote2, args, None, proxy))
+                args=(remote1, remote2, args, None, proxy, self._base_generator))
             p.start()
             self._sample_processes.append(p)
 
@@ -182,8 +183,9 @@ class DataGeneratorMultiProc(DataGenerator):
         # # TODO Adapt with memory & maybe improve
         batch = batch[:num_traj]
         final_ms = [x[1][1] for x in batch]
-        res_scores, infos = self.proxy_reward(final_ms)
-        res_scores = self.r2r(dockscore=np.array(res_scores, dtype=np.float64))
+        # res_scores, infos = self.proxy_reward(final_ms)
+        # res_scores = self.r2r(dockscore=np.array(res_scores, dtype=np.float64))
+        res_scores, infos = self._get_batch_reward(final_ms)
 
         transf_batch = []
         shuffle_zips = list(zip(batch, res_scores, infos))
