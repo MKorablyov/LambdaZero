@@ -9,6 +9,9 @@ import bisect
 import wandb
 from collections import deque
 from liftoff import OptionParser, dict_to_namespace
+import rdkit.DataStructs
+from rdkit import Chem
+import operator
 
 from LambdaZero.examples.lightrl.env.transforms import \
     TransformInfoDiscounted, TransformCompose, TransformInfoOracle
@@ -187,7 +190,7 @@ def get_stats(values, name, empty_val: float = 0) -> Dict:
 
 class AllTimeTop:
     """ Keep buffers for best scores """
-    def __init__(self, all_time_topk: List[int] = [10, 100, 100], order_ascending=True,
+    def __init__(self, all_time_topk: List[int] = [10, 100, 1000], order_ascending=True,
                  name: str = "score"):
         self._all_time_topk = all_time_topk
         # Compare new score to worst in buffer
@@ -196,7 +199,7 @@ class AllTimeTop:
         self._best_scores_buffer = {x: [] for x in all_time_topk}
         self._name = name
 
-    def update(self, values: List[float]):
+    def update(self, values: List[float], **kwargs):
         for new_value in values:
             for topk in self._all_time_topk:
                 tokv = self._best_scores_buffer[topk]
@@ -214,24 +217,187 @@ class AllTimeTop:
         return info
 
 
+class NumModes:
+    def __init__(self, tanimoto_thr=0.7):
+        self.tanimoto_thr = tanimoto_thr
+
+        self.modes = []
+
+    def __call__(self, batch):
+        # add one mode if needed
+        start = 0
+        if len(self.modes) == 0:
+            self.modes.append(Chem.RDKFingerprint(batch[0]))
+            start = 1
+
+        for mol in batch[start:]:
+            fp = Chem.RDKFingerprint(mol)
+            sims = np.asarray(rdkit.DataStructs.BulkTanimotoSimilarity(fp, self.modes))
+
+            if all(sims < self.tanimoto_thr):
+                self.modes.append(fp)
+
+        return len(self.modes)
+
+
+class TopKNodes:
+    def __init__(self, tanimoto_thr=0.7, topk=100, name="score"):
+        self.tanimoto_thr = tanimoto_thr
+        self.topk = topk
+        self._name = name
+
+    def __call__(self, batch, scores, ordered):
+        if not ordered:
+            raise NotImplementedError
+
+        # add one mode if needed
+        modes = []
+        modes_score = []
+        topk = self.topk
+        tanimoto_thr = self.tanimoto_thr
+
+        modes.append(Chem.RDKFingerprint(batch[0]))
+        modes_score.append(scores[0])
+
+        idx = 1
+
+        while len(modes) < topk and idx < len(batch):
+            mol = batch[idx]
+            fp = Chem.RDKFingerprint(mol)
+            sims = np.asarray(rdkit.DataStructs.BulkTanimotoSimilarity(fp, modes))
+
+            if all(sims < tanimoto_thr):
+                modes.append(fp)
+                modes_score.append(scores[idx])
+
+            idx += 1
+
+        if len(modes_score) >= topk:
+            return get_stats(modes_score, f"all_time_top{topk}nodes_{self._name}")
+        else:
+            print(f"Not enough nodes {len(modes_score)}")
+
+        return {}
+
+
+class AllTimeTopWithModes:
+    """ Keep buffers for best scores """
+    def __init__(self, all_time_topk: List[int] = [1000], order_ascending=True,
+                 name: str = "score", tanimoto_thr: float = 0.7):
+        self._all_time_topk = all_time_topk
+        # Compare new score to worst in buffer
+        self._order_ascending = order_ascending
+        self._pop = 0 if order_ascending else -1
+        self._tanimoto_thr = tanimoto_thr
+        self._min_calc = np.argmin if order_ascending else np.argmax
+        self._compare = operator.lt if order_ascending else operator.gt
+        self._best_scores_buffer = {x: np.zeros(x) for x in all_time_topk}
+        self._best_scores_argmin = {}
+        self._best_mol_buffer = {x: [] for x in all_time_topk}
+        self._name = name
+        self._added_cnt = {x: 0 for x in all_time_topk}
+        self._over_th = {x: dict() for x in all_time_topk}
+
+    def update(self, values: List[float], mols: List[Any]):
+        opc = self._compare
+        mcalc = self._min_calc
+
+        for new_value, new_mol in zip(values, mols):
+            for topk in self._all_time_topk:
+                tokv = self._best_scores_buffer[topk]
+                tokvargmin = self._best_scores_argmin
+                tokm = self._best_mol_buffer[topk]
+
+                if self._added_cnt[topk] >= topk:
+                    min_idx = tokvargmin.get(topk, mcalc(tokv))  # First time requesting argmin
+                    if opc(tokv[min_idx], new_value):
+                        # we need to add to buffer
+                        tokv[min_idx] = new_value
+                        tokm[min_idx] = new_mol
+
+                        tokvargmin[topk] = mcalc(tokv)  # Update argmin only when pop out list
+                else:
+                    tokv[self._added_cnt[topk]] = new_value
+                    self._added_cnt[topk] += 1
+                    tokm.append(new_mol)
+
+    def log(self) -> dict:
+        info = {}
+        for topk, topkv in self._best_scores_buffer.items():
+            topkv = topkv[:self._added_cnt[topk]]
+            info[f"all_time_top{topk}_{self._name}_count"] = len(topkv)
+            if len(topkv) > 0:
+                info.update(get_stats(topkv, f"all_time_top{topk}_{self._name}"))
+
+                modes_class = NumModes(tanimoto_thr=self._tanimoto_thr)
+                order = np.argsort(self._best_scores_buffer[topk])
+                # Order from best to worst so we can select mode for the best mol
+                order = order[::-1] if self._order_ascending else order
+                buff = self._best_mol_buffer[topk]
+                n_modes = modes_class([buff[ix] for ix in order])
+
+                info[f"all_time_top{topk}_{self._name}_modesf"] = float(n_modes) / len(topkv)
+
+        return info
+
+
+class MultiAllTimeTop:
+    def __init__(self, all_time_topk, mode_count, order_ascending, tanimoto_thr):
+        self._tops = []
+        for topk, do_modes in zip(all_time_topk, mode_count):
+            if do_modes:
+                self._tops.append(
+                    AllTimeTopWithModes(
+                        all_time_topk=[topk], order_ascending=order_ascending,
+                        tanimoto_thr=tanimoto_thr
+                    )
+                )
+            else:
+                self._tops.append(AllTimeTop(all_time_topk=[topk], order_ascending=order_ascending))
+
+    def update(self, values: List[float], mols: List[Any]):
+        for xtop in self._tops:
+            xtop.update(values, mols=mols)
+
+    def log(self) -> dict:
+        info_dict = dict()
+        for xtop in self._tops:
+            info_dict.update(xtop.log())
+
+        return info_dict
+
+
 class LogTopStats:
     def __init__(self,
                  topk: int = 100,
                  all_time_topk: List[int] = [10, 100, 1000],
+                 all_time_topk_mode_count: int = [100],
+                 tanimoto_thr: float = 0.7,
                  score_keys: Tuple[str, ...] = ("proxy", "qed", "synth", "dockscore", "dscore"),
                  order_key: str = "score",
                  order_ascending: bool = True,
                  unique_key: str = "res_molecule",
                  transform_info=None,
-                 filter_candidates: dict = {"qed": 0.3, "synth": 4.}):
+                 filter_candidates: dict = {"qed": 0.3, "synth": 4.},
+                 save_score_buffer_size=10000,
+                 out_dir: str = None):
+
+        assert len(set(all_time_topk_mode_count) - set(all_time_topk)) == 0, "Must have the topk with mode in topk list"
+        log_topk_with_modes = [True if itop in all_time_topk_mode_count else False for itop in all_time_topk]
 
         self._topk = topk
+        self._all_time_topk_mode_count = all_time_topk_mode_count
         self._all_time_topk = all_time_topk
+        self._tanimoto_thr = tanimoto_thr
         self._score_keys = score_keys
         self.do_dockscore = do_dockscore = "dockscore" in score_keys
+        self._out_dir = f"{out_dir}/log_top_stats.npy" if out_dir is not None else None
 
         self._order_key = order_key
         self._seen_mol = set()
+        self._saved_mol = []
+        self._save_score_buffer_size = save_score_buffer_size
+        self._save_keys = list(score_keys) + [order_key, unique_key, "mol"]
         self._collected_mol = 0
         self._new_received = 0
         self._new_have_score = 0
@@ -241,6 +407,7 @@ class LogTopStats:
 
         self._new_info = []
         self._order_ascending = order_ascending
+        self._compare = operator.lt if order_ascending else operator.gt
         self._unique_key = unique_key
         self._filter_candidates = filter_candidates
         if transform_info is None and do_dockscore:
@@ -249,9 +416,13 @@ class LogTopStats:
             ])
         self._transform_info = transform_info
 
-        self._all_time_topk_score = AllTimeTop(
-            all_time_topk=all_time_topk,
-            order_ascending=order_ascending
+        # self._all_time_topk_score = AllTimeTop(
+        #     all_time_topk=all_time_topk,
+        #     order_ascending=order_ascending
+        # )
+        self._all_time_topk_score = MultiAllTimeTop(
+            all_time_topk=all_time_topk, mode_count=log_topk_with_modes,
+            order_ascending=order_ascending, tanimoto_thr=tanimoto_thr
         )
 
     def reset(self):
@@ -280,11 +451,33 @@ class LogTopStats:
 
                 # If new key and respects candidate conditions
                 if good:
+                    # The buffer will be reduced each log call
+                    self._saved_mol.append({kid: info[kid] for kid in self._save_keys})
+
                     # TODO Should consider seen only the mol we actually calculate GT for (oracle d)
                     self._seen_mol.update([_id])  # TODO Should fix this
 
                     self._new_info.append(info)
-                    self._all_time_topk_score.update([info[self._order_key]])
+                    self._all_time_topk_score.update([info[self._order_key]], [info["mol"].mol])
+
+        # Cut only if too big
+        if len(self._saved_mol) > 2.0 * self._save_score_buffer_size:
+            self.reduce_saved_mol()
+
+    def reduce_saved_mol(self, return_ordered: bool = False):
+        order_key = self._order_key
+
+        if len(self._saved_mol) > 1.25 * self._save_score_buffer_size or return_ordered:
+            scores = [info[order_key] for info in self._saved_mol]
+            order = np.argsort(scores)
+            # Order from best to worst so we can select mode for the best mol
+            order = order[::-1] if self._order_ascending else order
+            topsave = order[:self._save_score_buffer_size]
+            smol = self._saved_mol
+
+            self._saved_mol = [smol[ix] for ix in topsave]
+
+        return self._saved_mol
 
     def log(self):
         if self._new_received == 0:
@@ -332,11 +525,33 @@ class LogTopStats:
 
             self.reset()
 
+        # Cut saved mol & order & get topKNodes
+        ordered_info = self.reduce_saved_mol(return_ordered=True)
+        ordered_mol, ordered_scores = [], []
+        for info in ordered_info[:self._save_score_buffer_size]:
+            ordered_mol.append(info["mol"].mol)
+            ordered_scores.append(info[self._order_key])
+
+        for topk_nodes in self._all_time_topk_mode_count:
+            calc_nodes = TopKNodes(tanimoto_thr=self._tanimoto_thr, topk=topk_nodes)
+            topkmodes_scores = calc_nodes(ordered_mol, ordered_scores, ordered=True)
+            # topkmodes_score can be None if not enough top found
+            logs.update(topkmodes_scores)
+
+        print(logs)
+
         self._new_received = 0
         self._new_have_score = 0
         self._new_empty = 0
         self._new_smi = 0
 
+        # Save stuff
+        if self._out_dir is not None:
+            np.save(self._out_dir, {
+                "unique_mols": self._saved_mol,
+                # "save_th": self._save_all_score_th,
+                "unique_key": self._unique_key,
+            })
         return logs
 
 

@@ -93,13 +93,15 @@ class TimeStats:
         return np.mean(self._buffer)
 
 
-def log_stats_remote(conn_recv, conn_send, log_topk, do_dockscore):
+def log_stats_remote(conn_recv, conn_send, log_topk, do_dockscore, out_dir):
     if do_dockscore:
         score_keys = ("proxy", "qed", "synth", "dockscore", "dscore")
     else:
         score_keys = ("proxy", "qed", "synth")
 
-    log_stats = LogTopStats(topk=log_topk, unique_key="smiles", score_keys=score_keys)
+    log_stats = LogTopStats(
+        topk=log_topk, unique_key="smiles", score_keys=score_keys, out_dir=out_dir
+    )
 
     while True:
         cmd, recv = conn_recv.get()
@@ -118,7 +120,7 @@ class LogTopKproc:
         log_proc_stats = Process(
             target=log_stats_remote,
             args=(log_stats_remote_send, log_stats_remote_recv, args.main.log_topk,
-                  args.main.log_dockscore)
+                  args.main.log_dockscore, args.out_dir)
         )
         log_proc_stats.start()
         self.recv_logtop = 0

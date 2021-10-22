@@ -161,7 +161,7 @@ class CandidateWrapper(torch.nn.Module):
                         infos[ix]["proxy"] = res_scores[ix] = proxy_scores.pop(0)
                         infos[ix]["score"] = res_scores[ix] * -1
 
-                        # infos[ix]["mol"] = mols[ix].dump() # Should add for proxy calc
+                        infos[ix]["mol"] = mols[ix] # .dump() # Should add for proxy calc
 
         for ix in update_mem:
             self._seen[infos[ix]["smiles"]] = [res_scores[ix], infos[ix]]
@@ -213,7 +213,7 @@ class ProxyOnlyWrapper(torch.nn.Module):
                 infos[ix]["qed"] = 100  # TODO Hack to not change candidate filering
                 infos[ix]["proxy"] = res_scores[ix] = proxy
                 infos[ix]["score"] = res_scores[ix] * -1
-                # infos[ix]["mol"] = mols[ix].dump()
+                infos[ix]["mol"] = mols[ix]  # .dump()
             else:
                 self._seen_nan_count += 1
 
@@ -241,8 +241,10 @@ class CandidateWrapperSatlin(torch.nn.Module):
         self.synth_th = getattr(args, "synth_th", 4.)
         self.candv = getattr(args, "candv", 0)
 
-        self.qed_cutoff = [0.0, self.qed_th]
-        self.synth_cutoff = [0, self.synth_th]
+        cutoff_min = getattr(args, "cutoff_min", 0.)
+        print("cutoff_min", cutoff_min)
+        self.qed_cutoff = [cutoff_min, self.qed_th]
+        self.synth_cutoff = [cutoff_min, self.synth_th]
 
     def calc_score_v1(self, info):
         sat_q = satlins(info["qed"], *self.qed_cutoff)
@@ -279,7 +281,7 @@ class CandidateWrapperSatlin(torch.nn.Module):
                 infos[ix]["proxy"] = proxy
                 res_scores[ix] = self.calc_score_v1(infos[ix])
                 infos[ix]["score"] = res_scores[ix] * -1
-                # infos[ix]["mol"] = mols[ix].dump()
+                infos[ix]["mol"] = mols[ix]  # .dump()
             else:
                 self._seen_nan_count += 1
 
@@ -338,7 +340,7 @@ class ProxyDebugWrapper(torch.nn.Module):
 
                 infos[ix]["proxy"] = res_scores[ix] = proxy
                 infos[ix]["score"] = res_scores[ix] * -1
-                infos[ix]["mol"] = mols[ix].dump()
+                infos[ix]["mol"] = mols[ix]  # .dump()
 
         return res_scores, infos
 
@@ -591,7 +593,7 @@ class ProxyDebug131_11(torch.nn.Module):
                 infos[ix]["qed"] = 100  # TODO Hack to not change candidate filering
                 infos[ix]["proxy"] = res_scores[ix] = proxy
                 infos[ix]["score"] = res_scores[ix] * -1
-                # infos[ix]["mol"] = mols[ix].dump()
+                infos[ix]["mol"] = mols[ix]  # .dump()
             else:
                 self._seen_nan_count += 1
 
