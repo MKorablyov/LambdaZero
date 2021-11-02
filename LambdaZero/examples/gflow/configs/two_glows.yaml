@@ -17,6 +17,13 @@ proxy:
     checkpoint: "/scratch/andrein/Datasets/Datasets/best_model.pk"
   default_score: 16
 
+proxy_two:
+  name: ProxyOnlyWrapper # ProxyDebugWrapper # ProxyOnlyWrapper
+  proxy:
+    name: ProxyExample
+    checkpoint: "/scratch/andrein/Datasets/Datasets/best_model.pk"
+  default_score: 16
+
 gflow_dataset:  # GFLOW 1
   name: DataGeneratorMultiProc # DataGenerator - for easier debugging
   wrapper: DataFilterAddOnline

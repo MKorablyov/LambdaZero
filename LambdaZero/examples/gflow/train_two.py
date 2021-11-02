@@ -468,18 +468,22 @@ def run(args):
             trainer_num_smpl = gen_model_dataset.sampled_mols_cnt
 
             # ======================================================================================
+            # Training error GFlowNet on data sampled from error GFlowNet dataset only!
             training_metrics_two = gen_model_dataset_two.run_train_batch(gflow_trainer_two, epoch)
             train_data_stats_two, new_sampled_mol_infos_two = gen_model_dataset_two.get_stats(epoch)
             training_metrics_two.update(train_data_stats_two)
             trainer_num_smpl_two = gen_model_dataset_two.sampled_mols_cnt
 
             # TODO Sample a batch of new molecules from model_two -> and add them to gen_model_dataset.online_mols
+            # Will help with state space coverage of GFlowNet for better estimates of Q functions
+            
             num_of_samples_two = 16
             new_mols_from_model_two = [
                 gen_model_dataset_two.get_sample_model(explore=False) for _ in range(num_of_samples_two)
             ]  # type: List[BlockMoleculeDataExtended]
-            for xmol in new_mols_from_model_two:
-                model_two_reward = 1. # TODO D loss -
+            samples = args.gflow_dataset.mdp.mols2batch([args.gflow_dataset.mdp.mol2repr(mol) for mol in new_mols_from_model_two])
+            for xmol in samples:
+                model_two_reward = gflow_trainer_two.compute_loss(xmol) # TODO D loss -
                 gen_model_dataset._add_mol_to_online(model_two_reward, model_two_reward, xmol, actually_add=True)
 
             # (for the beginning don't implement but Maybe pick the top only)
