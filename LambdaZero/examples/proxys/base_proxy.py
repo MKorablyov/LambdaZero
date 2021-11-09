@@ -7,7 +7,7 @@ import os.path as osp
 from torch_geometric.data import Data, Batch
 
 from LambdaZero.examples.models import get_model
-from LambdaZero.examples.generative_models.mols.mol_mdp_ext import MolMDPExtended
+from LambdaZero.examples.lightrl.env.mol_mdp_ext import MolMDPExtended
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments.molMDP import BlockMoleculeData
 
