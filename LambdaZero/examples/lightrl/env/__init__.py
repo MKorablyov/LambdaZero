@@ -7,3 +7,9 @@ register(
     entry_point='LambdaZero.examples.lightrl.env.block_mol_graph_v1:BlockMolEnvGraph_v1',
     kwargs={},
 )
+
+register(
+    id='BlockMolEnvGraph-v2',
+    entry_point='LambdaZero.examples.lightrl.env.block_mol_environment:BlockMoleculeEnvironment',
+    kwargs={},
+)

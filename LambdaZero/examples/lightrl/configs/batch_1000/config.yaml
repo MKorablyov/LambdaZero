@@ -1,8 +1,0 @@
-entropy_coef: [0.05, 0.08]
-
-#  - name: EGNNetRLBO
-#    levels: 6
-#    dim: 128
-#    m_dim: 128
-#policy:
-#  sample_best: [True, False]

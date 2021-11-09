@@ -1,4 +1,0 @@
-weight_step: [True, False]
-weight_dock: [True, False]
-weight_end: [True, False]
-loss_agg: ["sum", "mean"]

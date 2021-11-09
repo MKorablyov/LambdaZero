@@ -1,9 +1,0 @@
-env_cfg:
-  wrapper: [["ProxyCandidateRewardWithScoreMem"]]
-  precalculated_max: ["score", "frequency"]
-model:
-  name: [DeeperGCNSteps] # MPNNextra # EGNNetRLBO #MPNNet_v2  # MPNNetMultihead
-  dim: [128]
-  cond_level: [24]
-  levels: [28]
-  dropout: [0]

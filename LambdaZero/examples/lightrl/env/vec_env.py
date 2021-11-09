@@ -137,6 +137,18 @@ def pre_process_obss(obss, device=None):
     return DictList(obs)
 
 
+def pre_process_obss_custom_batch(obss, batch_method, device=None):
+    obs = dict()
+
+    for k in obss[0].keys():
+        if k == "mol_graph":
+            obs["mol_graph"] = batch_method([obs["mol_graph"] for obs in obss]).to(device)
+        else:
+            obs[k] = pre_process_vec([obs[k] for obs in obss], device=device)
+
+    return DictList(obs)
+
+
 def pre_process_vec(vec, device=None):
     if isinstance(vec[0], torch.Tensor):
         return torch.stack(vec).to(device)

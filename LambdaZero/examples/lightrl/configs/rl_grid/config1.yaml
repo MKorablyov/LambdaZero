@@ -1,6 +1,0 @@
-env_cfg:
-  wrapper: [["CountBasedReward", "ProxyCandidateReward"], ["ProxyCandidateReward"]]
-  precalculated_scores: [False]
-  env_args:
-    allow_removal: [True, False]
-algo: ["ppo"]

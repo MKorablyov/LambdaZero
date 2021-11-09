@@ -1,4 +1,0 @@
-model:
-  name: ["DeeperGCNSteps"] # SGC # TriangSag # MPNNet # MPNNet_v2 # MPNNet
-  cond_level: [1, 14, 24]
-

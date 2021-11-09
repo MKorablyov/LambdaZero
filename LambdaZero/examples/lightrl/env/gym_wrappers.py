@@ -112,11 +112,47 @@ class ProxyCandidateReward(gym.Wrapper):
                 if self.synth is not None:
                     synth_score = self.synth([mol_mol])[0]
                     if synth_score >= self.synth_th:
-                        reward = self.proxy_net(obs)[0] * -1
+                        reward = self.proxy_net([mol])[0] * -1
                         info["proxy"] = reward
                         info["score"] = reward
                         info["qed"] = qed_score
                         info["synth"] = synth_score
+
+        return obs, reward, done, info
+
+
+class ProxyOnlyReward(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.env = env
+        cfg = env.unwrapped._config  # type: dict
+
+        self.proxy_net = cfg.get("proxy_net", None)
+        self.normalize_r = cfg.get("normalize_r", False)
+        self.target_norm = cfg.get("target_norm", [-8.6, 1.10])
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+
+        mol = self.env.molMDP.molecule
+        mol_mol = mol.mol
+
+        if info.get("res_molecule", None) is None:
+            reward = -4
+            return obs, reward, done, info
+
+        reward = 0
+        if done:
+            reward = self.proxy_net([mol])[0] * -1
+            info["proxy"] = -reward
+            info["score"] = reward
+            info["synth"] = 100  # TODO Hack to not change candidate filering
+            info["qed"] = 100  # TODO Hack to not change candidate filering
+            info["mol"] = mol_mol  # .dump()
+            if self.normalize_r:
+                target_norm = self.target_norm
+                reward = -((-reward - target_norm[0]) / target_norm[1])
+                # print(reward, info["proxy"])
 
         return obs, reward, done, info
 
@@ -149,7 +185,7 @@ class ELUProxyCandidateReward(gym.Wrapper):
                 if self.synth is not None:
                     synth_score = self.synth([mol_mol])[0]
                     if synth_score >= self.synth_th:
-                        reward = self.proxy_net(obs)[0] * -1
+                        reward = self.proxy_net([mol])[0] * -1
                         reward = elu2([reward])[0]
                         info["proxy"] = reward
                         info["score"] = reward
@@ -185,7 +221,7 @@ class DiscountProxyCandidateReward(gym.Wrapper):
         if done:
             qed_score = QED.qed(mol_mol)
             synth_score = self.synth([mol_mol])[0]
-            proxy = self.proxy_net(obs, norm=False)[0]
+            proxy = self.proxy_net([mol], norm=False)[0]
 
             info["proxy"] = proxy
             info["qed"] = qed_score
@@ -263,7 +299,7 @@ class ActProxyCandidateReward(gym.Wrapper):
                 if self.synth is not None:
                     synth_score = self.synth([mol_mol])[0]
                     if synth_score >= self.synth_th:
-                        reward = self.proxy_net(obs)[0] * -1
+                        reward = self.proxy_net([mol])[0] * -1
                         info["proxy"] = reward
                         info["qed"] = qed_score
                         info["synth"] = synth_score
@@ -309,6 +345,8 @@ class OracleCandidateReward(gym.Wrapper):
 
 class ProxyCandidateRewardWithScoreMem(gym.Wrapper):
     def __init__(self, env):
+        # TODO fix deprecation with new env
+        raise NotImplementedError
         super().__init__(env)
         self.env = env
         cfg = env.unwrapped._config  # type: dict

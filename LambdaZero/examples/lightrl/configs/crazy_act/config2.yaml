@@ -1,3 +1,0 @@
-model:
-  name: ["MPNNet", "MPNNet_v2", "EGNNetRLBO", 'AGNN', 'Arma', 'AttFP', 'CoraNet', 'DGCNN', 'DNA', 'Faust', 'FILM', 'GAT', 'GAT2', 'GCN', 'GeniePathLazy', 'GeniePath', 'Saint', 'GUnet', 'MutagGin', 'DeeperGCN', 'PNA', 'PPINet', 'ProtMincutPool', 'SAGE', 'DGCNNSeal', 'SGC', 'SuperGat', 'TaGCN', 'TriangSag']
-  dropout: [0]

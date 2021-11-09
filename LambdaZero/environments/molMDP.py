@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
@@ -14,6 +16,7 @@ class BlockMoleculeData:
         self.numblocks = 0
         self.jbonds = []          # [block1, block2, bond1, bond2]
         self.stems = []           # [block1, bond1]
+        self.pending_stems = []
         self._mol = None
 
     def add_block(self, block_idx, block, block_r, stem_idx, atmidx):
@@ -30,11 +33,21 @@ class BlockMoleculeData:
         self.blocks.append(block)
         self.slices.append(self.slices[-1] + block.GetNumAtoms())
         self.numblocks += 1
-        [self.stems.append([self.numblocks-1,r]) for r in block_r[1:]]
 
-        if len(self.blocks)==1:
-            self.stems.append([self.numblocks-1, block_r[0]])
+        if len(self.blocks) == 1:
+            # Just 1 stem available (keep the rest pending)
+            # This forces to have all blocks connected to their first stem (if not using del action)
+            new_stems = [[self.numblocks - 1, r] for r in block_r]
+            self.stems.append(new_stems[0])
+            self.pending_stems = new_stems[1:]
         else:
+            # # add pending stems
+            if len(self.blocks) == 2:
+                self.stems += self.pending_stems
+
+            assert stem_idx < len(self.stems), "Not enough stems"
+            [self.stems.append([self.numblocks - 1, r]) for r in block_r[1:]]
+
             if stem_idx is None:
                 assert atmidx is not None, "need stem or atom idx"
                 stem_idx = np.where(self.stem_atmidxs==atmidx)[0][0]
@@ -197,3 +210,4 @@ class MolMDP:
             else:
                 self.reset()
         #assert self.molecule.mol is not None, "returning not a molecule"
+

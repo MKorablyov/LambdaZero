@@ -1,3 +1,4 @@
+import copy
 import time
 import warnings
 import os.path as osp
@@ -281,6 +282,12 @@ class BlockMolEnv_v3(gym.core.Env):
 
     def step(self, action: int):
         act_smiles = self.molMDP.molecule.smiles
+        prev_state = copy.deepcopy({
+                "blockidxs": self.molMDP.molecule.blockidxs,
+                "slices": self.molMDP.molecule.slices,
+                "jbonds": self.molMDP.molecule.jbonds,
+                "stems": self.molMDP.molecule.stems,
+            })
 
         if not self._prev_obs["action_mask"][action]:
             warnings.warn(f'illegal action: {action} - available {np.sum(self._prev_obs["action_mask"])}')
@@ -310,10 +317,8 @@ class BlockMolEnv_v3(gym.core.Env):
         reward, log_vals = self.reward(molecule, agent_stop, env_stop, self.num_steps)
 
         smiles = self.molMDP.molecule.smiles
-
         info = {"act_molecule": act_smiles, "res_molecule": smiles, "log_vals": log_vals,
-                "num_steps": self.num_steps,
-                "mol": self.molMDP.dump()}
+                "num_steps": self.num_steps}
         if self._crt_episode is not None:
             info["episode"] = self._crt_episode
 

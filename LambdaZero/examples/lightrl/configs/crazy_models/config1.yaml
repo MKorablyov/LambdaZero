@@ -1,3 +1,0 @@
-model:
-  name: ['AGNN', 'Arma', 'AttFP', 'CoraNet', 'DGCNN', 'DNA', 'Faust', 'FILM', 'GAT', 'GAT2', 'GCN', 'GeniePathLazy', 'GeniePath', 'Saint', 'GUnet', 'MutagGin', 'DeeperGCN', 'PNA', 'PPINet', 'ProtMincutPool', 'ProtTopkPool', 'SAGE', 'DGCNNSeal', 'SGC', 'SuperGat', 'TaGCN', 'TriangSag']
-  dim: [128]

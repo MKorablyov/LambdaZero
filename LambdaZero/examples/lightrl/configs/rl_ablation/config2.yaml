@@ -1,2 +1,0 @@
-env_cfg:
-  wrapper: [["CountBasedReward", "MaxCandidateReward"]]

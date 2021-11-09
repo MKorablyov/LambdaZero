@@ -1,8 +1,0 @@
-env_cfg:
-  wrapper: [ [ "SeenInfo", "ProxyCandidateReward" ], [ "SeenLinearInfo", "ProxyCandidateReward" ] ]
-  precalculated_scores: [False]
-  env_args:
-    allow_removal: [True, False]
-model:
-  num_out: [3]
-algo: ["ppo_twov"]
