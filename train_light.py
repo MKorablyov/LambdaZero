@@ -11,26 +11,17 @@ except RuntimeError:
 import copy
 import os
 import time
-import collections
-from collections import deque
-
-import gym
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 from argparse import Namespace
 import wandb
 import csv
-from typing import List
 
 from LambdaZero.examples.lightrl.a2c_ppo_acktr import algo, utils
 from LambdaZero.examples.lightrl.a2c_ppo_acktr.algo import gail
 
 from LambdaZero.examples.lightrl.utils.utils import parse_opts, add_to_cfg, flatten_cfg, update_cfg
 from LambdaZero.examples.lightrl.env.vec_env import get_envs, pre_process_obss_custom_batch
-from LambdaZero.examples.lightrl import env
 from LambdaZero.examples.lightrl.models import get_model
 from LambdaZero.examples.lightrl.policy.policy_base import Policy
 from LambdaZero.examples.lightrl.utils.storage import RolloutStorage
@@ -154,19 +145,6 @@ def setup_loggers(args: Namespace):
     flog = open(out_dir + "/logs.csv", 'w')
     log_writer = csv.DictWriter(flog, LOG_HEADER.keys())
     log_writer.writeheader()
-
-
-# def log_stats_remote(conn_recv, conn_send, log_topk):
-#     log_stats = LogTopStats(topk=log_topk)
-#
-#     while True:
-#         cmd, recv = conn_recv.get()
-#         if cmd == 0:
-#             log_stats.collect(*recv)
-#         elif cmd == 1:
-#             stats = log_stats.log()
-#             stats["total_num_steps"] = recv
-#             conn_send.put(stats)
 
 
 def score_memory(conn_recv, conn_send):
