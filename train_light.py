@@ -209,16 +209,6 @@ def run(args):
     # Log train rl stuff
     log_train = LogStatsTrain(r_buffer_size=args.main.stats_window_size)
 
-
-    # # Get remote calculation of logs for topk stats (because we also calculate dockscore)
-    # log_stats_remote_send = Queue()
-    # log_stats_remote_recv = Queue()
-    # log_proc_stats = Process(
-    #     target=log_stats_remote,
-    #     args=(log_stats_remote_send, log_stats_remote_recv, args.main.log_topk)
-    # )
-    # log_proc_stats.start()
-
     # This logs statistics for MIN and MAX values for everything plotted (summary for wandb)
     log_summary = SummaryStats(log_wandb=do_plot)
 
@@ -432,8 +422,6 @@ def run(args):
 
             # Send training step new mol infos for topK log statistics
             if len(new_mol_infos) > 0:
-                # send_all = [x for x in infos if "score" in x]
-                # log_stats_remote_send.put((0, (send_all,)))
                 send_all = [x for x in infos if "score" in x]
                 if len(send_all) > 0:
                     log_top_k.collect(
@@ -545,23 +533,6 @@ def run(args):
         # Get training log
         plot_vals, new_mol_infos = log_train.log()
 
-        # total_num_steps = (epoch + 1) * args.num_processes * args.num_steps
-
-        # while not log_stats_remote_recv.empty():
-        #     log_stats = log_stats_remote_recv.get()
-        #     print(log_stats)
-        #     log_summary.update(log_stats)
-        #     if do_plot:
-        #         wandb.log(log_stats)
-        #     recv_logtop += 1
-        #
-        # if (epoch + 1) % args.main.log_topk_interval == 0:
-        #     if (sent_logtop - recv_logtop) < 2:
-        #         log_stats_remote_send.put((1, total_num_steps))
-        #         sent_logtop += 1
-        #     else:
-        #         print(f"NOT GOOD. Skipping log top {total_num_steps}")
-
         if args.main.log_topk_freq > 0:
             # It starts calculating topk Automatically every args.main.log_topk_freq steps
             # Be sure that we send to collect all mol that want to be counted
@@ -571,9 +542,6 @@ def run(args):
             all_stats_top_k = log_top_k.get_stats()
 
             for stats_top_k in all_stats_top_k:
-                # print("-"*100,
-                #       f"\n[E {epoch}] [TOPK] {stats_top_k}\n",
-                #       "-"*100)
                 log_summary.update(stats_top_k)
                 if do_plot:
                     wandb.log(stats_top_k)
