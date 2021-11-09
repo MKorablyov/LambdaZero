@@ -29,7 +29,7 @@ from LambdaZero.examples.lightrl.a2c_ppo_acktr import algo, utils
 from LambdaZero.examples.lightrl.a2c_ppo_acktr.algo import gail
 
 from LambdaZero.examples.lightrl.utils.utils import parse_opts, add_to_cfg, flatten_cfg, update_cfg
-from LambdaZero.examples.lightrl.env.vec_env import get_envs, pre_process_obss
+from LambdaZero.examples.lightrl.env.vec_env import get_envs, pre_process_obss_custom_batch
 from LambdaZero.examples.lightrl import env
 from LambdaZero.examples.lightrl.models import get_model
 from LambdaZero.examples.lightrl.policy.policy_base import Policy
@@ -38,8 +38,10 @@ from LambdaZero.examples.lightrl.utils.storage_two_v import RolloutStorage as Ro
 
 from LambdaZero.examples.lightrl.evaluation import EvaluateBase
 from LambdaZero.examples.lightrl.utils.utils import set_seed
-from LambdaZero.examples.lightrl.utils.utils import LogTopStats, LogStatsTrain, SummaryStats
+from LambdaZero.examples.lightrl.utils.utils import LogTopKproc, SummaryStats, LogStatsTrain
 from LambdaZero.examples.lightrl.env.oracle import InterogateOracle
+
+from LambdaZero.examples.proxys import load_proxy
 
 from multiprocessing import Process, Pipe, Queue
 
@@ -154,17 +156,17 @@ def setup_loggers(args: Namespace):
     log_writer.writeheader()
 
 
-def log_stats_remote(conn_recv, conn_send, log_topk):
-    log_stats = LogTopStats(topk=log_topk)
-
-    while True:
-        cmd, recv = conn_recv.get()
-        if cmd == 0:
-            log_stats.collect(*recv)
-        elif cmd == 1:
-            stats = log_stats.log()
-            stats["total_num_steps"] = recv
-            conn_send.put(stats)
+# def log_stats_remote(conn_recv, conn_send, log_topk):
+#     log_stats = LogTopStats(topk=log_topk)
+#
+#     while True:
+#         cmd, recv = conn_recv.get()
+#         if cmd == 0:
+#             log_stats.collect(*recv)
+#         elif cmd == 1:
+#             stats = log_stats.log()
+#             stats["total_num_steps"] = recv
+#             conn_send.put(stats)
 
 
 def score_memory(conn_recv, conn_send):
@@ -200,17 +202,22 @@ def run(args):
 
     setup_loggers(args)  # Wandb plot mostly and maybe writers to csv
 
+    # Get remote calculation of logs for topk stats (because we also calculate dockscore)
+    if args.main.log_topk_freq > 0:
+        log_top_k = LogTopKproc(args)
+
     # Log train rl stuff
     log_train = LogStatsTrain(r_buffer_size=args.main.stats_window_size)
 
-    # Get remote calculation of logs for topk stats (because we also calculate dockscore)
-    log_stats_remote_send = Queue()
-    log_stats_remote_recv = Queue()
-    log_proc_stats = Process(
-        target=log_stats_remote,
-        args=(log_stats_remote_send, log_stats_remote_recv, args.main.log_topk)
-    )
-    log_proc_stats.start()
+
+    # # Get remote calculation of logs for topk stats (because we also calculate dockscore)
+    # log_stats_remote_send = Queue()
+    # log_stats_remote_recv = Queue()
+    # log_proc_stats = Process(
+    #     target=log_stats_remote,
+    #     args=(log_stats_remote_send, log_stats_remote_recv, args.main.log_topk)
+    # )
+    # log_proc_stats.start()
 
     # This logs statistics for MIN and MAX values for everything plotted (summary for wandb)
     log_summary = SummaryStats(log_wandb=do_plot)
@@ -225,24 +232,19 @@ def run(args):
     args.env_cfg.env_args.synth_net = synth_net
     args.eval_env_cfg.env_args.synth_net = synth_net
 
-    if args.proxy_dock is not None:
-        if args.proxy_dock != "default":
-            from LambdaZero.examples.lightrl.env.scores import load_docknet
-            proxy_net = load_docknet(args.proxy_dock, device=device)
-        else:
-            from LambdaZero.examples.lightrl.env.scores import LZProxyDockNetRun
-            proxy_net = LZProxyDockNetRun()
-            proxy_net.to(device)
+    # ==============================================================================================
 
-        proxy_net.share_memory()
-        args.env_cfg.env_args.proxy_net = proxy_net
-        args.eval_env_cfg.env_args.proxy_net = proxy_net
+    proxy_net = load_proxy(args.proxy.proxy)
+    proxy_net.share_memory()
+    args.env_cfg.env_args.proxy_net = proxy_net
+    args.eval_env_cfg.env_args.proxy_net = proxy_net
 
     # ==============================================================================================
     # precalculated scores for the envs
     precalculated_scores = getattr(args.env_cfg, "precalculated_scores", False)
 
     if precalculated_scores:
+        raise NotImplementedError
         max_send_scores = getattr(args.env_cfg, "max_send_scores", 100)
         precalculated_max = getattr(args.env_cfg, "precalculated_max", "frequency")
 
@@ -269,7 +271,7 @@ def run(args):
     envs, chunk_size = get_envs(args.env_cfg, args.env_cfg.procs)
 
     def process_obss(x):
-        return pre_process_obss(x, device=device)
+        return pre_process_obss_custom_batch(x, envs.first_env.molMDP.mols2batch, device=device)
 
     from LambdaZero.examples.lightrl.reg_models import get_actor_model
     from LambdaZero.examples.lightrl import reg_models
@@ -277,7 +279,8 @@ def run(args):
     if args.model.name in reg_models.MODELS:
         base_model = get_actor_model(args.model)
     else:
-        base_model = get_model(args.model, envs.observation_space.shape, envs.action_space)
+        base_model = get_model(args.model, envs.observation_space.shape, envs.action_space,
+                               mdp=envs.first_env.molMDP, env=envs.first_env)
 
     actor_critic = Policy(args.policy, envs.observation_space.shape, envs.action_space, base_model)
     actor_critic.to(device)
@@ -392,6 +395,8 @@ def run(args):
     mem = None
     sent_logtop = 0
     recv_logtop = 0
+    episode_cnt = 0
+    total_num_steps = 0
 
     for epoch in range(num_updates):
 
@@ -418,6 +423,8 @@ def run(args):
             ts_stats.act.start()
 
             obs, reward, done, infos = envs.step(send_act)
+            episode_cnt += sum(done)
+            total_num_steps += len(done)
 
             ts_stats.act.end()
 
@@ -425,9 +432,16 @@ def run(args):
 
             # Send training step new mol infos for topK log statistics
             if len(new_mol_infos) > 0:
+                # send_all = [x for x in infos if "score" in x]
+                # log_stats_remote_send.put((0, (send_all,)))
                 send_all = [x for x in infos if "score" in x]
-                log_stats_remote_send.put((0, (send_all,)))
-                # log_stats_remote_send.put((0, (new_mol_infos,)))
+                if len(send_all) > 0:
+                    log_top_k.collect(
+                        send_all,
+                        {"total_num_steps": total_num_steps,
+                         "step_num_sampled_mols": episode_cnt,
+                         "train_num_sampled_mols": episode_cnt}
+                    )
 
             # Update request que so new molecules are send to be docked
             if precalculated_scores:
@@ -531,22 +545,38 @@ def run(args):
         # Get training log
         plot_vals, new_mol_infos = log_train.log()
 
-        total_num_steps = (epoch + 1) * args.num_processes * args.num_steps
+        # total_num_steps = (epoch + 1) * args.num_processes * args.num_steps
 
-        while not log_stats_remote_recv.empty():
-            log_stats = log_stats_remote_recv.get()
-            print(log_stats)
-            log_summary.update(log_stats)
-            if do_plot:
-                wandb.log(log_stats)
-            recv_logtop += 1
+        # while not log_stats_remote_recv.empty():
+        #     log_stats = log_stats_remote_recv.get()
+        #     print(log_stats)
+        #     log_summary.update(log_stats)
+        #     if do_plot:
+        #         wandb.log(log_stats)
+        #     recv_logtop += 1
+        #
+        # if (epoch + 1) % args.main.log_topk_interval == 0:
+        #     if (sent_logtop - recv_logtop) < 2:
+        #         log_stats_remote_send.put((1, total_num_steps))
+        #         sent_logtop += 1
+        #     else:
+        #         print(f"NOT GOOD. Skipping log top {total_num_steps}")
 
-        if (epoch + 1) % args.main.log_topk_interval == 0:
-            if (sent_logtop - recv_logtop) < 2:
-                log_stats_remote_send.put((1, total_num_steps))
-                sent_logtop += 1
-            else:
-                print(f"NOT GOOD. Skipping log top {total_num_steps}")
+        if args.main.log_topk_freq > 0:
+            # It starts calculating topk Automatically every args.main.log_topk_freq steps
+            # Be sure that we send to collect all mol that want to be counted
+            # We will calculate logging step based on Number of collected molecules
+
+            # Get async TopK logs (Has a different total_num_steps than previous logs)
+            all_stats_top_k = log_top_k.get_stats()
+
+            for stats_top_k in all_stats_top_k:
+                # print("-"*100,
+                #       f"\n[E {epoch}] [TOPK] {stats_top_k}\n",
+                #       "-"*100)
+                log_summary.update(stats_top_k)
+                if do_plot:
+                    wandb.log(stats_top_k)
 
         if epoch % 20 == 0:
             for k, v in ts_stats.__dict__.items():
@@ -560,7 +590,8 @@ def run(args):
             "action_loss": action_loss,
             "total_num_steps": total_num_steps,
             "train_iter": epoch,
-        })
+             "step_num_sampled_mols": episode_cnt,
+         })
 
         if epoch % args.log_interval == 0:
             print(plot_vals)
