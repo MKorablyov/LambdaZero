@@ -86,6 +86,7 @@ class MPNNet_v2(ModelBase):
         break_logits = data.jbond_preds.reshape((data.num_graphs, -1))
         add_logits = data.stem_preds.reshape((data.num_graphs, -1))
 
+        print(stop_logit.size(), break_logits.size(), add_logits.size())
         actor_logits = torch.cat([stop_logit, break_logits, add_logits], 1)
 
         value = sout[:, :1]
