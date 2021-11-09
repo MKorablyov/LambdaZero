@@ -1,0 +1,84 @@
+# -- General train/log config
+main:
+  seed: 0 # type=int, default=0 - Leave 0 - seed will be chosen depending on run_id
+  use_gpu: true
+  plot: False # log & plot into Wandb
+  stats_window_size: 4096 # Window size for plotting stats about Training R
+  log_topk_interval: 50  # Training step freq to log top k -> procs * num_steps * interval frames
+  log_topk: 100  # Training step freq to log top k -> procs * num_steps * interval frames
+
+num_env_steps: 30.0e+7 # Training steps
+name: ""  # prefix name for run
+log_interval: 1  # Print logs frequency about training
+save_interval: 10000 # -- TODO Set very big because Not implemented
+cuda_deterministic: False
+
+# -- Environment config
+env_cfg:  # Example of envs cfg -
+  env: BlockMolEnvGraph-v1 # Env name
+  procs: 16 # Number of parallel environments to run
+  actual_procs: 8 # Actual number of CPU threads to distribute the environments
+  wrapper: ["CountBasedReward", "ProxyCandidateReward"]  #  List of wrappers - applied in reverse order
+  env_args:
+    reward: "DummyReward"  # Reward should be controlled by wrappers!
+    random_steps: 3
+    max_steps: 7
+    allow_removal: True
+    env_seed: 3
+
+# -- Proxy config - Only implemented to load proxy weights
+proxy_dock: /scratch/andrein/lz2/results/2021Jun05-125747_breg/0001_dataset.weighted_sampler_False/0/best_model.pk
+
+# -- PPO Training config
+algo: ppo  # 1 value head vs 2 value heads ("ppo" | "ppo_twov")
+num_steps: 256  # PPO Rollout length / env
+ppo_epoch: 4  # PPO num epochs
+num_mini_batch: 32  # Number of mini batches (batch size= env_cfg.procs * num_steps / num_mini_batch)
+
+use_linear_lr_decay: false  # Better keep it false - for experiment comparison (This seems more like a hyperparam to finetune for best only)
+lr: 2.5e-4  # Adam(actor_critic.parameters(), lr=lr, eps=eps)
+eps: 1.0e-05
+alpha: 0.99 # not used in Adam
+gamma: 0.99
+use_gae: True
+gae_lambda: 0.95
+entropy_coef: 0.05  # 0.05 Best after a shallow grid search (might be custom to MPNNV2 model)
+value_loss_coef: 0.5
+max_grad_norm: 0.5
+clip_param: 0.01  # 0.05 Best after a shallow grid search (might be custom to MPNNV2 model)
+
+policy:
+  sample_best: False
+
+# -- Model config
+model:
+  name: MPNNcond # MPNNextra # EGNNetRLBO #MPNNet_v2  # MPNNetMultihead # MPNNcondTestSet - might be better
+  recurrent: False
+  dim: 128
+  use_init: True
+  num_out: 2
+  levels: 6
+
+# EVALUATION Configs -- Relevant for 1 horizon setup
+eval_interval: 0  # for More than 1 step horizon keep interval to 0 (no evaluation)
+eval_episodes: 32
+eval_eps: 0.05
+repeat_eval_eps: 1
+offset: 0
+eval_determinitistic: False
+
+eval_env_cfg:  # Example of envs cfg -
+  env: BlockMolEnvGraph-v1 # Env name
+  procs: 1 # Number of parallel environments to run
+  actual_procs: 1 # Actual number of CPU threads to distribute the environments
+  eval_mode: True
+  env_args:
+    env_seed: [13]
+    eval_mode: True
+
+# TODO - ignore following
+log_monitor: False  # TODO - refactor (not used)
+gail: False # TODO - refactor (not used)
+gail_batch_size: 128  # TODO - refactor (not used)
+gail_epoch: 5  # TODO - refactor (not used)
+use_proper_time_limits: False  # TODO - refactor (not used)

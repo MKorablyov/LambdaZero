@@ -1,0 +1,3 @@
+model:
+  name: [MPNNcond]
+  zero_cond: [True]

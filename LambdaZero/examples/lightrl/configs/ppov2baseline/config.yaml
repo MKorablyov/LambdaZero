@@ -1,0 +1,4 @@
+env_cfg:  # Example of envs cfg -
+  env_args:
+    normalize_r: [True, False]
+    exploration_start: [101, 71, 41]

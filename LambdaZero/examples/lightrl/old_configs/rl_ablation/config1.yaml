@@ -1,0 +1,2 @@
+env_cfg:
+  wrapper: [["ProxyCandidateReward"]]

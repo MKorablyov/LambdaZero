@@ -1,0 +1,9 @@
+model:
+  name: [MPNNet] # MPNNet
+
+optim:
+  batch_size: [33] # TODO 32
+  batch_gradient: [1] # TODO 32
+
+dataset:
+  transform_complete: [True] # TODO True

@@ -1,0 +1,5 @@
+env_cfg:
+  wrapper: [["CountBasedReward", "ActProxyCandidateReward"]]
+  env_args:
+    max_steps: [8]
+
