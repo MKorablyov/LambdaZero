@@ -302,6 +302,8 @@ def run(args):
 
     # -- Load classes to generate scores
     # TODO D
+    args.proxy_two.device = device
+    args.proxy_two.floatX = gflow_model_args.floatX
     proxy_two = PROXY_WRAPPERS[args.proxy_two.name](args.proxy_two)
     proxy_two.to(device)
 
@@ -483,8 +485,8 @@ def run(args):
             ]  # type: List[BlockMoleculeDataExtended]
             samples = args.gflow_dataset.mdp.mols2batch([args.gflow_dataset.mdp.mol2repr(mol) for mol in new_mols_from_model_two])
             for xmol in samples:
-                model_two_reward = gflow_trainer_two.compute_loss(xmol) # TODO D loss -
-                gen_model_dataset._add_mol_to_online(model_two_reward, model_two_reward, xmol, actually_add=True)
+                proxy_one_reward, _ = gen_model_dataset._get_reward(xmol)
+                gen_model_dataset._add_mol_to_online(proxy_one_reward, proxy_one_reward, xmol, actually_add=True)
 
             # (for the beginning don't implement but Maybe pick the top only)
 

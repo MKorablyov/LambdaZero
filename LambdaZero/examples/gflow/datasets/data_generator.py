@@ -373,8 +373,11 @@ class DataGenerator:
         if rdmol is None:
             return self.R_min, {}
         smi = m.smiles
-        if smi in self.train_mols_map:
-            return self.train_mols_map[smi]
+
+        # Second Gflow might have different R (different loss based on Gflow1)
+        # if smi in self.train_mols_map:
+        #     return self.train_mols_map[smi]
+        
         res_scores, infos = self.proxy_reward([m])
         info = infos[0]
         r, info = self.train_mols_map[smi] = self.r2r(dockscore=res_scores[0]), info

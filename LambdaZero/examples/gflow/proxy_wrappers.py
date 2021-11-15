@@ -16,6 +16,7 @@ from argparse import Namespace
 from LambdaZero.contrib.functional import elu2
 from LambdaZero.utils import get_external_dirs
 from LambdaZero.environments.molMDP import BlockMoleculeData
+from LambdaZero.examples.gflow.datasets.data_generator import DataGenerator, Transition
 from LambdaZero.examples.proxys import load_proxy
 from scipy import stats
 import math
@@ -602,7 +603,7 @@ class ProxyDebug131_11(torch.nn.Module):
 class ProxyGflowErrorWrapper(torch.nn.Module):
     def __init__(self, args: Namespace,
                  gflow_model_one=None,
-                 gflow_dataset_one=None,
+                 gflow_dataset_one: DataGenerator = None,
                  gflow_trainer_one=None,
                  **kwargs):
         super(ProxyGflowErrorWrapper, self).__init__()
@@ -612,6 +613,8 @@ class ProxyGflowErrorWrapper(torch.nn.Module):
         self.gflow_trainer_one = gflow_trainer_one
 
         self._default_score = args.default_score
+        self.device = args.device
+        self.float_ttype = torch.float64 if args.floatX == 'float64' else torch.float32
         self._memory = dict()
 
         self._seen = set()
@@ -624,6 +627,63 @@ class ProxyGflowErrorWrapper(torch.nn.Module):
         self.gflow_dataset_one = gflow_dataset_one
         self.gflow_trainer_one = gflow_trainer_one
 
+    def compute_loss(self, mols: List[BlockMoleculeData]):
+        """ We use it for example for priority sampling - don't train just get loss """
+        model = self.gflow_model_one
+        device = self.device  # TODO
+        float_ttype = self.float_ttype
+        dataset_one = self.gflow_dataset_one
+        max_blocks = dataset_one.max_blocks
+        log_reg_c = self.log_reg_c
+        balanced_loss = False
+
+        # args = self.args
+        tf = lambda x: torch.tensor(x, device=device).to(float_ttype)
+        # clip_loss = tf([args.clip_loss])
+
+        # Construct Transitions from each mol
+        transitions = []
+        for mmm in mols:
+            r, info = dataset_one._get_reward(mmm)
+            if len(mmm.blocks) and not len(mmm.stems) or len(mmm.blocks) == max_blocks:
+                done = True
+            else:
+                done = False
+
+            transitions.append(Transition(*zip(*dataset_one.mdp.parents(mmm)), r, mmm, done))
+
+        b_p, b_pb, b_a, b_r, b_s, b_d, mols = dataset_one.sample2batch(transitions)
+        ntransitions = b_r.shape[0]
+
+        stem_out_s, mol_out_s = model(b_s)
+        stem_out_p, mol_out_p = model(b_p)
+
+        qsa_p = model.index_output_by_action(b_p, stem_out_p, mol_out_p[:, 0], b_a)
+        exp_inflow = (torch.zeros((ntransitions,), device=device, dtype=dataset_one.floatX)
+                      .index_add_(0, b_pb, torch.exp(qsa_p)))  # pb is the parents' batch index
+        inflow = torch.log(exp_inflow + log_reg_c)
+
+        # We should mask out out_flow of action stop (mol_out_s)
+        # b_d should be 1 for max_size mols
+        dummy_outflow_stop_action = torch.zeros_like(torch.exp(mol_out_s[:, 0]))
+        exp_outflow = model.sum_output(b_s, torch.exp(stem_out_s), dummy_outflow_stop_action)
+        outflow_plus_r = torch.log(log_reg_c + b_r + exp_outflow * (1-b_d))
+
+        # if args.do_nblocks_reg:
+        #     losses = _losses = ((inflow - outflow_plus_r) / (b_s.nblocks * args.max_blocks)).pow(2)
+        # else:
+        #     losses = _losses = (inflow - outflow_plus_r).pow(2)
+        # if clip_loss > 0:
+        #     ld = losses.detach()
+        #     losses = losses / ld * torch.minimum(ld, clip_loss)
+        losses = _losses = (inflow - outflow_plus_r).pow(2).flatten().cpu().numpy()
+
+        # term_loss = (losses * b_d).sum() / (b_d.sum() + 1e-20)
+        # flow_loss = (losses * (1-b_d)).sum() / ((1-b_d).sum() + 1e-20)
+        # priority = _losses.detach().clone()
+        return losses
+
+
     @torch.no_grad()
     def __call__(self, mols: List[BlockMoleculeData]):
         gflow_model_one = self.gflow_model_one
@@ -633,25 +693,24 @@ class ProxyGflowErrorWrapper(torch.nn.Module):
         res_scores = [self._default_score] * len(mols)
         infos = [{x: None for x in ["proxy", "qed", "synth", "score", "smiles"]} for _ in range(len(mols))]
 
-        for ix, xmol in enumerate(mols):
-            # TODO D
-            # Calculate Error based on gflow model !!!!
-            # Note that parents can be different if xmol has been chosen based on terminate or reached max steps
+        # Calculate Error based on gflow model !!!!
+        # Note that parents can be different if xmol has been chosen based on terminate or reached max steps
 
-            # should be -(gflow_model_one.in_flow(xmol) - gflow_model_one.out_flow(xmol)).pow(2)
-            proxy = 0
+        _gflow_one_losses = self.compute_loss(mols)
+        for ix, (xmol, mol_loss) in enumerate(zip(mols, _gflow_one_losses)):
+            proxy = mol_loss
 
             # keep for logging
             if mols[ix].smiles not in self._seen:
                 self._seen.update([mols[ix].smiles])
                 self._seen_p.append(proxy)
-            self._seen_scores.append(proxy * -1)
+            self._seen_scores.append(proxy)
 
             infos[ix]["smiles"] = mols[ix].smiles
             infos[ix]["synth"] = 100  # TODO Hack to not change candidate filering
             infos[ix]["qed"] = 100  # TODO Hack to not change candidate filering
             infos[ix]["proxy"] = res_scores[ix] = proxy
-            infos[ix]["score"] = res_scores[ix] * -1
+            infos[ix]["score"] = res_scores[ix]
 
         return res_scores, infos
 
@@ -662,4 +721,5 @@ PROXY_WRAPPERS = {
     "ProxyDebugWrapper": ProxyDebugWrapper,
     "ProxyDebug131_11": ProxyDebug131_11,
     "CandidateWrapperSatlin": CandidateWrapperSatlin,
+    "ProxyGflowErrorWrapper": ProxyGflowErrorWrapper,
 }
