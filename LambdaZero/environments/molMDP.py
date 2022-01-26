@@ -44,6 +44,7 @@ class BlockMoleculeData:
             # # add pending stems
             if len(self.blocks) == 2:
                 self.stems += self.pending_stems
+                self.pending_stems.clear()
 
             assert stem_idx < len(self.stems), "Not enough stems"
             [self.stems.append([self.numblocks - 1, r]) for r in block_r[1:]]
