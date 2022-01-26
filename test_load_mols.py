@@ -31,6 +31,6 @@ def get_mdp(
 
 
 if __name__ == "__main__":
-    data = np.load("data/mols_gen_random_proxy_ProxyQED_seed_113_cnt_300000.npy", allow_pickle=True).item()
+    data = np.load("data/mols_gen_random_proxy_ProxyQED_seed_113_cnt_300000.npy", allow_pickle=True)
     mdp = get_mdp()
     mol = mdp.load(data[0])
