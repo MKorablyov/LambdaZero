@@ -50,7 +50,7 @@ class BlockMoleculeDataExtended(BlockMoleculeData):
             "slices": self.slices,
             "jbonds": self.jbonds,
             "stems": self.stems,
-            "smiles": self.smiles,
+            "smiles": self.smiles if len(self.blockidxs) > 0 else None,
             "pending_stems": self.pending_stems,
         })
         return mol_data
