@@ -41,10 +41,10 @@ class GraphAgent(GFlowModelBase):
                                        nn.Linear(nemb, out_per_stem))
 
         self.global2pred = nn.Sequential(nn.Linear(nemb, nemb), nn.LeakyReLU(),
-                                         nn.Linear(nemb, out_per_mol))
+                                         nn.Linear(nemb, 1))
         if out_per_mol == 2:
             self.global2pred2 = nn.Sequential(nn.Linear(nemb, nemb), nn.LeakyReLU(),
-                                              nn.Linear(nemb, out_per_mol))
+                                              nn.Linear(nemb, 1))
         elif out_per_mol != 1:
             raise NotImplemented
 
@@ -122,10 +122,13 @@ class GraphAgent(GFlowModelBase):
 
         return stem_preds, mol_preds, per_jbond_out
 
-    def forward(self, graph_data, vec_data=None, do_stems=True, **kwargs):
+    def forward(self, graph_data, vec_data=None, do_stems=True, ret_values=False, **kwargs):
         stem_preds, mol_preds, _ = self.run_model(
             graph_data, vec_data, do_stems, do_bonds=False, **kwargs
         )
+        if ret_values:
+            return stem_preds, mol_preds
+
         return stem_preds, mol_preds[:, :1]
 
     def out_to_policy(self, s, stem_o, mol_o):
