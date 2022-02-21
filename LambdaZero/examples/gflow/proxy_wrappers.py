@@ -220,6 +220,64 @@ class ProxyOnlyWrapper(torch.nn.Module):
         return res_scores, infos
 
 
+class ProxyQED:
+    def __init__(self, args):
+        pass
+
+    def __call__(self, mols):
+        # QED constraint
+        qed = [QED.qed(mol.mol) for mol in mols]
+        return qed
+
+
+class QEDProxyOnlyWrapper(torch.nn.Module):
+    def __init__(self, args: Namespace, **kwargs):
+        super(QEDProxyOnlyWrapper, self).__init__()
+
+        self.proxy = ProxyQED(args)
+        self._default_score = args.default_score
+        self._memory = dict()
+
+        self._seen = set()
+        self._seen_nan_count = 0
+        self._seen_p = []
+        self._seen_scores = deque(maxlen=10000)
+
+    @torch.no_grad()
+    def __call__(self, mols: List[BlockMoleculeData]):
+        mols = mols if isinstance(mols, list) else [mols]
+
+        res_scores = [self._default_score] * len(mols)
+        infos = [{x: None for x in ["proxy", "qed", "synth", "score", "smiles"]} for _ in range(len(mols))]
+
+        mol_mol = [mol.mol for mol in mols]
+        good = [mmm is not None for mmm in mol_mol]
+
+        valid = [x for x, ggg in zip(mols, good) if ggg]
+        if len(valid) > 0:
+            proxy_scores = list(self.proxy(valid))
+
+        for ix, ggg in enumerate(good):
+            if ggg:
+                proxy = proxy_scores.pop(0)
+
+                if mols[ix].smiles not in self._seen:
+                    self._seen.update([mols[ix].smiles])
+                    self._seen_p.append(proxy)
+                self._seen_scores.append(proxy * -1)
+
+                infos[ix]["smiles"] = mols[ix].smiles
+                infos[ix]["synth"] = 100  # TODO Hack to not change candidate filering
+                infos[ix]["qed"] = 100  # TODO Hack to not change candidate filering
+                infos[ix]["proxy"] = res_scores[ix] = proxy
+                infos[ix]["score"] = res_scores[ix]
+                infos[ix]["mol"] = mols[ix]  # .dump()
+            else:
+                self._seen_nan_count += 1
+
+        return res_scores, infos
+
+
 class CandidateWrapperSatlin(torch.nn.Module):
     def __init__(self, args: Namespace, **kwargs):
         super(CandidateWrapperSatlin, self).__init__()
@@ -603,6 +661,7 @@ class ProxyDebug131_11(torch.nn.Module):
 PROXY_WRAPPERS = {
     "CandidateWrapper": CandidateWrapper,
     "ProxyOnlyWrapper": ProxyOnlyWrapper,
+    "QEDProxyOnlyWrapper": QEDProxyOnlyWrapper,
     "ProxyDebugWrapper": ProxyDebugWrapper,
     "ProxyDebug131_11": ProxyDebug131_11,
     "CandidateWrapperSatlin": CandidateWrapperSatlin,
