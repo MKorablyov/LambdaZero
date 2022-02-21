@@ -46,8 +46,8 @@ from LambdaZero.examples.gflow.utils import LogTopKproc, show_histogram
 
 datasets_dir, programs_dir, summaries_dir = get_external_dirs()
 
-tmp_dir = os.environ['SLURM_TMPDIR'] + '/lztmp/'
-os.makedirs(tmp_dir, exist_ok=True)
+# tmp_dir = os.environ.get['SLURM_TMPDIR'] + '/lztmp/'
+# os.makedirs(tmp_dir, exist_ok=True)
 
 
 def analyse_eval(args, generator_dataset, proxy, model, epoch, sampled_infos,
@@ -249,7 +249,7 @@ def sample_and_update_dataset_batch(args, model, generator_dataset, proxy, epoch
            sampled_infos
 
 
-def preprocess_args(args: Namespace):
+def preprocess_args(args: Namespace, init_loggers=True):
     args.cuda = args.main.use_gpu and torch.cuda.is_available()
     args.device = torch.device("cuda" if args.cuda else "cpu")
 
@@ -268,7 +268,11 @@ def preprocess_args(args: Namespace):
 
     # -- Init wandb logger
     args.use_wandb = args.main.plot
-    out_dir = setup_loggers(args)
+    if init_loggers:
+        out_dir = setup_loggers(args)
+    else:
+        out_dir = args.out_dir
+
     add_to_cfg(args, None, "out_dir", out_dir)
 
     # -- For grid experiment change Ref everywhere manually
@@ -319,6 +323,7 @@ def run(args):
     model = get_gflow_model(gflow_model_args, mdp=gen_model_dataset.mdp)
     model = model.double() if gflow_model_args.floatX == 'float64' else model
     model.to(device)
+    print(model)
 
     # ==============================================================================================
     # -- Data feeder
@@ -360,6 +365,8 @@ def run(args):
     )
     num_iterations = gflow_args.num_iterations
     max_sampled_mols = getattr(gflow_args, "max_sampled", 0)
+    checkpoint_freq = getattr(args.main, "checkpoint_freq", 0)
+    checkpoint_id = 0
 
     # ==============================================================================================
     # -- Pre-load online mols
