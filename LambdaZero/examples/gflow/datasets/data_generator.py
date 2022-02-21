@@ -67,6 +67,7 @@ class DataGenerator:
         self.R_min = getattr(args, 'R_min', 1e-8)
         self.min_info_dict = getattr(args, 'R_min', 1e-8)
         self.r_offset = getattr(args, 'r_offset', 4)
+        self.r_sgn = getattr(args, 'r_sgn', 1)
         self.dock_clip_max = getattr(args, 'dock_clip_max', 0)
         self.do_wrong_thing = getattr(args, 'do_wrong_thing', False)
         self.target_norm = getattr(args, "target_norm", [-8.6, 1.10])
@@ -131,6 +132,16 @@ class DataGenerator:
 
         self.mdp.build_translation_table()
         self.ts = [collections.deque(maxlen=100) for _ in range(10)]
+
+        print(f"Using ...")
+        print(f"reward_exp {self.reward_exp}")
+        print(f"reward_norm {self.reward_norm}")
+        print(f"R_min {self.R_min}")
+        print(f"r_sgn {self.r_sgn}")
+        print(f"target_norm {self.target_norm}")
+        print(f"r_offset {self.r_offset}")
+        print(f"dock_clip_max {self.dock_clip_max}")
+
         # ==========================================================================================
 
     @torch.no_grad()
@@ -414,9 +425,18 @@ class DataGenerator:
 
     def r2r(self, dockscore=None, normscore=None):
         if dockscore is not None:
-            normscore = self.r_offset - (np.clip(dockscore, None, self.dock_clip_max) - self.target_norm[0]) / self.target_norm[1]
+            s_max = self.dock_clip_max
+            sgn = self.r_sgn
+            t_norm = self.target_norm
+            r_offset = self.r_offset
+
+            clip_socres = \
+                np.clip(dockscore, s_max, None) if sgn > 0 else np.clip(dockscore, None, s_max)
+
+            normscore = (sgn * -1) * (r_offset - (clip_socres - t_norm[0]) / t_norm[1])
+
         normscore = np.clip(normscore, self.R_min, None)  # max(self.R_min, normscore)
-        return (normscore/self.reward_norm) ** self.reward_exp
+        return (normscore / self.reward_norm) ** self.reward_exp
 
     def inv_r2r(self, r_scores):
         normscore = r_scores ** (1 / self.reward_exp) * self.reward_norm
