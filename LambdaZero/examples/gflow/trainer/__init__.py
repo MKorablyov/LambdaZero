@@ -8,6 +8,7 @@ from LambdaZero.examples.gflow.trainer import trainer_fwdback_leafv
 from LambdaZero.examples.gflow.trainer import mse_terminal
 from LambdaZero.examples.gflow.trainer import gflow_credit
 from LambdaZero.examples.gflow.trainer import gflow_oversample
+from LambdaZero.examples.gflow.trainer import gfn_trajectory_balance
 
 GFLOW_TRAINERS = {
     "BasicTrainer": basic_trainer.BasicTrainer,
@@ -18,6 +19,7 @@ GFLOW_TRAINERS = {
     "MseTerminal": mse_terminal.MseTerminal,
     "GflowCreditAssign": gflow_credit.GflowCreditAssign,
     "GflowOversample": gflow_oversample.GflowOversample,
+    "TrainGFlowTrajBal": gfn_trajectory_balance
 }
 
 

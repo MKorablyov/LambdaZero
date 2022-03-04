@@ -17,6 +17,7 @@ class GraphAgent(GFlowModelBase):
         num_conv_steps = getattr(cfg, "num_conv_steps", 10)
         version = getattr(cfg, "version", "v4")
         repr_type = getattr(cfg, "repr_type", "block_graph")
+        partition_init = get_attr(cfg, "partition_init", 100)
         mdp_cfg = kwargs["mdp"]
         assert repr_type == "block_graph", "GraphAgent works on block_graph input"
 
@@ -54,6 +55,11 @@ class GraphAgent(GFlowModelBase):
         self.training_steps = 0
         self.categorical_style = 'softmax'
         self.escort_p = 6
+        self._logZ = nn.Parameter(torch.ones(64) * partition_init / 64)
+    
+    @property
+    def logZ(self):
+        return self._logZ.sum()
 
     def run_model(self, graph_data, vec_data=None, do_stems=True, do_bonds=True, **kwargs):
         blockemb, stememb, bondemb = self.embeddings
