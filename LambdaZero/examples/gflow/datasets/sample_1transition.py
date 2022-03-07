@@ -151,3 +151,84 @@ class DataGenSampleParentsTraj(DataGenerator):
             state.bondstypes = torch.tensor(stemtypes, device=self._device).long()
 
         return TrainBatch(p, p_batch, a, r, state, d, mols)
+
+
+class DataGenTrajBal(DataGenerator):
+    def __init__(self, args: Namespace, device: torch.device,
+                 model: torch.nn.Module = None, proxy: BaseProxy = None, sample_prob: float = 0.5):
+
+        super(DataGenTrajBal, self).__init__(args, device, model, proxy, sample_prob)
+        # self._sample_traj_bwd_trans = getattr(args, "sample_traj_bwd_trans", False)
+
+    def run_train_batch(self, trainer, epoch: int, train: bool = True):
+        """
+            trainer  # type: BasicTrainer
+
+            Run 1 step train loop
+            1. Collect new trajectory samples from model: Extend transition replay buffer
+            2. Add new trajectories going backward from stored molecules (online_mols) Extend transition replay buffer
+            3. Sample from transition replay buffer
+            4. Update transition replay buffer
+        """
+        self._trainer = trainer  # not nice
+
+        logs = {}
+
+        batch_size_in_traj, batch_size = trainer.train_batch_info()
+
+        # 1. Sample new set of trajectories from model
+        
+        batch = self._sample_batch_trajectories(self._iter_sample_new_traj)
+        # import pdb; pdb.set_trace();
+        # 3. Sample training transition batch
+        self._before_train_transition_sample()
+        # samples, sample_idxs = self._sample_train_transitions(batch_size_in_traj, batch_size)
+
+        # Bet batched samples
+        batch = self.sample2batch(batch)
+
+        if train:
+            train_info, logs = trainer.train_epoch(epoch, batch)
+
+            # 4. Update transition replay buffer (for prioritized sampling)
+            # self._update_train_batch_priority(sample_idxs, train_info)
+
+        return logs
+
+    def sample2batch(self, samples: List[Any]):
+        # samples = [list(sample) for sample in samples]
+        # batch = (*zip(*sum(samples, [])),
+        #          sum([[i] * len(t) for i, t in enumerate(samples)], []))
+        p, a, r, s, d, idc = [], [], [], [], [], []
+        # list(zip(*batch))
+        for i, sample in enumerate(samples):
+            trajs = sample[0]
+            for transition in trajs:
+                (_p, _a, _r, _s, _d) = transition
+                p.append(_p)
+                a.append((_a[0],))
+                r.append(_r)
+                s.append(_s)
+                d.append(_d)
+            idc.extend([i] * len(trajs))
+        # import pdb; pdb.set_trace();
+        mols = (p, s)
+        n = torch.tensor([len(pars) for pars in p], device=self._device).to(self.floatX)
+        # The batch index of each parent
+        p_batch = torch.tensor(sum([[i]*len(p) for i,p in enumerate(p)], []),
+                               device=self._device).long()
+        # Convert all parents and states to repr. Note that this
+        # concatenates all the parent lists, which is why we need
+        # p_batch
+        # flat_list = [item for sublist in p for item in sublist]
+
+        p = self.mdp.mols2batch([self.mdp.mol2repr(i[0]) for i in p])
+        s = self.mdp.mols2batch([self.mdp.mol2repr(i) for i in s])
+        # Concatenate all the actions (one per parent per sample)
+        a = torch.tensor(sum(a, ()), device=self._device).long()
+        # rewards and dones
+        r = torch.tensor(r, device=self._device).to(self.floatX)
+        d = torch.tensor(d, device=self._device).to(self.floatX)
+        idx = torch.tensor(idc, device=self._device).long()
+
+        return TrainBatch(p, p_batch, a, r, s, d, mols, idx, n)

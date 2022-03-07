@@ -13,6 +13,7 @@ TRAIN_DATASET = {
     "DataGenerator": data_generator.DataGenerator,
     "DataGeneratorMultiProc": data_generator_multiproc.DataGeneratorMultiProc,
     "DataGenSampleParentsTraj": sample_1transition.DataGenSampleParentsTraj,
+    "DataGenTrajBal": sample_1transition.DataGenTrajBal,
     "PrioritySamplingData": priority_sampling.PrioritySamplingData,
     "BatchWithOfflineTraj": sample_offline_traj.BatchWithOfflineTraj,
     "DebugFlow": debug_flow.DebugFlow,

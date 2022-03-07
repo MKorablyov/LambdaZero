@@ -17,7 +17,7 @@ class GraphAgent(GFlowModelBase):
         num_conv_steps = getattr(cfg, "num_conv_steps", 10)
         version = getattr(cfg, "version", "v4")
         repr_type = getattr(cfg, "repr_type", "block_graph")
-        partition_init = get_attr(cfg, "partition_init", 100)
+        partition_init = getattr(cfg, "partition_init", 100)
         mdp_cfg = kwargs["mdp"]
         assert repr_type == "block_graph", "GraphAgent works on block_graph input"
 

@@ -19,7 +19,7 @@ GFLOW_TRAINERS = {
     "MseTerminal": mse_terminal.MseTerminal,
     "GflowCreditAssign": gflow_credit.GflowCreditAssign,
     "GflowOversample": gflow_oversample.GflowOversample,
-    "TrainGFlowTrajBal": gfn_trajectory_balance
+    "TrainGFlowTrajBal": gfn_trajectory_balance.TrainGFlowTrajBal
 }
 
 

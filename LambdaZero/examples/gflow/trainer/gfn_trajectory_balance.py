@@ -21,6 +21,17 @@ class TrainGFlowTrajBal(BasicTrainer):
                  model=None, proxy=None, dataset: DataGenerator=None, do_save=True):
 
         super().__init__(args, model, proxy, dataset, do_save)
+        extra_t_info = []
+        self._train_losses_k = [
+            "train_loss",
+        ]
+        self._train_infos_k = [
+            "logZ", "train_r", "train_mols", "train_params", "FPS"
+        ] + extra_t_info
+
+        # This will be the metrics that actually get logged to plots
+        self._log_metrics = self._train_losses_k + extra_t_info + ["train_r", "FPS"]
+        self._train_metrics = LogMetrics(self._train_losses_k + self._train_infos_k)
 
     def train_epoch(self, epoch: int, train_batch: TrainBatch):
         dataset = self.dataset
@@ -48,8 +59,8 @@ class TrainGFlowTrajBal(BasicTrainer):
 
         # state outputs
         stem_out_s, mol_out_s = model(b_p)
-        logits = model.action_neg_log_likelihood(b_p, b_a, 0, stem_out_s, mol_out_s)
-        tzeros = torch.zeros(idc[-1]+1, device=device, dtype=args.floatX)
+        logits = -model.action_negloglikelihood(b_p, b_a, 0, stem_out_s, mol_out_s)
+        tzeros = torch.zeros(idc[-1]+1, device=device, dtype=self.float_ttype)
         traj_logits = tzeros.index_add(0, idc, logits)
         traj_r = tzeros.index_add(0, idc, b_r)
         uniform_log_PB = tzeros.index_add(0, idc, torch.log(1/n))
@@ -60,7 +71,7 @@ class TrainGFlowTrajBal(BasicTrainer):
         loss.backward(retain_graph=(not epoch % 50))
 
 
-        last_losses.append((loss.item()))
+        last_losses.append(loss.item())
 
         t_metrics.update(
             _t_losses_k,
@@ -72,16 +83,10 @@ class TrainGFlowTrajBal(BasicTrainer):
                 add some metrics to log (just _log_metrics of them will be logged to wandb though) 
             """
             t_metrics.update(_t_infos_k, [
-                # _term_loss.data.cpu().numpy(),
-                # _flow_loss.data.cpu().numpy(),
-                # exp_inflow.data.cpu().numpy(),
-                # exp_outflow.data.cpu().numpy(),
+                model.logZ.detach().cpu().numpy(),
                 b_r.data.cpu().numpy(),
                 mols[1],
                 [i.pow(2).sum().item() for i in model.parameters()],
-                # torch.autograd.grad(loss, qsa_p, retain_graph=True)[0].data.cpu().numpy(),
-                torch.autograd.grad(loss, stem_out_s, retain_graph=True)[0].data.cpu().numpy(),
-                # torch.autograd.grad(loss, stem_out_p, retain_graph=True)[0].data.cpu().numpy(),
                 self.train_num_mol / (time.time() - self._train_start_time)
             ])
         if args.clip_grad > 0:
@@ -95,7 +100,7 @@ class TrainGFlowTrajBal(BasicTrainer):
                 b.data.mul_(1-args.bootstrap_tau).add_(args.bootstrap_tau*_a)
 
         if not epoch % 100:
-            last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
+            # last_losses = [np.round(np.mean(i), 3) for i in zip(*last_losses)]
             print(epoch, last_losses)
             print('time:', time.time() - self.time_last_check)
             self.time_last_check = time.time()

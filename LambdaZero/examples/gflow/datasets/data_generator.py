@@ -403,9 +403,7 @@ class DataGenerator:
 
     def sample2batch(self, samples: List[Transition]) -> TrainBatch:
         """ Input get list of transitions """
-        batch = (*zip(*sum(samples, [])),
-                 sum([[i] * len(t) for i, t in enumerate(samples)], []))
-        p, a, r, s, d, idc = list(zip(*batch))
+        p, a, r, s, d = list(zip(*samples))
 
         mols = (p, s)
         # The batch index of each parent
@@ -418,15 +416,13 @@ class DataGenerator:
 
         p = self.mdp.mols2batch([self.mdp.mol2repr(i) for i in flat_list])
         s = self.mdp.mols2batch([self.mdp.mol2repr(i) for i in s])
-        n = torch.tensor([len(self.mdp.parents(m)) for m in s], device=self._device).to(self.floatX)
         # Concatenate all the actions (one per parent per sample)
         a = torch.tensor(sum(a, ()), device=self._device).long()
         # rewards and dones
         r = torch.tensor(r, device=self._device).to(self.floatX)
         d = torch.tensor(d, device=self._device).to(self.floatX)
-        idx = torch.tensor(idc, device=self._device).long()
-
-        return TrainBatch(p, p_batch, a, r, s, d, mols, idx, n)
+        
+        return TrainBatch(p, p_batch, a, r, s, d, mols)
 
     def r2r(self, dockscore=None, normscore=None):
         if dockscore is not None:
