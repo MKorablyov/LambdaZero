@@ -258,12 +258,19 @@ class BrutalDock(InMemoryDataset):
         print("processing", self.raw_paths)
         for raw_path, processed_path in zip(self.raw_paths, self.processed_paths):
             docked_index = pd.read_feather(raw_path)
-            smis = docked_index["smiles"].tolist()
+            try:
+                smis = docked_index["smi"].tolist()
+            except: pass
+            try:
+                smis = docked_index["smiles"].tolist()
+            except: pass
             props = {pr: docked_index[pr].tolist() for pr in self._props}
-
+            time.sleep(0.5)
             tasks = [self.proc_func.remote(smis[j], {pr: props[pr][j] for pr in props},
                                            self.pre_filter, self.pre_transform) for j in range(len(smis))]
+            time.sleep(0.5)
             graphs = ray.get(tasks)
+            time.sleep(0.5)
             graphs = [g for g in graphs if g is not None]
             # save to the disk
             torch.save(self.collate(graphs), processed_path)

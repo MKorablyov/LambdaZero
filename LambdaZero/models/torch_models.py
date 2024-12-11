@@ -211,7 +211,7 @@ class MPNNetDrop(nn.Module):
         self.lin1 = nn.Linear(2 * dim, dim)
         self.lin2 = nn.Linear(dim, out_dim)
 
-    def get_embed(self, data, do_dropout):
+    def get_embed(self, data, do_dropout=True):
         if self.drop_data: data.x = F.dropout(data.x, training=do_dropout, p=self.drop_prob)
         out = F.relu(self.lin0(data.x))
         h = out.unsqueeze(0)
@@ -231,7 +231,7 @@ class MPNNetDrop(nn.Module):
         if self.drop_last: out = F.dropout(out, training=do_dropout, p=self.drop_prob)
         return out
 
-    def forward(self, data, do_dropout):
+    def forward(self, data, do_dropout=True):
         embed = self.get_embed(data, do_dropout)
         out = self.lin2(embed)
         return out
